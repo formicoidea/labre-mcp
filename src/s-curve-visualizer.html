@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>S-Curve Visualizer — Wardley Evolution Model</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; padding: 20px; }
+  h1 { font-size: 1.4em; margin-bottom: 16px; color: #a0c4ff; }
+  .layout { display: flex; gap: 24px; flex-wrap: wrap; }
+  .chart-container { position: relative; }
+  canvas { background: #16213e; border-radius: 8px; cursor: crosshair; }
+  .controls { display: flex; flex-direction: column; gap: 12px; min-width: 300px; }
+  .control-group { background: #16213e; border-radius: 8px; padding: 14px; }
+  .control-group h3 { font-size: 0.85em; color: #a0c4ff; margin-bottom: 8px; }
+  .control-group.upper h3 { color: #ffa07a; }
+  .control-group.lower h3 { color: #98fb98; }
+  label { display: flex; justify-content: space-between; align-items: center; font-size: 0.82em; margin-bottom: 5px; }
+  input[type=range] { width: 120px; }
+  .value { font-family: monospace; color: #ffd166; min-width: 40px; text-align: right; }
+  .result { background: #0f3460; border-radius: 8px; padding: 14px; font-family: monospace; line-height: 1.8; font-size: 0.9em; }
+  .result .zone { font-weight: bold; font-size: 1.1em; }
+  .zone-competitive { color: #06d6a0; }
+  .zone-extra-competitive-market { color: #b08ce0; }
+  .legend { display: flex; gap: 16px; margin-top: 8px; font-size: 0.8em; }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .phase-bar { display: flex; margin-top: 8px; border-radius: 4px; overflow: hidden; font-size: 0.75em; text-align: center; }
+  .phase-bar div { padding: 4px 0; }
+  .phase-bar .genesis { background: #ef476f; flex: 1; }
+  .phase-bar .custom { background: #ffd166; color: #333; flex: 1; }
+  .phase-bar .product { background: #06d6a0; color: #333; flex: 1; }
+  .phase-bar .commodity { background: #118ab2; flex: 1; }
+  .phase-bar .active { outline: 2px solid white; position: relative; z-index: 1; }
+  .params-export { background: #16213e; border-radius: 8px; padding: 10px; font-family: monospace; font-size: 0.75em; color: #888; word-break: break-all; cursor: pointer; }
+  .params-export:hover { color: #a0c4ff; }
+</style>
+</head>
+<body>
+<h1>S-Curve — Deux sigmoïdes généralisées</h1>
+<div class="layout">
+  <div class="chart-container">
+    <canvas id="chart" width="600" height="600"></canvas>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#ffa07a"></div> Upper</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#98fb98"></div> Lower</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#a0c4ff"></div> Centre</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(6,214,160,0.3)"></div> Bande</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="control-group upper">
+      <h3>Bord supérieur — f(c) = yMin + (yMax-yMin) * sig(c,k,x₀)^nu</h3>
+      <label>k <input type="range" id="kUpper" min="2" max="20" step="0.5" value="8.5"> <span class="value" id="kUpper-val">8.5</span></label>
+      <label>x₀ <input type="range" id="x0Upper" min="0.05" max="0.70" step="0.01" value="0.28"> <span class="value" id="x0Upper-val">0.28</span></label>
+      <label>yMin <input type="range" id="yMinUpper" min="0" max="0.3" step="0.01" value="0"> <span class="value" id="yMinUpper-val">0</span></label>
+      <label>yMax <input type="range" id="yMaxUpper" min="0.7" max="1" step="0.01" value="1"> <span class="value" id="yMaxUpper-val">1</span></label>
+      <label>nu (skew) <input type="range" id="nuUpper" min="0.2" max="3" step="0.1" value="2.1"> <span class="value" id="nuUpper-val">2.1</span></label>
+    </div>
+
+    <div class="control-group lower">
+      <h3>Bord inférieur — f(c) = yMin + (yMax-yMin) * sig(c,k,x₀)^nu</h3>
+      <label>k <input type="range" id="kLower" min="2" max="20" step="0.5" value="7"> <span class="value" id="kLower-val">7</span></label>
+      <label>x₀ <input type="range" id="x0Lower" min="0.10" max="0.80" step="0.01" value="0.54"> <span class="value" id="x0Lower-val">0.54</span></label>
+      <label>yMin <input type="range" id="yMinLower" min="0" max="0.3" step="0.01" value="0"> <span class="value" id="yMinLower-val">0</span></label>
+      <label>yMax <input type="range" id="yMaxLower" min="0.7" max="1" step="0.01" value="0.98"> <span class="value" id="yMaxLower-val">0.98</span></label>
+      <label>nu (skew) <input type="range" id="nuLower" min="0.2" max="3" step="0.1" value="1.7"> <span class="value" id="nuLower-val">1.7</span></label>
+    </div>
+
+    <div class="control-group">
+      <h3>Point à évaluer (ou cliquer sur le graphe)</h3>
+      <label>Certitude <input type="range" id="cert" min="0" max="1" step="0.01" value="0.5"> <span class="value" id="cert-val">0.50</span></label>
+      <label>Ubiquité <input type="range" id="ubiq" min="0" max="1" step="0.01" value="0.5"> <span class="value" id="ubiq-val">0.50</span></label>
+    </div>
+
+    <div class="result" id="result">
+      Cliquez sur le graphe ou ajustez les sliders...
+    </div>
+
+    <div>
+      <div class="phase-bar" id="phase-bar">
+        <div class="genesis">Genesis</div>
+        <div class="custom">Custom</div>
+        <div class="product">Product</div>
+        <div class="commodity">Commodity</div>
+      </div>
+    </div>
+
+    <div class="params-export" id="params-export" title="Cliquer pour copier"></div>
+
+    <div class="control-group">
+      <h3>Points de référence</h3>
+      <label><span>A (0.28, 0.50)</span> <button onclick="setPoint(0.28, 0.50)">→</button></label>
+      <label><span>B (0.63, 0.74)</span> <button onclick="setPoint(0.63, 0.74)">→</button></label>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const PAD = 50;
+
+function sigmoid(c, k, x0) {
+  return 1 / (1 + Math.exp(-k * (c - x0)));
+}
+
+function gsigmoid(c, k, x0, yMin, yMax, nu) {
+  return yMin + (yMax - yMin) * Math.pow(sigmoid(c, k, x0), nu);
+}
+
+function upper(c, p) { return gsigmoid(c, p.kUpper, p.x0Upper, p.yMinUpper, p.yMaxUpper, p.nuUpper); }
+function lower(c, p) { return gsigmoid(c, p.kLower, p.x0Lower, p.yMinLower, p.yMaxLower, p.nuLower); }
+function center(c, p) { return (upper(c, p) + lower(c, p)) / 2; }
+
+const SLIDER_IDS = ['kUpper','x0Upper','yMinUpper','yMaxUpper','nuUpper',
+                     'kLower','x0Lower','yMinLower','yMaxLower','nuLower'];
+
+function getParams() {
+  const p = {};
+  for (const id of SLIDER_IDS) p[id] = parseFloat(document.getElementById(id).value);
+  return p;
+}
+
+function getPoint() {
+  return {
+    c: parseFloat(document.getElementById('cert').value),
+    u: parseFloat(document.getElementById('ubiq').value),
+  };
+}
+
+function classifyZone(c, u, p) {
+  const up = upper(c, p), lo = lower(c, p);
+  return (u >= lo && u <= up) ? 'competitive' : 'extra-competitive-market';
+}
+
+function bandDistance(c, u, p) {
+  const up = upper(c, p), lo = lower(c, p);
+  if (u > up) return -(u - up);
+  if (u < lo) return -(lo - u);
+  return Math.min(u - lo, up - u);
+}
+
+function projectOnCurve(c, u, p) {
+  let bestT = 0, bestDist = Infinity;
+  for (let t = 0; t <= 1; t += 0.001) {
+    const pu = center(t, p);
+    const dist = (t - c) ** 2 + (pu - u) ** 2;
+    if (dist < bestDist) { bestDist = dist; bestT = t; }
+  }
+  return { t: Math.round(bestT * 1000) / 1000, dist: Math.sqrt(bestDist) };
+}
+
+function computeEvolution(c, u, p) {
+  const zone = classifyZone(c, u, p);
+  const bd = bandDistance(c, u, p);
+  let evolution;
+  if (zone === 'competitive') {
+    evolution = projectOnCurve(c, u, p).t;
+  } else if (u > upper(c, p)) {
+    evolution = 1 + (u - upper(c, p));
+  } else {
+    evolution = -(lower(c, p) - u);
+  }
+  const phase =
+    evolution < 0 ? 'Extra-competitive market' :
+    evolution <= 0.18 ? 'Genesis' :
+    evolution <= 0.26 ? 'Custom' :
+    evolution <= 0.70 ? 'Product' :
+    evolution <= 1 ? 'Commodity' : 'Extra-competitive market';
+  return { zone, evolution: Math.round(evolution * 1000) / 1000, phase, bandDistance: Math.round(bd * 1000) / 1000 };
+}
+
+function toCanvas(c, u) {
+  return [PAD + c * (W - 2 * PAD), H - PAD - u * (H - 2 * PAD)];
+}
+
+function fromCanvas(x, y) {
+  return [
+    Math.max(0, Math.min(1, (x - PAD) / (W - 2 * PAD))),
+    Math.max(0, Math.min(1, (H - PAD - y) / (H - 2 * PAD))),
+  ];
+}
+
+function draw() {
+  const p = getParams();
+  const point = getPoint();
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = '#233554';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const v = i / 4;
+    const [x, y] = toCanvas(v, 0);
+    const [, y2] = toCanvas(v, 1);
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y2); ctx.stroke();
+    const [x3] = toCanvas(0, v);
+    const [x4] = toCanvas(1, v);
+    ctx.beginPath(); ctx.moveTo(x3, y); ctx.lineTo(x4, y); ctx.stroke();
+  }
+
+  // Band fill
+  ctx.fillStyle = 'rgba(6, 214, 160, 0.12)';
+  ctx.beginPath();
+  for (let c = 0; c <= 1; c += 0.005) {
+    const [x, y] = toCanvas(c, upper(c, p));
+    c === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  for (let c = 1; c >= 0; c -= 0.005) {
+    const [x, y] = toCanvas(c, lower(c, p));
+    ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // Phase rectangles (dynamic bounding boxes along the band)
+  const phases = [
+    { label: 'Genesis',   tStart: 0,    tEnd: 0.18 },
+    { label: 'Custom',    tStart: 0.18, tEnd: 0.26 },
+    { label: 'Product',   tStart: 0.26, tEnd: 0.70 },
+    { label: 'Commodity', tStart: 0.70, tEnd: 1.00 },
+  ];
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+  ctx.font = '11px system-ui';
+  for (const ph of phases) {
+    const yBot = lower(ph.tStart, p);
+    const yTop = upper(ph.tEnd, p);
+    const [x1, y1] = toCanvas(ph.tStart, yTop);
+    const [x2, y2] = toCanvas(ph.tEnd, yBot);
+    const w = x2 - x1;
+    const h = y2 - y1;
+    ctx.fillRect(x1, y1, w, h);
+    ctx.strokeRect(x1, y1, w, h);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.textAlign = 'left';
+    ctx.fillText(ph.label, x1 + 4, y1 + 14);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+  }
+
+  // Upper boundary
+  ctx.strokeStyle = '#ffa07a';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let c = 0; c <= 1; c += 0.005) {
+    const [x, y] = toCanvas(c, upper(c, p));
+    c === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Lower boundary
+  ctx.strokeStyle = '#98fb98';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let c = 0; c <= 1; c += 0.005) {
+    const [x, y] = toCanvas(c, lower(c, p));
+    c === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Center curve
+  ctx.strokeStyle = '#a0c4ff';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (let c = 0; c <= 1; c += 0.005) {
+    const [x, y] = toCanvas(c, center(c, p));
+    c === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Projection line
+  const result = computeEvolution(point.c, point.u, p);
+  if (result.zone === 'competitive') {
+    const proj = projectOnCurve(point.c, point.u, p);
+    const pu = center(proj.t, p);
+    const [px, py] = toCanvas(proj.t, pu);
+    const [qx, qy] = toCanvas(point.c, point.u);
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(qx, qy); ctx.lineTo(px, py); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#a0c4ff';
+    ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Query point
+  const zoneColor = result.zone === 'competitive' ? '#06d6a0' : '#b08ce0';
+  const [px, py] = toCanvas(point.c, point.u);
+  ctx.fillStyle = zoneColor;
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+  // Reference points
+  for (const ref of [{c:0.28, u:0.50, label:'A'}, {c:0.63, u:0.74, label:'B'}]) {
+    const [rx, ry] = toCanvas(ref.c, ref.u);
+    ctx.fillStyle = '#888';
+    ctx.strokeStyle = '#aaa';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(rx, ry, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#aaa';
+    ctx.font = '12px monospace';
+    ctx.fillText(ref.label, rx + 8, ry - 4);
+  }
+
+  // Axes labels
+  ctx.fillStyle = '#a0c4ff';
+  ctx.font = '13px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('Certitude', W / 2, H - 10);
+  ctx.save();
+  ctx.translate(14, H / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Ubiquité', 0, 0);
+  ctx.restore();
+
+  // Tick labels
+  ctx.fillStyle = '#667';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= 4; i++) {
+    const v = i / 4;
+    const [x, y] = toCanvas(v, 0);
+    ctx.fillText(v.toFixed(2), x, y + 16);
+    const [x2, y2] = toCanvas(0, v);
+    ctx.textAlign = 'right';
+    ctx.fillText(v.toFixed(2), x2 - 6, y2 + 4);
+    ctx.textAlign = 'center';
+  }
+
+  // Gap info
+  const gap = (c) => (upper(c, p) - lower(c, p)).toFixed(3);
+  ctx.fillStyle = '#556';
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(`gap: foot=${gap(0)} belly=${gap(0.45)} top=${gap(1)}`, PAD + 4, PAD - 8);
+
+  // Result display
+  const el = document.getElementById('result');
+  el.innerHTML = `
+    <div class="zone zone-${result.zone}">Zone: ${result.zone.toUpperCase()}</div>
+    certitude: ${point.c.toFixed(2)} | ubiquité: ${point.u.toFixed(2)}<br>
+    evolution: <b>${result.evolution}</b> | phase: <b>${result.phase}</b><br>
+    band distance: <b>${result.bandDistance}</b>
+  `;
+
+  // Phase bar
+  const phaseBarDivs = document.querySelectorAll('.phase-bar div');
+  phaseBarDivs.forEach(ph => ph.classList.remove('active'));
+  const idx = {Genesis:0, Custom:1, Product:2, Commodity:3}[result.phase];
+  if (idx !== undefined) phaseBarDivs[idx].classList.add('active');
+
+  // Export params (click to copy)
+  const exportEl = document.getElementById('params-export');
+  exportEl.textContent = JSON.stringify(p);
+}
+
+function setPoint(c, u) {
+  document.getElementById('cert').value = c;
+  document.getElementById('ubiq').value = u;
+  updateValues();
+  draw();
+}
+
+function updateValues() {
+  for (const id of SLIDER_IDS) {
+    document.getElementById(id + '-val').textContent = document.getElementById(id).value;
+  }
+  document.getElementById('cert-val').textContent = parseFloat(document.getElementById('cert').value).toFixed(2);
+  document.getElementById('ubiq-val').textContent = parseFloat(document.getElementById('ubiq').value).toFixed(2);
+}
+
+// Event listeners
+document.querySelectorAll('input[type=range]').forEach(el => {
+  el.addEventListener('input', () => { updateValues(); draw(); });
+});
+
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const [c, u] = fromCanvas(e.clientX - rect.left, e.clientY - rect.top);
+  setPoint(c.toFixed(2), u.toFixed(2));
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (e.buttons !== 1) return;
+  const rect = canvas.getBoundingClientRect();
+  const [c, u] = fromCanvas(e.clientX - rect.left, e.clientY - rect.top);
+  setPoint(c.toFixed(2), u.toFixed(2));
+});
+
+// Copy params on click
+document.getElementById('params-export').addEventListener('click', () => {
+  navigator.clipboard.writeText(document.getElementById('params-export').textContent);
+  document.getElementById('params-export').style.color = '#06d6a0';
+  setTimeout(() => { document.getElementById('params-export').style.color = ''; }, 800);
+});
+
+// Initial draw
+updateValues();
+draw();
+</script>
+</body>
+</html>

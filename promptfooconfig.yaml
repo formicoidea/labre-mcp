@@ -1,0 +1,261 @@
+description: 'Wardley API - Evolution score evaluations'
+
+defaultTest:
+  options:
+    providers:
+    - id: file://scripts/claude-eval.mjs
+      label: claude-code
+  assert:
+    # Validation structurelle : le resultat est un nombre entre -1 et 2
+    # - type: javascript
+    #   metric: 'Valid [-1,2]'
+    #   value: |
+    #     const raw = output.trim();
+    #     const val = parseFloat(raw);
+    #     if (isNaN(val)) return { pass: false, score: 0, reason: `Not a number. LLM: "${raw}"` };
+    #     if (val < -1 || val > 2) return { pass: false, score: 0, reason: `${val} hors [-1, 2]. LLM: "${raw}"` };
+    #     return { pass: true, score: 1, reason: `LLM: ${val}` };
+    # Validation de fourchette : le resultat S-curve est dans la range attendue
+    - type: javascript
+      metric: 'In range'
+      value: |
+        const data = JSON.parse(output.trim());
+        const val = data.scurve_evolution;
+        const min = context.vars.min_evolution;
+        const max = context.vars.max_evolution;
+        if (val < min || val > max) {
+          return { pass: false, score: 0, reason: `${val} hors fourchette [${min}, ${max}]` };
+        }
+        const target = (min + max) / 2;
+        const distance = Math.abs(val - target) / (max - min);
+        return { pass: true, score: +(1 - distance).toFixed(3), reason: `range [${min}, ${max}] | score: ${(1 - distance).toFixed(3)}` };
+    # Validation de zone : competitive [0,1] / extra-competitive-market (hors [0,1])
+    - type: javascript
+      metric: 'Zone'
+      value: |
+        const data = JSON.parse(output.trim());
+        const val = data.scurve_evolution;
+        const expected = context.vars.expected_zone;
+        if (!expected) return { pass: true, score: 1, reason: 'No zone check' };
+        const actual = (val >= 0 && val <= 1) ? 'competitive' : 'extra-competitive-market';
+        if (actual === expected) return { pass: true, score: 1, reason: `${expected} zone OK (${val})` };
+        return { pass: false, score: 0, reason: `Expected ${expected}, got ${actual} (${val})` };
+    # Coherence LLM : delta entre evolution directe du LLM et evolution S-curve
+    - type: javascript
+      metric: 'LLM coherence'
+      value: |
+        const data = JSON.parse(output.trim());
+        if (data.llm_evolution === null || data.llm_evolution === undefined) {
+          return { pass: false, score: 0, reason: 'No LLM evolution estimate' };
+        }
+        const diff = Math.abs(data.llm_evolution - data.scurve_evolution);
+        const score = Math.max(0, +(1 - diff).toFixed(3));
+        return {
+          pass: score >= 0.5,
+          score,
+          reason: `LLM=${data.llm_evolution} vs S-curve=${data.scurve_evolution} | diff=${diff.toFixed(3)}`
+        };
+    # Coherence Publication : delta entre evolution publication-type et evolution S-curve
+    - type: javascript
+      metric: 'Publication coherence'
+      value: |
+        const data = JSON.parse(output.trim());
+        if (data.pub_evolution === null || data.pub_evolution === undefined) {
+          return { pass: true, score: 0.5, reason: 'No publication type data' };
+        }
+        const diff = Math.abs(data.pub_evolution - data.scurve_evolution);
+        const score = Math.max(0, +(1 - diff).toFixed(3));
+        return {
+          pass: score >= 0.5,
+          score,
+          reason: `Pub=${data.pub_evolution} vs S-curve=${data.scurve_evolution} | diff=${diff.toFixed(3)}`
+        };
+    # Type de publication dominant vs attendu
+    - type: javascript
+      metric: 'Dominant pub type'
+      value: |
+        const data = JSON.parse(output.trim());
+        const expected = context.vars.expected_pub_dominant;
+        if (!expected || !data.pub_proportions) {
+          return { pass: true, score: 1, reason: 'No dominant pub check' };
+        }
+        const pubs = data.pub_proportions;
+        const types = ['wonder', 'build', 'operate', 'usage'];
+        const dominant = types.reduce((a, b) => (pubs[a] || 0) >= (pubs[b] || 0) ? a : b);
+        if (dominant === expected) return { pass: true, score: 1, reason: `Dominant: ${dominant} OK` };
+        return { pass: false, score: 0.5, reason: `Expected ${expected}, got ${dominant}` };
+
+providers:
+  - id: https
+    label: opencode-zen-kimi-2-5
+    config:
+      url: 'https://opencode.ai/zen/v1/chat/completions'
+      method: 'POST'
+      headers:
+        'Content-Type': 'application/json'
+        'Authorization': 'Bearer {{env.OPENCODE_API_KEY}}'
+      body:
+        model: 'kimi-k2.5'
+        messages:
+          - role: 'user'
+            content: '{{prompt}}'
+      transformResponse: 'json.choices[0].message.content'
+  - id: https
+    label: opencode-zen-haiku-4-5
+    config:
+      url: 'https://opencode.ai/zen/v1/messages'
+      method: 'POST'
+      headers:
+        'Content-Type': 'application/json'
+        'x-api-key': '{{env.OPENCODE_API_KEY}}'
+        'anthropic-version': '2023-06-01'
+      body:
+        model: 'claude-haiku-4-5'
+        max_tokens: 256
+        messages:
+          - role: 'user'
+            content: '{{prompt}}'
+      transformResponse: 'json.content[0].text'
+  # - id: file://scripts/claude-eval.mjs
+  #   label: claude-code
+
+prompts:
+  # - label: 'A - Expert economiste'
+  #   raw: |
+  #     Economic science and history of technics and science have no secret for you.
+  #     Given a component name and its business context, return a single decimal number between -1 and 2:
+  #     - [-1, 0): Social good - (Social goods enters the economic space through commodification)
+  #     - [0, 1]: Economic good - (Economic goods returns to the social good space through social ownership, Economic goods enter the common good space through decommodification)
+  #     - (1, 2]: Common good - (Common goods enters the economic space through privatisation)
+
+  #     Component to evaluate: {{component}}
+  #     Context: {{context}}
+  #     MANDATORY OUTPUT FORMAT: a single decimal number between -1 and 2, with no additional text.
+
+  # - label: 'B - Wardley Mapper expert'
+  #   raw: |
+  #     You are a Wardley Mapping practitioner with 10 years of experience.
+  #     Given a component name and its business context, return a single decimal number between -1 and 2:
+  #     - [-1, 0): Social good
+  #     - [0, 1]: Economic
+  #     - (1, 2]: Common good
+  #     Component to evaluate: {{component}}
+  #     Context: {{context}}
+  #     MANDATORY OUTPUT FORMAT: a single decimal number between -1 and 2, with no additional text.
+
+  - label: 'D - sans mention de la temporalité'
+    raw: |
+      You are an expert in economic science and technology history.
+
+      For the given component, estimate SEVEN values:
+      - certitude: how well-understood and defined (0 to 1)
+      - ubiquity: how widespread (0 to 1)
+      - evolution: your direct estimate of evolution according to the Wardley Maps evolution model (0 to 1)
+      - pub_wonder: proportion of publications describing novelty/wonder (0 to 1)
+      - pub_build: proportion focused on building/learning/experimenting (0 to 1)
+      - pub_operate: proportion about maintenance/operations/installation/features (0 to 1)
+      - pub_usage: proportion focused on using the component as a commodity (0 to 1)
+      The four pub_* proportions should sum to approximately 1.0.
+
+      Component: {{component}}
+      Context: {{context}}
+
+      MANDATORY FORMAT: exactly seven lines, no additional text:
+      certitude=X.XX
+      ubiquity=Y.YY
+      evolution=Z.ZZ
+      pub_wonder=W.WW
+      pub_build=B.BB
+      pub_operate=O.OO
+      pub_usage=U.UU
+
+
+  - label: 'D - avec mention de la temporalité'
+    raw: |
+      You are an expert in economic science and technology history.
+
+      For the given component, estimate SEVEN values reflecting its current evolutionary state:
+      - certitude: how well-understood and defined (0 to 1)
+      - ubiquity: how widespread (0 to 1)
+      - evolution: your direct estimate of evolution according to the Wardley Maps evolution model (0 to 1)
+      - pub_wonder: proportion of publications describing novelty/wonder (0 to 1)
+      - pub_build: proportion focused on building/learning/experimenting (0 to 1)
+      - pub_operate: proportion about maintenance/operations/installation/features (0 to 1)
+      - pub_usage: proportion focused on using the component as a commodity (0 to 1)
+      The four pub_* proportions should sum to approximately 1.0.
+
+      Component: {{component}}
+      Context: {{context}}
+
+      MANDATORY FORMAT: exactly seven lines, no additional text:
+      certitude=X.XX
+      ubiquity=Y.YY
+      evolution=Z.ZZ
+      pub_wonder=W.WW
+      pub_build=B.BB
+      pub_operate=O.OO
+      pub_usage=U.UU
+
+tests:
+  - vars:
+      component: 'ERP'
+      context: 'Big corporate'
+      min_evolution: 0.7
+      max_evolution: 1
+      expected_zone: 'competitive'
+      expected_pub_dominant: 'usage'
+    options:
+      transform: file://scripts/s-curve-transform.js
+  - vars:
+      component: 'CRM'
+      context: 'Enterprise software for sales teams'
+      min_evolution: 0.7
+      max_evolution: 1
+      expected_zone: 'competitive'
+      expected_pub_dominant: 'usage'
+    options:
+      transform: file://scripts/s-curve-transform.js
+  - vars:
+      component: 'LLM'
+      context: 'Automatic text generation for coding assistance'
+      min_evolution: 0.7
+      max_evolution: 1
+      expected_zone: 'competitive'
+      expected_pub_dominant: 'build'
+    options:
+      transform: file://scripts/s-curve-transform.js
+  - vars:
+      component: 'Wardley Mapping'
+      context: 'Decision making framework for business strategy'
+      min_evolution: 0
+      max_evolution: 0.18
+      expected_zone: 'competitive'
+      expected_pub_dominant: 'wonder'
+    options:
+      transform: file://scripts/s-curve-transform.js
+  - vars:
+      component: 'Electricity'
+      context: 'Western power supply in the late 20th century'
+      min_evolution: 0.7
+      max_evolution: 1
+      expected_zone: 'competitive'
+      expected_pub_dominant: 'usage'
+    options:
+      transform: file://scripts/s-curve-transform.js
+  - vars:
+      component: 'Electricity'
+      context: 'Western power supply today'
+      min_evolution: 0.7
+      max_evolution: 1
+      expected_zone: 'competitive'
+      expected_pub_dominant: 'usage'
+    options:
+      transform: file://scripts/s-curve-transform.js
+  - vars:
+      component: 'Air'
+      context: 'Athomospheric oxygen available to grow crops'
+      min_evolution: 0
+      max_evolution: 1
+      expected_zone: 'extra-competitive-market'
+    options:
+      transform: file://scripts/s-curve-transform.js

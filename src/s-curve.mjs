@@ -1,0 +1,146 @@
+// S-curve model: (certitude, ubiquity) → { zone, evolution }
+// Based on Wardley's evolution model with binary zone classification
+//
+// The band is defined by two independent generalized sigmoids:
+//   upper boundary: rises earlier, gentler slope
+//   lower boundary: rises later, steeper slope
+// Inside the band = competitive market (classic Wardley evolution)
+// Outside the band = extra-competitive market (social good OR common good — undetermined geometrically)
+// This naturally creates three visual stages:
+//   Foot (thin) → Belly (thick) → Top (medium)
+//
+// Each boundary: f(c) = yMin + (yMax - yMin) * sigmoid(c, k, x0)^nu
+//   yMin/yMax — asymptotic range (instead of fixed 0→1)
+//   nu — skew: 1=standard, >1=stays low longer, <1=rises early
+
+// Calibratable parameters — two independent generalized sigmoids
+export const DEFAULT_PARAMS = {
+  kUpper: 8.5,  x0Upper: 0.28, yMinUpper: 0, yMaxUpper: 1,    nuUpper: 2.1,
+  kLower: 7,    x0Lower: 0.54, yMinLower: 0, yMaxLower: 0.98, nuLower: 1.7,
+};
+
+// Publication type centroids — aligned with phase boundaries above
+// Used as anchors for weighted centroid (distribution → scalar)
+export const PUB_TYPE_CENTROIDS = {
+  wonder:  0.09,   // Genesis midpoint   [0, 0.18]
+  build:   0.22,   // Custom midpoint    [0.18, 0.26]
+  operate: 0.48,   // Product midpoint   [0.26, 0.70]
+  usage:   0.85,   // Commodity midpoint [0.70, 1.0]
+};
+
+// Publication type distribution → evolution scalar [0, 1]
+// Each input is a proportion (0-1); they are normalized to sum=1 internally.
+export function pubEvolution(wonder, build, operate, usage) {
+  const C = PUB_TYPE_CENTROIDS;
+  const sum = wonder + build + operate + usage;
+  if (sum === 0) return null;
+  const w = wonder / sum, b = build / sum, o = operate / sum, u = usage / sum;
+  return Math.round((w * C.wonder + b * C.build + o * C.operate + u * C.usage) * 1000) / 1000;
+}
+
+// Raw sigmoid (0→1)
+export function sigmoid(c, k, x0) {
+  return 1 / (1 + Math.exp(-k * (c - x0)));
+}
+
+// Generalized sigmoid with range and skew
+function gsigmoid(c, k, x0, yMin, yMax, nu) {
+  return yMin + (yMax - yMin) * Math.pow(sigmoid(c, k, x0), nu);
+}
+
+// Band boundaries — two independent generalized sigmoids
+export function bandUpper(c, params = DEFAULT_PARAMS) {
+  return gsigmoid(c, params.kUpper, params.x0Upper, params.yMinUpper, params.yMaxUpper, params.nuUpper);
+}
+
+export function bandLower(c, params = DEFAULT_PARAMS) {
+  return gsigmoid(c, params.kLower, params.x0Lower, params.yMinLower, params.yMaxLower, params.nuLower);
+}
+
+// Center of the band — used for geometric projection
+export function centerCurve(c, params = DEFAULT_PARAMS) {
+  return (bandUpper(c, params) + bandLower(c, params)) / 2;
+}
+
+// Is the point inside the evolution band?
+export function isInBand(c, u, params = DEFAULT_PARAMS) {
+  return u >= bandLower(c, params) && u <= bandUpper(c, params);
+}
+
+// Classify zone: competitive (inside band) / extra-competitive-market (outside band)
+export function classifyZone(c, u, params = DEFAULT_PARAMS) {
+  return isInBand(c, u, params) ? 'competitive' : 'extra-competitive-market';
+}
+
+// Signed distance from band boundary: positive = inside, negative = outside
+export function bandDistance(c, u, params = DEFAULT_PARAMS) {
+  const upper = bandUpper(c, params);
+  const lower = bandLower(c, params);
+  if (u > upper) return -(u - upper);
+  if (u < lower) return -(lower - u);
+  return Math.min(u - lower, upper - u);
+}
+
+// Geometric projection onto the center curve → t* ∈ [0, 1]
+export function projectOnCurve(c, u, params = DEFAULT_PARAMS) {
+  let bestT = 0;
+  let bestDist = Infinity;
+  for (let t = 0; t <= 1; t += 0.001) {
+    const pu = centerCurve(t, params);
+    const dist = (t - c) ** 2 + (pu - u) ** 2;
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestT = t;
+    }
+  }
+  return Math.round(bestT * 1000) / 1000;
+}
+
+// Main function: (certitude, ubiquity) → { zone, evolution, phase, bandDistance }
+export function computeEvolution(certitude, ubiquity, params = DEFAULT_PARAMS) {
+  const zone = classifyZone(certitude, ubiquity, params);
+  const bd = bandDistance(certitude, ubiquity, params);
+
+  let evolution;
+  if (zone === 'competitive') {
+    evolution = projectOnCurve(certitude, ubiquity, params);
+  } else {
+    // Outside band: determine direction for evolution scale
+    const upper = bandUpper(certitude, params);
+    const lower = bandLower(certitude, params);
+    if (ubiquity > upper) {
+      evolution = 1 + (ubiquity - upper);
+    } else {
+      evolution = -(lower - ubiquity);
+    }
+  }
+
+  const phase =
+    evolution < 0 ? 'Extra-competitive market' :
+    evolution <= 0.18 ? 'Genesis' :
+    evolution <= 0.26 ? 'Custom' :
+    evolution <= 0.70 ? 'Product' :
+    evolution <= 1 ? 'Commodity' :
+    'Extra-competitive market';
+
+  return {
+    zone,
+    evolution: Math.round(evolution * 1000) / 1000,
+    phase,
+    bandDistance: Math.round(bd * 1000) / 1000,
+  };
+}
+
+// Self-test when run directly
+if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}`) {
+  const pointA = { c: 0.28, u: 0.50, label: 'Point A (should be extra-competitive-market)' };
+  const pointB = { c: 0.63, u: 0.74, label: 'Point B (should be competitive)' };
+
+  for (const p of [pointA, pointB]) {
+    const result = computeEvolution(p.c, p.u);
+    console.log(`${p.label}`);
+    console.log(`  (c=${p.c}, u=${p.u}) → zone=${result.zone}, evolution=${result.evolution}, phase=${result.phase}, bandDistance=${result.bandDistance}`);
+    console.log(`  In band: ${isInBand(p.c, p.u)}`);
+    console.log();
+  }
+}
