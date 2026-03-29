@@ -1,0 +1,587 @@
+// Response formatter: transforms raw evaluation API results into
+// user-friendly conversational output with evolution stage, confidence,
+// and reasoning.
+//
+// Handles three output scenarios:
+//   1. Economic component evaluated → stage name, confidence bar, reasoning per strategy
+//   2. Non-economic component (social/common good) → re-questioning prompts
+//   3. Error / partial results → graceful degradation with actionable guidance
+//
+// Evolution stage mapping follows the Wardley Map x-axis:
+//   0.00–0.17  Genesis         (novel, uncertain)
+//   0.17–0.40  Custom-Built    (emerging, divergent)
+//   0.40–0.70  Product (+rental)(converging, feature-rich)
+//   0.70–1.00  Commodity (+utility) (standardised, invisible)
+//   < 0 or > 1  Extra-competitive-market zone
+
+// ─── Evolution Stage Mapping ────────────────────────────────────────────────
+
+/**
+ * @typedef {Object} EvolutionStage
+ * @property {string} name       - Stage label (e.g. "Product (+rental)")
+ * @property {string} shortName  - Short label (e.g. "Product")
+ * @property {string} descriptor - Human-readable trait (e.g. "converging, feature-differentiated")
+ * @property {number} rangeMin   - Lower bound (inclusive)
+ * @property {number} rangeMax   - Upper bound (exclusive, except last)
+ */
+
+const EVOLUTION_STAGES = [
+  {
+    name: 'Genesis',
+    shortName: 'Genesis',
+    descriptor: 'novel, poorly understood, high uncertainty',
+    rangeMin: 0.00,
+    rangeMax: 0.17,
+  },
+  {
+    name: 'Custom-Built',
+    shortName: 'Custom',
+    descriptor: 'emerging, divergent implementations, requires expertise',
+    rangeMin: 0.17,
+    rangeMax: 0.40,
+  },
+  {
+    name: 'Product (+rental)',
+    shortName: 'Product',
+    descriptor: 'converging, feature-differentiated, increasing competition',
+    rangeMin: 0.40,
+    rangeMax: 0.70,
+  },
+  {
+    name: 'Commodity (+utility)',
+    shortName: 'Commodity',
+    descriptor: 'standardised, well-defined, utility-like, volume operations',
+    rangeMin: 0.70,
+    rangeMax: 1.00,
+  },
+];
+
+/**
+ * Map an evolution value (0–1) to its Wardley stage.
+ *
+ * @param {number} evolution - Evolution value
+ * @returns {EvolutionStage & { position: string }}
+ */
+export function evolutionToStage(evolution) {
+  // Extra-competitive-market zones
+  if (evolution < 0) {
+    return {
+      ...EVOLUTION_STAGES[0],
+      position: `${evolution.toFixed(3)} (pre-Genesis / extra-competitive-market zone)`,
+    };
+  }
+  if (evolution > 1) {
+    return {
+      ...EVOLUTION_STAGES[3],
+      position: `${evolution.toFixed(3)} (beyond Commodity / extra-competitive-market zone)`,
+    };
+  }
+
+  // Normal range
+  for (const stage of EVOLUTION_STAGES) {
+    if (evolution >= stage.rangeMin && evolution < stage.rangeMax) {
+      return { ...stage, position: evolution.toFixed(3) };
+    }
+  }
+
+  // Edge case: exactly 1.0
+  return { ...EVOLUTION_STAGES[3], position: evolution.toFixed(3) };
+}
+
+// ─── Confidence Formatting ──────────────────────────────────────────────────
+
+/**
+ * Format a confidence value as a descriptive label + visual bar.
+ *
+ * @param {number} confidence - Confidence 0–1
+ * @returns {{ label: string, bar: string, percentage: string }}
+ */
+export function formatConfidence(confidence) {
+  const pct = Math.round(confidence * 100);
+  const filledBlocks = Math.round(confidence * 10);
+  const bar = '█'.repeat(filledBlocks) + '░'.repeat(10 - filledBlocks);
+
+  let label;
+  if (confidence >= 0.85) label = 'Very high';
+  else if (confidence >= 0.70) label = 'High';
+  else if (confidence >= 0.50) label = 'Moderate';
+  else if (confidence >= 0.30) label = 'Low';
+  else label = 'Very low';
+
+  return { label, bar, percentage: `${pct}%` };
+}
+
+// ─── Strategy Reasoning ─────────────────────────────────────────────────────
+
+/**
+ * Generate a human-readable reasoning sentence for a strategy result.
+ *
+ * @param {string} method - Strategy method identifier
+ * @param {Object} result - EvolutionResult { evolution, confidence, method }
+ * @param {Object} [component] - Original component input (for context)
+ * @returns {string} Reasoning sentence
+ */
+export function strategyReasoning(method, result, component = {}) {
+  const stage = evolutionToStage(result.evolution);
+
+  const reasoningMap = {
+    's-curve': () => {
+      const cert = component.certitude != null ? component.certitude.toFixed(2) : '?';
+      const ubi = component.ubiquity != null ? component.ubiquity.toFixed(2) : '?';
+      return (
+        `The dual sigmoid model projects certitude (${cert}) × ubiquity (${ubi}) ` +
+        `onto the S-curve center line, placing this component in the **${stage.name}** stage. ` +
+        `This mathematical model works best when both inputs are well-calibrated.`
+      );
+    },
+
+    'publication-analysis': () => {
+      const parts = [];
+      if (component.wonder != null) parts.push(`wonder=${component.wonder}`);
+      if (component.build != null) parts.push(`build=${component.build}`);
+      if (component.operate != null) parts.push(`operate=${component.operate}`);
+      if (component.usage != null) parts.push(`usage=${component.usage}`);
+      const distribution = parts.length > 0 ? parts.join(', ') : 'provided distribution';
+      return (
+        `Publication type analysis (${distribution}) indicates the dominant discourse ` +
+        `is consistent with the **${stage.name}** stage — ${stage.descriptor}.`
+      );
+    },
+
+    'timeline-benchmark': () =>
+      `Historical benchmark comparison places "${component.name || 'this component'}" ` +
+      `at the **${stage.name}** stage based on known evolution timelines of similar components.`,
+
+    'llm-direct': () =>
+      `Direct LLM assessment positions this component in the **${stage.name}** stage ` +
+      `based on semantic understanding of its description and market context.`,
+
+    'logprob-distribution': () =>
+      `Log-probability distribution analysis of stage tokens suggests ` +
+      `the **${stage.name}** stage with the highest probability mass.`,
+
+    'sector-agent': () =>
+      `Sector-specific agent analysis places this component in the **${stage.name}** stage ` +
+      `considering industry-specific evolution patterns and dynamics.`,
+  };
+
+  const generator = reasoningMap[method];
+  if (generator) return generator();
+
+  // Fallback for unknown/new strategies
+  return `Strategy "${method}" estimates the component at the **${stage.name}** stage (${stage.descriptor}).`;
+}
+
+// ─── Single Strategy Result Block ───────────────────────────────────────────
+
+/**
+ * Format a single strategy evaluation result into a markdown block.
+ *
+ * @param {string} method - Strategy method identifier
+ * @param {Object} evalResult - { evolution, confidence, method } or { error }
+ * @param {Object} [component] - Original component input
+ * @returns {string} Markdown block
+ */
+export function formatStrategyResult(method, evalResult, component = {}) {
+  if (evalResult.error) {
+    return `**${method}**: ⚠️ ${evalResult.error}`;
+  }
+
+  const stage = evolutionToStage(evalResult.evolution);
+  const conf = formatConfidence(evalResult.confidence);
+  const reasoning = strategyReasoning(method, evalResult, component);
+
+  const lines = [
+    `**${method}**`,
+    `  Evolution: **${stage.position}** → **${stage.name}**`,
+    `  Confidence: ${conf.bar} ${conf.percentage} (${conf.label})`,
+    `  ${reasoning}`,
+  ];
+  return lines.join('\n');
+}
+
+// ─── Full Response Formatter ────────────────────────────────────────────────
+
+/**
+ * Format a complete evaluation API response into conversational markdown.
+ *
+ * Accepts the result from:
+ *   - handleEstimateEvolution() (MCP tool)
+ *   - estimateEvolutionOneShot() (one-shot API)
+ *   - estimateEvolutionConversational() (conversational API)
+ *   - handleSkillInvocation() (skill handler, which adds parsedInput/availableStrategies)
+ *
+ * @param {Object} result - API response object
+ * @param {Object} [options] - Formatting options
+ * @param {Object} [options.component] - Original component input for richer reasoning
+ * @param {boolean} [options.compact] - If true, use shorter format
+ * @returns {string} Markdown-formatted conversational output
+ */
+export function formatResponse(result, options = {}) {
+  const component = options.component || result.parsedInput || {};
+  const compact = options.compact || false;
+  const name = component.name || result.classification?.space || 'Unknown';
+  const lines = [];
+
+  // ── Header ──
+  lines.push(`## Evolution Estimation: ${name}`);
+  lines.push('');
+
+  // ── Classification ──
+  const cls = result.classification;
+  if (cls) {
+    lines.push(`**Classification:** ${formatSpaceName(cls.space)}`);
+    if (cls.reason && !compact) {
+      lines.push(`> ${cls.reason}`);
+    }
+    lines.push('');
+  }
+
+  // ── Non-economic: re-questioning ──
+  if (result.reQuestions && result.reQuestions.length > 0) {
+    lines.push(formatReQuestioningBlock(result.reQuestions, name, cls));
+    return lines.join('\n');
+  }
+
+  // ── Economic: evaluation results ──
+  if (result.evaluations) {
+    const entries = Object.entries(result.evaluations);
+    const successful = entries.filter(([, ev]) => !ev.error);
+    const errors = entries.filter(([, ev]) => ev.error);
+
+    if (successful.length === 0 && errors.length > 0) {
+      // All strategies errored
+      lines.push('### ⚠️ No Successful Evaluations');
+      lines.push('');
+      lines.push('All strategies encountered errors:');
+      lines.push('');
+      for (const [method, ev] of errors) {
+        lines.push(`- **${method}**: ${ev.error}`);
+      }
+      lines.push('');
+      lines.push('*Try providing more parameters (certitude, ubiquity, publication proportions) or use a specific strategy.*');
+    } else {
+      // At least one success
+      if (compact) {
+        lines.push(formatCompactResults(successful, errors, component));
+      } else {
+        lines.push(formatDetailedResults(successful, errors, component));
+      }
+    }
+  }
+
+  // ── Conversational mode metadata ──
+  if (result.mode === 'conversational' && result.phase !== 'complete') {
+    lines.push('');
+    lines.push(formatConversationalGuidance(result));
+  }
+
+  // ── Available strategies footer ──
+  if (result.availableStrategies && !compact) {
+    lines.push('');
+    lines.push(`*Available strategies: ${result.availableStrategies.join(', ')}*`);
+  }
+
+  return lines.join('\n');
+}
+
+// ─── Internal Formatting Helpers ────────────────────────────────────────────
+
+/**
+ * Format a space name for display.
+ * @param {string} space
+ * @returns {string}
+ */
+function formatSpaceName(space) {
+  const names = {
+    economic: 'Economic Space (market-driven)',
+    social_good: 'Social Good (naturally available)',
+    common_good: 'Common Good (collectively managed)',
+  };
+  return names[space] || space;
+}
+
+/**
+ * Format the re-questioning block for non-economic components.
+ *
+ * @param {string[]} reQuestions
+ * @param {string} name
+ * @param {Object} classification
+ * @returns {string}
+ */
+function formatReQuestioningBlock(reQuestions, name, classification) {
+  const spaceLabel = classification?.space === 'social_good' ? 'social good' : 'common good';
+  const lines = [
+    `### ⚠️ Component Outside Economic Space`,
+    '',
+    `**"${name}"** has been classified as a **${spaceLabel}** — it falls outside the ` +
+    `standard Wardley Map evolution axis (Genesis → Commodity).`,
+    '',
+    `Evolution evaluation is **not applicable** for this type of component. ` +
+    `Instead, please consider the following questions to reframe your analysis:`,
+    '',
+  ];
+
+  for (let i = 0; i < reQuestions.length; i++) {
+    lines.push(`${i + 1}. ${reQuestions[i]}`);
+  }
+
+  lines.push('');
+  lines.push(
+    `💡 *Tip: If you meant a commodified or market version of this concept ` +
+    `(e.g., "bottled oxygen" instead of "air"), re-specify the component with its economic context.*`
+  );
+
+  return lines.join('\n');
+}
+
+/**
+ * Format detailed results with reasoning for each strategy.
+ *
+ * @param {Array} successful - [[method, result], ...]
+ * @param {Array} errors - [[method, result], ...]
+ * @param {Object} component
+ * @returns {string}
+ */
+function formatDetailedResults(successful, errors, component) {
+  const lines = [];
+
+  // Consensus summary (if multiple strategies)
+  if (successful.length > 1) {
+    lines.push(formatConsensus(successful));
+    lines.push('');
+  }
+
+  lines.push('### Strategy Results');
+  lines.push('');
+
+  for (const [method, ev] of successful) {
+    lines.push(formatStrategyResult(method, ev, component));
+    lines.push('');
+  }
+
+  if (errors.length > 0) {
+    lines.push('### Strategies with Errors');
+    lines.push('');
+    for (const [method, ev] of errors) {
+      lines.push(formatStrategyResult(method, ev, component));
+    }
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format compact results as a table.
+ *
+ * @param {Array} successful
+ * @param {Array} errors
+ * @param {Object} component
+ * @returns {string}
+ */
+function formatCompactResults(successful, errors, component) {
+  const lines = [];
+
+  lines.push('| Strategy | Evolution | Stage | Confidence |');
+  lines.push('|----------|-----------|-------|------------|');
+
+  for (const [method, ev] of successful) {
+    const stage = evolutionToStage(ev.evolution);
+    const conf = formatConfidence(ev.confidence);
+    lines.push(`| ${method} | ${stage.position} | ${stage.shortName} | ${conf.percentage} |`);
+  }
+
+  for (const [method, ev] of errors) {
+    lines.push(`| ${method} | — | — | ⚠️ ${ev.error} |`);
+  }
+
+  // One-line consensus
+  if (successful.length > 1) {
+    const evolutions = successful.map(([, ev]) => ev.evolution);
+    const avg = evolutions.reduce((a, b) => a + b, 0) / evolutions.length;
+    const avgStage = evolutionToStage(avg);
+    lines.push('');
+    lines.push(`**Consensus:** ~${avg.toFixed(3)} (${avgStage.name})`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format a consensus summary across multiple strategies.
+ *
+ * @param {Array} successful - [[method, result], ...]
+ * @returns {string}
+ */
+function formatConsensus(successful) {
+  const evolutions = successful.map(([, ev]) => ev.evolution);
+  const confidences = successful.map(([, ev]) => ev.confidence);
+
+  const avg = evolutions.reduce((a, b) => a + b, 0) / evolutions.length;
+  const min = Math.min(...evolutions);
+  const max = Math.max(...evolutions);
+  const spread = max - min;
+  const avgConf = confidences.reduce((a, b) => a + b, 0) / confidences.length;
+
+  const avgStage = evolutionToStage(avg);
+  const minStage = evolutionToStage(min);
+  const maxStage = evolutionToStage(max);
+
+  const lines = [
+    `### 📊 Consensus Overview`,
+    '',
+    `**${successful.length} strategies** evaluated — average evolution: **${avg.toFixed(3)}** (${avgStage.name})`,
+    '',
+    `| Metric | Value |`,
+    `|--------|-------|`,
+    `| Range | ${min.toFixed(3)} (${minStage.shortName}) – ${max.toFixed(3)} (${maxStage.shortName}) |`,
+    `| Spread | ${spread.toFixed(3)} |`,
+    `| Average confidence | ${formatConfidence(avgConf).percentage} |`,
+  ];
+
+  // Agreement assessment
+  if (spread < 0.10) {
+    lines.push('');
+    lines.push('✅ **Strong agreement** — strategies converge on a narrow range.');
+  } else if (spread < 0.25) {
+    lines.push('');
+    lines.push('🔶 **Moderate agreement** — strategies broadly agree but show some variation.');
+  } else {
+    lines.push('');
+    lines.push('🔴 **Low agreement** — strategies diverge significantly. Consider providing more parameters to reduce uncertainty.');
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format guidance for conversational mode (mid-conversation).
+ *
+ * @param {Object} result - Conversational result with phase, nextQuestion, summary
+ * @returns {string}
+ */
+function formatConversationalGuidance(result) {
+  const lines = [];
+
+  if (result.nextQuestion) {
+    lines.push(`### Next: ${result.nextQuestion.prompt}`);
+    lines.push('');
+    if (result.nextQuestion.hints && result.nextQuestion.hints.length > 0) {
+      for (const hint of result.nextQuestion.hints) {
+        lines.push(`- ${hint}`);
+      }
+      lines.push('');
+    }
+  }
+
+  if (result.summary) {
+    const { gathered, missing, exchangeCount } = result.summary;
+    const gatheredKeys = Object.keys(gathered);
+    if (gatheredKeys.length > 0) {
+      lines.push(`*Gathered so far (${exchangeCount} exchange(s)):* ${gatheredKeys.join(', ')}`);
+    }
+    if (missing && missing.length > 0) {
+      lines.push(`*Still available to provide:* ${missing.join(', ')}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+// ─── Self-test ──────────────────────────────────────────────────────────────
+
+if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}`) {
+  console.log('=== response-formatter self-test ===\n');
+
+  // Test 1: evolutionToStage mapping
+  console.log('--- Test 1: Evolution stage mapping ---');
+  const testValues = [0, 0.1, 0.17, 0.3, 0.4, 0.55, 0.7, 0.85, 1.0, -0.1, 1.2];
+  for (const v of testValues) {
+    const stage = evolutionToStage(v);
+    console.log(`  ${v.toFixed(2)} → ${stage.name} (${stage.position})`);
+  }
+  console.log();
+
+  // Test 2: Confidence formatting
+  console.log('--- Test 2: Confidence formatting ---');
+  for (const c of [0.1, 0.3, 0.5, 0.7, 0.85, 1.0]) {
+    const f = formatConfidence(c);
+    console.log(`  ${c.toFixed(1)} → ${f.bar} ${f.percentage} (${f.label})`);
+  }
+  console.log();
+
+  // Test 3: Strategy reasoning
+  console.log('--- Test 3: Strategy reasoning ---');
+  const component = { name: 'ERP', certitude: 0.9, ubiquity: 0.85, wonder: 0.02, build: 0.08, operate: 0.25, usage: 0.65 };
+  const testResult = { evolution: 0.75, confidence: 0.85, method: 's-curve' };
+  console.log(`  s-curve: ${strategyReasoning('s-curve', testResult, component)}`);
+  console.log(`  pub: ${strategyReasoning('publication-analysis', testResult, component)}`);
+  console.log(`  timeline: ${strategyReasoning('timeline-benchmark', testResult, component)}`);
+  console.log();
+
+  // Test 4: Full economic response
+  console.log('--- Test 4: Full economic response ---');
+  const economicResult = {
+    classification: { space: 'economic', reason: '"ERP" classified as economic.', requiresReQuestion: false },
+    reQuestions: null,
+    evaluations: {
+      's-curve': { evolution: 0.752, confidence: 0.85, method: 's-curve' },
+      'publication-analysis': { evolution: 0.71, confidence: 0.78, method: 'publication-analysis' },
+      'timeline-benchmark': { evolution: 0.80, confidence: 0.65, method: 'timeline-benchmark' },
+      'llm-direct': { error: 'LLM call not configured for one-shot mode.' },
+    },
+    parsedInput: component,
+    availableStrategies: ['s-curve', 'publication-analysis', 'timeline-benchmark', 'llm-direct', 'logprob-distribution', 'sector-agent'],
+  };
+  console.log(formatResponse(economicResult));
+  console.log();
+
+  // Test 5: Re-questioning response
+  console.log('--- Test 5: Re-questioning response ---');
+  const socialResult = {
+    classification: { space: 'social_good', reason: '"Air" is a naturally available resource.', requiresReQuestion: true },
+    reQuestions: [
+      'Did you mean a commercialized version of this resource (e.g., bottled oxygen, air filtration systems)?',
+      'Are you evaluating this as a dependency in a value chain where it has economic implications?',
+      'Could this be reframed as a specific product or service within the economic space?',
+    ],
+    evaluations: null,
+    parsedInput: { name: 'Air' },
+  };
+  console.log(formatResponse(socialResult));
+  console.log();
+
+  // Test 6: Compact format
+  console.log('--- Test 6: Compact format ---');
+  console.log(formatResponse(economicResult, { compact: true }));
+  console.log();
+
+  // Test 7: Single strategy
+  console.log('--- Test 7: Single strategy ---');
+  const singleResult = {
+    classification: { space: 'economic', reason: 'economic component', requiresReQuestion: false },
+    reQuestions: null,
+    evaluations: {
+      's-curve': { evolution: 0.752, confidence: 0.85, method: 's-curve' },
+    },
+    parsedInput: { name: 'ERP', certitude: 0.9, ubiquity: 0.85 },
+  };
+  console.log(formatResponse(singleResult));
+  console.log();
+
+  // Test 8: All errors
+  console.log('--- Test 8: All errors ---');
+  const errorResult = {
+    classification: { space: 'economic', reason: 'economic component', requiresReQuestion: false },
+    reQuestions: null,
+    evaluations: {
+      'llm-direct': { error: 'LLM not configured' },
+      'sector-agent': { error: 'LLM not configured' },
+    },
+    parsedInput: { name: 'Widget' },
+  };
+  console.log(formatResponse(errorResult));
+
+  console.log('\n=== response-formatter self-test completed ===');
+}

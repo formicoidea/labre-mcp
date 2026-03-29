@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "wardley-assistant": {
+      "command": "node",
+      "args": ["--env-file=.env", "src/mcp-server.mjs"],
+      "cwd": "C:\\Users\\Dell\\Documents\\5-DEV\\DevWardleyMaps\\WardleyAssistant",
+      "timeout": 600
+    }
+  }
+}

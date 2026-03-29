@@ -1,0 +1,37 @@
+title Tea Shop – Hot Beverages
+
+anchor Hot Beverage [0.95, 0.88]
+
+component Served Beverage [0.90, 0.85]
+component Tea Menu [0.85, 0.85]
+component Counter Service [0.80, 0.90]
+component Seating Area [0.72, 0.85]
+component Payment Processing [0.68, 0.88]
+component Brewing Process [0.58, 0.85]
+component Cups & Crockery [0.52, 0.93]
+component Brewing Equipment [0.44, 0.71]
+component Hot Water [0.38, 0.90]
+component Tea Stock [0.32, 0.78]
+component Tea Supplier [0.22, 0.75]
+component Water Supply [0.15, 0.95]
+component Electricity Supply [0.10, 0.95]
+
+Hot Beverage->Served Beverage
+Hot Beverage->Tea Menu
+Hot Beverage->Counter Service
+Hot Beverage->Seating Area
+Served Beverage->Brewing Process
+Served Beverage->Cups & Crockery
+Served Beverage->Counter Service
+Tea Menu->Tea Stock
+Counter Service->Brewing Process
+Counter Service->Payment Processing
+Brewing Process->Hot Water
+Brewing Process->Tea Stock
+Brewing Process->Brewing Equipment
+Brewing Equipment->Electricity Supply
+Hot Water->Water Supply
+Hot Water->Brewing Equipment
+Tea Stock->Tea Supplier
+
+style wardley
