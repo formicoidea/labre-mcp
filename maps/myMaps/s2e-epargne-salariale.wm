@@ -1,0 +1,69 @@
+title S2E – Service Inter Épargne Entreprise
+
+anchor Salarié Épargnant [0.95, 0.73]
+
+// Besoin visible du salarié
+component Épargne Salariale [0.90, 0.78]
+component Consultation Comptes [0.85, 0.22]
+component Versements & Arbitrages [0.82, 0.22]
+component Déblocage Anticipé [0.78, 0.75]
+
+// Services métier intermédiaires
+component Gestion des Dispositifs [0.70, 0.90]
+component Tenue de Comptes [0.65, 0.81]
+component Information & Conseil [0.72, 0.64]
+component Gestion des Flux Entreprise [0.68, 0.67]
+
+// Couche produits financiers
+component Fonds d'Épargne (FCPE) [0.55, 0.82]
+component Gestion d'Actifs [0.48, 0.72]
+component Conformité Réglementaire [0.52, 0.30]
+
+// Couche plateforme et infrastructure
+component Plateforme Digitale (Portail/App) [0.60, 0.48]
+component Moteur de Calcul [0.42, 0.65]
+component Référentiel Entreprises & Salariés [0.38, 0.66]
+component Système d'Information [0.32, 0.71]
+
+// Couche commodités
+component Infrastructure IT [0.18, 0.85]
+component Réseau Bancaire BPCE [0.25, 0.45]
+component Réglementation (Code du Travail, AMF) [0.10, 0.85]
+component Marchés Financiers [0.08, 0.90]
+
+// Liens - besoin du salarié
+Salarié Épargnant->Épargne Salariale
+Épargne Salariale->Consultation Comptes
+Épargne Salariale->Versements & Arbitrages
+Épargne Salariale->Déblocage Anticipé
+
+// Liens - services métier
+Consultation Comptes->Plateforme Digitale (Portail/App)
+Consultation Comptes->Tenue de Comptes
+Versements & Arbitrages->Gestion des Dispositifs
+Versements & Arbitrages->Tenue de Comptes
+Déblocage Anticipé->Conformité Réglementaire
+Déblocage Anticipé->Gestion des Dispositifs
+Information & Conseil->Plateforme Digitale (Portail/App)
+Gestion des Flux Entreprise->Tenue de Comptes
+Gestion des Flux Entreprise->Référentiel Entreprises & Salariés
+
+// Liens - produits financiers
+Gestion des Dispositifs->Fonds d'Épargne (FCPE)
+Gestion des Dispositifs->Conformité Réglementaire
+Fonds d'Épargne (FCPE)->Gestion d'Actifs
+Fonds d'Épargne (FCPE)->Marchés Financiers
+
+// Liens - plateforme
+Plateforme Digitale (Portail/App)->Système d'Information
+Tenue de Comptes->Moteur de Calcul
+Tenue de Comptes->Référentiel Entreprises & Salariés
+Moteur de Calcul->Système d'Information
+
+// Liens - infrastructure
+Système d'Information->Infrastructure IT
+Gestion d'Actifs->Marchés Financiers
+Réseau Bancaire BPCE->Infrastructure IT
+Conformité Réglementaire->Réglementation (Code du Travail, AMF)
+
+style wardley

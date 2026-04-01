@@ -1,6 +1,6 @@
 title Tea Shop – Hot Beverages
 
-anchor Hot Beverage [0.95, 0.88]
+anchor Hot Beverage [0.94, 0.8]
 
 component Served Beverage [0.90, 0.85]
 component Tea Menu [0.85, 0.85]
@@ -11,10 +11,10 @@ component Brewing Process [0.58, 0.85]
 component Cups & Crockery [0.52, 0.93]
 component Brewing Equipment [0.44, 0.71]
 component Hot Water [0.38, 0.90]
-component Tea Stock [0.32, 0.78]
-component Tea Supplier [0.22, 0.75]
+component Tea Stock [0.25, 0.78]
+component Tea Supplier [0.13, 0.74]
 component Water Supply [0.15, 0.95]
-component Electricity Supply [0.10, 0.95]
+component Electricity Supply [0.04, 0.95]
 
 Hot Beverage->Served Beverage
 Hot Beverage->Tea Menu

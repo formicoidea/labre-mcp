@@ -13,6 +13,8 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { createLLMCall } from './llm-call.mjs';
 import { estimateEvolutionOneShot } from './estimate-evolution.mjs';
+import { logDebug, logInfo, logError } from './mcp-notifications.mjs';
+import { createMessageResolverFromArgs } from './progress-messages.mjs';
 
 // ─── Value Chain Decomposition Prompt ───────────────────────────────────────
 
@@ -134,7 +136,20 @@ export async function generateValueChain(description, options = {}) {
     strategy = 'timeline-benchmark',
   } = options;
 
+  const TOOL = 'generateValueChain';
+
+  // ── Localized message resolver ──────────────────────────────────────
+  const { msg, lang } = createMessageResolverFromArgs({ description });
+
+  // Info-level: tool start (localized)
+  logInfo(TOOL, msg('tool.start.valuechain', { tool: TOOL }));
+  const t0 = Date.now();
+
+  logDebug(TOOL, `Parameters: strategy="${strategy}", outputDir="${outputDir}", lang=${lang}`);
+
   // Step 1: Decompose value chain via LLM
+  logDebug(TOOL, msg('step.decomposition'));
+
   const llmCall = createLLMCall({ model: 'claude-sonnet-4-6', effort: 'high' });
   const rawResponse = await llmCall(DECOMPOSE_PROMPT, { description });
 
@@ -144,13 +159,17 @@ export async function generateValueChain(description, options = {}) {
   try {
     chain = JSON.parse(jsonStr);
   } catch (err) {
+    logError(TOOL, msg('error.generic', { tool: TOOL, error: `Failed to parse LLM response: ${err.message}` }));
     throw new Error(`Failed to parse LLM value chain response: ${err.message}\nRaw: ${rawResponse.slice(0, 500)}`);
   }
 
   // Validate chain structure
   if (!chain.title || !chain.anchor || !chain.components?.length) {
+    logError(TOOL, msg('error.generic', { tool: TOOL, error: 'LLM returned invalid value chain structure' }));
     throw new Error('LLM returned invalid value chain structure');
   }
+
+  logDebug(TOOL, `Decomposition complete: "${chain.title}" — ${chain.components.length} components + 1 anchor`);
 
   // Step 2: Evaluate evolution for each component + anchor
   const evaluations = {};
@@ -159,7 +178,16 @@ export async function generateValueChain(description, options = {}) {
     ...chain.components.map(c => ({ name: c.name, context: c.context })),
   ];
 
-  for (const item of allItems) {
+  for (let i = 0; i < allItems.length; i++) {
+    const item = allItems[i];
+
+    // Debug: per-component progress
+    logDebug(TOOL, msg('step.evaluation.progress', {
+      current: i + 1,
+      total: allItems.length,
+      component: item.name,
+    }));
+
     try {
       const result = await estimateEvolutionOneShot({
         name: item.name,
@@ -173,14 +201,31 @@ export async function generateValueChain(description, options = {}) {
           || Object.values(result.evaluations).find(e => !e.error);
         if (stratResult && !stratResult.error) {
           evaluations[item.name] = Math.max(0, Math.min(1, stratResult.evolution));
+          logDebug(TOOL, msg('step.evaluation.bestpick', {
+            component: item.name,
+            evolution: evaluations[item.name],
+            strategy: strategy,
+            confidence: stratResult.confidence ?? 'N/A',
+          }));
         }
       }
-    } catch {
-      // Silently skip failed evaluations — will use default 0.5
+    } catch (err) {
+      // Log but skip failed evaluations — will use default 0.5
+      logDebug(TOOL, msg('step.evaluation.skipped', {
+        component: item.name,
+        reason: err.message || 'evaluation failed',
+      }));
     }
   }
 
+  logDebug(TOOL, msg('step.evaluation.summary', {
+    evaluated: Object.keys(evaluations).length,
+    skipped: allItems.length - Object.keys(evaluations).length,
+    total: allItems.length,
+  }));
+
   // Step 3: Generate .wm content
+  logDebug(TOOL, msg('step.wm.generation', { count: chain.components.length }));
   const wmContent = generateWmContent(chain, evaluations);
 
   // Step 4: Write file
@@ -189,6 +234,10 @@ export async function generateValueChain(description, options = {}) {
 
   await mkdir(dirname(filePath), { recursive: true });
   await writeFile(filePath, wmContent, 'utf-8');
+
+  // Info-level: tool end (localized)
+  const duration = Date.now() - t0;
+  logInfo(TOOL, msg('tool.end.valuechain', { tool: TOOL, count: chain.components.length, duration }));
 
   return {
     wmContent,

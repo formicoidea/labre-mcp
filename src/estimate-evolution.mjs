@@ -14,6 +14,8 @@ import { loadStrategies, getStrategy, listStrategies } from './strategies/regist
 import { BaseStrategy } from './strategies/base-strategy.mjs';
 import { ConversationSession } from './conversation-session.mjs';
 import { createLLMCall, createOpenCodeCall, createOpenCodeLogprobCall } from './llm-call.mjs';
+import { logDebug, logInfo, logError } from './mcp-notifications.mjs';
+import { createMessageResolverFromArgs } from './progress-messages.mjs';
 
 // ─── Valid Spaces ────────────────────────────────────────────────────────────
 
@@ -166,12 +168,27 @@ export async function estimateEvolutionOneShot(rawInput) {
   const validated = validateOneShotInput(rawInput);
   const { name, description, space, strategy, ...componentData } = validated;
 
+  // ── Localized message resolver (pilot: estimateEvolution) ──────────
+  const { msg, lang } = createMessageResolverFromArgs({ name, description, context: description });
+  const TOOL = 'estimateEvolution';
+
+  // Info-level: tool start (localized)
+  logInfo(TOOL, msg('tool.start', { tool: TOOL, component: name }));
+
+  const t0 = Date.now();
+
+  logDebug(TOOL, `Input validated: component="${name}", strategy="${strategy}"${space ? `, space="${space}"` : ''} [lang=${lang}]`);
+
   // Step 2: Classify
   const classification = resolveClassification(name, description, space);
+
+  logDebug(TOOL, msg('step.classification', { component: name, space: classification.space }));
 
   // Step 3: Non-economic → re-questioning
   if (classification.requiresReQuestion) {
     const reQuestions = buildReQuestions(classification, name);
+    const duration = Date.now() - t0;
+    logInfo(TOOL, msg('tool.end', { tool: TOOL, component: name, duration }));
     return {
       mode: 'oneshot',
       classification,
@@ -196,16 +213,22 @@ export async function estimateEvolutionOneShot(rawInput) {
 
   if (strategy === 'all') {
     const strategies = await loadStrategies();
+    const strategyNames = [...strategies.keys()];
+
+    logDebug(TOOL, `Loaded ${strategyNames.length} strategies for "${name}": ${strategyNames.join(', ')}`);
 
     // Phase A: Run all non-s-curve strategies first (they may produce certitude/ubiquity)
     for (const [method, StrategyCls] of strategies) {
       if (method === 's-curve') continue;
       try {
+        logDebug(TOOL, msg('step.strategy', { strategy: method, component: name }));
         const instance = createStrategyInstance(StrategyCls);
         const result = await Promise.resolve(instance.evaluate(component));
         evaluations[method] = result;
+        logDebug(TOOL, msg('step.strategy.result', { strategy: method, evolution: result.evolution, confidence: result.confidence }));
       } catch (err) {
         evaluations[method] = { error: err.message };
+        logDebug(TOOL, msg('step.strategy.error', { strategy: method, error: err.message }));
       }
     }
 
@@ -223,6 +246,7 @@ export async function estimateEvolutionOneShot(rawInput) {
         enrichedComponent.ubiquity = Math.round(
           llmResults.reduce((s, r) => s + r.ubiquity, 0) / llmResults.length * 1000
         ) / 1000;
+        logDebug(TOOL, `Enriched "${name}" from ${llmResults.length} LLM result(s): certitude=${enrichedComponent.certitude}, ubiquity=${enrichedComponent.ubiquity}`);
       }
     }
 
@@ -230,27 +254,39 @@ export async function estimateEvolutionOneShot(rawInput) {
     const scurveCls = strategies.get('s-curve');
     if (scurveCls) {
       try {
+        logDebug(TOOL, msg('step.strategy', { strategy: 's-curve', component: name }));
         const instance = createStrategyInstance(scurveCls);
         const result = await Promise.resolve(instance.evaluate(enrichedComponent));
         evaluations['s-curve'] = result;
+        logDebug(TOOL, msg('step.strategy.result', { strategy: 's-curve', evolution: result.evolution, confidence: result.confidence }));
       } catch (err) {
         evaluations['s-curve'] = { error: err.message };
+        logDebug(TOOL, msg('step.strategy.error', { strategy: 's-curve', error: err.message }));
       }
     }
   } else {
     try {
+      logDebug(TOOL, msg('step.strategy', { strategy, component: name }));
       const StrategyCls = await getStrategy(strategy);
       const instance = createStrategyInstance(StrategyCls);
       const result = await Promise.resolve(instance.evaluate(component));
       evaluations[strategy] = result;
+      logDebug(TOOL, msg('step.strategy.result', { strategy, evolution: result.evolution, confidence: result.confidence }));
     } catch (err) {
       evaluations[strategy] = { error: err.message };
+      logDebug(TOOL, msg('step.strategy.error', { strategy, error: err.message }));
     }
   }
 
   // Step 6: Format result
   const successCount = Object.values(evaluations).filter(e => !e.error).length;
   const errorCount = Object.values(evaluations).filter(e => e.error).length;
+  const duration = Date.now() - t0;
+
+  logDebug(TOOL, `Results for "${name}": ${successCount} succeeded, ${errorCount} failed out of ${Object.keys(evaluations).length} strategies`);
+
+  // Info-level: tool end (localized)
+  logInfo(TOOL, msg('tool.end', { tool: TOOL, component: name, duration }));
 
   let message = `Component "${name}" classified as ${classification.space}. `;
   message += `Evaluated with ${successCount} strategy(ies)`;
@@ -277,14 +313,18 @@ function getLLMCall() {
     // - _WARDLEY_NESTED=1 → subprocess MCP → Agent SDK fonctionne (process isole)
     // - sinon → session Claude Code interactive → OpenCode (evite conflit subprocess)
     if (process.env._WARDLEY_NESTED) {
+      const model = process.env.WARDLEY_LLM_MODEL || 'claude-sonnet-4-6';
+      logDebug('estimateEvolution', `LLM backend: Agent SDK, model="${model}"`);
       _llmCall = createLLMCall({
-        model: process.env.WARDLEY_LLM_MODEL || 'claude-sonnet-4-6',
+        model,
         effort: 'high',
         maxBudgetUsd: 0.10,
       });
     } else {
+      const model = process.env.WARDLEY_LLM_MODEL || 'kimi-k2.5';
+      logDebug('estimateEvolution', `LLM backend: OpenCode API, model="${model}"`);
       _llmCall = createOpenCodeCall({
-        model: process.env.WARDLEY_LLM_MODEL || 'kimi-k2.5',
+        model,
       });
     }
   }
@@ -294,9 +334,9 @@ function getLLMCall() {
 let _logprobCall = null;
 function getLogprobCall() {
   if (!_logprobCall) {
-    _logprobCall = createOpenCodeLogprobCall({
-      model: process.env.WARDLEY_LOGPROB_MODEL || 'kimi-k2.5',
-    });
+    const model = process.env.WARDLEY_LOGPROB_MODEL || 'kimi-k2.5';
+    logDebug('estimateEvolution', `Logprob backend: OpenCode API, model="${model}"`);
+    _logprobCall = createOpenCodeLogprobCall({ model });
   }
   return _logprobCall;
 }
@@ -372,38 +412,47 @@ function createStrategyInstance(StrategyCls) {
  */
 export async function estimateEvolutionConversational(input = {}) {
   const { sessionState, data = {}, forceEstimate = false, strategy } = input;
+  const TOOL = 'estimateEvolution';
 
   // Create or restore session
   let session;
   if (sessionState) {
     try {
       session = ConversationSession.deserialize(sessionState);
+      logDebug(TOOL, `Session restored (phase: ${session.phase})`);
     } catch {
       session = new ConversationSession();
+      logDebug(TOOL, 'Session deserialization failed — new session created');
     }
   } else {
     session = new ConversationSession();
+    logDebug(TOOL, 'New conversational session created');
   }
 
   // Apply strategy preference if provided
   if (strategy) {
     session.update({ strategy });
+    logDebug(TOOL, `Strategy preference set: "${strategy}"`);
   }
 
   // Update session with new data
   if (data && Object.keys(data).length > 0) {
     session.update(data);
+    logDebug(TOOL, `Session updated with ${Object.keys(data).length} field(s): ${Object.keys(data).join(', ')}`);
   }
 
   // Force estimation if requested
   if (forceEstimate && !session.isReadyForEstimation()) {
     session.forceReady();
+    logDebug(TOOL, 'Force estimation requested — session marked as ready');
   }
 
   // Check for non-economic classification (triggers re-questioning)
   if (session.isReadyForEstimation() && session.isNonEconomic()) {
     const classification = session.getClassification();
     const reQuestions = session.getReQuestions();
+
+    logDebug(TOOL, `Component "${session.state.name}" classified as ${classification.space} — re-questioning`);
 
     return {
       mode: 'conversational',
@@ -428,31 +477,44 @@ export async function estimateEvolutionConversational(input = {}) {
     const selectedStrategy = session.state.strategy || 'all';
     const evaluations = {};
 
+    logDebug(TOOL, `Conversational estimation ready for "${session.state.name}", strategy="${selectedStrategy}"`);
+
     if (selectedStrategy === 'all') {
       const strategies = await loadStrategies();
+      const strategyNames = [...strategies.keys()];
+      logDebug(TOOL, `Running ${strategyNames.length} strategies: ${strategyNames.join(', ')}`);
+
       for (const [method, StrategyCls] of strategies) {
         try {
+          logDebug(TOOL, `Running strategy "${method}" on "${session.state.name}"...`);
           const instance = createStrategyInstance(StrategyCls);
           const result = await Promise.resolve(instance.evaluate(component));
           evaluations[method] = result;
+          logDebug(TOOL, `Strategy "${method}": evolution=${result.evolution}, confidence=${result.confidence}`);
         } catch (err) {
           evaluations[method] = { error: err.message };
+          logDebug(TOOL, `Strategy "${method}" failed: ${err.message}`);
         }
       }
     } else {
       try {
+        logDebug(TOOL, `Running single strategy "${selectedStrategy}" on "${session.state.name}"...`);
         const StrategyCls = await getStrategy(selectedStrategy);
         const instance = createStrategyInstance(StrategyCls);
         const result = await Promise.resolve(instance.evaluate(component));
         evaluations[selectedStrategy] = result;
+        logDebug(TOOL, `Strategy "${selectedStrategy}": evolution=${result.evolution}, confidence=${result.confidence}`);
       } catch (err) {
         evaluations[selectedStrategy] = { error: err.message };
+        logDebug(TOOL, `Strategy "${selectedStrategy}" failed: ${err.message}`);
       }
     }
 
     const successCount = Object.values(evaluations).filter(e => !e.error).length;
     const errorCount = Object.values(evaluations).filter(e => e.error).length;
     const summary = session.getSummary();
+
+    logDebug(TOOL, `Conversational results for "${session.state.name}": ${successCount} succeeded, ${errorCount} failed, ${summary.exchangeCount} exchange(s)`);
 
     let message = `Component "${session.state.name}" — conversational estimation complete after ${summary.exchangeCount} exchange(s). `;
     message += `Evaluated with ${successCount} strategy(ies)`;
@@ -477,6 +539,8 @@ export async function estimateEvolutionConversational(input = {}) {
   // Not ready yet — return the next question
   const nextQuestion = session.nextQuestion();
   const summary = session.getSummary();
+
+  logDebug(TOOL, `Conversational phase "${session.phase}": ${summary.missing.length} field(s) still missing, gathered=${summary.gathered.length}`);
 
   return {
     mode: 'conversational',

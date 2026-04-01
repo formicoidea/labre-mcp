@@ -1,124 +1,108 @@
 // Timeline benchmark strategy: evolution estimation based on historical
-// benchmarks and LLM-powered temporal reasoning.
+// capability analysis and iterative timeline reconstruction.
 //
-// Tier 1: Curated reference components with known evolution positions
-//         (fast, deterministic keyword matching)
-// Tier 2: LLM historical reasoning — analyzes genesis/product/commodity
-//         dates and current position (requires llmCall injection)
-// Tier 3: Publication-type distribution model fallback
-// Tier 4: Certitude/ubiquity rough midpoint fallback
+// Phase 1: Capability Identification — looks behind technical labels to
+//          identify the true underlying capability or need
+//          (delegated to src/identify-capability.mjs)
+// Phase 2: Recursive Historical Timeline — iteratively builds a chronological
+//          timeline of solutions/manifestations until the current year,
+//          each milestone evaluated by LLMDirectStrategy with date context
+//
+// Requires llmCall injection (shared with LLMDirectStrategy internally).
 
 import { BaseStrategy } from './base-strategy.mjs';
-import { pubEvolution, PUB_TYPE_CENTROIDS } from '../s-curve.mjs';
+import { identifyCapability } from '../identify-capability.mjs';
+import { LLMDirectStrategy } from './llm-direct-strategy.mjs';
 
-// Historical benchmark components with known evolution positions
-// Organized by Wardley evolution phase boundaries:
-//   Genesis [0, 0.18] | Custom [0.18, 0.26] | Product [0.26, 0.70] | Commodity [0.70, 1.0]
-const BENCHMARKS = [
-  // Commodity (0.70–1.0)
-  { keywords: ['electricity', 'power supply', 'power grid'],            evolution: 0.95, phase: 'commodity' },
-  { keywords: ['water supply', 'running water', 'tap water'],           evolution: 0.95, phase: 'commodity' },
-  { keywords: ['erp', 'enterprise resource planning'],                  evolution: 0.78, phase: 'commodity' },
-  { keywords: ['crm', 'customer relationship management'],              evolution: 0.82, phase: 'commodity' },
-  { keywords: ['email', 'smtp', 'electronic mail'],                     evolution: 0.92, phase: 'commodity' },
-  { keywords: ['cloud computing', 'iaas', 'paas', 'cloud'],            evolution: 0.80, phase: 'commodity' },
-  { keywords: ['database', 'rdbms', 'sql'],                             evolution: 0.85, phase: 'commodity' },
-  { keywords: ['web server', 'http server'],                             evolution: 0.88, phase: 'commodity' },
-  { keywords: ['operating system', 'os'],                                evolution: 0.90, phase: 'commodity' },
-  { keywords: ['tcp/ip', 'internet protocol', 'networking'],            evolution: 0.92, phase: 'commodity' },
-  { keywords: ['spreadsheet', 'excel'],                                  evolution: 0.88, phase: 'commodity' },
+const CURRENT_YEAR = new Date().getFullYear();
+const MAX_HISTORY_ITERATIONS = 15;
 
-  // Product (0.26–0.70)
-  { keywords: ['kubernetes', 'k8s', 'container orchestration'],         evolution: 0.62, phase: 'product' },
-  { keywords: ['machine learning', 'ml'],                                evolution: 0.55, phase: 'product' },
-  { keywords: ['devops', 'ci/cd', 'continuous integration'],            evolution: 0.58, phase: 'product' },
-  { keywords: ['microservices', 'micro-services'],                       evolution: 0.52, phase: 'product' },
-  { keywords: ['nosql', 'document database', 'mongodb'],                evolution: 0.55, phase: 'product' },
-  { keywords: ['serverless', 'faas', 'lambda'],                         evolution: 0.48, phase: 'product' },
+const HISTORY_ITERATION_PROMPT = `You are an expert in technology history, the history of techniques, and Wardley Mapping.
 
-  // Custom (0.18–0.26)
-  { keywords: ['llm', 'large language model', 'language model', 'gpt'], evolution: 0.80, phase: 'commodity' },
-  { keywords: ['quantum computing', 'quantum computer'],                 evolution: 0.20, phase: 'custom' },
-  { keywords: ['edge ai', 'edge computing ai'],                          evolution: 0.22, phase: 'custom' },
+You are building a chronological timeline of how a capability has been fulfilled throughout history.
 
-  // Genesis (0–0.18)
-  { keywords: ['wardley mapping', 'wardley map'],                        evolution: 0.12, phase: 'genesis' },
-  { keywords: ['agi', 'artificial general intelligence'],                evolution: 0.08, phase: 'genesis' },
-  { keywords: ['brain-computer interface', 'bci', 'neural interface'],  evolution: 0.10, phase: 'genesis' },
-  { keywords: ['fusion energy', 'nuclear fusion', 'fusion reactor'],    evolution: 0.14, phase: 'genesis' },
-
-  // Extra-competitive (social/common goods)
-  { keywords: ['air', 'atmospheric', 'oxygen', 'breathing'],            evolution: null, phase: 'extra-competitive' },
-  { keywords: ['sunlight', 'solar radiation'],                           evolution: null, phase: 'extra-competitive' },
-];
-
-const TIMELINE_PROMPT = `You are an expert in technology history and Wardley Mapping.
-
-Estimate the evolution position of a technology component based on its historical timeline.
-
-Component: {{component}}
+Underlying capability: {{capability}}
+Original component: {{component}}
 Context: {{context}}
+Current year: ${CURRENT_YEAR}
 
-REASONING STEPS:
-1. When was this component first conceived or discovered? (genesis date)
-2. When did it move from experimental/custom-built to having competing products? (product date)
-3. When did it become standardized/commoditized, if ever? (commodity date)
-4. How many years has elapsed in each phase?
-5. What is the current state TODAY (${new Date().getFullYear()})?
+{{history_section}}
 
-Wardley evolution phases:
-- Genesis [0, 0.18]: Novel, experimental, few understand it
-- Custom [0.18, 0.26]: Emerging, being built for specific needs
-- Product [0.26, 0.70]: Multiple competing implementations, well-understood
-- Commodity [0.70, 1.0]: Standardized, utility, ubiquitous
+Your task: identify the NEXT chronological milestone — the next significant solution, method, or manifestation of this capability that appeared AFTER the ones listed above.
 
-Based on the timeline analysis, estimate the current evolution position.
+Rules:
+- Each milestone must be LATER than the previous one
+- Focus on major inflection points, not minor incremental updates
 
 MANDATORY FORMAT: exactly two lines at the end, no additional text after them:
-evolution=X.XX
-confidence=Y.YY`;
+milestone_name=<name of the solution or manifestation>
+milestone_date=<year as integer>`;
 
 /**
- * Parse LLM timeline response into evolution and confidence values.
+ * Parse a single history iteration response from the LLM.
  * @param {string} text
- * @returns {{ evolution: number, confidence: number }}
+ * @returns {{ name: string, date: number }}
  */
-function parseTimelineResponse(text) {
-  const evoMatch = text.match(/evolution[:\s=]*([\d.]+)/i);
-  const confMatch = text.match(/confidence[:\s=]*([\d.]+)/i);
+export function parseHistoryIterationResponse(text) {
+  const nameMatch = text.match(/milestone_name[:\s=]*(.*)/i);
+  const dateMatch = text.match(/milestone_date[:\s=]*(\d+)/i);
 
-  if (!evoMatch) {
-    throw new Error(`TimelineBenchmarkStrategy: could not parse LLM response: ${text.slice(0, 200)}`);
+  if (!nameMatch || !dateMatch) {
+    throw new Error(`TimelineBenchmarkStrategy: could not parse history iteration: ${text.slice(0, 200)}`);
   }
 
   return {
-    evolution: parseFloat(evoMatch[1]),
-    confidence: confMatch ? parseFloat(confMatch[1]) : 0.6,
+    name: nameMatch[1].trim(),
+    date: parseInt(dateMatch[1], 10),
   };
 }
 
 /**
- * Score how well a component matches a benchmark entry.
- * Returns 0 (no match) to 1 (perfect match).
+ * Format the accumulated history into a text section for the next prompt.
+ * @param {Array<{ name: string, date: number, evolution: number, certitude: number, ubiquity: number }>} history
+ * @returns {string}
  */
-function matchScore(component, benchmark) {
-  const searchText = `${component.name} ${component.context || ''} ${component.description || ''}`.toLowerCase();
+export function formatHistorySection(history) {
+  if (history.length === 0) {
+    return 'History so far: (none — you are identifying the OLDEST known solution for this capability)';
+  }
+  const lines = history.map(
+    h => `- ${h.name} (${h.date}): evolution=${h.evolution}, certitude=${h.certitude}, ubiquity=${h.ubiquity}`,
+  );
+  const last = history[history.length - 1];
+  return `History so far (chronological):\n${lines.join('\n')}\n\nContinue from after ${last.name} (${last.date}).`;
+}
 
-  let bestScore = 0;
-  for (const keyword of benchmark.keywords) {
-    const kw = keyword.toLowerCase();
-    if (searchText.includes(kw)) {
-      // Longer keyword matches are more specific → higher score
-      const score = kw.length / Math.max(searchText.length, 1);
-      // Boost exact component name matches
-      const nameMatch = component.name.toLowerCase().includes(kw) ||
-                        kw.includes(component.name.toLowerCase());
-      const boosted = nameMatch ? Math.min(1, score * 3 + 0.5) : score;
-      bestScore = Math.max(bestScore, boosted);
+/**
+ * Compute confidence from the richness, internal consistency, and LLM-direct confidence of the timeline.
+ * @param {Array<{ name: string, date: number, evolution: number, confidence: number }>} history
+ * @returns {number} confidence in [0.2, 0.95]
+ */
+export function computeTimelineConfidence(history) {
+  if (history.length === 0) return 0.2;
+
+  // Factor 1: iteration richness (more milestones = more grounded)
+  const iterationFactor = Math.min(history.length / MAX_HISTORY_ITERATIONS, 1);
+
+  // Factor 2: monotonicity of evolution values
+  let monotonicSteps = 0;
+  for (let i = 1; i < history.length; i++) {
+    if (history[i].evolution >= history[i - 1].evolution) {
+      monotonicSteps++;
     }
   }
+  const monotonicityFactor = history.length > 1
+    ? monotonicSteps / (history.length - 1)
+    : 1;
 
-  return bestScore;
+  // Factor 3: average confidence from LLM-direct evaluations
+  const avgLlmConfidence = history.reduce((s, h) => s + h.confidence, 0) / history.length;
+
+  return Math.round(
+    Math.max(0.2, Math.min(0.95,
+      iterationFactor * 0.25 + monotonicityFactor * 0.25 + avgLlmConfidence * 0.45 + 0.05,
+    )) * 1000,
+  ) / 1000;
 }
 
 export class TimelineBenchmarkStrategy extends BaseStrategy {
@@ -126,8 +110,7 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
   /**
    * @param {Object} [options]
    * @param {function(string): Promise<string>} [options.llmCall]
-   *   Optional async function for LLM-based historical reasoning.
-   *   If not provided, only keyword matching and analytical fallbacks are used.
+   *   Async function for LLM calls. Required for both phases.
    */
   constructor({ llmCall } = {}) {
     super();
@@ -143,81 +126,78 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
    * @returns {Promise<import('./base-strategy.mjs').EvolutionResult>}
    */
   async evaluate(component) {
-    // Try benchmark matching first
-    let bestMatch = null;
-    let bestScore = 0;
-
-    for (const benchmark of BENCHMARKS) {
-      const score = matchScore(component, benchmark);
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = benchmark;
-      }
+    if (!this._llmCall) {
+      throw new Error('TimelineBenchmarkStrategy requires an llmCall function');
     }
 
-    // If we have a strong benchmark match
-    if (bestMatch && bestScore > 0.1) {
-      // For extra-competitive goods (air, sunlight, etc.)
-      if (bestMatch.evolution === null) {
-        // Return a negative evolution to signal extra-competitive
-        const result = {
-          evolution: -0.5,
-          confidence: Math.round(Math.min(0.9, bestScore + 0.3) * 1000) / 1000,
-          method: TimelineBenchmarkStrategy.method,
-        };
-        return BaseStrategy.validateResult(result);
-      }
+    // ── Phase 1: Capability Identification ──────────────────────────
+    const capability = await identifyCapability(component, this._llmCall);
 
-      const result = {
-        evolution: bestMatch.evolution,
-        confidence: Math.round(Math.min(0.9, bestScore + 0.2) * 1000) / 1000,
-        method: TimelineBenchmarkStrategy.method,
-      };
-      return BaseStrategy.validateResult(result);
-    }
+    // ── Phase 2: Recursive Historical Timeline Loop ─────────────────
+    const llmDirect = new LLMDirectStrategy({ llmCall: this._llmCall });
+    const history = []; // Array<{ name, date, evolution, confidence, certitude, ubiquity }>
 
-    // TIER 2: LLM historical reasoning
-    if (this._llmCall) {
-      const prompt = TIMELINE_PROMPT
+    for (let i = 0; i < MAX_HISTORY_ITERATIONS; i++) {
+      const historySection = formatHistorySection(history);
+
+      const iterationPrompt = HISTORY_ITERATION_PROMPT
+        .replace('{{capability}}', capability.capability)
         .replace('{{component}}', component.name || '')
-        .replace('{{context}}', component.description || component.context || '');
+        .replace('{{context}}', component.description || component.context || '')
+        .replace('{{history_section}}', historySection);
 
-      const response = await this._llmCall(prompt);
-      const parsed = parseTimelineResponse(response);
+      let milestone;
+      try {
+        const response = await this._llmCall(iterationPrompt);
+        milestone = parseHistoryIterationResponse(response);
+      } catch (err) {
+        // If LLM fails mid-loop and we have at least one result, use it
+        if (history.length > 0) break;
+        throw err;
+      }
 
-      const result = {
-        evolution: parsed.evolution,
-        confidence: Math.min(0.85, parsed.confidence), // cap below benchmark confidence
-        method: TimelineBenchmarkStrategy.method,
-      };
-      return BaseStrategy.validateResult(result);
-    }
+      // Evaluate evolution via LLMDirectStrategy with date context
+      let evoResult;
+      try {
+        evoResult = await llmDirect.evaluate({
+          name: milestone.name,
+          context: component.description || component.context || '',
+          date: milestone.date,
+        });
+      } catch (err) {
+        if (history.length > 0) break;
+        throw err;
+      }
 
-    // TIER 3: Publication type distribution fallback
-    if (component.wonder != null && component.build != null &&
-        component.operate != null && component.usage != null) {
-      const evo = pubEvolution(component.wonder, component.build, component.operate, component.usage);
-      if (evo !== null) {
-        const result = {
-          evolution: evo,
-          confidence: 0.4, // Lower confidence for pub-distribution fallback
-          method: TimelineBenchmarkStrategy.method,
-        };
-        return BaseStrategy.validateResult(result);
+      history.push({
+        name: milestone.name,
+        date: milestone.date,
+        evolution: evoResult.evolution,
+        confidence: evoResult.confidence,
+        certitude: evoResult.certitude,
+        ubiquity: evoResult.ubiquity,
+      });
+
+      // Termination: reached current year
+      if (milestone.date >= CURRENT_YEAR) {
+        break;
       }
     }
 
-    // Last resort: if certitude/ubiquity available, rough midpoint estimate
-    if (component.certitude != null && component.ubiquity != null) {
-      const roughEvo = Math.round(((component.certitude + component.ubiquity) / 2) * 1000) / 1000;
-      const result = {
-        evolution: roughEvo,
-        confidence: 0.2,
-        method: TimelineBenchmarkStrategy.method,
-      };
-      return BaseStrategy.validateResult(result);
-    }
+    // ── Compute final result ────────────────────────────────────────
+    const lastMilestone = history[history.length - 1];
+    const evolution = Math.round(
+      Math.max(0, Math.min(1, lastMilestone.evolution)) * 1000,
+    ) / 1000;
+    const confidence = computeTimelineConfidence(history);
 
-    throw new Error('TimelineBenchmarkStrategy: insufficient data — need keywords, pub distribution, or certitude/ubiquity');
+    const result = {
+      evolution,
+      confidence,
+      method: TimelineBenchmarkStrategy.method,
+      trace: history,
+    };
+
+    return BaseStrategy.validateResult(result);
   }
 }

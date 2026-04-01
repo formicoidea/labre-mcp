@@ -25,6 +25,8 @@ import { createInterface } from 'node:readline';
 import { ESTIMATE_EVOLUTION_TOOL, handleEstimateEvolution } from './mcp-tool.mjs';
 import { GENERATE_VALUE_CHAIN_TOOL, handleGenerateValueChain } from './generate-value-chain.mjs';
 import { EVALUATE_MAP_TOOL, handleEvaluateMap } from './evaluate-map.mjs';
+import { logInfo, logError } from './mcp-notifications.mjs';
+import { classifyAndLogLLMError, classifyLLMError } from './llm-error-handler.mjs';
 
 // ─── Tool Registry ──────────────────────────────────────────────────────────
 
@@ -51,6 +53,10 @@ const SERVER_INFO = {
 
 const SERVER_CAPABILITIES = {
   tools: {},
+  logging: {},
+  experimental: {
+    'claude/channel': {},
+  },
 };
 
 /**
@@ -84,6 +90,7 @@ async function handleRequest(request) {
           protocolVersion: '2024-11-05',
           serverInfo: SERVER_INFO,
           capabilities: SERVER_CAPABILITIES,
+          instructions: 'Progress notifications arrive as <channel source="wardley-assistant" level="..." tool="...">. They are one-way status updates showing tool execution progress. Display them to the user as real-time progress indicators. No reply expected.',
         },
       };
 
@@ -124,8 +131,28 @@ async function handleRequest(request) {
         };
       }
 
+      // Build a concise description of the invocation for log messages
+      const toolArgs = params?.arguments ?? {};
+      const toolSubject = toolArgs.name || toolArgs.filePath || toolArgs.description?.slice(0, 60) || '';
+      const startMsg = toolSubject
+        ? `Starting ${toolName} for "${toolSubject}"...`
+        : `Starting ${toolName}...`;
+
+      // Info-level: tool invocation start
+      logInfo(toolName, startMsg);
+
+      const startTime = Date.now();
+
       try {
-        const result = await handler(params?.arguments ?? {});
+        const result = await handler(toolArgs);
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+        // Info-level: tool invocation end (success)
+        const endMsg = toolSubject
+          ? `${toolName} completed for "${toolSubject}" in ${elapsed}s`
+          : `${toolName} completed in ${elapsed}s`;
+        logInfo(toolName, endMsg);
+
         return {
           jsonrpc: '2.0',
           id,
@@ -139,6 +166,19 @@ async function handleRequest(request) {
           },
         };
       } catch (err) {
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+        // Classify the error to determine if it's an LLM-specific issue
+        const classified = classifyLLMError(err);
+        const isLLMError = classified.type !== 'generic';
+
+        // Error-level: tool invocation failure with specific error type
+        const typeLabel = isLLMError ? ` [${classified.type}]` : '';
+        const errMsg = toolSubject
+          ? `${toolName} failed for "${toolSubject}" after ${elapsed}s${typeLabel}: ${err.message}`
+          : `${toolName} failed after ${elapsed}s${typeLabel}: ${err.message}`;
+        logError(toolName, errMsg);
+
         return {
           jsonrpc: '2.0',
           id,

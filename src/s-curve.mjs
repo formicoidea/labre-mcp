@@ -5,7 +5,7 @@
 //   upper boundary: rises earlier, gentler slope
 //   lower boundary: rises later, steeper slope
 // Inside the band = competitive market (classic Wardley evolution)
-// Outside the band = extra-competitive market (social good OR common good — undetermined geometrically)
+// Outside the band = still projected geometrically (zone is informational, confidence degrades)
 // This naturally creates three visual stages:
 //   Foot (thin) → Belly (thick) → Top (medium)
 //
@@ -81,7 +81,7 @@ export function bandDistance(c, u, params = DEFAULT_PARAMS) {
   return Math.min(u - lower, upper - u);
 }
 
-// Geometric projection onto the center curve → t* ∈ [0, 1]
+// Geometric projection onto the center curve → { evolution: t* ∈ [0, 1], distToCenter }
 export function projectOnCurve(c, u, params = DEFAULT_PARAMS) {
   let bestT = 0;
   let bestDist = Infinity;
@@ -93,7 +93,10 @@ export function projectOnCurve(c, u, params = DEFAULT_PARAMS) {
       bestT = t;
     }
   }
-  return Math.round(bestT * 1000) / 1000;
+  return {
+    evolution: Math.round(bestT * 1000) / 1000,
+    distToCenter: Math.round(Math.sqrt(bestDist) * 1000) / 1000,
+  };
 }
 
 // Main function: (certitude, ubiquity) → { zone, evolution, phase, bandDistance }
@@ -101,33 +104,22 @@ export function computeEvolution(certitude, ubiquity, params = DEFAULT_PARAMS) {
   const zone = classifyZone(certitude, ubiquity, params);
   const bd = bandDistance(certitude, ubiquity, params);
 
-  let evolution;
-  if (zone === 'competitive') {
-    evolution = projectOnCurve(certitude, ubiquity, params);
-  } else {
-    // Outside band: determine direction for evolution scale
-    const upper = bandUpper(certitude, params);
-    const lower = bandLower(certitude, params);
-    if (ubiquity > upper) {
-      evolution = 1 + (ubiquity - upper);
-    } else {
-      evolution = -(lower - ubiquity);
-    }
-  }
+  // Always project geometrically onto center curve — evolution is always in [0, 1].
+  // distToCenter = Euclidean distance from point to nearest point on center sigmoid.
+  const proj = projectOnCurve(certitude, ubiquity, params);
 
   const phase =
-    evolution < 0 ? 'Extra-competitive market' :
-    evolution <= 0.18 ? 'Genesis' :
-    evolution <= 0.26 ? 'Custom' :
-    evolution <= 0.70 ? 'Product' :
-    evolution <= 1 ? 'Commodity' :
-    'Extra-competitive market';
+    proj.evolution <= 0.18 ? 'Genesis' :
+    proj.evolution <= 0.26 ? 'Custom' :
+    proj.evolution <= 0.70 ? 'Product' :
+    'Commodity';
 
   return {
     zone,
-    evolution: Math.round(evolution * 1000) / 1000,
+    evolution: proj.evolution,
     phase,
     bandDistance: Math.round(bd * 1000) / 1000,
+    distToCenter: proj.distToCenter,
   };
 }
 

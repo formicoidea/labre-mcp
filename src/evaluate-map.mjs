@@ -14,6 +14,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { classifyComponent } from './classification-gate.mjs';
 import { estimateEvolutionOneShot } from './estimate-evolution.mjs';
+import { logDebug, logInfo, logError } from './mcp-notifications.mjs';
+import { createMessageResolverFromArgs } from './progress-messages.mjs';
 
 // ─── .wm Parser ─────────────────────────────────────────────────────────────
 
@@ -148,7 +150,8 @@ export function parseWardleyMap(content) {
  * @returns {Promise<{evaluations: Array, summary: Object}>}
  */
 export async function evaluateMapComponents(parsedMap, options = {}) {
-  const { strategy = 'all', context = parsedMap.title || '' } = options;
+  const { strategy = 'all', context = parsedMap.title || '', msg } = options;
+  const TOOL = 'evaluateMap';
   const evaluations = [];
 
   // Evaluate anchors + components
@@ -157,11 +160,37 @@ export async function evaluateMapComponents(parsedMap, options = {}) {
     ...parsedMap.components.map(c => ({ ...c, type: 'component' })),
   ];
 
-  for (const item of allItems) {
+  for (let i = 0; i < allItems.length; i++) {
+    const item = allItems[i];
+
+    // Debug: per-component progress
+    if (msg) {
+      logDebug(TOOL, msg('step.evaluation.progress', {
+        current: i + 1,
+        total: allItems.length,
+        component: item.name,
+      }));
+    }
+
     // Classification gate
     const classification = classifyComponent(item.name, context);
 
+    // Debug: classification result
+    if (msg) {
+      logDebug(TOOL, msg('step.classification', {
+        component: item.name,
+        space: classification.space,
+      }));
+    }
+
     if (classification.requiresReQuestion) {
+      // Debug: skipped component
+      if (msg) {
+        logDebug(TOOL, msg('step.evaluation.skipped', {
+          component: item.name,
+          reason: classification.space,
+        }));
+      }
       evaluations.push({
         name: item.name,
         type: item.type,
@@ -200,6 +229,15 @@ export async function evaluateMapComponents(parsedMap, options = {}) {
 
         if (best) {
           bestEvolution = Math.round(best[1].evolution * 100) / 100;
+          // Debug: best evolution picked
+          if (msg) {
+            logDebug(TOOL, msg('step.evaluation.bestpick', {
+              component: item.name,
+              evolution: bestEvolution,
+              strategy: best[0],
+              confidence: best[1].confidence,
+            }));
+          }
         }
       }
 
@@ -214,6 +252,9 @@ export async function evaluateMapComponents(parsedMap, options = {}) {
         skipped: false,
       });
     } catch (err) {
+      logError(TOOL, msg
+        ? msg('error.generic', { tool: TOOL, error: err.message })
+        : `Error evaluating "${item.name}": ${err.message}`);
       evaluations.push({
         name: item.name,
         type: item.type,
@@ -229,6 +270,15 @@ export async function evaluateMapComponents(parsedMap, options = {}) {
 
   const evaluated = evaluations.filter(e => !e.skipped);
   const skipped = evaluations.filter(e => e.skipped);
+
+  // Debug: evaluation summary (mirrors estimateEvolution pattern)
+  if (msg) {
+    logDebug(TOOL, msg('step.evaluation.summary', {
+      evaluated: evaluated.length,
+      skipped: skipped.length,
+      total: allItems.length,
+    }));
+  }
 
   return {
     evaluations,
@@ -330,18 +380,45 @@ export function formatEvaluationReport(evaluations, summary) {
  */
 export async function evaluateMapFile(filePath, options = {}) {
   const { strategy = 'all', updateFile = true } = options;
+  const TOOL = 'evaluateMap';
 
-  const content = await readFile(filePath, 'utf-8');
+  // ── Localized message resolver ──────────────────────────────────────
+  const { msg, lang } = createMessageResolverFromArgs({ filePath });
+
+  // Info-level: tool start (localized)
+  logInfo(TOOL, msg('tool.start.map', { tool: TOOL, filePath }));
+  const t0 = Date.now();
+
+  // Debug: strategy selection
+  logDebug(TOOL, `Strategy: "${strategy}", updateFile: ${updateFile}, lang: ${lang}`);
+
+  let content;
+  try {
+    content = await readFile(filePath, 'utf-8');
+  } catch (err) {
+    logError(TOOL, msg('error.parse', { error: `Cannot read file "${filePath}": ${err.message}` }));
+    throw err;
+  }
+
   const parsedMap = parseWardleyMap(content);
 
-  const { evaluations, summary } = await evaluateMapComponents(parsedMap, { strategy });
+  // Debug: parsing complete
+  const componentCount = parsedMap.anchors.length + parsedMap.components.length;
+  logDebug(TOOL, msg('step.parsing', { count: componentCount }));
+
+  const { evaluations, summary } = await evaluateMapComponents(parsedMap, { strategy, msg });
   const report = formatEvaluationReport(evaluations, summary);
 
   let updatedContent = content;
   if (updateFile) {
+    logDebug(TOOL, msg('step.file.update', { count: summary.evaluated }));
     updatedContent = updateWmContent(content, evaluations);
     await writeFile(filePath, updatedContent, 'utf-8');
   }
+
+  // Info-level: tool end (localized)
+  const duration = Date.now() - t0;
+  logInfo(TOOL, msg('tool.end.map', { tool: TOOL, filePath, count: summary.evaluated, duration }));
 
   return { evaluations, summary, report, updatedContent, filePath };
 }

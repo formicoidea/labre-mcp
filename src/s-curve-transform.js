@@ -61,20 +61,8 @@ function pubEvolution(wonder, build, operate, usage) {
 }
 
 function computeEvolution(certitude, ubiquity) {
-  const upper = bandUpper(certitude);
-  const lower = bandLower(certitude);
-  const inBand = ubiquity >= lower && ubiquity <= upper;
-
-  let evolution;
-  if (inBand) {
-    evolution = projectOnCurve(certitude, ubiquity);
-  } else if (ubiquity > upper) {
-    evolution = 1 + (ubiquity - upper);
-  } else {
-    evolution = -(lower - ubiquity);
-  }
-
-  return Math.round(evolution * 1000) / 1000;
+  // Always project geometrically — evolution is always in [0, 1]
+  return projectOnCurve(certitude, ubiquity);
 }
 
 module.exports = function (output, context) {

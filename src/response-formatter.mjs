@@ -12,7 +12,7 @@
 //   0.17–0.40  Custom-Built    (emerging, divergent)
 //   0.40–0.70  Product (+rental)(converging, feature-rich)
 //   0.70–1.00  Commodity (+utility) (standardised, invisible)
-//   < 0 or > 1  Extra-competitive-market zone
+//   (evolution is always in [0, 1] via geometric projection)
 
 // ─── Evolution Stage Mapping ────────────────────────────────────────────────
 
@@ -63,21 +63,6 @@ const EVOLUTION_STAGES = [
  * @returns {EvolutionStage & { position: string }}
  */
 export function evolutionToStage(evolution) {
-  // Extra-competitive-market zones
-  if (evolution < 0) {
-    return {
-      ...EVOLUTION_STAGES[0],
-      position: `${evolution.toFixed(3)} (pre-Genesis / extra-competitive-market zone)`,
-    };
-  }
-  if (evolution > 1) {
-    return {
-      ...EVOLUTION_STAGES[3],
-      position: `${evolution.toFixed(3)} (beyond Commodity / extra-competitive-market zone)`,
-    };
-  }
-
-  // Normal range
   for (const stage of EVOLUTION_STAGES) {
     if (evolution >= stage.rangeMin && evolution < stage.rangeMax) {
       return { ...stage, position: evolution.toFixed(3) };

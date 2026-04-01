@@ -21,10 +21,16 @@ For the given component, estimate THREE values:
 - certitude: how well-understood and defined this component is (0 to 1)
 - ubiquity: how widespread this component is (0 to 1)
 - evolution: your direct estimate of evolution on the Wardley Maps axis (0 to 1)
-  Genesis [0, 0.18] | Custom [0.18, 0.26] | Product [0.26, 0.70] | Commodity [0.70, 1.0]
+  Genesis [0, 0.18] | Custom [0.18, 0.40] | Product [0.40, 0.70] | Commodity [0.70, 1.0]
 
 Component: {{component}}
 Context: {{context}}
+Context date: {{date}}
+
+Important rules:
+- Evaluate the component in the specific context provided, not in the abstract.
+- Do not infer evolution from age (context date) alone.
+- A component may be old yet still be early in evolution.
 
 MANDATORY FORMAT: exactly three lines, no additional text:
 certitude=X.XX
@@ -82,7 +88,8 @@ export class LLMDirectStrategy extends BaseStrategy {
   async evaluate(component) {
     const prompt = PROMPT_TEMPLATE
       .replace('{{component}}', component.name || '')
-      .replace('{{context}}', component.description || component.context || '');
+      .replace('{{context}}', component.description || component.context || '')
+      .replace('{{date}}', component.date ? new Date(component.date).getFullYear() : 'unknown');
 
     const response = await this._llmCall(prompt);
     const parsed = parseLLMResponse(response);
@@ -109,6 +116,7 @@ export class LLMDirectStrategy extends BaseStrategy {
       // Expose LLM-estimated inputs for cross-strategy use (e.g. s-curve)
       certitude: parsed.certitude,
       ubiquity: parsed.ubiquity,
+      evaluation_date:component.date ? new Date(component.date).getFullYear() : 'unknown'
     };
 
     return BaseStrategy.validateResult(result);

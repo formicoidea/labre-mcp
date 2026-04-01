@@ -5,12 +5,7 @@
 // Requires: certitude, ubiquity inputs on the component.
 
 import { BaseStrategy } from './base-strategy.mjs';
-import {
-  computeEvolution,
-  isInBand,
-  bandDistance,
-  DEFAULT_PARAMS,
-} from '../s-curve.mjs';
+import { computeEvolution } from '../s-curve.mjs';
 
 export class SCurveStrategy extends BaseStrategy {
 
@@ -31,20 +26,17 @@ export class SCurveStrategy extends BaseStrategy {
 
     const result = computeEvolution(certitude, ubiquity);
 
-    // Confidence is based on how deep inside the band the point sits.
-    // Points inside the band get high confidence; outside gets lower confidence
-    // scaled by how far they are from the boundary.
-    const inBand = isInBand(certitude, ubiquity);
-    const bd = Math.abs(bandDistance(certitude, ubiquity));
-
+    // Confidence: constant inside band, logarithmic decay outside.
+    // Discontinuous gap at boundary signals clearly that the point left the valid zone.
+    // Distance is Euclidean to the center sigmoid (not vertical to band edge).
     let confidence;
-    if (inBand) {
-      // Inside band: confidence 0.7–1.0 based on distance from boundary
-      // (deeper inside = higher confidence)
-      confidence = Math.min(1, 0.7 + bd * 0.6);
+    if (result.zone === 'competitive') {
+      confidence = 0.9;
     } else {
-      // Outside band: confidence 0.2–0.5 inversely proportional to distance
-      confidence = Math.max(0.2, 0.5 - bd * 0.3);
+      // Outside band: logarithmic decay from 0.90 (continuous), using Euclidean distance to center sigmoid
+      const k = 2.0;
+      const scale = 0.2;
+      confidence = Math.max(0.05, 0.9 / (1 + k * Math.log(1 + result.distToCenter / scale)));
     }
     confidence = Math.round(confidence * 1000) / 1000;
 

@@ -19,8 +19,8 @@ import { BaseStrategy } from './base-strategy.mjs';
 // Phase midpoints aligned with s-curve.mjs PUB_TYPE_CENTROIDS / phase boundaries
 const PHASE_CENTROIDS = {
   genesis:   0.09,   // [0, 0.18]
-  custom:    0.22,   // [0.18, 0.26]
-  product:   0.48,   // [0.26, 0.70]
+  custom:    0.22,   // [0.18, 0.40]
+  product:   0.48,   // [0.40, 0.70]
   commodity: 0.85,   // [0.70, 1.0]
 };
 

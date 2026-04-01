@@ -15,6 +15,7 @@
  * @property {number} evolution  - Evolution position (0–1 competitive, outside = extra-competitive)
  * @property {number} confidence - Confidence score (0–1)
  * @property {string} method     - Strategy identifier string
+ * @property {array} trace    - trace of reasoning steps, strategy-specific format (optional)
  */
 
 /**
@@ -27,6 +28,7 @@
  * @property {number}  [operate]   - Operate publication proportion
  * @property {number}  [usage]     - Usage publication proportion
  * @property {string}  [description] - Free-text component description
+ * @property {string|Date} [date]    - Optional date for context (e.g. when component is to observe)
  * @property {Object}  [metadata]  - Additional strategy-specific data
  */
 
@@ -74,7 +76,7 @@ export class BaseStrategy {
       throw new TypeError('EvolutionResult must be a non-null object');
     }
 
-    const { evolution, confidence, method } = result;
+    const { evolution, confidence, method, trace } = result;
 
     if (typeof evolution !== 'number' || Number.isNaN(evolution)) {
       throw new TypeError(`EvolutionResult.evolution must be a number, got ${evolution}`);

@@ -13,6 +13,7 @@
 //   const { text, logprobs } = await logprobCall('Classify {{component}}', { component: 'ERP' });
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
+import { classifyAndLogLLMError } from './llm-error-handler.mjs';
 
 // ─── Template Interpolation ─────────────────────────────────────────────────
 
@@ -67,21 +68,30 @@ export function createLLMCall(config = {}) {
       options.systemPrompt = systemPrompt;
     }
 
+    const errorContext = { logger: 'llm-call', model };
+
     let resultText = '';
 
-    for await (const message of query({ prompt: interpolatedPrompt, options })) {
-      if (message.type === 'result') {
-        if (message.subtype === 'success') {
-          resultText = message.result || '';
-        } else {
-          const errors = message.errors || [];
-          throw new Error(`LLM call failed: ${errors.join(', ') || 'unknown error'}`);
+    try {
+      for await (const message of query({ prompt: interpolatedPrompt, options })) {
+        if (message.type === 'result') {
+          if (message.subtype === 'success') {
+            resultText = message.result || '';
+          } else {
+            const errors = message.errors || [];
+            throw new Error(`LLM call failed: ${errors.join(', ') || 'unknown error'}`);
+          }
         }
       }
+    } catch (err) {
+      classifyAndLogLLMError(err, errorContext);
+      throw err;
     }
 
     if (!resultText) {
-      throw new Error('LLM call returned empty response');
+      const emptyErr = new Error('LLM call returned empty response');
+      classifyAndLogLLMError(emptyErr, errorContext);
+      throw emptyErr;
     }
 
     return resultText;
@@ -123,21 +133,30 @@ export function createStructuredLLMCall(config = {}) {
       outputFormat: { type: 'json_schema', schema },
     };
 
+    const errorContext = { logger: 'llm-call-structured', model };
+
     let resultText = '';
 
-    for await (const message of query({ prompt: interpolatedPrompt, options })) {
-      if (message.type === 'result') {
-        if (message.subtype === 'success') {
-          resultText = message.result || '';
-        } else {
-          const errors = message.errors || [];
-          throw new Error(`Structured LLM call failed: ${errors.join(', ') || 'unknown error'}`);
+    try {
+      for await (const message of query({ prompt: interpolatedPrompt, options })) {
+        if (message.type === 'result') {
+          if (message.subtype === 'success') {
+            resultText = message.result || '';
+          } else {
+            const errors = message.errors || [];
+            throw new Error(`Structured LLM call failed: ${errors.join(', ') || 'unknown error'}`);
+          }
         }
       }
+    } catch (err) {
+      classifyAndLogLLMError(err, errorContext);
+      throw err;
     }
 
     if (!resultText) {
-      throw new Error('Structured LLM call returned empty response');
+      const emptyErr = new Error('Structured LLM call returned empty response');
+      classifyAndLogLLMError(emptyErr, errorContext);
+      throw emptyErr;
     }
 
     return JSON.parse(resultText);
@@ -168,33 +187,48 @@ export function createOpenCodeCall(config = {}) {
   return async function openCodeCall(prompt, variables) {
     const interpolatedPrompt = interpolate(prompt, variables);
 
+    const errorContext = { logger: 'opencode-call', model };
+
     if (!apiKey) {
-      throw new Error('OpenCode API key not configured. Set OPENCODE_API_KEY in .env');
+      const authErr = new Error('OpenCode API key not configured. Set OPENCODE_API_KEY in .env');
+      classifyAndLogLLMError(authErr, errorContext);
+      throw authErr;
     }
 
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: interpolatedPrompt }],
-        temperature,
-      }),
-    });
+    let response;
+    try {
+      response = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: interpolatedPrompt }],
+          temperature,
+        }),
+      });
+    } catch (fetchErr) {
+      // Network errors (ECONNREFUSED, DNS, timeout, etc.)
+      classifyAndLogLLMError(fetchErr, errorContext);
+      throw fetchErr;
+    }
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`OpenCode API error ${response.status}: ${body}`);
+      const apiErr = new Error(`OpenCode API error ${response.status}: ${body}`);
+      classifyAndLogLLMError(apiErr, errorContext);
+      throw apiErr;
     }
 
     const data = await response.json();
     const text = data.choices?.[0]?.message?.content;
 
     if (!text) {
-      throw new Error('OpenCode call returned empty response');
+      const emptyErr = new Error('OpenCode call returned empty response');
+      classifyAndLogLLMError(emptyErr, errorContext);
+      throw emptyErr;
     }
 
     return text;
@@ -222,29 +256,41 @@ export function createOpenCodeLogprobCall(config = {}) {
   return async function openCodeLogprobCall(prompt, variables) {
     const interpolatedPrompt = interpolate(prompt, variables);
 
+    const errorContext = { logger: 'opencode-logprob', model };
+
     if (!apiKey) {
-      throw new Error('OpenCode API key not configured. Set OPENCODE_API_KEY in .env');
+      const authErr = new Error('OpenCode API key not configured. Set OPENCODE_API_KEY in .env');
+      classifyAndLogLLMError(authErr, errorContext);
+      throw authErr;
     }
 
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: interpolatedPrompt }],
-        temperature: 0,
-        logprobs: true,
-        top_logprobs: topLogprobs,
-        max_tokens: 10,
-      }),
-    });
+    let response;
+    try {
+      response = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: interpolatedPrompt }],
+          temperature: 0,
+          logprobs: true,
+          top_logprobs: topLogprobs,
+          max_tokens: 10,
+        }),
+      });
+    } catch (fetchErr) {
+      classifyAndLogLLMError(fetchErr, errorContext);
+      throw fetchErr;
+    }
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`OpenCode logprob API error ${response.status}: ${body}`);
+      const apiErr = new Error(`OpenCode logprob API error ${response.status}: ${body}`);
+      classifyAndLogLLMError(apiErr, errorContext);
+      throw apiErr;
     }
 
     const data = await response.json();

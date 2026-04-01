@@ -153,24 +153,23 @@ function projectOnCurve(c, u, p) {
   return { t: Math.round(bestT * 1000) / 1000, dist: Math.sqrt(bestDist) };
 }
 
+function computeConfidence(zone, distToCenter) {
+  if (zone === 'competitive') return 0.9;
+  const k = 2.0, scale = 0.2;
+  return Math.max(0.05, 0.9 / (1 + k * Math.log(1 + distToCenter / scale)));
+}
+
 function computeEvolution(c, u, p) {
   const zone = classifyZone(c, u, p);
   const bd = bandDistance(c, u, p);
-  let evolution;
-  if (zone === 'competitive') {
-    evolution = projectOnCurve(c, u, p).t;
-  } else if (u > upper(c, p)) {
-    evolution = 1 + (u - upper(c, p));
-  } else {
-    evolution = -(lower(c, p) - u);
-  }
+  const proj = projectOnCurve(c, u, p);
+  const evolution = proj.t;
   const phase =
-    evolution < 0 ? 'Extra-competitive market' :
     evolution <= 0.18 ? 'Genesis' :
     evolution <= 0.26 ? 'Custom' :
     evolution <= 0.70 ? 'Product' :
-    evolution <= 1 ? 'Commodity' : 'Extra-competitive market';
-  return { zone, evolution: Math.round(evolution * 1000) / 1000, phase, bandDistance: Math.round(bd * 1000) / 1000 };
+    'Commodity';
+  return { zone, evolution: Math.round(evolution * 1000) / 1000, phase, bandDistance: Math.round(bd * 1000) / 1000, distToCenter: proj.dist };
 }
 
 function toCanvas(c, u) {
@@ -272,21 +271,21 @@ function draw() {
   }
   ctx.stroke();
 
-  // Projection line
+  // Projection line — always drawn (projection works for all points)
   const result = computeEvolution(point.c, point.u, p);
-  if (result.zone === 'competitive') {
-    const proj = projectOnCurve(point.c, point.u, p);
-    const pu = center(proj.t, p);
-    const [px, py] = toCanvas(proj.t, pu);
-    const [qx, qy] = toCanvas(point.c, point.u);
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath(); ctx.moveTo(qx, qy); ctx.lineTo(px, py); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#a0c4ff';
-    ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
-  }
+  const confidence = computeConfidence(result.zone, result.distToCenter);
+  const proj = projectOnCurve(point.c, point.u, p);
+  const pu = center(proj.t, p);
+  const [projX, projY] = toCanvas(proj.t, pu);
+  const [qx, qy] = toCanvas(point.c, point.u);
+  // Line opacity reflects confidence
+  ctx.strokeStyle = `rgba(255,255,255,${0.15 + confidence * 0.5})`;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(qx, qy); ctx.lineTo(projX, projY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#a0c4ff';
+  ctx.beginPath(); ctx.arc(projX, projY, 4, 0, Math.PI * 2); ctx.fill();
 
   // Query point
   const zoneColor = result.zone === 'competitive' ? '#06d6a0' : '#b08ce0';
@@ -342,11 +341,14 @@ function draw() {
 
   // Result display
   const el = document.getElementById('result');
+  const confRound = Math.round(confidence * 1000) / 1000;
+  const confColor = confidence >= 0.9 ? '#06d6a0' : confidence >= 0.3 ? '#ffd166' : '#ef476f';
   el.innerHTML = `
     <div class="zone zone-${result.zone}">Zone: ${result.zone.toUpperCase()}</div>
     certitude: ${point.c.toFixed(2)} | ubiquité: ${point.u.toFixed(2)}<br>
     evolution: <b>${result.evolution}</b> | phase: <b>${result.phase}</b><br>
-    band distance: <b>${result.bandDistance}</b>
+    distance to center: <b>${result.distToCenter.toFixed(3)}</b><br>
+    confidence: <b style="color:${confColor}">${confRound}</b>
   `;
 
   // Phase bar
