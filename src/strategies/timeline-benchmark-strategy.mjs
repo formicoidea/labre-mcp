@@ -19,7 +19,7 @@ const MAX_HISTORY_ITERATIONS = 15;
 
 const HISTORY_ITERATION_PROMPT = `You are an expert in technology history, the history of techniques, and Wardley Mapping.
 
-You are building a chronological timeline of how a capability has been fulfilled throughout history.
+You are building a chronological timeline of how a capability has been fulfilled throughout history, starting from its Genesis (earliest known manifestation) up to the present year (${CURRENT_YEAR}).
 
 Underlying capability: {{capability}}
 Original component: {{component}}
@@ -28,11 +28,14 @@ Current year: ${CURRENT_YEAR}
 
 {{history_section}}
 
+{{pacing_guidance}}
+
 Your task: identify the NEXT chronological milestone — the next significant solution, method, or manifestation of this capability that appeared AFTER the ones listed above.
 
 Rules:
 - Each milestone must be LATER than the previous one
 - Focus on major inflection points, not minor incremental updates
+- Space milestones to cover the remaining timeline proportionally
 
 MANDATORY FORMAT: exactly two lines at the end, no additional text after them:
 milestone_name=<name of the solution or manifestation>
@@ -59,18 +62,43 @@ export function parseHistoryIterationResponse(text) {
 
 /**
  * Format the accumulated history into a text section for the next prompt.
- * @param {Array<{ name: string, date: number, evolution: number, certitude: number, ubiquity: number }>} history
+ * @param {Array<{ name: string, date: number, evolution: number, confidence: number }>} history
  * @returns {string}
  */
 export function formatHistorySection(history) {
   if (history.length === 0) {
-    return 'History so far: (none — you are identifying the OLDEST known solution for this capability)';
+    return 'History so far: (none — identify the GENESIS-ERA origin: the EARLIEST known form of this capability, when it was first conceived or rudimentarily practiced. This should be in the Genesis stage of evolution: novel, poorly understood, rare.)';
   }
   const lines = history.map(
-    h => `- ${h.name} (${h.date}): evolution=${h.evolution}, certitude=${h.certitude}, ubiquity=${h.ubiquity}`,
+    h => `- ${h.name} (${h.date}): evolution=${h.evolution}`,
   );
   const last = history[history.length - 1];
   return `History so far (chronological):\n${lines.join('\n')}\n\nContinue from after ${last.name} (${last.date}).`;
+}
+
+/**
+ * Generate adaptive pacing guidance so the LLM spaces milestones to reach the present.
+ * @param {Array<{ date: number }>} history
+ * @param {number} iteration - current iteration index (0-based)
+ * @param {number} maxIterations
+ * @returns {string}
+ */
+export function formatPacingGuidance(history, iteration, maxIterations) {
+  const remaining = maxIterations - iteration - 1;
+  const lastDate = history.length > 0 ? history[history.length - 1].date : null;
+  const yearsToGo = lastDate != null ? CURRENT_YEAR - lastDate : null;
+
+  if (remaining <= 1) {
+    return `FINAL ITERATION: This must be the current or most recent manifestation of this capability in ${CURRENT_YEAR}.`;
+  }
+  if (remaining <= 3) {
+    return `IMPORTANT: Only ${remaining} iterations remain to reach ${CURRENT_YEAR}. ${yearsToGo != null ? `You still need to cover ~${yearsToGo} years. ` : ''}Your next milestone should jump significantly forward in time.`;
+  }
+  if (lastDate != null && yearsToGo > 0) {
+    const avgGap = Math.ceil(yearsToGo / remaining);
+    return `PACING: ${remaining} iterations remaining to reach ${CURRENT_YEAR}. Last milestone was in ${lastDate} (~${yearsToGo} years to go). Aim for roughly ${avgGap}-year gaps between milestones.`;
+  }
+  return '';
 }
 
 /**
@@ -98,9 +126,16 @@ export function computeTimelineConfidence(history) {
   // Factor 3: average confidence from LLM-direct evaluations
   const avgLlmConfidence = history.reduce((s, h) => s + h.confidence, 0) / history.length;
 
+  // Factor 4: temporal coverage — did the timeline reach the present?
+  const firstDate = history[0].date;
+  const lastDate = history[history.length - 1].date;
+  const totalSpan = CURRENT_YEAR - firstDate;
+  const coveredSpan = lastDate - firstDate;
+  const coverageFactor = totalSpan > 0 ? Math.min(coveredSpan / totalSpan, 1) : 0;
+
   return Math.round(
     Math.max(0.2, Math.min(0.95,
-      iterationFactor * 0.25 + monotonicityFactor * 0.25 + avgLlmConfidence * 0.45 + 0.05,
+      iterationFactor * 0.15 + monotonicityFactor * 0.20 + avgLlmConfidence * 0.40 + coverageFactor * 0.20 + 0.05,
     )) * 1000,
   ) / 1000;
 }
@@ -130,8 +165,10 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
       throw new Error('TimelineBenchmarkStrategy requires an llmCall function');
     }
 
-    // ── Phase 1: Capability Identification ──────────────────────────
-    const capability = await identifyCapability(component, this._llmCall);
+    // ── Phase 1: Capability Identification (skip if pre-identified by orchestrator)
+    const capability = component.capability
+      ? { capability: component.capability, nature: component.nature || 'none' }
+      : await identifyCapability(component, this._llmCall);
 
     // ── Phase 2: Recursive Historical Timeline Loop ─────────────────
     const llmDirect = new LLMDirectStrategy({ llmCall: this._llmCall });
@@ -139,12 +176,14 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
 
     for (let i = 0; i < MAX_HISTORY_ITERATIONS; i++) {
       const historySection = formatHistorySection(history);
+      const pacingGuidance = formatPacingGuidance(history, i, MAX_HISTORY_ITERATIONS);
 
       const iterationPrompt = HISTORY_ITERATION_PROMPT
         .replace('{{capability}}', capability.capability)
         .replace('{{component}}', component.name || '')
         .replace('{{context}}', component.description || component.context || '')
-        .replace('{{history_section}}', historySection);
+        .replace('{{history_section}}', historySection)
+        .replace('{{pacing_guidance}}', pacingGuidance);
 
       let milestone;
       try {
@@ -156,11 +195,13 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
         throw err;
       }
 
-      // Evaluate evolution via LLMDirectStrategy with date context
+      // Evaluate evolution of the capability (not the milestone name) at the milestone date
       let evoResult;
       try {
         evoResult = await llmDirect.evaluate({
           name: milestone.name,
+          capability: capability.capability,
+          nature: capability.nature,
           context: component.description || component.context || '',
           date: milestone.date,
         });
@@ -174,13 +215,33 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
         date: milestone.date,
         evolution: evoResult.evolution,
         confidence: evoResult.confidence,
-        certitude: evoResult.certitude,
-        ubiquity: evoResult.ubiquity,
       });
 
       // Termination: reached current year
       if (milestone.date >= CURRENT_YEAR) {
         break;
+      }
+    }
+
+    // ── Fallback: force present-day evaluation if loop didn't reach current year
+    if (history.length > 0 && history[history.length - 1].date < CURRENT_YEAR) {
+      try {
+        const presentResult = await llmDirect.evaluate({
+          name: component.name || capability.capability,
+          capability: capability.capability,
+          nature: capability.nature,
+          context: component.description || component.context || '',
+          date: CURRENT_YEAR,
+        });
+        history.push({
+          name: `${component.name || capability.capability} (${CURRENT_YEAR})`,
+          date: CURRENT_YEAR,
+          evolution: presentResult.evolution,
+          confidence: presentResult.confidence,
+          _fallback: true,
+        });
+      } catch {
+        // If fallback fails, proceed with accumulated history
       }
     }
 

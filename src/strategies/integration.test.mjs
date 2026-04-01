@@ -15,8 +15,15 @@ import { BaseStrategy } from './base-strategy.mjs';
 
 // ── Mock LLM functions ──────────────────────────────────────────────────────
 
-/** Mock LLM call that returns certitude/ubiquity/evolution format */
+/** Mock LLM call that returns evolution/confidence format (for llm-direct) */
 function mockLLMCall(prompt) {
+  return Promise.resolve(
+    'evolution=0.55\nconfidence=0.75'
+  );
+}
+
+/** Mock LLM call that returns certitude/ubiquity/evolution format (for sector-agent) */
+function mockSectorAgentLLMCall(prompt) {
   return Promise.resolve(
     'certitude=0.75\nubiquity=0.60\nevolution=0.55'
   );
@@ -30,16 +37,34 @@ function mockTimelineLLMCall(prompt) {
       'type=capability\nnature=activite\ncapability=Fournir de l\'infrastructure informatique à la demande\nconfidence=0.85'
     );
   }
-  if (prompt.includes('certitude')) {
-    // LLM-direct evaluation (called internally by timeline-benchmark for each milestone)
+  if (prompt.includes('NEXT chronological milestone')) {
+    // Phase 2: history iteration — return a single milestone at current year
     return Promise.resolve(
-      'certitude=0.75\nubiquity=0.60\nevolution=0.80'
+      `milestone_name=Cloud hyperscalers\nmilestone_date=${new Date().getFullYear()}`
     );
   }
-  // Phase 2: history iteration — return a single milestone at current year
+  // LLM-direct evaluation (called internally by timeline-benchmark for each milestone)
   return Promise.resolve(
-    `milestone_name=Cloud hyperscalers\nmilestone_date=${new Date().getFullYear()}`
+    'evolution=0.80\nconfidence=0.85'
   );
+}
+
+/** Mock LLM call for timeline-benchmark stalling scenario (never reaches current year) */
+function mockTimelineLLMCallStalling(prompt) {
+  if (prompt.includes('underlying capability')) {
+    return Promise.resolve(
+      'type=capability\nnature=activite\ncapability=Test capability\nconfidence=0.85'
+    );
+  }
+  if (prompt.includes('NEXT chronological milestone')) {
+    // Always return dates in the past — simulates stalling
+    if (!mockTimelineLLMCallStalling._count) mockTimelineLLMCallStalling._count = 0;
+    mockTimelineLLMCallStalling._count++;
+    const year = 1900 + mockTimelineLLMCallStalling._count * 5;
+    return Promise.resolve(`milestone_name=Milestone ${mockTimelineLLMCallStalling._count}\nmilestone_date=${year}`);
+  }
+  // LLM-direct evaluation
+  return Promise.resolve('evolution=0.45\nconfidence=0.60');
 }
 
 /** Mock LLM logprob call returning phase classification with logprobs */
@@ -85,7 +110,7 @@ const COMPONENT_MINIMAL = {
 const STRATEGY_OPTIONS = {
   'llm-direct':            { llmCall: mockLLMCall },
   'logprob-distribution':  { llmLogprobCall: mockLLMLogprobCall },
-  'sector-agent':          { llmCall: mockLLMCall },
+  'sector-agent':          { llmCall: mockSectorAgentLLMCall },
   'publication-analysis':  { llmCall: mockPubLLMCall },
   // Analytical strategies need no special options
   's-curve':               {},
@@ -265,7 +290,7 @@ async function main() {
 
   console.log('\nLLM Strategy Mock Integration:');
 
-  await runTest('llm-direct: blends S-curve and LLM estimates', async () => {
+  await runTest('llm-direct: returns direct evolution estimate', async () => {
     const strategies = await loadStrategies();
     const Cls = strategies.get('llm-direct');
     const instance = new Cls({ llmCall: mockLLMCall });
@@ -290,7 +315,7 @@ async function main() {
   await runTest('sector-agent: blends sector analysis with S-curve', async () => {
     const strategies = await loadStrategies();
     const Cls = strategies.get('sector-agent');
-    const instance = new Cls({ llmCall: mockLLMCall });
+    const instance = new Cls({ llmCall: mockSectorAgentLLMCall });
     const result = await instance.evaluate(COMPONENT_MINIMAL);
     assertEvolutionResult(result, 'sector-agent');
     assert.ok(result.evolution >= 0 && result.evolution <= 1,
@@ -304,6 +329,19 @@ async function main() {
     // Component without pub proportions → triggers LLM fallback
     const result = await instance.evaluate(COMPONENT_MINIMAL);
     assertEvolutionResult(result, 'publication-analysis');
+  });
+
+  await runTest('timeline-benchmark: fallback reaches present when loop stalls', async () => {
+    mockTimelineLLMCallStalling._count = 0; // reset counter
+    const strategies = await loadStrategies();
+    const Cls = strategies.get('timeline-benchmark');
+    const instance = new Cls({ llmCall: mockTimelineLLMCallStalling });
+    const result = await instance.evaluate({ name: 'Test', description: 'Test capability' });
+    assertEvolutionResult(result, 'timeline-benchmark');
+    const lastTrace = result.trace[result.trace.length - 1];
+    assert.equal(lastTrace.date, new Date().getFullYear(),
+      `Last milestone should be at current year via fallback, got ${lastTrace.date}`);
+    assert.strictEqual(lastTrace._fallback, true, 'Last milestone should be marked as fallback');
   });
 
   // ── Test 5: Strategy method names are unique ──────────────────────────

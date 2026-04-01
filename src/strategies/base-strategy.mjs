@@ -29,6 +29,8 @@
  * @property {number}  [usage]     - Usage publication proportion
  * @property {string}  [description] - Free-text component description
  * @property {string|Date} [date]    - Optional date for context (e.g. when component is to observe)
+ * @property {string}  [capability] - Underlying capability (activity/practice/knowledge/data) identified by orchestrator
+ * @property {string}  [nature]    - Capability nature: activite|pratique|connaissance|donnee|none
  * @property {Object}  [metadata]  - Additional strategy-specific data
  */
 

@@ -14,6 +14,7 @@ import { loadStrategies, getStrategy, listStrategies } from './strategies/regist
 import { BaseStrategy } from './strategies/base-strategy.mjs';
 import { ConversationSession } from './conversation-session.mjs';
 import { createLLMCall, createOpenCodeCall, createOpenCodeLogprobCall } from './llm-call.mjs';
+import { identifyCapability } from './identify-capability.mjs';
 import { logDebug, logInfo, logError } from './mcp-notifications.mjs';
 import { createMessageResolverFromArgs } from './progress-messages.mjs';
 
@@ -207,6 +208,16 @@ export async function estimateEvolutionOneShot(rawInput) {
     description,
     ...componentData,
   };
+
+  // Step 4b: Identify underlying capability for LLM strategies
+  try {
+    const capResult = await identifyCapability(component, getLLMCall());
+    component.capability = capResult.capability;
+    component.nature = capResult.nature;
+    logDebug(TOOL, `Identified capability for "${name}": ${capResult.capability} (${capResult.nature})`);
+  } catch {
+    // LLM not available — skip capability identification (analytical strategies don't need it)
+  }
 
   // Step 5: Evaluate with selected strategy(ies)
   const evaluations = {};
