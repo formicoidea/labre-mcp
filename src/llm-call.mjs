@@ -15,6 +15,23 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { classifyAndLogLLMError } from './llm-error-handler.mjs';
 
+// ─── Retry Configuration (aligned with Ouroboros claude_code_adapter) ───────
+
+const MAX_RETRIES = 5;
+const INITIAL_BACKOFF_MS = 2000;
+const RETRYABLE_PATTERNS = [
+  'concurrency', 'rate', 'timeout', 'overloaded',
+  'temporarily', 'empty response', 'need retry', 'startup',
+  'unknown error',
+];
+
+function isRetryableError(err) {
+  const msg = String(err.message || err).toLowerCase();
+  return RETRYABLE_PATTERNS.some(p => msg.includes(p));
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
 // ─── Template Interpolation ─────────────────────────────────────────────────
 
 /**
@@ -55,6 +72,11 @@ export function createLLMCall(config = {}) {
   return async function llmCall(prompt, variables) {
     const interpolatedPrompt = interpolate(prompt, variables);
 
+    // Prevent nested session detection that causes silent empty responses
+    if (process.env.CLAUDECODE) {
+      delete process.env.CLAUDECODE;
+    }
+
     const options = {
       model,
       maxTurns: 1,
@@ -70,31 +92,37 @@ export function createLLMCall(config = {}) {
 
     const errorContext = { logger: 'llm-call', model };
 
-    let resultText = '';
-
-    try {
-      for await (const message of query({ prompt: interpolatedPrompt, options })) {
-        if (message.type === 'result') {
-          if (message.subtype === 'success') {
-            resultText = message.result || '';
-          } else {
-            const errors = message.errors || [];
-            throw new Error(`LLM call failed: ${errors.join(', ') || 'unknown error'}`);
+    let lastError;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        let resultText = '';
+        for await (const message of query({ prompt: interpolatedPrompt, options })) {
+          if (message.type === 'result') {
+            if (message.subtype === 'success') {
+              resultText = message.result || '';
+            } else {
+              const errors = message.errors || [];
+              throw new Error(`LLM call failed: ${errors.join(', ') || 'unknown error'}`);
+            }
           }
         }
+        if (!resultText) {
+          throw new Error('LLM call returned empty response');
+        }
+        return resultText;
+      } catch (err) {
+        lastError = err;
+        if (isRetryableError(err) && attempt < MAX_RETRIES - 1) {
+          const backoff = INITIAL_BACKOFF_MS * (2 ** attempt);
+          await sleep(backoff);
+          continue;
+        }
+        classifyAndLogLLMError(err, errorContext);
+        throw err;
       }
-    } catch (err) {
-      classifyAndLogLLMError(err, errorContext);
-      throw err;
     }
-
-    if (!resultText) {
-      const emptyErr = new Error('LLM call returned empty response');
-      classifyAndLogLLMError(emptyErr, errorContext);
-      throw emptyErr;
-    }
-
-    return resultText;
+    classifyAndLogLLMError(lastError, errorContext);
+    throw lastError;
   };
 }
 
@@ -123,6 +151,11 @@ export function createStructuredLLMCall(config = {}) {
   return async function structuredLLMCall(prompt, variables) {
     const interpolatedPrompt = interpolate(prompt, variables);
 
+    // Prevent nested session detection that causes silent empty responses
+    if (process.env.CLAUDECODE) {
+      delete process.env.CLAUDECODE;
+    }
+
     const options = {
       model,
       maxTurns: 1,
@@ -135,31 +168,37 @@ export function createStructuredLLMCall(config = {}) {
 
     const errorContext = { logger: 'llm-call-structured', model };
 
-    let resultText = '';
-
-    try {
-      for await (const message of query({ prompt: interpolatedPrompt, options })) {
-        if (message.type === 'result') {
-          if (message.subtype === 'success') {
-            resultText = message.result || '';
-          } else {
-            const errors = message.errors || [];
-            throw new Error(`Structured LLM call failed: ${errors.join(', ') || 'unknown error'}`);
+    let lastError;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        let resultText = '';
+        for await (const message of query({ prompt: interpolatedPrompt, options })) {
+          if (message.type === 'result') {
+            if (message.subtype === 'success') {
+              resultText = message.result || '';
+            } else {
+              const errors = message.errors || [];
+              throw new Error(`Structured LLM call failed: ${errors.join(', ') || 'unknown error'}`);
+            }
           }
         }
+        if (!resultText) {
+          throw new Error('Structured LLM call returned empty response');
+        }
+        return JSON.parse(resultText);
+      } catch (err) {
+        lastError = err;
+        if (isRetryableError(err) && attempt < MAX_RETRIES - 1) {
+          const backoff = INITIAL_BACKOFF_MS * (2 ** attempt);
+          await sleep(backoff);
+          continue;
+        }
+        classifyAndLogLLMError(err, errorContext);
+        throw err;
       }
-    } catch (err) {
-      classifyAndLogLLMError(err, errorContext);
-      throw err;
     }
-
-    if (!resultText) {
-      const emptyErr = new Error('Structured LLM call returned empty response');
-      classifyAndLogLLMError(emptyErr, errorContext);
-      throw emptyErr;
-    }
-
-    return JSON.parse(resultText);
+    classifyAndLogLLMError(lastError, errorContext);
+    throw lastError;
   };
 }
 

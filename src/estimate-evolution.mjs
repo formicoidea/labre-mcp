@@ -320,24 +320,13 @@ export async function estimateEvolutionOneShot(rawInput) {
 let _llmCall = null;
 function getLLMCall() {
   if (!_llmCall) {
-    // Detection auto du contexte :
-    // - _WARDLEY_NESTED=1 → subprocess MCP → Agent SDK fonctionne (process isole)
-    // - sinon → session Claude Code interactive → OpenCode (evite conflit subprocess)
-    if (process.env._WARDLEY_NESTED) {
-      const model = process.env.WARDLEY_LLM_MODEL || 'claude-sonnet-4-6';
-      logDebug('estimateEvolution', `LLM backend: Agent SDK, model="${model}"`);
-      _llmCall = createLLMCall({
-        model,
-        effort: 'high',
-        maxBudgetUsd: 0.10,
-      });
-    } else {
-      const model = process.env.WARDLEY_LLM_MODEL || 'kimi-k2.5';
-      logDebug('estimateEvolution', `LLM backend: OpenCode API, model="${model}"`);
-      _llmCall = createOpenCodeCall({
-        model,
-      });
-    }
+    const model = process.env.WARDLEY_LLM_MODEL || 'claude-sonnet-4-6';
+    logDebug('estimateEvolution', `LLM backend: Agent SDK, model="${model}"`);
+    _llmCall = createLLMCall({
+      model,
+      effort: 'high',
+      maxBudgetUsd: 0.10,
+    });
   }
   return _llmCall;
 }
