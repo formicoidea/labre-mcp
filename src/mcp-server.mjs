@@ -26,6 +26,7 @@ import { ESTIMATE_EVOLUTION_TOOL, handleEstimateEvolution } from './mcp-tool.mjs
 import { GENERATE_VALUE_CHAIN_TOOL, handleGenerateValueChain } from './generate-value-chain.mjs';
 import { EVALUATE_MAP_TOOL, handleEvaluateMap } from './evaluate-map.mjs';
 import { IDENTIFY_CAPABILITY_TOOL, handleIdentifyCapability } from './identify-capability.mjs';
+import { ESTIMATE_ANCHOR_EVOLUTION_TOOL, handleEstimateAnchorEvolution } from './estimate-anchor-evolution.mjs';
 import { logInfo, logError } from './mcp-notifications.mjs';
 import { classifyAndLogLLMError, classifyLLMError } from './llm-error-handler.mjs';
 
@@ -37,6 +38,7 @@ const REGISTERED_TOOLS = [
   GENERATE_VALUE_CHAIN_TOOL,
   EVALUATE_MAP_TOOL,
   IDENTIFY_CAPABILITY_TOOL,
+  ESTIMATE_ANCHOR_EVOLUTION_TOOL,
 ];
 
 /** Map of tool name → handler for fast dispatch */
@@ -45,6 +47,7 @@ const TOOL_HANDLERS = new Map([
   [GENERATE_VALUE_CHAIN_TOOL.name, handleGenerateValueChain],
   [EVALUATE_MAP_TOOL.name, handleEvaluateMap],
   [IDENTIFY_CAPABILITY_TOOL.name, handleIdentifyCapability],
+  [ESTIMATE_ANCHOR_EVOLUTION_TOOL.name, handleEstimateAnchorEvolution],
 ]);
 
 // ─── MCP Server Implementation ─────────────────────────────────────────────
