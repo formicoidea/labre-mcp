@@ -371,6 +371,11 @@ function createStrategyInstance(StrategyCls) {
     return new StrategyCls({ llmCall: getLLMCall() });
   }
 
+  // CPC evolution strategy: inject LLM for CPC mapper (patent source uses env vars)
+  if (method === 'cpc-evolution') {
+    return new StrategyCls({ llmCall: getLLMCall() });
+  }
+
   // Logprob strategy: inject OpenCode/kimi logprob call
   if (method === 'logprob-distribution') {
     return new StrategyCls({ llmLogprobCall: getLogprobCall() });

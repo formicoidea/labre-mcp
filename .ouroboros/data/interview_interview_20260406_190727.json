@@ -1,0 +1,87 @@
+{
+  "interview_id": "interview_20260406_190727",
+  "status": "completed",
+  "rounds": [
+    {
+      "round_number": 1,
+      "question": "Quelle est la spec qui vient d'être écrite — quel problème ou fonctionnalité décrit-elle, et quel aspect spécifique souhaitez-vous clarifier ou challenger pendant cet entretien ?",
+      "user_response": "voici la spec à interviewer :\n\n# Plan : Réécriture de la spec Wardley Evolution Score\n\n## Context\n\nLa spec wardley_evolution_score_spec.md a été rédigée par un autre Claude sans connaissance du codebase WardleyAssistant. Elle propose un projet Python standalone (BigQuery + SQLite + matplotlib + CLI) pour calculer un score d'évolution Wardley à partir de données brevets CPC.\n\nProblème : Le codebase est un serveur MCP Node.js avec 6 stratégies pluggables et un modèle S-curve calibré qui prend déjà (certitude, ubiquité) → evolution. La spec réinvente l'architecture au lieu de s'y intégrer.\n\nObjectif : Réécrire la spec pour qu'elle décrive une nouvelle stratégie pluggable cpc-evolution-strategy.mjs qui s'intègre dans le pipeline existant. Les 8 indicateurs brevets restent (ils sont solides), mais ils alimentent le S-curve model existant au lieu d'un scoring custom.\n\n## Ce qu'on garde / modifie / supprime\n\nGARDER:\n- Les 8 indicateurs (4 certitude + 4 ubiquité)\n- Le framework certitude × ubiquité — s'aligne avec le S-curve\n- BigQuery comme source de données\n- Les requêtes SQL adaptées Node.js\n- La table de validation croisée (B61C=Commodity, G06N=Commodity, etc.)\n\nMODIFIER:\n- Stack : Python → Node.js ESM (.mjs)\n- Architecture : CLI standalone → BaseStrategy subclass auto-découverte\n- Scoring composite : formule custom → délégation à computeEvolution(c, u) de s-curve.mjs\n- Accès données : BigQuery direct → abstrait derrière PatentDataSource interface + cache\n- Entrée CPC : saisie manuelle → mapping LLM-assisté composant → codes CPC\n\nSUPPRIMER:\n- Toute la structure projet Python\n- CLI commands\n- Visualisations matplotlib/plotly\n- SQLite comme data store\n- Sections 7-8-9 de la spec originale\n\n## Architecture - Data flow\n\nComponent { name, capability }\n→ [1] CPC Mapper (LLM : capability → codes CPC + fallback hardcodé)\n→ [2] Patent Data Source (6 requêtes BigQuery, résultats cachés)\n→ [3] Patent Indicators (8 indicateurs normalisés [0,1] → certitude + ubiquité)\n→ [4] computeEvolution(certitude, ubiquity) ← s-curve.mjs existant\n→ [5] EvolutionResult { evolution, confidence, method: 'cpc-evolution', certitude, ubiquity, trace }\n\n## Nouveaux fichiers\n- src/strategies/cpc-evolution-strategy.mjs (extends BaseStrategy)\n- src/patent/cpc-mapper.mjs\n- src/patent/patent-data-source.mjs (interface abstraite)\n- src/patent/bigquery-patent-source.mjs\n- src/patent/patent-cache.mjs\n- src/patent/patent-indicators.mjs (fonctions pures, sans I/O)\n\n## Les 8 indicateurs\n\nCertitude: c1 Convergence HHI (0.30), c2 Stabilité taxonomique (0.20), c3 Densité citation (0.25), c4 Rétrécissement claims (0.25)\nUbiquité: u1 Diversité assignees (0.30), u2 Couverture géographique (0.25), u3 Diffusion inter-sectorielle (0.25), u4 Ratio brevets expirés (0.20)\n\nAgrégation: certitude = weighted mean c1..c4, ubiquité = weighted mean u1..u4, puis computeEvolution(c, u)\n\n## Modèle de confiance\nconfidence = dataQuality × 0.5 + modelConfidence × 0.5, borné [0.1, 0.95]\n\n## Variables d'environnement nouvelles\nBIGQUERY_PROJECT_ID (requis), GOOGLE_APPLICATION_CREDENTIALS (requis), WARDLEY_PATENT_CACHE_TTL (optionnel, 24h)\n\n## Validation croisée attendue\nB61C (Locomotives) → Commodity, G06N (IA/ML) → Commodity, H10N (Supraconducteurs) → Genesis",
+      "timestamp": "2026-04-06T19:08:38.601810Z"
+    },
+    {
+      "round_number": 2,
+      "question": "Le message semble tronqué (il coupe à « les 8 indicateurs brevets restent (ils sont solides), m... »), mais j'ai l'essentiel du contexte : une spec standalone Python à réécrire comme stratégie pluggable Node.js dans le pipeline existant.\n\nLa question architecturale centrale : les 8 indicateurs brevets CPC de la spec originale doivent-ils être **convertis en paires (certitude, ubiquité)** pour alimenter le modèle S-curve calibré existant, ou bien la nouvelle `cpc-evolution-strategy` doit-elle **produire directement un score d'évolution** en court-circuitant le S-curve — et si oui, comment ce score cohabite-t-il avec ceux des 6 autres stratégies dans la classification gate ?",
+      "user_response": "Les 8 indicateurs produisent (certitude, ubiquité) qui alimentent le S-curve existant via computeEvolution(c, u). Pas de court-circuit. C'est le même pattern que sector-agent-strategy.mjs qui expose certitude/ubiquity sur son résultat pour le Phase B enrichment. Le S-curve est le modèle calibré unique — toutes les stratégies convergent vers lui.",
+      "timestamp": "2026-04-06T19:09:08.887204Z"
+    },
+    {
+      "round_number": 3,
+      "question": "La spec originale prévoyait BigQuery comme source de données brevets CPC — dans le contexte d'une stratégie pluggable Node.js exécutée à l'intérieur du serveur MCP, **d'où la stratégie `cpc-evolution-strategy` obtient-elle ses données brevets** : appel direct à une API externe (Google Patents, Lens.org, etc.), dataset pré-calculé embarqué, ou le caller fournit-il les données CPC en input du tool MCP ?",
+      "user_response": "Appel direct à BigQuery via @google-cloud/bigquery (npm). L'accès est abstrait derrière une interface PatentDataSource (patent-data-source.mjs) avec BigQuery comme implémentation initiale (bigquery-patent-source.mjs). Un cache décorator (patent-cache.mjs) met en cache les résultats en mémoire/disque avec TTL configurable (24h par défaut). Cela permet de swapper BigQuery pour un mock en test ou une autre source à l'avenir (Lens.org, données pré-calculées, etc.) sans toucher à la stratégie.",
+      "timestamp": "2026-04-06T19:11:43.423206Z"
+    },
+    {
+      "round_number": 4,
+      "question": "Les 8 indicateurs brevets produisent **deux** valeurs (certitude, ubiquité) — quelle est la logique de mapping envisagée : chaque indicateur contribue-t-il à l'un ou l'autre axe selon une répartition fixe (ex. 4 indicateurs → certitude, 4 → ubiquité), ou bien un modèle d'agrégation pondéré combine-t-il les 8 en un score composite avant de le projeter sur les deux axes ?",
+      "user_response": "Répartition fixe 4+4. Les 4 indicateurs de certitude (convergence HHI 0.30, stabilité taxonomique 0.20, densité citation 0.25, rétrécissement claims 0.25) sont agrégés en weighted mean → certitude. Les 4 indicateurs d'ubiquité (diversité assignees 0.30, couverture géo 0.25, diffusion inter-sectorielle 0.25, ratio expirés 0.20) sont agrégés en weighted mean → ubiquité. Pas de mélange entre les deux axes. Chaque indicateur contribue à un seul axe.",
+      "timestamp": "2026-04-06T19:12:29.503703Z"
+    },
+    {
+      "round_number": 5,
+      "question": "Quand un utilisateur demande l'évolution d'un composant Wardley (ex. « containerization », « lithium-ion batteries »), **comment la stratégie traduit-elle le nom du composant en codes CPC** pour interroger BigQuery — est-ce un mapping statique embarqué, une recherche full-text dans les métadonnées brevets, ou le caller doit-il fournir explicitement le(s) code(s) CPC en input du tool ?",
+      "user_response": "Mapping LLM-assisté via cpc-mapper.mjs. Le module reçoit component.capability (déjà décodé par identify-capability.mjs dans le pipeline) et demande au LLM d'identifier les codes CPC pertinents (niveau sous-classe, 4 caractères, ex: G06F). Le prompt fournit la structure CPC (sections A-H) comme contexte. Validation regex du format. En complément, un fallback hardcodé pour les composants courants (ERP→G06Q, Cloud→H04L, etc.) évite un appel LLM inutile. Retourne 1-5 codes CPC + confidence du mapping.",
+      "timestamp": "2026-04-06T19:13:17.683757Z"
+    },
+    {
+      "round_number": 6,
+      "question": "BigQuery sur le dataset Google Patents peut renvoyer des volumes très variables selon le code CPC — de dizaines de milliers de brevets pour G06F à potentiellement quelques dizaines pour un sous-domaine niche. **Quel est le seuil minimum de brevets en dessous duquel la stratégie considère les données insuffisantes**, et dans ce cas, retourne-t-elle un résultat avec une confidence dégradée, ou bien s'abstient-elle complètement (permettant aux autres stratégies du pipeline de prendre le relais) ?",
+      "user_response": "Le modèle de confiance gère ça de façon graduelle, pas binaire. Moins de 10 brevets → dataQuality entre 0.2-0.4 (confidence finale très basse). 10-100 → 0.4-0.7. Plus de 100 → 0.7-0.9. La stratégie retourne toujours un résultat — même avec peu de données — mais avec une confidence dégradée. Le pipeline existant (Phase B enrichment) moyenne les certitude/ubiquité de toutes les stratégies, donc une stratégie à faible confidence sera naturellement pondérée moins fort que les autres. Pas d'abstention explicite — le système de confiance fait le travail.",
+      "timestamp": "2026-04-06T19:14:55.164018Z"
+    },
+    {
+      "round_number": 7,
+      "question": "Nous avons couvert l'intégration architecturale, la source de données, le mapping indicateurs→axes, la traduction composant→CPC, et le modèle de confiance — l'image est assez nette. Reste une question de scope pour la spec réécrite : **les 8 indicateurs doivent-ils tous être livrés dans la v1 de `cpc-evolution-strategy`, ou certains sont-ils plus complexes à requêter sur BigQuery (ex. stabilité taxonomique nécessitant une analyse temporelle multi-années) et devraient être phasés dans une v2, et y a-t-il d'autres aspects non couverts (budget coût BigQuery, latence cible, auth/credentials) que la spec doit adresser ?**",
+      "user_response": "Tous les 8 indicateurs en v1. Mais besoin d'un mécanisme de paramétrage pour activer/désactiver chaque indicateur individuellement dans l'agrégation — objectif : pouvoir benchmarker la pertinence de chaque indicateur en les combinant ou isolant. Les poids doivent se redistribuer automatiquement quand un indicateur est désactivé (renormalisation). BigQuery est gratuit pour le premier TB sur les public datasets donc pas de contrainte de coût. Pour l'auth, l'utilisateur fournira une API key avant la phase de test — la spec doit prévoir ce setup mais ce n'est pas un bloqueur pour l'implémentation.",
+      "timestamp": "2026-04-06T19:19:12.893068Z"
+    }
+  ],
+  "initial_context": "interview au sujet de la spec écrite juste avant",
+  "created_at": "2026-04-06T19:07:27.508498Z",
+  "updated_at": "2026-04-06T19:19:50.356499Z",
+  "is_brownfield": true,
+  "codebase_paths": [
+    {
+      "path": "C:/Users/Dell/Documents/5-DEV/DevWardleyMaps/WardleyAssistant",
+      "role": "primary"
+    }
+  ],
+  "codebase_context": "",
+  "explore_completed": false,
+  "ambiguity_score": 0.156,
+  "ambiguity_breakdown": {
+    "goal_clarity": {
+      "name": "Goal Clarity",
+      "clarity_score": 0.92,
+      "weight": 0.35,
+      "justification": "The goal is exceptionally well-defined: rewrite a standalone Python spec into a pluggable Node.js ESM strategy (cpc-evolution-strategy.mjs) that integrates into the existing WardleyAssistant MCP pipeline. The conversation provides an explicit keep/modify/delete breakdown, a 5-step data flow diagram, specific file names and locations, all 8 patent indicators with their individual weights, and a clear architectural decision that all strategies converge through the single calibrated S-curve model via computeEvolution(c, u). The only minor gap is that some operational details (e.g., exact BigQuery query shapes) are left to implementation, which is reasonable at spec level."
+    },
+    "constraint_clarity": {
+      "name": "Constraint Clarity",
+      "clarity_score": 0.85,
+      "weight": 0.25,
+      "justification": "Constraints are well-articulated: must extend BaseStrategy for auto-discovery, must use Node.js ESM (.mjs), must delegate to computeEvolution(c, u) with no bypass, BigQuery via @google-cloud/bigquery with PatentDataSource interface abstraction, LLM-assisted CPC mapping with regex validation and hardcoded fallback, cache decorator with configurable TTL (24h default), confidence bounded [0.1, 0.95], required env vars specified. Auth is explicitly deferred to pre-test phase (intentional, not penalized). The question about latency targets was raised but not answered — this is a minor gap. Cost constraint is addressed (BigQuery free tier). The indicator toggle/renormalization mechanism is specified but its configuration surface (env var, config file, code constant?) is not clarified."
+    },
+    "success_criteria_clarity": {
+      "name": "Success Criteria Clarity",
+      "clarity_score": 0.68,
+      "weight": 0.25,
+      "justification": "Success Criteria Clarity justification not provided by model."
+    },
+    "context_clarity": {
+      "name": "Context Clarity",
+      "clarity_score": 0.93,
+      "weight": 0.15,
+      "justification": "Codebase context is excellent. The conversation demonstrates deep familiarity with the existing architecture: references specific files (s-curve.mjs, sector-agent-strategy.mjs, identify-capability.mjs), describes the BaseStrategy auto-discovery pattern, explains Phase B enrichment pipeline behavior (weighted averaging of certitude/ubiquité across strategies), and identifies the exact integration point (computeEvolution(c, u)). The interviewee uses sector-agent-strategy.mjs as a concrete precedent for the same (certitude, ubiquité) → S-curve pattern, making the architectural alignment unambiguous. The existing 6-strategy pipeline and classification gate are clearly understood."
+    }
+  }
+}

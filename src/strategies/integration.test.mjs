@@ -1,8 +1,8 @@
-// Integration tests: verify all 6 strategies are functional and return
+// Integration tests: verify all 7 strategies are functional and return
 // results conforming to the {evolution, confidence, method} interface.
 //
 // Tests cover:
-//   - All 6 strategies discovered by the registry
+//   - All 7 strategies discovered by the registry
 //   - Each strategy returns a valid EvolutionResult
 //   - BaseStrategy.validateResult passes for every result
 //   - Interface shape: evolution (number), confidence (number 0-1), method (non-empty string)
@@ -115,6 +115,8 @@ const STRATEGY_OPTIONS = {
   // Analytical strategies need no special options
   's-curve':               {},
   'timeline-benchmark':    { llmCall: mockTimelineLLMCall },
+  // CPC evolution: no external dependencies required (graceful degradation)
+  'cpc-evolution':         {},
 };
 
 // Components that work for each strategy
@@ -125,6 +127,7 @@ const STRATEGY_COMPONENTS = {
   'logprob-distribution':  COMPONENT_MINIMAL,     // uses LLM logprobs
   'publication-analysis':  COMPONENT_FULL,        // has pub proportions
   'sector-agent':          COMPONENT_MINIMAL,     // uses LLM
+  'cpc-evolution':         COMPONENT_MINIMAL,     // graceful degradation without BigQuery
 };
 
 // ── Expected strategies ─────────────────────────────────────────────────────
@@ -136,6 +139,7 @@ const EXPECTED_STRATEGIES = [
   'logprob-distribution',
   'publication-analysis',
   'sector-agent',
+  'cpc-evolution',
 ];
 
 // ── Test helpers ─────────────────────────────────────────────────────────────
@@ -191,7 +195,7 @@ async function runTest(name, fn) {
 }
 
 async function main() {
-  console.log('=== Integration Tests: All 6 Strategies ===\n');
+  console.log('=== Integration Tests: All 7 Strategies ===\n');
 
   // Reset registry cache
   clearCache();
@@ -200,10 +204,10 @@ async function main() {
 
   console.log('Registry Discovery:');
 
-  await runTest('discovers exactly 6 strategies', async () => {
+  await runTest('discovers exactly 7 strategies', async () => {
     const strategies = await loadStrategies();
-    assert.equal(strategies.size, 6,
-      `Expected 6 strategies, found ${strategies.size}: [${[...strategies.keys()].join(', ')}]`);
+    assert.equal(strategies.size, 7,
+      `Expected 7 strategies, found ${strategies.size}: [${[...strategies.keys()].join(', ')}]`);
   });
 
   await runTest('all expected strategy methods are present', async () => {
