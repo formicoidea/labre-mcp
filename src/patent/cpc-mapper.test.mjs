@@ -1,195 +1,304 @@
-// Test: mapCapabilityToCPC orchestrator
+// Test: CPC Mapper — progressive discovery through CPC hierarchy
 //
 // Verifies the cascading resolution strategy:
-//   1. LLM → validated CPC codes
-//   2. Hardcoded fallback on empty/error
-//   3. Ultimate default (G06F) guarantees non-empty
-//
-// Return contract: always 1-5 element array of valid CPC codes.
+//   1. Progressive discovery (LLM + taxonomy cache)
+//   2. LLM fallback (no cache)
+//   3. Ultimate default: ['G06F']
 
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  mapCapabilityToCPC,
-  llmMapCapabilityToCPC,
-  lookupFallback,
   isValidCpcCode,
-  CPC_PRIMARY_REGEX,
+  CPC_CODE_REGEX,
+  mapCapabilityToCPC,
+  mapComponentToCpc,
+  llmPickClass,
+  llmPickFromList,
+  llmFallbackMapping,
+  progressiveDiscovery,
+  formatCount,
+  ULTIMATE_DEFAULT_CODES,
 } from './cpc-mapper.mjs';
 
-// ── Test helpers ──────────────────────────────────────────────────────────────
+// ─── Mock helpers ───────────────────────────────────────────────────────────
 
-/** Mock LLM that returns valid CPC codes */
-function mockLlmSuccess(response) {
+function mockLlm(response) {
   return async () => response;
 }
 
-/** Mock LLM that throws an error */
-function mockLlmError() {
-  return async () => { throw new Error('LLM unavailable'); };
+function mockLlmSequence(responses) {
+  let callIndex = 0;
+  return async () => {
+    const response = responses[callIndex] || responses[responses.length - 1];
+    callIndex++;
+    return response;
+  };
 }
 
-/** Mock LLM that returns garbage (no valid codes extractable) */
-function mockLlmGarbage() {
-  return async () => 'Sorry, I cannot determine the CPC codes for this.';
+function mockTaxonomyCache(data = {}) {
+  return {
+    getSubclasses: async (code) => data[code] || [],
+    getGroups: async (code) => data[code] || [],
+    getSubgroups: async (code) => data[code] || [],
+  };
 }
 
-/** Mock LLM returning exactly N valid codes */
-function mockLlmCodes(codes) {
-  return async () => codes.join('\n');
-}
+// ─── isValidCpcCode ─────────────────────────────────────────────────────────
 
-// ── Return contract tests ─────────────────────────────────────────────────────
-
-console.log('── mapCapabilityToCPC: return contract ──');
-
-// Test: always returns an array
-{
-  const result = await mapCapabilityToCPC('cloud computing');
-  assert.ok(Array.isArray(result), 'Result must be an array');
-  console.log('  ✓ returns an array');
-}
-
-// Test: array has 1-5 elements (never empty)
-{
-  const testCases = [
-    'cloud computing',
-    'blockchain',
-    'quantum teleportation of cheese', // unlikely to match anything
-    '', // empty string
-    null, // null input
-    undefined, // undefined input
-  ];
-
-  for (const cap of testCases) {
-    const result = await mapCapabilityToCPC(cap);
-    assert.ok(result.length >= 1, `Result for "${cap}" must have >= 1 element, got ${result.length}`);
-    assert.ok(result.length <= 5, `Result for "${cap}" must have <= 5 elements, got ${result.length}`);
-  }
-  console.log('  ✓ always returns 1-5 elements (never empty, never >5)');
-}
-
-// Test: all returned codes are valid CPC codes
-{
-  const result = await mapCapabilityToCPC('machine learning');
-  for (const code of result) {
-    assert.ok(isValidCpcCode(code), `"${code}" must be a valid CPC code`);
-  }
-  console.log('  ✓ all returned codes pass isValidCpcCode');
-}
-
-// ── LLM path tests ───────────────────────────────────────────────────────────
-
-console.log('── mapCapabilityToCPC: LLM path ──');
-
-// Test: uses LLM codes when LLM succeeds
-{
-  const result = await mapCapabilityToCPC('container orchestration', {
-    llmCall: mockLlmCodes(['G06F', 'H04L']),
+describe('isValidCpcCode', () => {
+  it('accepts 4-char subclass codes', () => {
+    assert.ok(isValidCpcCode('G06F'));
+    assert.ok(isValidCpcCode('H04L'));
+    assert.ok(isValidCpcCode('A61K'));
   });
-  assert.deepEqual(result, ['G06F', 'H04L'], 'Should return LLM codes when LLM succeeds');
-  console.log('  ✓ uses LLM codes on success');
-}
 
-// Test: caps LLM results at 5
-{
-  const result = await mapCapabilityToCPC('everything tech', {
-    llmCall: mockLlmCodes(['G06F', 'H04L', 'G06N', 'H01L', 'G06Q', 'B33Y', 'A61K']),
+  it('accepts group codes (subclass + digits + slash)', () => {
+    assert.ok(isValidCpcCode('G06F9/'));
+    assert.ok(isValidCpcCode('H04L67/'));
+    assert.ok(isValidCpcCode('A61K31/'));
   });
-  assert.ok(result.length <= 5, `LLM returned 7 codes but result should be capped at 5, got ${result.length}`);
-  console.log('  ✓ caps LLM results at 5 elements');
-}
 
-// ── Fallback path tests ──────────────────────────────────────────────────────
-
-console.log('── mapCapabilityToCPC: fallback path ──');
-
-// Test: falls back to hardcoded map on LLM error
-{
-  const result = await mapCapabilityToCPC('blockchain', {
-    llmCall: mockLlmError(),
+  it('accepts full subgroup codes', () => {
+    assert.ok(isValidCpcCode('G06F9/455'));
+    assert.ok(isValidCpcCode('G06F9/45558'));
+    assert.ok(isValidCpcCode('H04L67/10'));
   });
-  assert.ok(result.length >= 1, 'Should fall back to hardcoded map on LLM error');
-  assert.ok(result.includes('H04L'), 'Blockchain should map to H04L from fallback');
-  console.log('  ✓ falls back to hardcoded map on LLM error');
-}
 
-// Test: falls back to hardcoded map on LLM returning garbage
-{
-  const result = await mapCapabilityToCPC('semiconductor', {
-    llmCall: mockLlmGarbage(),
+  it('rejects invalid codes', () => {
+    assert.ok(!isValidCpcCode(''));
+    assert.ok(!isValidCpcCode('G06'));
+    assert.ok(!isValidCpcCode('Z06F'));
+    assert.ok(!isValidCpcCode('G06f'));
+    assert.ok(!isValidCpcCode(null));
+    assert.ok(!isValidCpcCode(42));
+    assert.ok(!isValidCpcCode('G06F 9/455'));
   });
-  assert.ok(result.length >= 1, 'Should fall back on LLM garbage response');
-  assert.ok(result.includes('H01L'), 'Semiconductor should map to H01L from fallback');
-  console.log('  ✓ falls back to hardcoded map on LLM garbage');
-}
+});
 
-// Test: falls back to hardcoded map on empty LLM result
-{
-  const result = await mapCapabilityToCPC('database', {
-    llmCall: mockLlmCodes([]),
+// ─── formatCount ────────────────────────────────────────────────────────────
+
+describe('formatCount', () => {
+  it('formats millions', () => assert.equal(formatCount(8780599), '8.8M'));
+  it('formats thousands', () => assert.equal(formatCount(50000), '50K'));
+  it('formats small numbers', () => assert.equal(formatCount(42), '42'));
+});
+
+// ─── llmPickClass ───────────────────────────────────────────────────────────
+
+describe('llmPickClass', () => {
+  it('extracts 3-char class code from LLM response', async () => {
+    const result = await llmPickClass('container orchestration', mockLlm('G06'));
+    assert.equal(result, 'G06');
   });
-  assert.ok(result.length >= 1, 'Should fall back on empty LLM result');
-  assert.ok(result.includes('G06F'), 'Database should map to G06F from fallback');
-  console.log('  ✓ falls back to hardcoded map on empty LLM result');
-}
 
-// ── Ultimate default path tests ──────────────────────────────────────────────
-
-console.log('── mapCapabilityToCPC: ultimate default ──');
-
-// Test: returns G06F for completely unmappable capability
-{
-  const result = await mapCapabilityToCPC('xyzzy plugh quantum cheese teleporter', {
-    llmCall: mockLlmGarbage(),
+  it('extracts class from verbose response', async () => {
+    const result = await llmPickClass('test', mockLlm('The most relevant class is G06.'));
+    assert.equal(result, 'G06');
   });
-  assert.deepEqual(result, ['G06F'], 'Should return ultimate default G06F for unmappable capability');
-  console.log('  ✓ returns G06F ultimate default for unmappable capability');
-}
 
-// Test: returns G06F for empty/null/undefined input
-{
-  for (const input of ['', null, undefined]) {
-    const result = await mapCapabilityToCPC(input, {
-      llmCall: mockLlmError(), // LLM should not even be called for empty input
+  it('returns null for garbage response', async () => {
+    const result = await llmPickClass('test', mockLlm('I dont know'));
+    assert.equal(result, null);
+  });
+});
+
+// ─── llmPickFromList ────────────────────────────────────────────────────────
+
+describe('llmPickFromList', () => {
+  it('returns selected codes that exist in the list', async () => {
+    const entries = [
+      { code: 'G06F', cnt: 8780599 },
+      { code: 'G06N', cnt: 507836 },
+      { code: 'G06Q', cnt: 2633447 },
+    ];
+    const result = await llmPickFromList('AI', entries, mockLlm('G06N'));
+    assert.deepEqual(result, ['G06N']);
+  });
+
+  it('handles multi-select', async () => {
+    const entries = [
+      { code: 'G06F9/', cnt: 939043 },
+      { code: 'G06F16/', cnt: 1201612 },
+      { code: 'G06F3/', cnt: 2104238 },
+    ];
+    const result = await llmPickFromList('data processing', entries, mockLlm('G06F9/\nG06F16/'));
+    assert.deepEqual(result, ['G06F9/', 'G06F16/']);
+  });
+
+  it('returns single entry list without LLM call', async () => {
+    const entries = [{ code: 'G06F', cnt: 100 }];
+    let called = false;
+    const result = await llmPickFromList('test', entries, async () => { called = true; return ''; });
+    assert.deepEqual(result, ['G06F']);
+    assert.ok(!called);
+  });
+
+  it('returns empty for empty list', async () => {
+    const result = await llmPickFromList('test', [], mockLlm('G06F'));
+    assert.deepEqual(result, []);
+  });
+
+  it('filters out codes not in the list', async () => {
+    const entries = [
+      { code: 'G06F', cnt: 100 },
+      { code: 'G06N', cnt: 50 },
+    ];
+    const result = await llmPickFromList('test', entries, mockLlm('H04L'));
+    assert.deepEqual(result, []);
+  });
+
+  it('caps at 3 results', async () => {
+    const entries = [
+      { code: 'A', cnt: 1 }, { code: 'B', cnt: 1 },
+      { code: 'C', cnt: 1 }, { code: 'D', cnt: 1 },
+    ];
+    const result = await llmPickFromList('test', entries, mockLlm('A\nB\nC\nD'));
+    assert.ok(result.length <= 3);
+  });
+});
+
+// ─── progressiveDiscovery ───────────────────────────────────────────────────
+
+describe('progressiveDiscovery', () => {
+  it('discovers codes through full hierarchy', async () => {
+    const cache = mockTaxonomyCache({
+      'G06': [{ code: 'G06F', cnt: 8780599 }, { code: 'G06N', cnt: 507836 }],
+      'G06F': [{ code: 'G06F9/', cnt: 939043 }, { code: 'G06F3/', cnt: 2104238 }],
+      'G06F9/': [{ code: 'G06F9/455', cnt: 64647 }, { code: 'G06F9/50', cnt: 24327 }],
     });
-    assert.deepEqual(result, ['G06F'], `Should return G06F for "${input}" input`);
-  }
-  console.log('  ✓ returns G06F for empty/null/undefined input');
-}
 
-// ── Never-throws contract ────────────────────────────────────────────────────
-
-console.log('── mapCapabilityToCPC: never throws ──');
-
-// Test: never throws even with broken llmCall
-{
-  const result = await mapCapabilityToCPC('machine learning', {
-    llmCall: () => { throw new TypeError('unexpected sync throw'); },
+    const llm = mockLlmSequence(['G06', 'G06F', 'G06F9/', 'G06F9/455']);
+    const result = await progressiveDiscovery('container orchestration', llm, cache);
+    assert.ok(result.length > 0);
+    assert.ok(result.includes('G06F9/455'));
   });
-  assert.ok(Array.isArray(result), 'Should not throw, should return fallback');
-  assert.ok(result.length >= 1, 'Should return at least 1 code');
-  console.log('  ✓ never throws on sync LLM error');
-}
 
-// Test: never throws on non-string input
-{
-  const result = await mapCapabilityToCPC(12345);
-  assert.ok(Array.isArray(result) && result.length >= 1, 'Should handle non-string gracefully');
-  console.log('  ✓ handles non-string input gracefully');
-}
+  it('stops at subclass level when no groups available', async () => {
+    const cache = mockTaxonomyCache({
+      'G06': [{ code: 'G06F', cnt: 100 }],
+      'G06F': [],
+    });
 
-// ── Deduplication ────────────────────────────────────────────────────────────
-
-console.log('── mapCapabilityToCPC: deduplication ──');
-
-// Test: LLM codes are deduplicated
-{
-  const result = await mapCapabilityToCPC('networking', {
-    llmCall: mockLlmCodes(['H04L', 'H04L', 'G06F', 'G06F', 'H04W']),
+    const llm = mockLlmSequence(['G06', 'G06F']);
+    const result = await progressiveDiscovery('test', llm, cache);
+    assert.deepEqual(result, ['G06F']);
   });
-  const unique = new Set(result);
-  assert.equal(result.length, unique.size, 'Should not contain duplicates');
-  console.log('  ✓ LLM codes are deduplicated');
-}
 
-console.log('\n✅ All mapCapabilityToCPC tests passed');
+  it('stops at group level when no subgroups available', async () => {
+    const cache = mockTaxonomyCache({
+      'G06': [{ code: 'G06F', cnt: 100 }],
+      'G06F': [{ code: 'G06F9/', cnt: 50 }],
+      'G06F9/': [],
+    });
+
+    const llm = mockLlmSequence(['G06', 'G06F', 'G06F9/']);
+    const result = await progressiveDiscovery('test', llm, cache);
+    assert.deepEqual(result, ['G06F9/']);
+  });
+
+  it('returns empty when LLM fails to pick class', async () => {
+    const cache = mockTaxonomyCache({});
+    const result = await progressiveDiscovery('test', mockLlm('dunno'), cache);
+    assert.deepEqual(result, []);
+  });
+
+  it('returns empty when no subclasses exist', async () => {
+    const cache = mockTaxonomyCache({ 'G06': [] });
+    const result = await progressiveDiscovery('test', mockLlm('G06'), cache);
+    assert.deepEqual(result, []);
+  });
+});
+
+// ─── mapCapabilityToCPC (main API) ──────────────────────────────────────────
+
+describe('mapCapabilityToCPC', () => {
+  it('returns 1-5 codes (never empty)', async () => {
+    const result = await mapCapabilityToCPC('container orchestration', {
+      llmCall: mockLlm('G06F'),
+    });
+    assert.ok(result.length >= 1);
+    assert.ok(result.length <= 5);
+  });
+
+  it('uses progressive discovery when cache provided', async () => {
+    const cache = mockTaxonomyCache({
+      'G06': [{ code: 'G06F', cnt: 100 }],
+      'G06F': [{ code: 'G06F9/', cnt: 50 }],
+      'G06F9/': [{ code: 'G06F9/455', cnt: 30 }],
+    });
+
+    const result = await mapCapabilityToCPC('container orchestration', {
+      llmCall: mockLlmSequence(['G06', 'G06F', 'G06F9/', 'G06F9/455']),
+      taxonomyCache: cache,
+    });
+    assert.ok(result.includes('G06F9/455'));
+  });
+
+  it('falls back to LLM-only when no cache', async () => {
+    const result = await mapCapabilityToCPC('container orchestration', {
+      llmCall: mockLlm('G06F\nH04L'),
+    });
+    assert.ok(result.includes('G06F'));
+  });
+
+  it('returns ultimate default for empty input', async () => {
+    const result = await mapCapabilityToCPC('', {
+      llmCall: mockLlm('G06F'),
+    });
+    assert.deepEqual(result, ['G06F']);
+  });
+
+  it('returns ultimate default when everything fails', async () => {
+    const result = await mapCapabilityToCPC('test', {
+      llmCall: async () => { throw new Error('LLM down'); },
+    });
+    assert.deepEqual(result, ULTIMATE_DEFAULT_CODES);
+  });
+
+  it('never throws', async () => {
+    const result = await mapCapabilityToCPC('test', {
+      llmCall: async () => { throw new Error('fail'); },
+      taxonomyCache: {
+        getSubclasses: async () => { throw new Error('cache fail'); },
+        getGroups: async () => { throw new Error('cache fail'); },
+        getSubgroups: async () => { throw new Error('cache fail'); },
+      },
+    });
+    assert.ok(Array.isArray(result));
+    assert.ok(result.length >= 1);
+  });
+});
+
+// ─── mapComponentToCpc ──────────────────────────────────────────────────────
+
+describe('mapComponentToCpc', () => {
+  it('uses component.capability when available', async () => {
+    const result = await mapComponentToCpc(
+      { name: 'K8s', capability: 'container orchestration' },
+      mockLlm('G06F'),
+    );
+    assert.ok(result.length >= 1);
+  });
+
+  it('falls back to component.name', async () => {
+    const result = await mapComponentToCpc(
+      { name: 'Kubernetes' },
+      mockLlm('G06F'),
+    );
+    assert.ok(result.length >= 1);
+  });
+
+  it('passes taxonomyCache through options', async () => {
+    const cache = mockTaxonomyCache({
+      'G06': [{ code: 'G06F', cnt: 100 }],
+      'G06F': [],
+    });
+
+    const result = await mapComponentToCpc(
+      { name: 'test', capability: 'test' },
+      mockLlmSequence(['G06', 'G06F']),
+      { taxonomyCache: cache },
+    );
+    assert.deepEqual(result, ['G06F']);
+  });
+});

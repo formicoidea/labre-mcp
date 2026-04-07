@@ -453,24 +453,35 @@ export class CpcEvolutionStrategy extends BaseStrategy {
 
   /**
    * Resolve CPC codes from component capability via CPC mapper.
+   * Uses progressive discovery (LLM + taxonomy cache) when available.
    * Falls back to empty array if no mapper available (confidence will be low).
    *
    * @param {import('../strategies/base-strategy.mjs').ComponentInput} component
-   * @returns {Promise<string[]>} Array of 4-char CPC sub-class codes
+   * @returns {Promise<string[]>} Array of CPC codes (variable length)
    */
   async _resolveCpcCodes(component) {
     if (this._cpcMapper) {
       try {
         return await this._cpcMapper.mapToCpc(component);
       } catch {
-        // Mapper failed — try hardcoded fallback below
+        // Mapper failed — try default mapper below
       }
     }
 
-    // Lazy-load CPC mapper module
+    // Lazy-load CPC mapper + taxonomy cache
     try {
       const { mapComponentToCpc } = await import('./cpc-mapper.mjs');
-      return await mapComponentToCpc(component, this._llmCall);
+
+      // Try to create taxonomy cache for progressive discovery
+      let taxonomyCache = null;
+      try {
+        const { createTaxonomyCache } = await import('./cpc-taxonomy-cache.mjs');
+        taxonomyCache = await createTaxonomyCache();
+      } catch {
+        // Cache unavailable — mapper will use LLM fallback
+      }
+
+      return await mapComponentToCpc(component, this._llmCall, { taxonomyCache });
     } catch {
       // Module not available or failed — return empty
       return [];

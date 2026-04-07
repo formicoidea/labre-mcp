@@ -204,7 +204,7 @@ export async function withRetry(fn, options = {}) {
 /**
  * Create a QueryContext from CPC codes and optional overrides.
  *
- * @param {string[]} cpcCodes - Array of 4-char CPC subclass codes
+ * @param {string[]} cpcCodes - Array of CPC codes (4-char subclass or more specific prefixes)
  * @param {Object}   [options]
  * @param {string}   [options.dataset]    - BigQuery dataset override
  * @param {number}   [options.minYear]    - Minimum filing year
@@ -213,14 +213,15 @@ export async function withRetry(fn, options = {}) {
  */
 export function createQueryContext(cpcCodes, options = {}) {
   if (!Array.isArray(cpcCodes) || cpcCodes.length === 0) {
-    throw new Error('cpcCodes must be a non-empty array of 4-char CPC subclass codes');
+    throw new Error('cpcCodes must be a non-empty array of CPC codes');
   }
 
-  // Validate each code: must match 4-char CPC subclass format (A-H + 2 digits + letter)
+  // Validate each code: must start with valid CPC subclass (A-H + 2 digits + letter)
+  // Accepts variable-length codes: G06F, G06F9/, G06F9/455, etc.
   for (const code of cpcCodes) {
-    if (!/^[A-H]\d{2}[A-Z]$/.test(code)) {
+    if (!/^[A-H]\d{2}[A-Z]/.test(code)) {
       throw new Error(
-        `Invalid CPC subclass code "${code}": must be 4 characters matching /^[A-H]\\d{2}[A-Z]$/ (e.g. G06F, H04L)`
+        `Invalid CPC code "${code}": must start with a valid subclass (e.g. G06F, G06F9/, G06F9/455)`
       );
     }
   }
@@ -239,7 +240,7 @@ export function createQueryContext(cpcCodes, options = {}) {
 // Each function returns a BuiltQuery { sql, params, types, name }.
 //
 // Common pattern:
-//   - Filter publications by CPC subclass: SUBSTR(cpc_code.code, 1, 4) IN UNNEST(@cpc_codes)
+//   - Filter publications by CPC prefix: EXISTS (SELECT 1 FROM UNNEST(@cpc_codes) p WHERE STARTS_WITH(cpc_code.code, p))
 //   - Filter by filing year: CAST(FLOOR(filing_date / 10000) AS INT64) >= @min_year
 //   - filing_date is INT64 in YYYYMMDD format (e.g. 20150115)
 //   - CPC codes are REPEATED RECORD with .code STRING (e.g. "G06F  16/00")
@@ -272,7 +273,7 @@ export function buildCpcDistributionQuery(ctx) {
       \`${ctx.dataset}.patents.publications\` p,
       UNNEST(p.cpc) AS cpc_code
     WHERE
-      SUBSTR(cpc_code.code, 1, 4) IN UNNEST(@cpc_codes)
+      EXISTS (SELECT 1 FROM UNNEST(@cpc_codes) AS p WHERE STARTS_WITH(cpc_code.code, p))
       AND p.filing_date > 0
       AND CAST(FLOOR(p.filing_date / 10000) AS INT64) >= @min_year
     GROUP BY cpc
@@ -315,7 +316,7 @@ export function buildYearlyClassificationsQuery(ctx) {
         \`${ctx.dataset}.patents.publications\` p,
         UNNEST(p.cpc) AS cpc_code
       WHERE
-        SUBSTR(cpc_code.code, 1, 4) IN UNNEST(@cpc_codes)
+        EXISTS (SELECT 1 FROM UNNEST(@cpc_codes) AS p WHERE STARTS_WITH(cpc_code.code, p))
         AND p.filing_date > 0
         AND CAST(FLOOR(p.filing_date / 10000) AS INT64) >= @min_year
     )
@@ -360,7 +361,7 @@ export function buildCitationDataQuery(ctx) {
         \`${ctx.dataset}.patents.publications\` p,
         UNNEST(p.cpc) AS cpc_code
       WHERE
-        SUBSTR(cpc_code.code, 1, 4) IN UNNEST(@cpc_codes)
+        EXISTS (SELECT 1 FROM UNNEST(@cpc_codes) AS p WHERE STARTS_WITH(cpc_code.code, p))
         AND p.filing_date > 0
         AND CAST(FLOOR(p.filing_date / 10000) AS INT64) >= @min_year
       LIMIT @max_patents
@@ -438,7 +439,7 @@ export function buildClaimsTimelineQuery(ctx) {
         UNNEST(p.cpc) AS cpc_code,
         UNNEST(p.claims_localized) AS claims
       WHERE
-        SUBSTR(cpc_code.code, 1, 4) IN UNNEST(@cpc_codes)
+        EXISTS (SELECT 1 FROM UNNEST(@cpc_codes) AS p WHERE STARTS_WITH(cpc_code.code, p))
         AND p.filing_date > 0
         AND CAST(FLOOR(p.filing_date / 10000) AS INT64) >= @min_year
         AND claims.language = 'en'
@@ -486,7 +487,7 @@ export function buildAssigneeDataQuery(ctx) {
         UNNEST(p.cpc) AS cpc_code,
         UNNEST(p.assignee_harmonized) AS assignee
       WHERE
-        SUBSTR(cpc_code.code, 1, 4) IN UNNEST(@cpc_codes)
+        EXISTS (SELECT 1 FROM UNNEST(@cpc_codes) AS p WHERE STARTS_WITH(cpc_code.code, p))
         AND p.filing_date > 0
         AND CAST(FLOOR(p.filing_date / 10000) AS INT64) >= @min_year
         AND assignee.name IS NOT NULL
@@ -531,7 +532,7 @@ export function buildGeoDataQuery(ctx) {
         \`${ctx.dataset}.patents.publications\` p,
         UNNEST(p.cpc) AS cpc_code
       WHERE
-        SUBSTR(cpc_code.code, 1, 4) IN UNNEST(@cpc_codes)
+        EXISTS (SELECT 1 FROM UNNEST(@cpc_codes) AS p WHERE STARTS_WITH(cpc_code.code, p))
         AND p.filing_date > 0
         AND CAST(FLOOR(p.filing_date / 10000) AS INT64) >= @min_year
         AND p.country_code IS NOT NULL
@@ -577,7 +578,7 @@ export function buildSectorDataQuery(ctx) {
         \`${ctx.dataset}.patents.publications\` p,
         UNNEST(p.cpc) AS cpc_code
       WHERE
-        SUBSTR(cpc_code.code, 1, 4) IN UNNEST(@cpc_codes)
+        EXISTS (SELECT 1 FROM UNNEST(@cpc_codes) AS p WHERE STARTS_WITH(cpc_code.code, p))
         AND p.filing_date > 0
         AND CAST(FLOOR(p.filing_date / 10000) AS INT64) >= @min_year
       LIMIT @max_patents
@@ -646,7 +647,7 @@ export function buildExpirationDataQuery(ctx) {
         \`${ctx.dataset}.patents.publications\` p,
         UNNEST(p.cpc) AS cpc_code
       WHERE
-        SUBSTR(cpc_code.code, 1, 4) IN UNNEST(@cpc_codes)
+        EXISTS (SELECT 1 FROM UNNEST(@cpc_codes) AS p WHERE STARTS_WITH(cpc_code.code, p))
         AND p.filing_date > 0
         AND CAST(FLOOR(p.filing_date / 10000) AS INT64) >= @min_year
     )
@@ -692,7 +693,7 @@ export function buildTotalPatentsQuery(ctx) {
       \`${ctx.dataset}.patents.publications\` p,
       UNNEST(p.cpc) AS cpc_code
     WHERE
-      SUBSTR(cpc_code.code, 1, 4) IN UNNEST(@cpc_codes)
+      EXISTS (SELECT 1 FROM UNNEST(@cpc_codes) AS p WHERE STARTS_WITH(cpc_code.code, p))
       AND p.filing_date > 0
       AND CAST(FLOOR(p.filing_date / 10000) AS INT64) >= @min_year
   `;

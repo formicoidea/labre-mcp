@@ -195,35 +195,40 @@ describe('createQueryContext', () => {
   it('should reject invalid CPC code format — lowercase', () => {
     assert.throws(
       () => createQueryContext(['g06f']),
-      /Invalid CPC subclass code/
+      /Invalid CPC code/
     );
   });
 
   it('should reject invalid CPC code format — too short', () => {
     assert.throws(
       () => createQueryContext(['G06']),
-      /Invalid CPC subclass code/
+      /Invalid CPC code/
     );
   });
 
-  it('should reject invalid CPC code format — too long', () => {
-    assert.throws(
-      () => createQueryContext(['G06F1']),
-      /Invalid CPC subclass code/
-    );
+  it('should accept variable-length CPC codes', () => {
+    // Group-level codes (subclass + digits + slash)
+    const ctx1 = createQueryContext(['G06F9/']);
+    assert.equal(ctx1.cpcCodes[0], 'G06F9/');
+    // Subgroup-level codes
+    const ctx2 = createQueryContext(['G06F9/455']);
+    assert.equal(ctx2.cpcCodes[0], 'G06F9/455');
+    // Mixed levels
+    const ctx3 = createQueryContext(['G06F', 'G06F9/', 'H04L67/10']);
+    assert.equal(ctx3.cpcCodes.length, 3);
   });
 
   it('should reject invalid CPC code format — wrong section letter', () => {
     assert.throws(
       () => createQueryContext(['Z06F']),
-      /Invalid CPC subclass code/
+      /Invalid CPC code/
     );
   });
 
   it('should reject mixed valid/invalid CPC codes', () => {
     assert.throws(
       () => createQueryContext(['G06F', 'invalid']),
-      /Invalid CPC subclass code/
+      /Invalid CPC code/
     );
   });
 
@@ -267,7 +272,7 @@ describe('buildCpcDistributionQuery', () => {
 
   it('should use SUBSTR to extract 4-char subclass', () => {
     const q = buildCpcDistributionQuery(testCtx());
-    assert.ok(q.sql.includes('SUBSTR(cpc_code.code, 1, 4)'), 'Must extract 4-char subclass');
+    assert.ok(q.sql.includes('STARTS_WITH(cpc_code.code, p)'), 'Must use prefix matching');
   });
 
   it('should COUNT DISTINCT publication_number', () => {
@@ -611,7 +616,7 @@ describe('buildAllQueries', () => {
   it('should validate CPC codes', () => {
     assert.throws(
       () => buildAllQueries(['invalid']),
-      /Invalid CPC subclass code/
+      /Invalid CPC code/
     );
   });
 
