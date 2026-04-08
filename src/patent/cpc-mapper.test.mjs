@@ -43,6 +43,11 @@ function mockTaxonomyCache(data = {}) {
   };
 }
 
+/** Helper to add title field to mock entries if missing */
+function withTitles(entries) {
+  return entries.map(e => ({ title: e.code, ...e }));
+}
+
 // ─── isValidCpcCode ─────────────────────────────────────────────────────────
 
 describe('isValidCpcCode', () => {
@@ -160,99 +165,103 @@ describe('llmPickFromList', () => {
 // ─── progressiveDiscovery ───────────────────────────────────────────────────
 
 describe('progressiveDiscovery', () => {
-  it('discovers codes through full hierarchy', async () => {
+  it('discovers codes through full hierarchy with titles', async () => {
     const cache = mockTaxonomyCache({
-      'G06': [{ code: 'G06F', cnt: 8780599 }, { code: 'G06N', cnt: 507836 }],
-      'G06F': [{ code: 'G06F9/', cnt: 939043 }, { code: 'G06F3/', cnt: 2104238 }],
-      'G06F9/': [{ code: 'G06F9/455', cnt: 64647 }, { code: 'G06F9/50', cnt: 24327 }],
+      'G06': [{ code: 'G06F', cnt: 8780599, title: 'ELECTRIC DIGITAL DATA PROCESSING' }, { code: 'G06N', cnt: 507836, title: 'COMPUTING MODELS' }],
+      'G06F': [{ code: 'G06F9/', cnt: 939043, title: 'Program control' }, { code: 'G06F3/', cnt: 2104238, title: 'Input/Output' }],
+      'G06F9/': [{ code: 'G06F9/455', cnt: 64647, title: 'Emulation; Virtualisation' }, { code: 'G06F9/50', cnt: 24327, title: 'Resource allocation' }],
     });
 
     const llm = mockLlmSequence(['G06', 'G06F', 'G06F9/', 'G06F9/455']);
     const result = await progressiveDiscovery('container orchestration', llm, cache);
-    assert.ok(result.length > 0);
-    assert.ok(result.includes('G06F9/455'));
+    assert.ok(result.codes.length > 0);
+    assert.ok(result.codes.includes('G06F9/455'));
+    assert.equal(result.titles['G06F9/455'], 'Emulation; Virtualisation');
   });
 
   it('stops at subclass level when no groups available', async () => {
     const cache = mockTaxonomyCache({
-      'G06': [{ code: 'G06F', cnt: 100 }],
+      'G06': [{ code: 'G06F', cnt: 100, title: 'DATA PROCESSING' }],
       'G06F': [],
     });
 
     const llm = mockLlmSequence(['G06', 'G06F']);
     const result = await progressiveDiscovery('test', llm, cache);
-    assert.deepEqual(result, ['G06F']);
+    assert.deepEqual(result.codes, ['G06F']);
+    assert.equal(result.titles['G06F'], 'DATA PROCESSING');
   });
 
   it('stops at group level when no subgroups available', async () => {
     const cache = mockTaxonomyCache({
-      'G06': [{ code: 'G06F', cnt: 100 }],
-      'G06F': [{ code: 'G06F9/', cnt: 50 }],
+      'G06': [{ code: 'G06F', cnt: 100, title: 'DATA PROCESSING' }],
+      'G06F': [{ code: 'G06F9/', cnt: 50, title: 'Program control' }],
       'G06F9/': [],
     });
 
     const llm = mockLlmSequence(['G06', 'G06F', 'G06F9/']);
     const result = await progressiveDiscovery('test', llm, cache);
-    assert.deepEqual(result, ['G06F9/']);
+    assert.deepEqual(result.codes, ['G06F9/']);
   });
 
   it('returns empty when LLM fails to pick class', async () => {
     const cache = mockTaxonomyCache({});
     const result = await progressiveDiscovery('test', mockLlm('dunno'), cache);
-    assert.deepEqual(result, []);
+    assert.deepEqual(result.codes, []);
   });
 
   it('returns empty when no subclasses exist', async () => {
     const cache = mockTaxonomyCache({ 'G06': [] });
     const result = await progressiveDiscovery('test', mockLlm('G06'), cache);
-    assert.deepEqual(result, []);
+    assert.deepEqual(result.codes, []);
   });
 });
 
 // ─── mapCapabilityToCPC (main API) ──────────────────────────────────────────
 
 describe('mapCapabilityToCPC', () => {
-  it('returns 1-5 codes (never empty)', async () => {
+  it('returns {codes, titles} with 1-5 codes (never empty)', async () => {
     const result = await mapCapabilityToCPC('container orchestration', {
       llmCall: mockLlm('G06F'),
     });
-    assert.ok(result.length >= 1);
-    assert.ok(result.length <= 5);
+    assert.ok(result.codes.length >= 1);
+    assert.ok(result.codes.length <= 5);
+    assert.ok(typeof result.titles === 'object');
   });
 
   it('uses progressive discovery when cache provided', async () => {
     const cache = mockTaxonomyCache({
-      'G06': [{ code: 'G06F', cnt: 100 }],
-      'G06F': [{ code: 'G06F9/', cnt: 50 }],
-      'G06F9/': [{ code: 'G06F9/455', cnt: 30 }],
+      'G06': [{ code: 'G06F', cnt: 100, title: 'DATA PROCESSING' }],
+      'G06F': [{ code: 'G06F9/', cnt: 50, title: 'Program control' }],
+      'G06F9/': [{ code: 'G06F9/455', cnt: 30, title: 'Virtualisation' }],
     });
 
     const result = await mapCapabilityToCPC('container orchestration', {
       llmCall: mockLlmSequence(['G06', 'G06F', 'G06F9/', 'G06F9/455']),
       taxonomyCache: cache,
     });
-    assert.ok(result.includes('G06F9/455'));
+    assert.ok(result.codes.includes('G06F9/455'));
+    assert.equal(result.titles['G06F9/455'], 'Virtualisation');
   });
 
   it('falls back to LLM-only when no cache', async () => {
     const result = await mapCapabilityToCPC('container orchestration', {
       llmCall: mockLlm('G06F\nH04L'),
     });
-    assert.ok(result.includes('G06F'));
+    assert.ok(result.codes.includes('G06F'));
   });
 
   it('returns ultimate default for empty input', async () => {
     const result = await mapCapabilityToCPC('', {
       llmCall: mockLlm('G06F'),
     });
-    assert.deepEqual(result, ['G06F']);
+    assert.deepEqual(result.codes, ['G06F']);
   });
 
   it('returns ultimate default when everything fails', async () => {
     const result = await mapCapabilityToCPC('test', {
       llmCall: async () => { throw new Error('LLM down'); },
     });
-    assert.deepEqual(result, ULTIMATE_DEFAULT_CODES);
+    assert.deepEqual(result.codes, ULTIMATE_DEFAULT_CODES);
   });
 
   it('never throws', async () => {
@@ -264,8 +273,8 @@ describe('mapCapabilityToCPC', () => {
         getSubgroups: async () => { throw new Error('cache fail'); },
       },
     });
-    assert.ok(Array.isArray(result));
-    assert.ok(result.length >= 1);
+    assert.ok(Array.isArray(result.codes));
+    assert.ok(result.codes.length >= 1);
   });
 });
 
@@ -277,7 +286,7 @@ describe('mapComponentToCpc', () => {
       { name: 'K8s', capability: 'container orchestration' },
       mockLlm('G06F'),
     );
-    assert.ok(result.length >= 1);
+    assert.ok(result.codes.length >= 1);
   });
 
   it('falls back to component.name', async () => {
@@ -285,12 +294,12 @@ describe('mapComponentToCpc', () => {
       { name: 'Kubernetes' },
       mockLlm('G06F'),
     );
-    assert.ok(result.length >= 1);
+    assert.ok(result.codes.length >= 1);
   });
 
   it('passes taxonomyCache through options', async () => {
     const cache = mockTaxonomyCache({
-      'G06': [{ code: 'G06F', cnt: 100 }],
+      'G06': [{ code: 'G06F', cnt: 100, title: 'DATA PROCESSING' }],
       'G06F': [],
     });
 
@@ -299,6 +308,7 @@ describe('mapComponentToCpc', () => {
       mockLlmSequence(['G06', 'G06F']),
       { taxonomyCache: cache },
     );
-    assert.deepEqual(result, ['G06F']);
+    assert.deepEqual(result.codes, ['G06F']);
+    assert.equal(result.titles['G06F'], 'DATA PROCESSING');
   });
 });

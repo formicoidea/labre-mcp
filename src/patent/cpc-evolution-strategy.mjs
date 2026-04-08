@@ -23,6 +23,7 @@
 
 import { BaseStrategy } from '../strategies/base-strategy.mjs';
 import { computeEvolution } from '../s-curve.mjs';
+import { getCpcTitle } from './cpc-taxonomy-cache.mjs';
 
 // ─── Default indicator configuration ────────────────────────────────────────
 
@@ -293,7 +294,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
       ubiquity,
       // Detailed trace for debugging and transparency
       trace: [
-        { step: 'cpc-codes', value: cpcCodes },
+        { step: 'cpc-codes', value: cpcCodes.map(code => ({ code, title: getCpcTitle(code) })) },
         { step: 'patent-count', value: patentCount },
         { step: 'certitude-indicators', value: indicatorValues.certitude, weights: certitudeWeights },
         { step: 'ubiquity-indicators', value: indicatorValues.ubiquity, weights: ubiquityWeights },
@@ -462,7 +463,9 @@ export class CpcEvolutionStrategy extends BaseStrategy {
   async _resolveCpcCodes(component) {
     if (this._cpcMapper) {
       try {
-        return await this._cpcMapper.mapToCpc(component);
+        const result = await this._cpcMapper.mapToCpc(component);
+        // Handle both old (string[]) and new ({codes, titles}) return formats
+        return Array.isArray(result) ? result : result.codes || [];
       } catch {
         // Mapper failed — try default mapper below
       }
@@ -471,6 +474,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
     // Lazy-load CPC mapper + taxonomy cache
     try {
       const { mapComponentToCpc } = await import('./cpc-mapper.mjs');
+      const { setCpcTitle } = await import('./cpc-taxonomy-cache.mjs');
 
       // Try to create taxonomy cache for progressive discovery
       let taxonomyCache = null;
@@ -481,7 +485,16 @@ export class CpcEvolutionStrategy extends BaseStrategy {
         // Cache unavailable — mapper will use LLM fallback
       }
 
-      return await mapComponentToCpc(component, this._llmCall, { taxonomyCache });
+      const result = await mapComponentToCpc(component, this._llmCall, { taxonomyCache });
+
+      // Register titles from discovery into the global title store
+      if (result.titles) {
+        for (const [code, title] of Object.entries(result.titles)) {
+          setCpcTitle(code, title);
+        }
+      }
+
+      return result.codes || [];
     } catch {
       // Module not available or failed — return empty
       return [];

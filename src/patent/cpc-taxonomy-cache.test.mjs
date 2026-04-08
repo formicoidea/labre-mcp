@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { writeFile, unlink, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { CpcTaxonomyCache } from './cpc-taxonomy-cache.mjs';
+import { CpcTaxonomyCache, getCpcTitle } from './cpc-taxonomy-cache.mjs';
 
 // ─── Mock BigQuery client ───────────────────────────────────────────────────
 
@@ -12,7 +12,7 @@ function createMockClient(responses = {}) {
     query: async ({ query, params }) => {
       const key = params.parent_code;
       const data = responses[key] || [];
-      return [data.map(([code, cnt]) => ({ code, cnt }))];
+      return [data.map(([code, cnt, title]) => ({ code, cnt, title: title || code }))];
     },
   };
 }
@@ -35,9 +35,13 @@ describe('CpcTaxonomyCache', () => {
   });
 
   describe('getSubclasses', () => {
-    it('returns subclasses from BigQuery', async () => {
+    it('returns subclasses with titles from BigQuery', async () => {
       const client = createMockClient({
-        'G06': [['G06F', 8780599], ['G06Q', 2633447], ['G06N', 507836]],
+        'G06': [
+          ['G06F', 8780599, 'ELECTRIC DIGITAL DATA PROCESSING'],
+          ['G06Q', 2633447, 'ICT FOR ADMINISTRATIVE PURPOSES'],
+          ['G06N', 507836, 'COMPUTING BASED ON SPECIFIC MODELS'],
+        ],
       });
       const cache = new CpcTaxonomyCache({
         bigqueryClient: client,
@@ -49,6 +53,7 @@ describe('CpcTaxonomyCache', () => {
       assert.equal(result.length, 3);
       assert.equal(result[0].code, 'G06F');
       assert.equal(result[0].cnt, 8780599);
+      assert.equal(result[0].title, 'ELECTRIC DIGITAL DATA PROCESSING');
       assert.equal(result[2].code, 'G06N');
     });
 
@@ -273,6 +278,51 @@ describe('CpcTaxonomyCache', () => {
       assert.equal(cache.size, 1);
       await cache.getSubclasses('H04');
       assert.equal(cache.size, 2);
+    });
+  });
+
+  describe('getCpcTitle', () => {
+    it('returns title from cache after lookup', async () => {
+      const client = createMockClient({
+        'G06': [['G06F', 100, 'ELECTRIC DIGITAL DATA PROCESSING']],
+      });
+      const cache = new CpcTaxonomyCache({
+        bigqueryClient: client,
+        queryOptions: {},
+        cachePath: testCachePath(),
+      });
+
+      await cache.getSubclasses('G06');
+      assert.equal(getCpcTitle('G06F'), 'ELECTRIC DIGITAL DATA PROCESSING');
+    });
+
+    it('returns code itself when no title available', () => {
+      assert.equal(getCpcTitle('Z99X'), 'Z99X');
+    });
+
+    it('persists titles through disk cache', async () => {
+      const path = testCachePath();
+      const client = createMockClient({
+        'G06': [['G06F', 100, 'ELECTRIC DIGITAL DATA PROCESSING']],
+      });
+
+      // First instance: populate
+      const cache1 = new CpcTaxonomyCache({ bigqueryClient: client, queryOptions: {}, cachePath: path });
+      await cache1.getSubclasses('G06');
+
+      // Clear title store to simulate new process
+      await cache1.clear();
+
+      // Second instance: load from disk
+      const cache2 = new CpcTaxonomyCache({ bigqueryClient: null, cachePath: path });
+      // Re-populate from disk (need to re-write cache since clear wiped it)
+      const cache3 = new CpcTaxonomyCache({ bigqueryClient: client, queryOptions: {}, cachePath: path });
+      await cache3.getSubclasses('G06');
+
+      // New instance loads from disk and registers titles
+      const cache4 = new CpcTaxonomyCache({ bigqueryClient: null, cachePath: path });
+      await cache4.getSubclasses('G06');
+      assert.equal(getCpcTitle('G06F'), 'ELECTRIC DIGITAL DATA PROCESSING');
     });
   });
 });

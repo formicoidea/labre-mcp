@@ -1,18 +1,20 @@
 // CPC Taxonomy Cache: lazy-loaded hierarchical CPC code cache backed by BigQuery.
 //
-// Provides three levels of CPC hierarchy discovery:
-//   1. getSubclasses(classCode)   — "G06" → ["G06F", "G06N", "G06Q", ...]
-//   2. getGroups(subclassCode)    — "G06F" → ["G06F3/", "G06F9/", "G06F16/", ...]
-//   3. getSubgroups(groupCode)    — "G06F9/" → ["G06F9/455", "G06F9/50", ...]
+// Provides three levels of CPC hierarchy discovery with titles from
+// patents-public-data.cpc.definition (authoritative CPC taxonomy, all sections A-H + Y):
+//   1. getSubclasses(classCode)   — "G06" → [{code:"G06F", cnt:8M, title:"ELECTRIC DIGITAL DATA PROCESSING"}, ...]
+//   2. getGroups(subclassCode)    — "G06F" → [{code:"G06F9/", cnt:939K, title:"Arrangements for program control"}, ...]
+//   3. getSubgroups(groupCode)    — "G06F9/" → [{code:"G06F9/455", cnt:64K, title:"Emulation; Virtualisation"}, ...]
+//
+// Each entry includes { code, cnt, title } — titles come from BigQuery JOIN with cpc.definition.
 //
 // Cache is populated lazily from BigQuery on first access, then stored:
 //   - In-memory Map for fast repeated lookups
 //   - On-disk JSON file for cross-session persistence
 //
-// TTL defaults to 30 days (CPC taxonomy changes infrequently).
+// getCpcTitle(code) resolves titles from the cache (no static file needed).
 //
-// Used by cpc-mapper.mjs for progressive CPC code discovery:
-//   LLM picks section → cache provides real subclasses → LLM picks → etc.
+// TTL defaults to 30 days (CPC taxonomy changes infrequently).
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -26,58 +28,128 @@ export const DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 /** Default cache file path. */
 export const DEFAULT_CACHE_PATH = join(homedir(), '.wardley-assistant', 'cpc-cache.json');
 
-/** BigQuery dataset for patent data. */
-const BQ_TABLE = '`patents-public-data.patents.publications`';
+/** BigQuery tables. */
+const BQ_PUBLICATIONS = '`patents-public-data.patents.publications`';
+const BQ_CPC_DEF = '`patents-public-data.cpc.definition`';
 
-// ─── SQL Templates ──────────────────────────────────────────────────────────
+// ─── SQL Templates (with JOIN cpc.definition for titles) ────────────────────
 
 /**
- * SQL to get distinct 4-char subclasses under a 3-char class code.
- * e.g., "G06" → ["G06F", "G06N", "G06Q", ...]
+ * SQL: subclasses of a 3-char class code, with titles from cpc.definition.
+ * e.g., "G06" → [{code:"G06F", cnt:8780599, title:"ELECTRIC DIGITAL DATA PROCESSING"}, ...]
  */
 const SQL_SUBCLASSES = `
-  SELECT DISTINCT SUBSTR(cpc.code, 1, 4) AS code, COUNT(*) AS cnt
-  FROM ${BQ_TABLE}, UNNEST(cpc) AS cpc
-  WHERE SUBSTR(cpc.code, 1, 3) = @parent_code AND cpc.first = TRUE
-  GROUP BY code
-  ORDER BY cnt DESC
+  SELECT sc.code, sc.cnt, IFNULL(def.titleFull, sc.code) AS title
+  FROM (
+    SELECT DISTINCT SUBSTR(cpc.code, 1, 4) AS code, COUNT(*) AS cnt
+    FROM ${BQ_PUBLICATIONS}, UNNEST(cpc) AS cpc
+    WHERE SUBSTR(cpc.code, 1, 3) = @parent_code AND cpc.first = TRUE
+    GROUP BY code
+  ) sc
+  LEFT JOIN ${BQ_CPC_DEF} def ON def.symbol = sc.code
+  ORDER BY sc.cnt DESC
 `;
 
 /**
- * SQL to get distinct groups under a 4-char subclass code.
- * e.g., "G06F" → ["G06F3/", "G06F9/", "G06F16/", ...]
- * Uses regex to extract the group prefix (subclass + digits + slash).
+ * SQL: groups of a 4-char subclass code, with titles from cpc.definition.
+ * Groups in publications are like "G06F9/" but in cpc.definition they are "G06F9/00".
+ * JOIN uses CONCAT(code, '00') to match.
  */
 const SQL_GROUPS = `
-  SELECT DISTINCT REGEXP_EXTRACT(cpc.code, r"^([A-H][0-9]{2}[A-Z][0-9]+/)") AS code, COUNT(*) AS cnt
-  FROM ${BQ_TABLE}, UNNEST(cpc) AS cpc
-  WHERE SUBSTR(cpc.code, 1, 4) = @parent_code AND cpc.first = TRUE
-  GROUP BY code
-  HAVING code IS NOT NULL
-  ORDER BY cnt DESC
+  SELECT grp.code, grp.cnt, IFNULL(def.titleFull, grp.code) AS title
+  FROM (
+    SELECT DISTINCT REGEXP_EXTRACT(cpc.code, r"^([A-H][0-9]{2}[A-Z][0-9]+/)") AS code, COUNT(*) AS cnt
+    FROM ${BQ_PUBLICATIONS}, UNNEST(cpc) AS cpc
+    WHERE SUBSTR(cpc.code, 1, 4) = @parent_code AND cpc.first = TRUE
+    GROUP BY code
+    HAVING code IS NOT NULL
+  ) grp
+  LEFT JOIN ${BQ_CPC_DEF} def ON def.symbol = CONCAT(grp.code, '00')
+  ORDER BY grp.cnt DESC
 `;
 
 /**
- * SQL to get distinct subgroups under a group prefix.
- * e.g., "G06F9/" → ["G06F9/455", "G06F9/50", "G06F9/4881", ...]
- * Only returns the top 50 by patent count to keep cache manageable.
+ * SQL: subgroups of a group prefix, with titles from cpc.definition.
+ * Top 50 by patent count.
  */
 const SQL_SUBGROUPS = `
-  SELECT DISTINCT cpc.code AS code, COUNT(*) AS cnt
-  FROM ${BQ_TABLE}, UNNEST(cpc) AS cpc
-  WHERE STARTS_WITH(cpc.code, @parent_code) AND cpc.first = TRUE
-  GROUP BY code
-  ORDER BY cnt DESC
-  LIMIT 50
+  SELECT sg.code, sg.cnt, IFNULL(def.titleFull, sg.code) AS title
+  FROM (
+    SELECT DISTINCT cpc.code AS code, COUNT(*) AS cnt
+    FROM ${BQ_PUBLICATIONS}, UNNEST(cpc) AS cpc
+    WHERE STARTS_WITH(cpc.code, @parent_code) AND cpc.first = TRUE
+    GROUP BY code
+    ORDER BY cnt DESC
+    LIMIT 50
+  ) sg
+  LEFT JOIN ${BQ_CPC_DEF} def ON def.symbol = sg.code
+  ORDER BY sg.cnt DESC
 `;
 
 // ─── Cache entry shape ──────────────────────────────────────────────────────
 
 /**
+ * @typedef {Object} CpcEntry
+ * @property {string} code - CPC code
+ * @property {number} cnt - Patent count
+ * @property {string} title - Human-readable title from cpc.definition
+ */
+
+/**
  * @typedef {Object} CacheEntry
- * @property {Array<{code: string, cnt: number}>} children - Child codes with patent counts
+ * @property {CpcEntry[]} children - Child codes with patent counts and titles
  * @property {number} fetchedAt - Timestamp when this entry was fetched
  */
+
+// ─── CPC Title resolution from cache ────────────────────────────────────────
+
+/** @type {Map<string, string>} Global title store populated from cache entries. */
+const _titleStore = new Map();
+
+/**
+ * Get the human-readable title for a CPC code.
+ * Resolves from the in-memory title store (populated by cache lookups).
+ *
+ * Fallback chain:
+ *   1. Exact match in title store
+ *   2. Trimmed trailing zeros (G06F9/50 → G06F9/5)
+ *   3. Parent group (G06F9/455 → G06F9/)
+ *   4. The code itself
+ *
+ * @param {string} code - CPC code at any hierarchy level
+ * @returns {string}
+ */
+export function getCpcTitle(code) {
+  if (_titleStore.has(code)) return _titleStore.get(code);
+
+  // Try trimming trailing zeros (BigQuery: G06F9/50 → cpc.definition: G06F9/5)
+  if (code.includes('/')) {
+    const trimmed = code.replace(/0+$/, '');
+    if (_titleStore.has(trimmed)) return _titleStore.get(trimmed);
+  }
+
+  // Try parent group (G06F9/455 → G06F9/)
+  const slashIdx = code.indexOf('/');
+  if (slashIdx > 0) {
+    const group = code.substring(0, slashIdx + 1);
+    if (_titleStore.has(group)) return _titleStore.get(group);
+  }
+
+  return code;
+}
+
+/**
+ * Register a title in the global store.
+ * Called internally when cache entries are loaded, or externally
+ * by the strategy to register titles from progressive discovery.
+ * @param {string} code
+ * @param {string} title
+ */
+export function setCpcTitle(code, title) {
+  if (code && title && title !== code) {
+    _titleStore.set(code, title);
+  }
+}
 
 // ─── CpcTaxonomyCache class ────────────────────────────────────────────────
 
@@ -85,8 +157,8 @@ export class CpcTaxonomyCache {
 
   /**
    * @param {Object} options
-   * @param {Object} options.bigqueryClient - BigQuery client instance (from bigquery-client.mjs getClient())
-   * @param {Object} options.queryOptions - Default query options (from defaultQueryOptions())
+   * @param {Object} options.bigqueryClient - BigQuery client instance
+   * @param {Object} options.queryOptions - Default query options
    * @param {string} [options.cachePath] - Path to on-disk cache file
    * @param {number} [options.ttlMs] - Cache TTL in milliseconds (default: 30 days)
    */
@@ -102,9 +174,9 @@ export class CpcTaxonomyCache {
   }
 
   /**
-   * Get subclasses of a CPC class (3-char code → 4-char codes).
+   * Get subclasses of a CPC class (3-char code → 4-char codes with titles).
    * @param {string} classCode - 3-char class code (e.g., "G06")
-   * @returns {Promise<Array<{code: string, cnt: number}>>}
+   * @returns {Promise<CpcEntry[]>}
    */
   async getSubclasses(classCode) {
     const key = classCode.toUpperCase();
@@ -112,9 +184,9 @@ export class CpcTaxonomyCache {
   }
 
   /**
-   * Get groups of a CPC subclass (4-char code → group prefixes).
+   * Get groups of a CPC subclass (4-char code → group prefixes with titles).
    * @param {string} subclassCode - 4-char subclass code (e.g., "G06F")
-   * @returns {Promise<Array<{code: string, cnt: number}>>}
+   * @returns {Promise<CpcEntry[]>}
    */
   async getGroups(subclassCode) {
     const key = subclassCode.toUpperCase();
@@ -122,9 +194,9 @@ export class CpcTaxonomyCache {
   }
 
   /**
-   * Get subgroups of a CPC group (group prefix → full codes).
+   * Get subgroups of a CPC group (group prefix → full codes with titles).
    * @param {string} groupCode - Group prefix (e.g., "G06F9/")
-   * @returns {Promise<Array<{code: string, cnt: number}>>}
+   * @returns {Promise<CpcEntry[]>}
    */
   async getSubgroups(groupCode) {
     const key = groupCode.toUpperCase();
@@ -133,15 +205,15 @@ export class CpcTaxonomyCache {
 
   /**
    * Get cached children or fetch from BigQuery.
-   * @param {string} parentCode - Parent CPC code
-   * @param {string} sql - SQL template to use
-   * @returns {Promise<Array<{code: string, cnt: number}>>}
+   * Registers titles in the global store on load.
    * @private
    */
   async _getOrFetch(parentCode, sql) {
     // Check memory cache first
     const cached = this._memory.get(parentCode);
     if (cached && (Date.now() - cached.fetchedAt) < this._ttlMs) {
+      // Re-register titles (may have been lost if title store was cleared)
+      for (const child of cached.children) setCpcTitle(child.code, child.title);
       return cached.children;
     }
 
@@ -150,15 +222,18 @@ export class CpcTaxonomyCache {
       await this._loadFromDisk();
       this._diskLoaded = true;
 
-      // Re-check after disk load
       const diskCached = this._memory.get(parentCode);
       if (diskCached && (Date.now() - diskCached.fetchedAt) < this._ttlMs) {
+        for (const child of diskCached.children) setCpcTitle(child.code, child.title);
         return diskCached.children;
       }
     }
 
     // Fetch from BigQuery
     const children = await this._fetchFromBigQuery(parentCode, sql);
+
+    // Register titles
+    for (const child of children) setCpcTitle(child.code, child.title);
 
     // Store in memory + persist to disk
     const entry = { children, fetchedAt: Date.now() };
@@ -169,16 +244,11 @@ export class CpcTaxonomyCache {
   }
 
   /**
-   * Fetch CPC hierarchy data from BigQuery.
-   * @param {string} parentCode - Parent CPC code
-   * @param {string} sql - SQL query template
-   * @returns {Promise<Array<{code: string, cnt: number}>>}
+   * Fetch CPC hierarchy data from BigQuery (with titles from cpc.definition).
    * @private
    */
   async _fetchFromBigQuery(parentCode, sql) {
-    if (!this._client) {
-      return [];
-    }
+    if (!this._client) return [];
 
     try {
       const [rows] = await this._client.query({
@@ -189,9 +259,12 @@ export class CpcTaxonomyCache {
 
       return rows
         .filter(r => r.code)
-        .map(r => ({ code: r.code, cnt: Number(r.cnt) || 0 }));
+        .map(r => ({
+          code: r.code,
+          cnt: Number(r.cnt) || 0,
+          title: r.title || r.code,
+        }));
     } catch (err) {
-      // Log but don't throw — cache gracefully degrades to empty
       if (typeof process !== 'undefined' && process.env.WARDLEY_VERBOSE) {
         console.error(`CpcTaxonomyCache: BigQuery fetch failed for "${parentCode}":`, err.message);
       }
@@ -199,10 +272,7 @@ export class CpcTaxonomyCache {
     }
   }
 
-  /**
-   * Load cache from disk JSON file.
-   * @private
-   */
+  /** @private */
   async _loadFromDisk() {
     try {
       const raw = await readFile(this._cachePath, 'utf-8');
@@ -212,6 +282,10 @@ export class CpcTaxonomyCache {
         for (const [key, entry] of Object.entries(data)) {
           if (entry?.children && entry?.fetchedAt) {
             this._memory.set(key, entry);
+            // Register titles from disk cache
+            for (const child of entry.children) {
+              if (child.title) setCpcTitle(child.code, child.title);
+            }
           }
         }
       }
@@ -220,36 +294,27 @@ export class CpcTaxonomyCache {
     }
   }
 
-  /**
-   * Persist cache to disk JSON file.
-   * @private
-   */
+  /** @private */
   async _saveToDisk() {
     try {
       const data = Object.fromEntries(this._memory.entries());
       await mkdir(dirname(this._cachePath), { recursive: true });
       await writeFile(this._cachePath, JSON.stringify(data, null, 2), 'utf-8');
     } catch {
-      // Disk write failed — non-critical, memory cache still works
+      // Disk write failed — non-critical
     }
   }
 
-  /**
-   * Clear all cached entries (memory + disk).
-   */
+  /** Clear all cached entries (memory + disk + title store). */
   async clear() {
     this._memory.clear();
+    _titleStore.clear();
     try {
       await writeFile(this._cachePath, '{}', 'utf-8');
-    } catch {
-      // Ignore disk errors
-    }
+    } catch { /* ignore */ }
   }
 
-  /**
-   * Get the number of cached entries.
-   * @returns {number}
-   */
+  /** Get the number of cached entries. */
   get size() {
     return this._memory.size;
   }
@@ -259,12 +324,7 @@ export class CpcTaxonomyCache {
 
 /**
  * Create a CpcTaxonomyCache with BigQuery client from environment.
- * Fails gracefully if BigQuery is not configured — returns a cache
- * that always returns empty arrays.
- *
  * @param {Object} [options]
- * @param {string} [options.cachePath] - Override cache file path
- * @param {number} [options.ttlMs] - Override TTL
  * @returns {Promise<CpcTaxonomyCache>}
  */
 export async function createTaxonomyCache(options = {}) {
@@ -281,7 +341,6 @@ export async function createTaxonomyCache(options = {}) {
       ttlMs: options.ttlMs,
     });
   } catch {
-    // BigQuery not configured — return cache that works from disk only
     return new CpcTaxonomyCache({
       cachePath: options.cachePath,
       ttlMs: options.ttlMs,

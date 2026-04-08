@@ -68,7 +68,7 @@ Return ONLY the 3-character class code (e.g., G06). Nothing else.`;
 const PROMPT_PICK_FROM_LIST = `You are a patent classification expert. Given a technology capability, select the most relevant CPC code(s) from the list below.
 
 Capability: {{capability}}
-
+{{parent_context}}
 Available codes:
 {{codes_list}}
 
@@ -92,23 +92,34 @@ async function llmPickClass(capability, llmCall) {
 }
 
 /**
- * Ask LLM to pick from a list of real CPC codes.
+ * Ask LLM to pick from a list of real CPC codes (with titles and parent context).
  * @param {string} capability
- * @param {Array<{code: string, cnt: number}>} codeEntries - Available codes with patent counts
+ * @param {Array<{code: string, cnt: number, title?: string}>} codeEntries - Available codes
  * @param {function} llmCall
+ * @param {Object} [options]
+ * @param {Array<{code: string, title: string}>} [options.parentPath] - Breadcrumb of parent selections
  * @returns {Promise<string[]>} Selected codes (1-3)
  */
-async function llmPickFromList(capability, codeEntries, llmCall) {
+async function llmPickFromList(capability, codeEntries, llmCall, options = {}) {
   if (codeEntries.length === 0) return [];
   if (codeEntries.length === 1) return [codeEntries[0].code];
 
-  // Format codes with patent counts for context
+  // Format codes with titles and patent counts
   const codesList = codeEntries
-    .map(e => `${e.code} (${formatCount(e.cnt)} patents)`)
+    .map(e => {
+      const title = e.title && e.title !== e.code ? ` — ${e.title}` : '';
+      return `${e.code}${title} (${formatCount(e.cnt)} patents)`;
+    })
     .join('\n');
+
+  // Format parent context as breadcrumb
+  const parentContext = options.parentPath?.length
+    ? `\nParent classification path:\n${options.parentPath.map(p => `  ${p.code} (${p.title})`).join(' > ')}\n`
+    : '';
 
   const prompt = PROMPT_PICK_FROM_LIST
     .replace('{{capability}}', capability)
+    .replace('{{parent_context}}', parentContext)
     .replace('{{codes_list}}', codesList);
 
   const response = await llmCall(prompt);
@@ -169,69 +180,82 @@ async function llmFallbackMapping(capability, llmCall) {
  *
  * Flow:
  *   1. LLM picks class (3 chars)
- *   2. Cache → subclasses → LLM picks (4 chars)
- *   3. Cache → groups → LLM picks (e.g., "G06F9/")
- *   4. Cache → subgroups → LLM picks (e.g., "G06F9/455")
+ *   2. Cache → subclasses (with titles) → LLM picks (4 chars)
+ *   3. Cache → groups (with titles) → LLM picks (e.g., "G06F9/")
+ *   4. Cache → subgroups (with titles) → LLM picks (e.g., "G06F9/455")
  *
- * Stops descending when:
- *   - No children at a level (leaf reached)
- *   - Cache/BigQuery unavailable (returns best level found)
+ * At each level, the LLM sees:
+ *   - The parent classification path (breadcrumb)
+ *   - Code titles from cpc.definition (not just raw codes)
  *
  * @param {string} capability - Technology capability text
  * @param {function} llmCall - LLM call function
  * @param {import('./cpc-taxonomy-cache.mjs').CpcTaxonomyCache} taxonomyCache
- * @returns {Promise<string[]>} 1-5 CPC codes at the deepest level discovered
+ * @returns {Promise<{codes: string[], titles: Record<string, string>}>}
  */
 async function progressiveDiscovery(capability, llmCall, taxonomyCache) {
+  const parentPath = [];
+  const titles = {};
+
+  // Helper: find entry by code in a list
+  const findEntry = (list, code) => list.find(e => e.code === code);
+
   // Step 1: LLM identifies the class
   const classCode = await llmPickClass(capability, llmCall);
-  if (!classCode) return [];
+  if (!classCode) return { codes: [], titles };
 
-  // Step 2: Get real subclasses from cache/BigQuery
+  // Step 2: Get real subclasses from cache/BigQuery (with titles)
   const subclasses = await taxonomyCache.getSubclasses(classCode);
-  if (subclasses.length === 0) {
-    // No data at this level — can't descend further
-    return [];
-  }
+  if (subclasses.length === 0) return { codes: [], titles };
 
-  const selectedSubclasses = await llmPickFromList(capability, subclasses, llmCall);
-  if (selectedSubclasses.length === 0) return [];
+  const selectedSubclasses = await llmPickFromList(capability, subclasses, llmCall, { parentPath });
+  if (selectedSubclasses.length === 0) return { codes: [], titles };
+
+  // Record titles and build parent path
+  for (const code of selectedSubclasses) {
+    const entry = findEntry(subclasses, code);
+    if (entry?.title) titles[code] = entry.title;
+  }
+  const scEntry = findEntry(subclasses, selectedSubclasses[0]);
+  parentPath.push({ code: selectedSubclasses[0], title: scEntry?.title || selectedSubclasses[0] });
 
   // Step 3: For each selected subclass, get groups
   const allGroups = [];
-  for (const sc of selectedSubclasses.slice(0, 2)) { // Limit to 2 subclasses to control LLM calls
+  for (const sc of selectedSubclasses.slice(0, 2)) {
     const groups = await taxonomyCache.getGroups(sc);
-    if (groups.length > 0) {
-      allGroups.push(...groups.map(g => ({ ...g, parent: sc })));
-    }
+    if (groups.length > 0) allGroups.push(...groups);
   }
 
-  if (allGroups.length === 0) {
-    // No groups found — return at subclass level
-    return selectedSubclasses;
-  }
+  if (allGroups.length === 0) return { codes: selectedSubclasses, titles };
 
-  const selectedGroups = await llmPickFromList(capability, allGroups, llmCall);
-  if (selectedGroups.length === 0) return selectedSubclasses;
+  const selectedGroups = await llmPickFromList(capability, allGroups, llmCall, { parentPath });
+  if (selectedGroups.length === 0) return { codes: selectedSubclasses, titles };
+
+  for (const code of selectedGroups) {
+    const entry = findEntry(allGroups, code);
+    if (entry?.title) titles[code] = entry.title;
+  }
+  const grpEntry = findEntry(allGroups, selectedGroups[0]);
+  parentPath.push({ code: selectedGroups[0], title: grpEntry?.title || selectedGroups[0] });
 
   // Step 4: For each selected group, get subgroups
   const allSubgroups = [];
-  for (const grp of selectedGroups.slice(0, 2)) { // Limit to 2 groups
+  for (const grp of selectedGroups.slice(0, 2)) {
     const subgroups = await taxonomyCache.getSubgroups(grp);
-    if (subgroups.length > 0) {
-      allSubgroups.push(...subgroups);
-    }
+    if (subgroups.length > 0) allSubgroups.push(...subgroups);
   }
 
-  if (allSubgroups.length === 0) {
-    // No subgroups — return at group level
-    return selectedGroups;
+  if (allSubgroups.length === 0) return { codes: selectedGroups, titles };
+
+  const selectedSubgroups = await llmPickFromList(capability, allSubgroups, llmCall, { parentPath });
+  if (selectedSubgroups.length === 0) return { codes: selectedGroups, titles };
+
+  for (const code of selectedSubgroups) {
+    const entry = findEntry(allSubgroups, code);
+    if (entry?.title) titles[code] = entry.title;
   }
 
-  const selectedSubgroups = await llmPickFromList(capability, allSubgroups, llmCall);
-  if (selectedSubgroups.length === 0) return selectedGroups;
-
-  return selectedSubgroups;
+  return { codes: selectedSubgroups, titles };
 }
 
 // ─── Main public API ────────────────────────────────────────────────────────
@@ -246,22 +270,22 @@ const ULTIMATE_DEFAULT_CODES = ['G06F'];
  * Map a capability string to 1-5 CPC codes via progressive discovery.
  *
  * Resolution cascade:
- *   1. Progressive discovery (LLM + cache/BigQuery hierarchy)
+ *   1. Progressive discovery (LLM + cache/BigQuery hierarchy with titles)
  *   2. LLM fallback (no cache — LLM guesses from training knowledge)
  *   3. Ultimate default: ['G06F']
  *
- * **Return contract:** Always returns an array with 1-5 elements.
- * Never throws, never returns empty.
+ * **Return contract:** Always returns { codes: string[] (1-5), titles: Record<string,string> }.
+ * Never throws, codes never empty.
  *
  * @param {string} capability - Technology capability or component description
  * @param {Object} [options]
  * @param {function} [options.llmCall] - Injected LLM call function
  * @param {import('./cpc-taxonomy-cache.mjs').CpcTaxonomyCache} [options.taxonomyCache] - CPC cache
- * @returns {Promise<string[]>} Array of 1-5 valid CPC codes
+ * @returns {Promise<{codes: string[], titles: Record<string, string>}>}
  */
 export async function mapCapabilityToCPC(capability, options = {}) {
   const cap = (typeof capability === 'string' ? capability : '').trim();
-  if (!cap) return [...ULTIMATE_DEFAULT_CODES];
+  if (!cap) return { codes: [...ULTIMATE_DEFAULT_CODES], titles: {} };
 
   // Resolve LLM call function
   const llmCall = typeof options.llmCall === 'function'
@@ -271,27 +295,27 @@ export async function mapCapabilityToCPC(capability, options = {}) {
   // Path 1: Progressive discovery with taxonomy cache
   if (options.taxonomyCache) {
     try {
-      const codes = await progressiveDiscovery(cap, llmCall, options.taxonomyCache);
-      if (codes.length > 0) {
-        return codes.slice(0, 5);
+      const result = await progressiveDiscovery(cap, llmCall, options.taxonomyCache);
+      if (result.codes.length > 0) {
+        return { codes: result.codes.slice(0, 5), titles: result.titles };
       }
     } catch {
       // Progressive discovery failed — fall through
     }
   }
 
-  // Path 2: LLM fallback (no cache, returns 4-char codes)
+  // Path 2: LLM fallback (no cache, returns 4-char codes, no titles)
   try {
     const codes = await llmFallbackMapping(cap, llmCall);
     if (codes.length > 0) {
-      return codes.slice(0, 5);
+      return { codes: codes.slice(0, 5), titles: {} };
     }
   } catch {
     // LLM failed entirely
   }
 
   // Path 3: Ultimate default
-  return [...ULTIMATE_DEFAULT_CODES];
+  return { codes: [...ULTIMATE_DEFAULT_CODES], titles: {} };
 }
 
 /**
@@ -304,7 +328,7 @@ export async function mapCapabilityToCPC(capability, options = {}) {
  * @param {function} [llmCall] - Optional LLM call function
  * @param {Object} [options]
  * @param {import('./cpc-taxonomy-cache.mjs').CpcTaxonomyCache} [options.taxonomyCache]
- * @returns {Promise<string[]>} Array of valid CPC codes
+ * @returns {Promise<{codes: string[], titles: Record<string, string>}>}
  */
 export async function mapComponentToCpc(component, llmCall, options = {}) {
   const capability = component.capability || component.name || '';
