@@ -4,12 +4,25 @@
 // before producing a final evolution estimation. The session accumulates
 // context across exchanges and determines when enough data has been gathered.
 //
-// Question phases:
-//   1. Identity     — component name and description (required)
-//   2. Classification — economic space pre-check
+// Question phases (capability path):
+//   1. Identity       — component name and description (required)
+//   2. Classification — economic space pre-check + solution vs capability detection
 //   3. Characteristics — certitude, ubiquity, maturity indicators
 //   4. Market signals — publication types, market dynamics, adoption patterns
 //   5. Final — estimation with accumulated context
+//
+// Question phases (solution path):
+//   1. Identity       — component name and description (required)
+//   2. Classification — economic space pre-check + solution vs capability detection
+//   3. Solution context — market position, adoption, maturity for 12-property evaluation
+//   4. Final — estimation with accumulated context
+//
+// After the classification phase, the session detects whether the component
+// is a concrete named solution (e.g. "Kubernetes", "Salesforce") or an
+// abstract capability (e.g. "container orchestration", "CRM"). Solutions
+// branch to a solution-specific path evaluated against 12 Wardley evolution
+// properties; capabilities continue through the existing characteristics/
+// market-signals path.
 //
 // Usage:
 //   const session = new ConversationSession();
@@ -19,11 +32,16 @@
 //   if (session.isReadyForEstimation()) { ... }
 
 import { classifyComponent, buildReQuestions } from './classification-gate.mjs';
+import {
+  detectComponentType,
+  COMPONENT_TYPE,
+  CONFIDENCE_THRESHOLD,
+} from './solution-capability-router.mjs';
 
 // ─── Question Phases ────────────────────────────────────────────────────────
 
 /**
- * @typedef {'identity' | 'classification' | 'characteristics' | 'market_signals' | 'ready'} Phase
+ * @typedef {'identity' | 'classification' | 'characteristics' | 'market_signals' | 'solution_context' | 'ready'} Phase
  */
 
 /**
@@ -50,6 +68,10 @@ import { classifyComponent, buildReQuestions } from './classification-gate.mjs';
  * @property {string|null}  marketDynamics  - Free-text market dynamics observations
  * @property {string|null}  adoptionPattern - Adoption pattern description
  * @property {string|null}  strategy    - Preferred strategy (or 'all')
+ * @property {string|null}  componentType   - Detected type: 'solution' or 'capability'
+ * @property {number|null}  componentTypeConfidence - Detection confidence (0–1)
+ * @property {string|null}  componentTypeMethod     - Detection method (e.g. 'known-solution', 'heuristic')
+ * @property {string|null}  solutionContext - Free-text context for solution 12-property evaluation
  * @property {Phase}        phase       - Current conversation phase
  * @property {string[]}     history     - Log of gathered fields per exchange
  */
@@ -106,6 +128,30 @@ const PHASE_QUESTIONS = {
       '**Adoption pattern**: Is adoption accelerating, plateauing, or ubiquitous?',
     ],
     fields: ['wonder', 'build', 'operate', 'usage', 'maturitySignals', 'marketDynamics', 'adoptionPattern'],
+  },
+};
+
+// ─── Solution-Specific Phase Questions ──────────────────────────────────────
+//
+// When a component is detected as a concrete named solution (e.g. Kubernetes,
+// Salesforce), the conversation branches to solution-specific questions that
+// gather context for the 12-property evolution evaluation. These questions map
+// to the Wardley evolution properties: Market, Knowledge, Perception, Value
+// focus, Understanding, Comparison, Efficiency, etc.
+
+const SOLUTION_PHASE_QUESTIONS = {
+  solution_context: {
+    phase: 'solution_context',
+    prompt: 'I\'ve identified this as a specific named solution/product. Let me gather context for the 12-property Wardley evolution evaluation.',
+    hints: [
+      '**Market & Competition**: How many competitors/alternatives exist? Is pricing converging? Are there utility providers?',
+      '**Adoption & Knowledge**: How widely adopted is this solution? Is there formal training, certifications? Are specialists easy to hire?',
+      '**Perception**: How is it perceived by users and the industry? Is it taken for granted, or seen as novel/differentiating?',
+      '**Maturity**: How long has it been available? Is it well-documented with established best practices?',
+      '**Value & Efficiency**: What drives adoption decisions — innovation, differentiation, features, or cost/availability?',
+      'Any additional context about vendor, ecosystem, or market position will improve the evaluation.',
+    ],
+    fields: ['solutionContext', 'marketDynamics', 'adoptionPattern'],
   },
 };
 
@@ -243,6 +289,10 @@ export class ConversationSession {
       marketDynamics: null,
       adoptionPattern: null,
       strategy: 'all',
+      componentType: null,
+      componentTypeConfidence: null,
+      componentTypeMethod: null,
+      solutionContext: null,
       phase: 'identity',
       history: [],
       ...initial,
@@ -303,7 +353,8 @@ export class ConversationSession {
       return null;
     }
 
-    const template = PHASE_QUESTIONS[this.state.phase];
+    // Look up in standard phases first, then solution-specific phases
+    const template = PHASE_QUESTIONS[this.state.phase] || SOLUTION_PHASE_QUESTIONS[this.state.phase];
     if (!template) return null;
 
     // Customize hints based on already-gathered data
@@ -330,6 +381,18 @@ export class ConversationSession {
       }
     }
 
+    // Solution-specific phase: add component type detection info
+    if (this.state.phase === 'solution_context') {
+      const typeInfo = this.state.componentType === COMPONENT_TYPE.SOLUTION
+        ? `✓ Detected as solution (confidence: ${(this.state.componentTypeConfidence * 100).toFixed(0)}%, method: ${this.state.componentTypeMethod})`
+        : `✓ Component type: ${this.state.componentType}`;
+      customized.hints.unshift(typeInfo);
+
+      if (this.state.solutionContext) {
+        customized.hints.unshift(`✓ Solution context already provided`);
+      }
+    }
+
     return customized;
   }
 
@@ -350,6 +413,45 @@ export class ConversationSession {
    */
   isNonEconomic() {
     return this.state.space === 'social_good' || this.state.space === 'common_good';
+  }
+
+  /**
+   * Check if the component was detected as a concrete named solution.
+   * @returns {boolean}
+   */
+  isSolution() {
+    return this.state.componentType === COMPONENT_TYPE.SOLUTION;
+  }
+
+  /**
+   * Check if the component was detected as an abstract capability.
+   * @returns {boolean}
+   */
+  isCapability() {
+    return this.state.componentType === COMPONENT_TYPE.CAPABILITY;
+  }
+
+  /**
+   * Check if the solution vs capability detection needs LLM fallback.
+   * True when naming confidence is below the 90% threshold.
+   * @returns {boolean}
+   */
+  needsComponentTypeFallback() {
+    return this.state.componentTypeConfidence != null &&
+      this.state.componentTypeConfidence < CONFIDENCE_THRESHOLD;
+  }
+
+  /**
+   * Get the component type detection result from session state.
+   * @returns {{ type: string|null, confidence: number|null, method: string|null, needsFallback: boolean }}
+   */
+  getComponentTypeDetection() {
+    return {
+      type: this.state.componentType,
+      confidence: this.state.componentTypeConfidence,
+      method: this.state.componentTypeMethod,
+      needsFallback: this.needsComponentTypeFallback(),
+    };
   }
 
   /**
@@ -411,6 +513,40 @@ export class ConversationSession {
     if (this.state.marketDynamics) input.metadata.marketDynamics = this.state.marketDynamics;
     if (this.state.adoptionPattern) input.metadata.adoptionPattern = this.state.adoptionPattern;
 
+    // Add solution routing metadata (detected during classification phase)
+    if (this.state.componentType) {
+      input.componentType = this.state.componentType;
+      input.componentTypeConfidence = this.state.componentTypeConfidence;
+      input.componentTypeMethod = this.state.componentTypeMethod;
+      // Tag as solution for solution strategies
+      if (this.state.componentType === COMPONENT_TYPE.SOLUTION) {
+        input.isSolution = true;
+      }
+    }
+
+    // Add solution-specific context for 12-property evaluation
+    if (this.state.solutionContext) {
+      input.solutionContext = this.state.solutionContext;
+      input.metadata.solutionContext = this.state.solutionContext;
+    }
+
+    // ── Enrich context for solution components ──
+    // When the component is a solution, compose a rich context string from all
+    // conversational data gathered during the solution_context phase. This ensures
+    // solution strategy LLM prompts receive the full conversational context
+    // (not just the bare description) for accurate 12-property evaluation.
+    if (this.state.componentType === COMPONENT_TYPE.SOLUTION) {
+      const contextParts = [];
+      if (this.state.description) contextParts.push(this.state.description);
+      if (this.state.solutionContext) contextParts.push(this.state.solutionContext);
+      if (this.state.marketDynamics) contextParts.push(`Market dynamics: ${this.state.marketDynamics}`);
+      if (this.state.adoptionPattern) contextParts.push(`Adoption pattern: ${this.state.adoptionPattern}`);
+      if (this.state.sector) contextParts.push(`Sector: ${this.state.sector}`);
+      if (contextParts.length > 0) {
+        input.context = contextParts.join('. ');
+      }
+    }
+
     return input;
   }
 
@@ -422,11 +558,24 @@ export class ConversationSession {
     const gathered = {};
     const missing = {};
 
-    const fields = [
-      'name', 'description', 'space',
+    // Base fields shared by both paths
+    const baseFields = ['name', 'description', 'space'];
+
+    // Path-specific fields
+    const capabilityFields = [
       'certitude', 'ubiquity',
       'wonder', 'build', 'operate', 'usage',
       'sector', 'maturitySignals', 'marketDynamics', 'adoptionPattern',
+    ];
+    const solutionFields = [
+      'solutionContext', 'marketDynamics', 'adoptionPattern',
+    ];
+
+    // Choose fields based on detected component type
+    const isSolutionPath = this.state.componentType === COMPONENT_TYPE.SOLUTION;
+    const fields = [
+      ...baseFields,
+      ...(isSolutionPath ? solutionFields : capabilityFields),
     ];
 
     for (const field of fields) {
@@ -437,8 +586,15 @@ export class ConversationSession {
       }
     }
 
+    // Include component type info when available
+    if (this.state.componentType) {
+      gathered.componentType = this.state.componentType;
+      gathered.componentTypeConfidence = this.state.componentTypeConfidence;
+    }
+
     return {
       phase: this.state.phase,
+      componentType: this.state.componentType,
       gathered,
       missing: Object.keys(missing),
       history: this.state.history,
@@ -507,6 +663,14 @@ export class ConversationSession {
       const classification = classifyComponent(this.state.name, this.state.description || '');
       this.state.space = classification.space;
     }
+
+    // Detect solution vs capability type (once, after name is available)
+    if (this.state.name && this.state.componentType == null) {
+      const detection = detectComponentType(this.state.name, this.state.description || '');
+      this.state.componentType = detection.type;
+      this.state.componentTypeConfidence = detection.confidence;
+      this.state.componentTypeMethod = detection.method;
+    }
   }
 
   /**
@@ -523,7 +687,7 @@ export class ConversationSession {
       if (this.state.phase === 'identity') return;
     }
 
-    // Phase: classification → need space resolved
+    // Phase: classification → need space resolved, then branch on component type
     if (this.state.phase === 'classification') {
       // Auto-classify if possible
       if (this.state.space == null && this.state.name) {
@@ -537,10 +701,24 @@ export class ConversationSession {
           this.state.phase = 'ready';
           return;
         }
-        this.state.phase = 'characteristics';
+
+        // ── Solution vs capability branching ──
+        // After economic space is confirmed, branch based on component type.
+        // Solutions go to solution_context; capabilities go to characteristics.
+        if (this.state.componentType === COMPONENT_TYPE.SOLUTION) {
+          this.state.phase = 'solution_context';
+          this.state.history.push(
+            `Classification: detected as solution (confidence=${this.state.componentTypeConfidence}, ` +
+            `method=${this.state.componentTypeMethod}) — branching to solution path`
+          );
+        } else {
+          this.state.phase = 'characteristics';
+        }
       }
       if (this.state.phase === 'classification') return;
     }
+
+    // ── Capability path phases ──
 
     // Phase: characteristics → need at least certitude OR ubiquity
     if (this.state.phase === 'characteristics') {
@@ -559,6 +737,20 @@ export class ConversationSession {
 
       // Ready if we have either publication proportions or market text signals
       if (hasPubs || hasMarketText) {
+        this.state.phase = 'ready';
+      }
+    }
+
+    // ── Solution path phases ──
+
+    // Phase: solution_context → can proceed when we have solution context or
+    //   market dynamics or adoption pattern (any context for 12-property eval)
+    if (this.state.phase === 'solution_context') {
+      const hasSolutionContext = this.state.solutionContext != null;
+      const hasMarketText = this.state.marketDynamics || this.state.adoptionPattern;
+
+      // Ready if we have any solution-relevant context
+      if (hasSolutionContext || hasMarketText) {
         this.state.phase = 'ready';
       }
     }
@@ -623,23 +815,56 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
   console.log(`Re-questions:`, session2.getReQuestions());
   console.log();
 
-  // Test 3: Free-text inference
-  console.log('--- Test 3: Free-text inference ---');
+  // Test 3: Free-text inference — Kubernetes detected as SOLUTION
+  console.log('--- Test 3: Solution detection — Kubernetes branches to solution_context ---');
   const session3 = new ConversationSession();
   session3.update({ name: 'Kubernetes', description: 'Container orchestration platform' });
+  console.log(`Component type: ${session3.state.componentType}`);
+  console.log(`Type confidence: ${session3.state.componentTypeConfidence}`);
+  console.log(`Type method: ${session3.state.componentTypeMethod}`);
+  console.log(`Phase after identity: ${session3.phase}`);
+  console.assert(session3.state.componentType === 'solution', 'Kubernetes should be detected as solution');
+  console.assert(session3.phase === 'solution_context', 'Should branch to solution_context phase');
+  console.assert(session3.isSolution(), 'isSolution() should return true');
+
+  // Solution path: provide solution context
   session3.update({
+    solutionContext: 'Dominant container orchestration platform, CNCF project, widely adopted by enterprises',
+  });
+  console.log(`Phase after solution context: ${session3.phase}`);
+  console.assert(session3.phase === 'ready', 'Should be ready after solution context');
+  console.log(`Summary:`, JSON.stringify(session3.getSummary(), null, 2));
+  console.log();
+
+  // Test 3b: Capability detection — "container orchestration" stays on capability path
+  console.log('--- Test 3b: Capability detection — branches to characteristics ---');
+  const session3b = new ConversationSession();
+  session3b.update({ name: 'container orchestration', description: 'Managing container workloads' });
+  console.log(`Component type: ${session3b.state.componentType}`);
+  console.log(`Phase: ${session3b.phase}`);
+  console.assert(session3b.state.componentType === 'capability', 'container orchestration should be capability');
+  console.assert(session3b.phase === 'characteristics', 'Should stay on capability path (characteristics)');
+  console.assert(session3b.isCapability(), 'isCapability() should return true');
+  console.assert(!session3b.isSolution(), 'isSolution() should return false');
+  console.log();
+
+  // Test 3c: Free-text inference (capability path)
+  console.log('--- Test 3c: Free-text inference on capability path ---');
+  const session3c = new ConversationSession();
+  session3c.update({ name: 'monitoring', description: 'System monitoring capability' });
+  session3c.update({
     maturitySignals: 'Well understood technology with established best practices, widely adopted by enterprises',
   });
-  console.log(`Inferred certitude: ${session3.state.certitude}`);
-  console.log(`Inferred ubiquity: ${session3.state.ubiquity}`);
-  session3.update({
-    marketDynamics: 'Many competitors, feature differentiation, dominant players like AWS EKS and Google GKE',
+  console.log(`Inferred certitude: ${session3c.state.certitude}`);
+  console.log(`Inferred ubiquity: ${session3c.state.ubiquity}`);
+  session3c.update({
+    marketDynamics: 'Many competitors, feature differentiation, dominant players',
     adoptionPattern: 'Mass adoption in enterprise, mainstream',
   });
-  console.log(`Inferred wonder: ${session3.state.wonder}`);
-  console.log(`Inferred build: ${session3.state.build}`);
-  console.log(`Phase: ${session3.phase}`);
-  console.log(`Summary:`, JSON.stringify(session3.getSummary(), null, 2));
+  console.log(`Inferred wonder: ${session3c.state.wonder}`);
+  console.log(`Inferred build: ${session3c.state.build}`);
+  console.log(`Phase: ${session3c.phase}`);
+  console.log(`Summary:`, JSON.stringify(session3c.getSummary(), null, 2));
   console.log();
 
   // Test 4: Serialization

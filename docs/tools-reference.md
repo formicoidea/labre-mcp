@@ -6,7 +6,7 @@ WardleyAssistant expose 3 outils via le protocole MCP. Chacun est appele via `to
 
 ## estimateEvolution
 
-Estime la position d'evolution d'un composant sur l'axe de Wardley (0 = Genesis, 1 = Commodity).
+Estime la position d'evolution d'un composant sur l'axe de Wardley (0 = Genesis, 1 = Commodity). Supporte de maniere transparente les **solutions nommees** (Kubernetes, Salesforce) et les **capabilities abstraites** (CRM, container orchestration) — le routage est automatique.
 
 ### Schema d'entree
 
@@ -88,7 +88,23 @@ Reponse : question de la phase suivante + `sessionState` a renvoyer au tour suiv
 }
 ```
 
-### Structure de la reponse
+### Exemple — solution nommee
+
+```json
+{
+  "name": "estimateEvolution",
+  "arguments": {
+    "name": "Kubernetes",
+    "context": "Orchestration de conteneurs pour microservices",
+    "mode": "oneshot",
+    "space": "economic"
+  }
+}
+```
+
+Le routeur detecte automatiquement "Kubernetes" comme une solution et route vers le pipeline des 12 proprietes Wardley.
+
+### Structure de la reponse — capability
 
 ```json
 {
@@ -99,6 +115,12 @@ Reponse : question de la phase suivante + `sessionState` a renvoyer au tour suiv
     "reason": "...",
     "requiresReQuestion": false
   },
+  "routing": {
+    "type": "capability",
+    "confidence": 0.95,
+    "method": "naming_heuristics",
+    "evalMode": "exclusive"
+  },
   "evaluations": {
     "s-curve": { "evolution": 0.76, "confidence": 0.85, "method": "s-curve" },
     "llm-direct": { "evolution": 0.72, "confidence": 0.90, "method": "llm-direct" }
@@ -108,6 +130,35 @@ Reponse : question de la phase suivante + `sessionState` a renvoyer au tour suiv
   "sessionState": null,
   "nextQuestion": null,
   "phase": null
+}
+```
+
+### Structure de la reponse — solution
+
+```json
+{
+  "mode": "oneshot",
+  "routing": {
+    "type": "solution",
+    "confidence": 0.98,
+    "method": "known_solutions_dictionary",
+    "evalMode": "exclusive"
+  },
+  "evaluations": {
+    "solution-properties": {
+      "evolution": 0.55,
+      "confidence": 0.88,
+      "method": "solution-properties",
+      "stage": "Product",
+      "meanPhase": 2.8,
+      "phaseDistribution": { "1": 0, "2": 4, "3": 6, "4": 2 },
+      "dominantPhase": { "phase": 3, "count": 6, "label": "Product" },
+      "properties": [
+        { "id": "market", "name": "Market", "phase": 3, "label": "Product", "confidence": 0.90 }
+      ]
+    }
+  },
+  "formatted": "## Evolution Estimation: Kubernetes\n..."
 }
 ```
 

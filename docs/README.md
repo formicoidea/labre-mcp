@@ -1,31 +1,30 @@
 # WardleyAssistant — Documentation
 
-WardleyAssistant est un serveur MCP (Model Context Protocol) qui estime la position d'evolution des composants sur une Wardley Map. Il expose 3 outils via JSON-RPC 2.0 sur stdio, utilise 6 strategies d'evaluation pluggables et classe automatiquement les composants par espace economique.
+WardleyAssistant est un serveur MCP (Model Context Protocol) qui estime la position d'evolution des composants sur une Wardley Map. Il expose 3 outils via JSON-RPC 2.0 sur stdio et route automatiquement entre deux pipelines d'evaluation :
+
+- **Capability strategies** (6 strategies pluggables) pour les capacites abstraites
+- **Solution strategies** (12 proprietes Wardley) pour les produits/solutions nommes
+
+Le routage est transparent : detection automatique via naming, LLM et web search.
 
 ## Architecture simplifiee
 
-```
-Appel MCP (Claude Code / client MCP)
-        |
-  mcp-server.mjs       (JSON-RPC 2.0 stdio)
-        |
-  +-----+-----+--------+
-  |           |         |
-estimateEvolution  evaluateMap  generateValueChain
-  |
-Classification Gate  (social_good / common_good / economic)
-  |
-Mode Router  (oneshot / guided / auto)
-  |
-Strategies Registry  (auto-discovery)
-  |
-+--------+--------+--------+--------+--------+
-| s-curve | pub-analysis | timeline | llm-direct | logprob | sector-agent |
-+--------+--------+--------+--------+--------+
-  |
-Response Formatter  (markdown, confiance, stade)
-  |
-Notifications  (channels Claude Code + MCP standard)
+```mermaid
+flowchart TD
+    MCP["mcp-server.mjs\nJSON-RPC 2.0 stdio"]
+    MCP --> EE["estimateEvolution"]
+    MCP --> EM["evaluateMap"]
+    MCP --> GV["generateValueChain"]
+
+    EE & EM & GV --> CG["Classification Gate\nsocial_good / common_good / economic"]
+    CG --> MR["Mode Router\noneshot / guided / auto"]
+    MR --> SCR["Solution/Capability Router"]
+
+    SCR -->|"solution"| SS["Solution Strategies\n12 proprietes Wardley"]
+    SCR -->|"capability"| CS["Capability Strategies\ns-curve, pub-analysis, timeline,\nllm-direct, logprob, sector-agent"]
+
+    SS & CS --> RF["Response Formatter"]
+    RF --> N["Notifications"]
 ```
 
 ## Table des matieres
@@ -35,7 +34,7 @@ Notifications  (channels Claude Code + MCP standard)
 | [Demarrage rapide](getting-started.md) | Prerequisites, installation, premier appel |
 | [Architecture](architecture.md) | Pipeline, flux de donnees, modules |
 | [Reference des outils](tools-reference.md) | Les 3 outils MCP (schemas, parametres, exemples) |
-| [Strategies](strategies.md) | Les 6 strategies d'evaluation (principe, I/O, maths) |
+| [Strategies](strategies.md) | Capability (6 strategies) et Solution (12 proprietes Wardley) |
 | [Gate de classification](classification-gate.md) | Filtrage social_good / common_good / economic |
 | [Configuration](configuration.md) | Variables d'environnement, .mcp.json, channels |
 | [Notifications](notifications.md) | Progression temps reel, i18n, gestion d'erreurs |

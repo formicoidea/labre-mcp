@@ -284,6 +284,12 @@ export class CpcEvolutionStrategy extends BaseStrategy {
     const modelConfidence = computeModelConfidence(scurveResult);
     const confidence = computeConfidence(dataQuality, modelConfidence);
 
+    // Step 8: Generate .wm pipeline insight
+    const cpcTitles = cpcCodes.map(code => ({ code, title: getCpcTitle(code) }));
+    const insight = await this._generatePipelineInsight(
+      component, scurveResult.evolution, cpcTitles
+    );
+
     // Build result following BaseStrategy contract + Phase B enrichment pattern
     const result = {
       evolution: scurveResult.evolution,
@@ -294,13 +300,14 @@ export class CpcEvolutionStrategy extends BaseStrategy {
       ubiquity,
       // Detailed trace for debugging and transparency
       trace: [
-        { step: 'cpc-codes', value: cpcCodes.map(code => ({ code, title: getCpcTitle(code) })) },
+        { step: 'cpc-codes', value: cpcTitles },
         { step: 'patent-count', value: patentCount },
         { step: 'certitude-indicators', value: indicatorValues.certitude, weights: certitudeWeights },
         { step: 'ubiquity-indicators', value: indicatorValues.ubiquity, weights: ubiquityWeights },
         { step: 'aggregated', certitude, ubiquity },
         { step: 's-curve', ...scurveResult },
         { step: 'confidence', dataQuality, modelConfidence, combined: confidence },
+        { step: 'insight', value: insight },
       ],
     };
 
@@ -448,6 +455,148 @@ export class CpcEvolutionStrategy extends BaseStrategy {
   resetIndicatorConfig() {
     this._certitudeIndicators = { ...DEFAULT_CERTITUDE_INDICATORS };
     this._ubiquityIndicators = { ...DEFAULT_UBIQUITY_INDICATORS };
+  }
+
+  // ─── Pipeline insight generation ────────────────────────────────────────
+
+  /**
+   * Generate a .wm pipeline insight showing the evaluated component
+   * within its underlying capability pipeline.
+   *
+   * @param {import('../strategies/base-strategy.mjs').ComponentInput} component
+   * @param {number} evolution - Computed evolution score
+   * @param {Array<{code: string, title: string}>} cpcTitles - CPC codes with titles
+   * @returns {Promise<string>} .wm format snippet
+   * @private
+   */
+  async _generatePipelineInsight(component, evolution, cpcTitles) {
+    const DEFAULT_VISIBILITY = 0.51;
+    const STATE_OF_ART_MIN = 0.85;
+
+    try {
+      // 1. Derive capability name from CPC titles or component
+      const capabilityName = this._deriveCapabilityName(component, cpcTitles);
+
+      // 2. Ask LLM for a state-of-the-art example
+      const stateOfArt = await this._getStateOfArtExample(component, evolution, cpcTitles);
+
+      // 3. Compute positions
+      const stateOfArtEvolution = stateOfArt?.evolution ?? Math.max(STATE_OF_ART_MIN, evolution + 0.1);
+      const pipelineMin = Math.round(Math.max(0, evolution - 0.05) * 100) / 100;
+      const pipelineMax = Math.round(Math.min(1, stateOfArtEvolution + 0.02) * 100) / 100;
+      const evoRounded = Math.round(evolution * 1000) / 1000;
+      const sotRounded = Math.round(stateOfArtEvolution * 100) / 100;
+
+      // 4. Format component name for .wm (quote if contains spaces)
+      const compName = component.name || 'Component';
+      const wmCompName = compName.includes(' ') ? `"${compName}"` : compName;
+
+      // 5. Build .wm snippet
+      const lines = [
+        `component ${capabilityName} [${DEFAULT_VISIBILITY}, ${pipelineMin}] label [-53, -17]`,
+        `pipeline ${capabilityName}`,
+        `{`,
+        `    component ${wmCompName} [${evoRounded}] label [-61, -23]`,
+      ];
+
+      if (stateOfArt) {
+        const sotName = stateOfArt.name.includes(' ') || stateOfArt.name.includes('"')
+          ? `"${stateOfArt.name.replace(/"/g, "'")}"` : stateOfArt.name;
+        const sotLabel = stateOfArt.description
+          ? `"${stateOfArt.name.replace(/"/g, "'")}\\n${stateOfArt.description.replace(/"/g, "'")}"`
+          : sotName;
+        lines.push(`    component ${sotLabel} [${sotRounded}] label [-4, 30]`);
+      }
+
+      lines.push(`}`);
+      return lines.join('\n');
+    } catch {
+      // Fallback: simple pipeline without state of the art
+      const compName = component.name || 'Component';
+      const wmCompName = compName.includes(' ') ? `"${compName}"` : compName;
+      const evoRounded = Math.round(evolution * 1000) / 1000;
+      return [
+        `component Capability [${DEFAULT_VISIBILITY}, ${evoRounded}] label [-53, -17]`,
+        `pipeline Capability`,
+        `{`,
+        `    component ${wmCompName} [${evoRounded}] label [-61, -23]`,
+        `}`,
+      ].join('\n');
+    }
+  }
+
+  /**
+   * Derive a clean capability name from CPC titles or component data.
+   * @private
+   */
+  _deriveCapabilityName(component, cpcTitles) {
+    // Prefer component.capability if set by identify-capability pipeline
+    if (component.capability) {
+      const cap = component.capability.trim();
+      // Title-case, remove quotes
+      const clean = cap.charAt(0).toUpperCase() + cap.slice(1);
+      return clean.includes(' ') ? `"${clean}"` : clean;
+    }
+
+    // Use first CPC title, cleaned up
+    if (cpcTitles.length > 0 && cpcTitles[0].title !== cpcTitles[0].code) {
+      let title = cpcTitles[0].title
+        .replace(/,?\s*e\.g\..*$/i, '')    // Remove "e.g. ..." suffixes
+        .replace(/\s*\[.*?\]/g, '')         // Remove [CPU] style brackets
+        .replace(/\s+/g, ' ')
+        .trim();
+      // Truncate if too long for a .wm component name
+      if (title.length > 50) title = title.substring(0, 47) + '...';
+      return `"${title}"`;
+    }
+
+    return `"${component.name || 'Capability'}"`;
+  }
+
+  /**
+   * Ask the LLM for a concrete state-of-the-art example in the CPC domain.
+   * @private
+   */
+  async _getStateOfArtExample(component, evolution, cpcTitles) {
+    if (!this._llmCall) return null;
+
+    const phase =
+      evolution <= 0.18 ? 'Genesis' :
+      evolution <= 0.26 ? 'Custom' :
+      evolution <= 0.70 ? 'Product' : 'Commodity';
+
+    const cpcContext = cpcTitles
+      .map(t => `${t.code}: ${t.title}`)
+      .join('\n');
+
+    const prompt = `Given the CPC patent domain:
+${cpcContext}
+
+The component "${component.name}" is evaluated at evolution ${evolution.toFixed(2)} (${phase}).
+
+Wardley evolution axis: Genesis [0, 0.18] | Custom [0.18, 0.26] | Product [0.26, 0.70] | Commodity [0.70, 1.0]
+
+Name ONE concrete product or service that represents the most commoditized/utility form of this capability domain — something more evolved than "${component.name}". Estimate its evolution position on the Wardley axis.
+
+MANDATORY FORMAT (one line):
+NAME | SHORT_DESCRIPTION | EVOLUTION
+(max 30 chars for NAME, max 40 chars for SHORT_DESCRIPTION, EVOLUTION as decimal 0-1)`;
+
+    try {
+      const response = await this._llmCall(prompt);
+      const match = response.match(/^(.+?)\s*\|\s*(.+?)\s*\|\s*([\d.]+)\s*$/m);
+      if (match) {
+        const evo = parseFloat(match[3]);
+        return {
+          name: match[1].trim().substring(0, 30),
+          description: match[2].trim().substring(0, 40),
+          evolution: Number.isFinite(evo) ? Math.max(evolution, Math.min(1, evo)) : null,
+        };
+      }
+    } catch {
+      // LLM failed — return null
+    }
+    return null;
   }
 
   // ─── Internal pipeline methods ──────────────────────────────────────────

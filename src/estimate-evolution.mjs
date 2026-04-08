@@ -17,6 +17,14 @@ import { createLLMCall, createOpenCodeCall, createOpenCodeLogprobCall } from './
 import { identifyCapability } from './identify-capability.mjs';
 import { logDebug, logInfo, logError } from './mcp-notifications.mjs';
 import { createMessageResolverFromArgs } from './progress-messages.mjs';
+import {
+  detectComponentType,
+  determineRoutingTargets,
+  dispatchSolutionStrategies,
+  COMPONENT_TYPE,
+  CONFIDENCE_THRESHOLD,
+} from './solution-capability-router.mjs';
+import { verifyClassification } from './dual-verification-orchestrator.mjs';
 
 // ─── Valid Spaces ────────────────────────────────────────────────────────────
 
@@ -219,73 +227,141 @@ export async function estimateEvolutionOneShot(rawInput) {
     // LLM not available — skip capability identification (analytical strategies don't need it)
   }
 
-  // Step 5: Evaluate with selected strategy(ies)
+  // Step 4c: Route component to solution or capability strategies
+  //   Tier 1: Fast naming convention detection
+  const detection = detectComponentType(name, description);
+  let routingTargets = determineRoutingTargets(detection);
+  let verifiedDetection = null;
+
+  logDebug(TOOL, `Routing "${name}": type=${detection.type}, confidence=${detection.confidence}, ` +
+    `needsFallback=${detection.needsFallback}, evalMode=${routingTargets.mode}`);
+
+  // Fallback: when naming convention confidence < 90%, delegate to the
+  // dual-verification orchestrator (LLM + web search) for higher accuracy.
+  // Forwards the component name plus any partial classification context
+  // accumulated so far (description, capability, nature).
+  if (detection.needsFallback) {
+    logDebug(TOOL, `Naming confidence ${detection.confidence} < 0.90 for "${name}" — triggering dual-verification fallback`);
+
+    try {
+      const partialContext = {
+        description,
+        llmCall: getLLMCall(),
+        ...(component.capability && { capability: component.capability }),
+        ...(component.nature && { nature: component.nature }),
+      };
+
+      verifiedDetection = await verifyClassification(name, partialContext);
+
+      // Use verified result for routing (overrides naming-only detection)
+      routingTargets = verifiedDetection.routingTargets;
+
+      logDebug(TOOL,
+        `Dual-verification result for "${name}": type=${verifiedDetection.classification}, ` +
+        `confidence=${verifiedDetection.confidence}, method=${verifiedDetection.method}, ` +
+        `verified=${verifiedDetection.verified}, tiers=${verifiedDetection.tiersUsed.join('+')}`);
+    } catch (err) {
+      // Fallback failed — continue with the naming-only detection
+      logDebug(TOOL,
+        `Dual-verification fallback failed for "${name}": ${err.message} — using naming-only routing`);
+    }
+  }
+
+  logDebug(TOOL, `Final routing "${name}": solution=${routingTargets.useSolutionStrategies}, ` +
+    `capability=${routingTargets.useCapabilityStrategies}`);
+
+  // Step 5: Evaluate with selected strategy(ies) — dispatched via routing
   const evaluations = {};
 
-  if (strategy === 'all') {
-    const strategies = await loadStrategies();
-    const strategyNames = [...strategies.keys()];
+  // Step 5a: Run capability strategies (existing pipeline) if routed
+  if (routingTargets.useCapabilityStrategies) {
+    logDebug(TOOL, `Dispatching "${name}" to capability strategies`);
 
-    logDebug(TOOL, `Loaded ${strategyNames.length} strategies for "${name}": ${strategyNames.join(', ')}`);
+    if (strategy === 'all') {
+      const strategies = await loadStrategies();
+      const strategyNames = [...strategies.keys()];
 
-    // Phase A: Run all non-s-curve strategies first (they may produce certitude/ubiquity)
-    for (const [method, StrategyCls] of strategies) {
-      if (method === 's-curve') continue;
+      logDebug(TOOL, `Loaded ${strategyNames.length} capability strategies for "${name}": ${strategyNames.join(', ')}`);
+
+      // Phase A: Run all non-s-curve strategies first (they may produce certitude/ubiquity)
+      for (const [method, StrategyCls] of strategies) {
+        if (method === 's-curve') continue;
+        try {
+          logDebug(TOOL, msg('step.strategy', { strategy: method, component: name }));
+          const instance = createStrategyInstance(StrategyCls);
+          const result = await Promise.resolve(instance.evaluate(component));
+          evaluations[method] = result;
+          logDebug(TOOL, msg('step.strategy.result', { strategy: method, evolution: result.evolution, confidence: result.confidence }));
+        } catch (err) {
+          evaluations[method] = { error: err.message };
+          logDebug(TOOL, msg('step.strategy.error', { strategy: method, error: err.message }));
+        }
+      }
+
+      // Phase B: If certitude/ubiquity not on the component, derive from LLM strategies
+      const enrichedComponent = { ...component };
+      if (enrichedComponent.certitude == null || enrichedComponent.ubiquity == null) {
+        const llmResults = Object.values(evaluations).filter(
+          e => !e.error && e.certitude != null && e.ubiquity != null
+        );
+        if (llmResults.length > 0) {
+          // Average certitude/ubiquity from all LLM strategies that provided them
+          enrichedComponent.certitude = Math.round(
+            llmResults.reduce((s, r) => s + r.certitude, 0) / llmResults.length * 1000
+          ) / 1000;
+          enrichedComponent.ubiquity = Math.round(
+            llmResults.reduce((s, r) => s + r.ubiquity, 0) / llmResults.length * 1000
+          ) / 1000;
+          logDebug(TOOL, `Enriched "${name}" from ${llmResults.length} LLM result(s): certitude=${enrichedComponent.certitude}, ubiquity=${enrichedComponent.ubiquity}`);
+        }
+      }
+
+      // Phase C: Run s-curve with enriched component
+      const scurveCls = strategies.get('s-curve');
+      if (scurveCls) {
+        try {
+          logDebug(TOOL, msg('step.strategy', { strategy: 's-curve', component: name }));
+          const instance = createStrategyInstance(scurveCls);
+          const result = await Promise.resolve(instance.evaluate(enrichedComponent));
+          evaluations['s-curve'] = result;
+          logDebug(TOOL, msg('step.strategy.result', { strategy: 's-curve', evolution: result.evolution, confidence: result.confidence }));
+        } catch (err) {
+          evaluations['s-curve'] = { error: err.message };
+          logDebug(TOOL, msg('step.strategy.error', { strategy: 's-curve', error: err.message }));
+        }
+      }
+    } else {
       try {
-        logDebug(TOOL, msg('step.strategy', { strategy: method, component: name }));
+        logDebug(TOOL, msg('step.strategy', { strategy, component: name }));
+        const StrategyCls = await getStrategy(strategy);
         const instance = createStrategyInstance(StrategyCls);
         const result = await Promise.resolve(instance.evaluate(component));
-        evaluations[method] = result;
-        logDebug(TOOL, msg('step.strategy.result', { strategy: method, evolution: result.evolution, confidence: result.confidence }));
+        evaluations[strategy] = result;
+        logDebug(TOOL, msg('step.strategy.result', { strategy, evolution: result.evolution, confidence: result.confidence }));
       } catch (err) {
-        evaluations[method] = { error: err.message };
-        logDebug(TOOL, msg('step.strategy.error', { strategy: method, error: err.message }));
+        evaluations[strategy] = { error: err.message };
+        logDebug(TOOL, msg('step.strategy.error', { strategy, error: err.message }));
       }
     }
+  }
 
-    // Phase B: If certitude/ubiquity not on the component, derive from LLM strategies
-    const enrichedComponent = { ...component };
-    if (enrichedComponent.certitude == null || enrichedComponent.ubiquity == null) {
-      const llmResults = Object.values(evaluations).filter(
-        e => !e.error && e.certitude != null && e.ubiquity != null
-      );
-      if (llmResults.length > 0) {
-        // Average certitude/ubiquity from all LLM strategies that provided them
-        enrichedComponent.certitude = Math.round(
-          llmResults.reduce((s, r) => s + r.certitude, 0) / llmResults.length * 1000
-        ) / 1000;
-        enrichedComponent.ubiquity = Math.round(
-          llmResults.reduce((s, r) => s + r.ubiquity, 0) / llmResults.length * 1000
-        ) / 1000;
-        logDebug(TOOL, `Enriched "${name}" from ${llmResults.length} LLM result(s): certitude=${enrichedComponent.certitude}, ubiquity=${enrichedComponent.ubiquity}`);
-      }
-    }
-
-    // Phase C: Run s-curve with enriched component
-    const scurveCls = strategies.get('s-curve');
-    if (scurveCls) {
-      try {
-        logDebug(TOOL, msg('step.strategy', { strategy: 's-curve', component: name }));
-        const instance = createStrategyInstance(scurveCls);
-        const result = await Promise.resolve(instance.evaluate(enrichedComponent));
-        evaluations['s-curve'] = result;
-        logDebug(TOOL, msg('step.strategy.result', { strategy: 's-curve', evolution: result.evolution, confidence: result.confidence }));
-      } catch (err) {
-        evaluations['s-curve'] = { error: err.message };
-        logDebug(TOOL, msg('step.strategy.error', { strategy: 's-curve', error: err.message }));
-      }
-    }
-  } else {
+  // Step 5b: Run solution strategies if routed
+  if (routingTargets.useSolutionStrategies) {
+    logDebug(TOOL, `Dispatching "${name}" to solution strategies`);
     try {
-      logDebug(TOOL, msg('step.strategy', { strategy, component: name }));
-      const StrategyCls = await getStrategy(strategy);
-      const instance = createStrategyInstance(StrategyCls);
-      const result = await Promise.resolve(instance.evaluate(component));
-      evaluations[strategy] = result;
-      logDebug(TOOL, msg('step.strategy.result', { strategy, evolution: result.evolution, confidence: result.confidence }));
+      const solutionEvals = await dispatchSolutionStrategies(component, {
+        llmCall: getLLMCall(),
+        strategy: strategy === 'all' ? 'all' : strategy,
+        mode: 'auto',
+      });
+      // Merge solution evaluations (prefix to avoid key collisions)
+      for (const [method, result] of Object.entries(solutionEvals)) {
+        const key = evaluations[method] ? `solution:${method}` : method;
+        evaluations[key] = result;
+      }
     } catch (err) {
-      evaluations[strategy] = { error: err.message };
-      logDebug(TOOL, msg('step.strategy.error', { strategy, error: err.message }));
+      evaluations['solution-dispatch-error'] = { error: err.message };
+      logDebug(TOOL, `Solution strategy dispatch failed: ${err.message}`);
     }
   }
 
@@ -299,8 +375,16 @@ export async function estimateEvolutionOneShot(rawInput) {
   // Info-level: tool end (localized)
   logInfo(TOOL, msg('tool.end', { tool: TOOL, component: name, duration }));
 
-  let message = `Component "${name}" classified as ${classification.space}. `;
-  message += `Evaluated with ${successCount} strategy(ies)`;
+  // Build routing metadata — use verified detection if available, else naming-only
+  const effectiveType = verifiedDetection ? verifiedDetection.classification : detection.type;
+  const effectiveConfidence = verifiedDetection ? verifiedDetection.confidence : detection.confidence;
+  const effectiveMethod = verifiedDetection ? verifiedDetection.method : detection.method;
+
+  let message = `Component "${name}" classified as ${classification.space}`;
+  if (effectiveType === COMPONENT_TYPE.SOLUTION) {
+    message += ` (detected as solution, confidence=${effectiveConfidence})`;
+  }
+  message += `. Evaluated with ${successCount} strategy(ies)`;
   if (errorCount > 0) {
     message += ` (${errorCount} strategy(ies) returned errors)`;
   }
@@ -311,6 +395,18 @@ export async function estimateEvolutionOneShot(rawInput) {
     classification,
     reQuestions: null,
     evaluations,
+    routing: {
+      type: effectiveType,
+      confidence: effectiveConfidence,
+      method: effectiveMethod,
+      evalMode: routingTargets.mode,
+      usedSolutionStrategies: routingTargets.useSolutionStrategies,
+      usedCapabilityStrategies: routingTargets.useCapabilityStrategies,
+      ...(verifiedDetection && {
+        verified: verifiedDetection.verified,
+        tiersUsed: verifiedDetection.tiersUsed,
+      }),
+    },
     message,
   };
 }
@@ -475,7 +571,7 @@ export async function estimateEvolutionConversational(input = {}) {
     };
   }
 
-  // If ready for estimation, run the strategies
+  // If ready for estimation, run the strategies with routing
   if (session.isReadyForEstimation()) {
     const classification = session.getClassification();
     const component = session.buildComponentInput();
@@ -484,34 +580,134 @@ export async function estimateEvolutionConversational(input = {}) {
 
     logDebug(TOOL, `Conversational estimation ready for "${session.state.name}", strategy="${selectedStrategy}"`);
 
-    if (selectedStrategy === 'all') {
-      const strategies = await loadStrategies();
-      const strategyNames = [...strategies.keys()];
-      logDebug(TOOL, `Running ${strategyNames.length} strategies: ${strategyNames.join(', ')}`);
+    // Route component to solution or capability strategies.
+    //
+    // The conversation session already detected the component type during the
+    // classification phase (stored in session.state.componentType). We reuse
+    // that detection here instead of re-running detectComponentType() — this
+    // ensures routing is consistent with the conversation branching the user
+    // experienced (solution_context vs characteristics/market_signals path).
+    //
+    // When the session detection confidence is below the 90% threshold,
+    // we still trigger the dual-verification fallback for higher accuracy.
 
-      for (const [method, StrategyCls] of strategies) {
+    let convDetection;
+    const sessionDetection = session.getComponentTypeDetection();
+
+    if (sessionDetection.type && sessionDetection.confidence >= CONFIDENCE_THRESHOLD) {
+      // Session already has high-confidence detection — reuse it directly
+      convDetection = {
+        type: sessionDetection.type,
+        confidence: sessionDetection.confidence,
+        method: sessionDetection.method,
+        needsFallback: false,
+      };
+      logDebug(TOOL,
+        `Reusing session detection for "${session.state.name}": type=${convDetection.type}, ` +
+        `confidence=${convDetection.confidence}, method=${convDetection.method} (no fallback needed)`);
+    } else {
+      // Re-detect (session had low confidence or no detection)
+      convDetection = detectComponentType(
+        session.state.name,
+        session.state.description || ''
+      );
+      logDebug(TOOL,
+        `Conversational routing "${session.state.name}": type=${convDetection.type}, ` +
+        `confidence=${convDetection.confidence}, needsFallback=${convDetection.needsFallback}`);
+    }
+
+    let convRoutingTargets = determineRoutingTargets(convDetection);
+    let convVerifiedDetection = null;
+
+    logDebug(TOOL, `Routing targets "${session.state.name}": ` +
+      `solution=${convRoutingTargets.useSolutionStrategies}, ` +
+      `capability=${convRoutingTargets.useCapabilityStrategies}, mode=${convRoutingTargets.mode}`);
+
+    // Fallback: when naming convention confidence < 90%, delegate to the
+    // dual-verification orchestrator (LLM + web search) for higher accuracy.
+    // Forwards component name plus partial classification context from session.
+    if (convDetection.needsFallback) {
+      logDebug(TOOL,
+        `Naming confidence ${convDetection.confidence} < 0.90 for "${session.state.name}" — ` +
+        `triggering dual-verification fallback (conversational)`);
+
+      try {
+        const convPartialContext = {
+          description: session.state.description || '',
+          llmCall: getLLMCall(),
+          ...(component.capability && { capability: component.capability }),
+          ...(component.nature && { nature: component.nature }),
+        };
+
+        convVerifiedDetection = await verifyClassification(session.state.name, convPartialContext);
+
+        // Use verified result for routing (overrides naming-only detection)
+        convRoutingTargets = convVerifiedDetection.routingTargets;
+
+        logDebug(TOOL,
+          `Dual-verification result for "${session.state.name}": type=${convVerifiedDetection.classification}, ` +
+          `confidence=${convVerifiedDetection.confidence}, method=${convVerifiedDetection.method}, ` +
+          `verified=${convVerifiedDetection.verified}, tiers=${convVerifiedDetection.tiersUsed.join('+')}`);
+      } catch (err) {
+        logDebug(TOOL,
+          `Dual-verification fallback failed for "${session.state.name}": ${err.message} — ` +
+          `using naming-only routing`);
+      }
+    }
+
+    logDebug(TOOL, `Final conversational routing "${session.state.name}": ` +
+      `solution=${convRoutingTargets.useSolutionStrategies}, capability=${convRoutingTargets.useCapabilityStrategies}`);
+
+    // Run capability strategies if routed
+    if (convRoutingTargets.useCapabilityStrategies) {
+      if (selectedStrategy === 'all') {
+        const strategies = await loadStrategies();
+        const strategyNames = [...strategies.keys()];
+        logDebug(TOOL, `Running ${strategyNames.length} capability strategies: ${strategyNames.join(', ')}`);
+
+        for (const [method, StrategyCls] of strategies) {
+          try {
+            logDebug(TOOL, `Running strategy "${method}" on "${session.state.name}"...`);
+            const instance = createStrategyInstance(StrategyCls);
+            const result = await Promise.resolve(instance.evaluate(component));
+            evaluations[method] = result;
+            logDebug(TOOL, `Strategy "${method}": evolution=${result.evolution}, confidence=${result.confidence}`);
+          } catch (err) {
+            evaluations[method] = { error: err.message };
+            logDebug(TOOL, `Strategy "${method}" failed: ${err.message}`);
+          }
+        }
+      } else {
         try {
-          logDebug(TOOL, `Running strategy "${method}" on "${session.state.name}"...`);
+          logDebug(TOOL, `Running single strategy "${selectedStrategy}" on "${session.state.name}"...`);
+          const StrategyCls = await getStrategy(selectedStrategy);
           const instance = createStrategyInstance(StrategyCls);
           const result = await Promise.resolve(instance.evaluate(component));
-          evaluations[method] = result;
-          logDebug(TOOL, `Strategy "${method}": evolution=${result.evolution}, confidence=${result.confidence}`);
+          evaluations[selectedStrategy] = result;
+          logDebug(TOOL, `Strategy "${selectedStrategy}": evolution=${result.evolution}, confidence=${result.confidence}`);
         } catch (err) {
-          evaluations[method] = { error: err.message };
-          logDebug(TOOL, `Strategy "${method}" failed: ${err.message}`);
+          evaluations[selectedStrategy] = { error: err.message };
+          logDebug(TOOL, `Strategy "${selectedStrategy}" failed: ${err.message}`);
         }
       }
-    } else {
+    }
+
+    // Run solution strategies if routed
+    if (convRoutingTargets.useSolutionStrategies) {
+      logDebug(TOOL, `Dispatching "${session.state.name}" to solution strategies (conversational)`);
       try {
-        logDebug(TOOL, `Running single strategy "${selectedStrategy}" on "${session.state.name}"...`);
-        const StrategyCls = await getStrategy(selectedStrategy);
-        const instance = createStrategyInstance(StrategyCls);
-        const result = await Promise.resolve(instance.evaluate(component));
-        evaluations[selectedStrategy] = result;
-        logDebug(TOOL, `Strategy "${selectedStrategy}": evolution=${result.evolution}, confidence=${result.confidence}`);
+        const solutionEvals = await dispatchSolutionStrategies(component, {
+          llmCall: getLLMCall(),
+          strategy: selectedStrategy === 'all' ? 'all' : selectedStrategy,
+          mode: 'conversational',
+        });
+        for (const [method, result] of Object.entries(solutionEvals)) {
+          const key = evaluations[method] ? `solution:${method}` : method;
+          evaluations[key] = result;
+        }
       } catch (err) {
-        evaluations[selectedStrategy] = { error: err.message };
-        logDebug(TOOL, `Strategy "${selectedStrategy}" failed: ${err.message}`);
+        evaluations['solution-dispatch-error'] = { error: err.message };
+        logDebug(TOOL, `Solution strategy dispatch failed: ${err.message}`);
       }
     }
 
@@ -521,8 +717,16 @@ export async function estimateEvolutionConversational(input = {}) {
 
     logDebug(TOOL, `Conversational results for "${session.state.name}": ${successCount} succeeded, ${errorCount} failed, ${summary.exchangeCount} exchange(s)`);
 
-    let message = `Component "${session.state.name}" — conversational estimation complete after ${summary.exchangeCount} exchange(s). `;
-    message += `Evaluated with ${successCount} strategy(ies)`;
+    // Build routing metadata — use verified detection if available
+    const convEffectiveType = convVerifiedDetection ? convVerifiedDetection.classification : convDetection.type;
+    const convEffectiveConfidence = convVerifiedDetection ? convVerifiedDetection.confidence : convDetection.confidence;
+    const convEffectiveMethod = convVerifiedDetection ? convVerifiedDetection.method : convDetection.method;
+
+    let message = `Component "${session.state.name}" — conversational estimation complete after ${summary.exchangeCount} exchange(s)`;
+    if (convEffectiveType === COMPONENT_TYPE.SOLUTION) {
+      message += ` (detected as solution, confidence=${convEffectiveConfidence})`;
+    }
+    message += `. Evaluated with ${successCount} strategy(ies)`;
     if (errorCount > 0) {
       message += ` (${errorCount} returned errors)`;
     }
@@ -535,6 +739,18 @@ export async function estimateEvolutionConversational(input = {}) {
       classification,
       reQuestions: null,
       evaluations,
+      routing: {
+        type: convEffectiveType,
+        confidence: convEffectiveConfidence,
+        method: convEffectiveMethod,
+        evalMode: convRoutingTargets.mode,
+        usedSolutionStrategies: convRoutingTargets.useSolutionStrategies,
+        usedCapabilityStrategies: convRoutingTargets.useCapabilityStrategies,
+        ...(convVerifiedDetection && {
+          verified: convVerifiedDetection.verified,
+          tiersUsed: convVerifiedDetection.tiersUsed,
+        }),
+      },
       summary,
       sessionState: session.serialize(),
       message,

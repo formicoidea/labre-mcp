@@ -23,10 +23,13 @@ export const ESTIMATE_EVOLUTION_TOOL = {
   name: 'estimateEvolution',
   description:
     'Estimate the Wardley Map evolution position of a component. ' +
+    'Transparently handles both named solutions (e.g. "Kubernetes", "Salesforce") and abstract capabilities (e.g. "CRM", "container orchestration"). ' +
+    'Solutions are evaluated against 12 Wardley evolution properties (Market, Knowledge, Perception, etc.); ' +
+    'capabilities use pluggable strategies (s-curve, pub-distribution, etc.). ' +
+    'Routing is automatic: naming convention detection (≥90% confidence) or LLM + web search fallback. ' +
     'Pre-filters by economic space (social good / common good / economic) via a classification gate. ' +
     'Social good and common good components trigger re-questioning instead of evaluation. ' +
-    'Economic components are evaluated using one or all pluggable strategies (s-curve, pub-distribution, etc.). ' +
-    'Returns {evolution, confidence, method} for each strategy, or re-questioning prompts for non-economic components.',
+    'Returns {evolution, confidence, method} for each strategy, plus routing metadata showing which pipeline was used.',
   inputSchema: {
     type: 'object',
     properties: {

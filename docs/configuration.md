@@ -8,6 +8,7 @@
 | `WARDLEY_VERBOSE` | `1`, `true`, `yes` | Active les messages debug dans les notifications. Desactive par defaut. |
 | `WARDLEY_LLM_MODEL` | `claude-sonnet-4-6`, `kimi-k2.5`, etc. | Override du modele LLM (par defaut : `claude-sonnet-4-6` pour Agent SDK, `kimi-k2.5` pour OpenCode) |
 | `WARDLEY_LOGPROB_MODEL` | `kimi-k2.5` | Modele pour la strategie logprob-distribution |
+| `WARDLEY_EVAL_MODE` | `exclusive`, `parallel` | Mode de routage solution/capability. `exclusive` (defaut) : un seul pipeline. `parallel` : les deux pipelines, resultats fusionnes. |
 | `_WARDLEY_NESTED` | `1` | **Automatique** — Positionne par le serveur au demarrage. Guard anti-recursion. Ne pas modifier. |
 
 ## Fichier .env

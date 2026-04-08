@@ -166,7 +166,7 @@ function computeEvolution(c, u, p) {
   const evolution = proj.t;
   const phase =
     evolution <= 0.18 ? 'Genesis' :
-    evolution <= 0.26 ? 'Custom' :
+    evolution <= 0.40 ? 'Custom' :
     evolution <= 0.70 ? 'Product' :
     'Commodity';
   return { zone, evolution: Math.round(evolution * 1000) / 1000, phase, bandDistance: Math.round(bd * 1000) / 1000, distToCenter: proj.dist };
@@ -218,8 +218,8 @@ function draw() {
   // Phase rectangles (dynamic bounding boxes along the band)
   const phases = [
     { label: 'Genesis',   tStart: 0,    tEnd: 0.18 },
-    { label: 'Custom',    tStart: 0.18, tEnd: 0.26 },
-    { label: 'Product',   tStart: 0.26, tEnd: 0.70 },
+    { label: 'Custom',    tStart: 0.18, tEnd: 0.40 },
+    { label: 'Product',   tStart: 0.40, tEnd: 0.70 },
     { label: 'Commodity', tStart: 0.70, tEnd: 1.00 },
   ];
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';

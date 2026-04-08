@@ -6,43 +6,24 @@ WardleyAssistant est un serveur MCP implementant le protocole JSON-RPC 2.0 sur s
 
 ## Pipeline de traitement
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                   mcp-server.mjs                        │
-│  initialize | tools/list | tools/call | ping            │
-└──────────────┬──────────────────────────────────────────┘
-               │ tools/call dispatch
-    ┌──────────┼──────────┐
-    │          │          │
-┌───▼───┐ ┌───▼───┐ ┌───▼────┐
-│estimate│ │evaluate│ │generate│
-│Evol.  │ │Map    │ │ValueCh.│
-└───┬───┘ └───┬───┘ └───┬────┘
-    │          │          │
-    └──────────┼──────────┘
-               │
-    ┌──────────▼──────────┐
-    │ Classification Gate │  social_good → re-question
-    │ (fixe, non-pluggable)│  common_good → re-question
-    └──────────┬──────────┘  economic → evaluation
-               │
-    ┌──────────▼──────────┐
-    │    Mode Router      │
-    │ oneshot | guided    │
-    └──────────┬──────────┘
-               │
-    ┌──────────▼──────────┐
-    │ Strategy Registry   │  auto-decouverte *-strategy.mjs
-    │  6 strategies       │
-    └──────────┬──────────┘
-               │
-    ┌──────────▼──────────┐
-    │ Response Formatter  │  markdown, barres de confiance
-    └──────────┬──────────┘
-               │
-    ┌──────────▼──────────┐
-    │   Notifications     │  claude/channel + notifications/message
-    └─────────────────────┘
+```mermaid
+flowchart TD
+    MCP["mcp-server.mjs\ninitialize | tools/list | tools/call | ping"]
+    MCP --> EE["estimateEvolution"]
+    MCP --> EM["evaluateMap"]
+    MCP --> GV["generateValueChain"]
+
+    EE & EM & GV --> CG["Classification Gate\n(social_good / common_good / economic)"]
+    CG -->|"non-economic"| RQ["Re-questions"]
+    CG -->|"economic"| MR["Mode Router\noneshot | guided"]
+
+    MR --> SCR["Solution/Capability Router\nDetection 3-tiers :\nnaming → LLM → web search"]
+
+    SCR -->|"solution detectee"| SS["Solution Strategies\n(12 proprietes Wardley)"]
+    SCR -->|"capability detectee"| CS["Capability Strategies\n(6 strategies pluggables)"]
+
+    SS & CS --> RF["Response Formatter\nmarkdown, barres de confiance"]
+    RF --> N["Notifications\nclaude/channel + notifications/message"]
 ```
 
 ## Modules par couche
@@ -67,7 +48,18 @@ WardleyAssistant est un serveur MCP implementant le protocole JSON-RPC 2.0 sur s
 | `skill-handler.mjs` | Parsing de langage naturel → appels API structures |
 | `identify-capability.mjs` | Decode les noms techniques (CRM → gestion relation client) via LLM |
 
-### Strategies
+### Routage Solution / Capability
+
+| Module | Role |
+|---|---|
+| `solution-capability-router.mjs` | Detection du type de composant (solution vs capability) et dispatch |
+| `detect-solution.mjs` | Heuristiques de nommage + fallback LLM (tiers 1 et 2) |
+| `dual-verification-orchestrator.mjs` | Orchestration des 3 tiers de verification avec court-circuit |
+| `web-search-verification.mjs` | Verification tier 3 via recherche web |
+| `signal-combiner.mjs` | Fusion des signaux LLM + web search en verdict unique |
+| `eval-mode-dispatcher.mjs` | Dispatch vers les registres de strategies selon le mode eval |
+
+### Strategies Capability
 
 | Module | Role |
 |---|---|
@@ -79,6 +71,19 @@ WardleyAssistant est un serveur MCP implementant le protocole JSON-RPC 2.0 sur s
 | `strategies/llm-direct-strategy.mjs` | Estimation LLM directe (blend 70% s-curve + 30% LLM) |
 | `strategies/logprob-distribution-strategy.mjs` | Logprobs OpenCode → distribution de probabilite |
 | `strategies/sector-agent-strategy.mjs` | Agent sectoriel specialise |
+
+### Strategies Solution
+
+| Module | Role |
+|---|---|
+| `solution-strategies/registry.mjs` | Auto-decouverte des fichiers `*-strategy.mjs` dans `solution-strategies/` |
+| `solution-strategies/solution-base-strategy.mjs` | Classe abstraite solution (etend `BaseStrategy`) |
+| `solution-strategies/properties-strategy.mjs` | Evaluation des 12 proprietes Wardley (auto + conversationnel) |
+| `solution-strategies/evolution-properties.json` | Reference : 12 proprietes × 4 phases avec descriptions |
+| `solution-strategies/phase-classifier.mjs` | Mapping propriete → phase (1-4) |
+| `solution-strategies/aggregate-properties.mjs` | Agregation ponderee des phases en evolution [0-1] |
+| `solution-strategies/assemble-result.mjs` | Enrichissement des resultats (stage, distribution, confiance) |
+| `solution-strategies/solution-evolution-result.mjs` | Modele de resultat solution avec validation |
 
 ### Mathematiques
 
@@ -113,10 +118,10 @@ WardleyAssistant est un serveur MCP implementant le protocole JSON-RPC 2.0 sur s
 
 Le systeme supporte deux backends LLM, selectionnes automatiquement :
 
-```
-                ┌─ _WARDLEY_NESTED=1 ──→ Claude Agent SDK (claude-sonnet-4-6)
-llm-call.mjs ──┤
-                └─ sinon ──────────────→ OpenCode API (kimi-k2.5)
+```mermaid
+flowchart LR
+    LLM["llm-call.mjs"] -->|"_WARDLEY_NESTED=1"| SDK["Claude Agent SDK\n(claude-sonnet-4-6)"]
+    LLM -->|"sinon"| OC["OpenCode API\n(kimi-k2.5)"]
 ```
 
 | Backend | Modele par defaut | Quand | Logprobs |
@@ -134,65 +139,80 @@ Le serveur MCP positionne `_WARDLEY_NESTED=1` au demarrage. Si un processus enfa
 
 ## Flux de donnees — estimateEvolution
 
+```mermaid
+flowchart TD
+    Input["Input: name, context, certitude, ubiquity, ..."]
+    Input --> Validate["validateInput()"]
+    Validate --> Mode["detectMode()\noneshot / guided"]
+    Mode --> Classify["classifyComponent()\nsocial_good / common_good / economic"]
+    Classify -->|"non-economic"| ReQ["buildReQuestions() → retour"]
+    Classify -->|"economic"| Detect["detectComponentType()\nDetection 3-tiers"]
+
+    Detect --> Targets["determineRoutingTargets()\nWARDLEY_EVAL_MODE"]
+
+    Targets -->|"solution"| SolPipe["Pipeline Solution"]
+    Targets -->|"capability"| CapPipe["Pipeline Capability"]
+    Targets -->|"parallel"| SolPipe & CapPipe
+
+    subgraph SolPipe["Pipeline Solution"]
+        direction TB
+        SLoad["loadSolutionStrategies()"]
+        SLoad --> SProp["properties-strategy.evaluate()\n12 proprietes → phases → evolution"]
+        SProp --> SAssemble["assembleSolutionResult()\nstage, distribution, confiance"]
+    end
+
+    subgraph CapPipe["Pipeline Capability"]
+        direction TB
+        CLoad["loadStrategies()"]
+        CLoad --> PhaseA["Phase A : llm-direct, logprob,\npub-analysis, timeline, sector-agent"]
+        PhaseA --> PhaseB["Phase B : enrichissement\nmoyenne certitude/ubiquity"]
+        PhaseB --> PhaseC["Phase C : s-curve enrichie"]
+    end
+
+    SolPipe & CapPipe --> Format["formatResponse()\nMarkdown, consensus, barres"]
 ```
-Input: { name, context, certitude, ubiquity, ... }
-  │
-  ├─ validateInput()          Validation des parametres
-  │
-  ├─ detectMode()             Auto-detection oneshot/guided
-  │
-  ├─ classifyComponent()      Gate: social_good/common_good/economic
-  │    └─ Si non-economic → buildReQuestions() → retour
-  │
-  ├─ loadStrategies()         Auto-decouverte des fichiers *-strategy.mjs
-  │
-  ├─ Phase A: strategies non-s-curve
-  │    ├─ llm-direct.evaluate()
-  │    ├─ logprob-distribution.evaluate()
-  │    ├─ publication-analysis.evaluate()
-  │    ├─ timeline-benchmark.evaluate()
-  │    └─ sector-agent.evaluate()
-  │
-  ├─ Phase B: enrichissement
-  │    └─ Moyenne des certitude/ubiquity des phases A
-  │
-  ├─ Phase C: s-curve avec donnees enrichies
-  │    └─ s-curve.evaluate()
-  │
-  └─ formatResponse()         Markdown avec consensus, tableau, barres
+
+### Detection solution vs capability — pipeline 3-tiers
+
+Le routeur determine si un composant est une **solution nommee** (Kubernetes, Salesforce, SAP ERP) ou une **capability abstraite** (container orchestration, CRM, ERP). Le choix du pipeline d'evaluation en depend.
+
+```mermaid
+flowchart TD
+    T1["Tier 1 : Nommage\nDictionnaires + regex\n< 1ms"]
+    T1 -->|"conf >= 90%"| Stop1["Route directe"]
+    T1 -->|"conf < 90%"| T2["Tier 2 : LLM\nClassification semantique\n~1-2s"]
+    T2 -->|"conf >= 85%"| Stop2["Route directe"]
+    T2 -->|"conf < 85%"| T3["Tier 3 : Web Search\nEvidence externe\n~2-5s"]
+    T3 --> SC["Signal Combiner\nFusion LLM + web search"]
+    SC --> Route["Route finale"]
 ```
+
+Le **Signal Combiner** fusionne les signaux LLM et web search en un verdict unique :
+- Accord → bonus de confiance (+0.10)
+- Desaccord → poids LLM (0.45) vs web search (0.55), penalite de confiance (-0.10)
+- Signal manquant → degradation (×0.85)
 
 ## Flux de donnees — evaluateMap
 
-```
-Input: { filePath }
-  │
-  ├─ parseWardleyMap()        Regex: title, anchors, components, links
-  │
-  ├─ Pour chaque composant :
-  │    ├─ classifyComponent()
-  │    ├─ Si economic → estimateEvolutionOneShot()
-  │    └─ Mise a jour des coordonnees [visibility, maturity]
-  │
-  ├─ Ecriture du fichier .wm mis a jour
-  │
-  └─ Rapport markdown (tableau original/nouveau/delta)
+```mermaid
+flowchart TD
+    Input["Input: filePath"] --> Parse["parseWardleyMap()\ntitle, anchors, components, links"]
+    Parse --> Loop["Pour chaque composant"]
+    Loop --> Class["classifyComponent()"]
+    Class -->|"economic"| Eval["estimateEvolutionOneShot()"]
+    Eval --> Update["Mise a jour coordonnees\n[visibility, maturity]"]
+    Update --> Write["Ecriture fichier .wm"]
+    Write --> Report["Rapport markdown\ntableau original / nouveau / delta"]
 ```
 
 ## Flux de donnees — generateValueChain
 
-```
-Input: { description, filename }
-  │
-  ├─ Appel LLM : decomposition en chaine de valeur JSON
-  │    └─ { anchor, components: [{ name, visibility, dependencies }] }
-  │
-  ├─ Pour chaque composant + anchor :
-  │    └─ estimateEvolutionOneShot() → maturity
-  │
-  ├─ generateWmContent()      Syntaxe OWM avec coordonnees
-  │
-  ├─ Ecriture du fichier .wm
-  │
-  └─ { wmContent, filePath, components, evaluations }
+```mermaid
+flowchart TD
+    Input["Input: description, filename"] --> LLM["Appel LLM\nDecomposition en chaine de valeur JSON"]
+    LLM --> Loop["Pour chaque composant + anchor"]
+    Loop --> Eval["estimateEvolutionOneShot() → maturity"]
+    Eval --> Gen["generateWmContent()\nSyntaxe OWM avec coordonnees"]
+    Gen --> Write["Ecriture fichier .wm"]
+    Write --> Out["wmContent, filePath,\ncomponents, evaluations"]
 ```

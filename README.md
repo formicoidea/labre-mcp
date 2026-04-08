@@ -1,6 +1,6 @@
 # WardleyAssistant
 
-Serveur MCP (Model Context Protocol) pour l'estimation de la position d'evolution des composants sur les cartes de Wardley. Utilise 6 strategies pluggables, une gate de classification economique et supporte les modes oneshot et conversationnel.
+Serveur MCP (Model Context Protocol) pour l'estimation de la position d'evolution des composants sur les cartes de Wardley. Route automatiquement entre deux pipelines d'evaluation — **capability strategies** (6 strategies pluggables) pour les capacites abstraites et **solution strategies** (12 proprietes Wardley) pour les produits nommes — avec gate de classification economique et modes oneshot/conversationnel.
 
 ## Demarrage rapide
 
@@ -26,7 +26,7 @@ La documentation complete est disponible dans le dossier [`docs/`](docs/README.m
 - [Demarrage rapide](docs/getting-started.md)
 - [Architecture](docs/architecture.md)
 - [Reference des outils](docs/tools-reference.md)
-- [Strategies d'evaluation](docs/strategies.md)
+- [Strategies d'evaluation](docs/strategies.md) (capability + solution)
 - [Gate de classification](docs/classification-gate.md)
 - [Configuration](docs/configuration.md)
 - [Notifications](docs/notifications.md)

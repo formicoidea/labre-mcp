@@ -73,6 +73,65 @@ async evaluate(component) {
 
 ---
 
+## Ajouter une solution strategy
+
+Meme principe que les capability strategies, mais dans le dossier `src/solution-strategies/`.
+
+### Etape 1 : Creer le fichier
+
+Creer `src/solution-strategies/ma-strategy.mjs` :
+
+```javascript
+import { SolutionBaseStrategy } from './solution-base-strategy.mjs';
+
+export class MaStrategy extends SolutionBaseStrategy {
+  static get method() {
+    return 'ma-solution-strategy';
+  }
+
+  async evaluate(component) {
+    const { name, description } = component;
+
+    // Votre logique d'evaluation ici
+    // Doit retourner un SolutionEvolutionResult
+    return this.validateSolutionResult({
+      evolution: 0.55,
+      confidence: 0.80,
+      method: MaStrategy.method,
+      properties: [], // detail par propriete (optionnel)
+    });
+  }
+}
+```
+
+### Etape 2 : C'est tout
+
+Le registre (`solution-strategies/registry.mjs`) decouvre automatiquement tout fichier `*-strategy.mjs` dans `src/solution-strategies/`. Meme mecanisme que les capability strategies.
+
+### Contrat a respecter
+
+| Methode | Obligatoire | Description |
+|---|---|---|
+| `static get method()` | Oui | Identifiant unique (string) |
+| `evaluate(component)` | Oui | Retourne `SolutionEvolutionResult` |
+
+### SolutionEvolutionResult
+
+Etend `EvolutionResult` avec des champs supplementaires :
+
+```javascript
+{
+  evolution: number,        // Position [0-1]
+  confidence: number,       // Score [0-1]
+  method: string,           // Identifiant de la strategie
+  properties: array,        // Detail par propriete (optionnel)
+  stage: string,            // Genesis / Custom / Product / Commodity
+  phaseDistribution: object // { 1: n, 2: n, 3: n, 4: n }
+}
+```
+
+---
+
 ## Ajouter un nouvel outil MCP
 
 ### Etape 1 : Creer le module

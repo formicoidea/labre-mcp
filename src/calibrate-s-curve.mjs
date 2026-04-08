@@ -30,7 +30,7 @@ for (const r of results) {
 
   const phase =
     parsed.scurve_evolution <= 0.18 ? 'Genesis' :
-    parsed.scurve_evolution <= 0.26 ? 'Custom' :
+    parsed.scurve_evolution <= 0.40 ? 'Custom' :
     parsed.scurve_evolution <= 0.70 ? 'Product' :
     'Commodity';
 

@@ -128,6 +128,7 @@ export function detectMode(input) {
  * @property {string|null} sessionState - Session state for guided mode continuation
  * @property {Object|null}  nextQuestion - Next question in guided mode
  * @property {string|null}  phase        - Current phase in guided mode
+ * @property {Object|null}  routing      - Solution/capability routing metadata (type, confidence, method, evalMode)
  */
 
 // ─── Unified Router ────────────────────────────────────────────────────────
@@ -196,6 +197,8 @@ async function routeOneShot(input, modeReason) {
     sessionState: null,
     nextQuestion: null,
     phase: null,
+    // Pass through routing metadata (solution/capability detection + confidence)
+    routing: result.routing || null,
   };
 }
 
@@ -259,6 +262,8 @@ async function routeGuided(input, modeReason) {
     sessionState: result.sessionState,
     nextQuestion: result.nextQuestion || null,
     phase: result.phase,
+    // Pass through routing metadata (solution/capability detection + confidence)
+    routing: result.routing || null,
   };
 }
 
@@ -299,7 +304,14 @@ function formatGuidedTurn(result) {
     return 'Session state is unclear. Provide more data or use `forceEstimate: true` to proceed.';
   }
 
-  const phaseOrder = ['identity', 'classification', 'characteristics', 'market_signals', 'ready'];
+  // Phase order depends on whether the component is on the solution or capability path
+  const isSolutionPath = result.summary?.componentType === 'solution' ||
+    result.summary?.gathered?.componentType === 'solution';
+
+  const phaseOrder = isSolutionPath
+    ? ['identity', 'classification', 'solution_context', 'ready']
+    : ['identity', 'classification', 'characteristics', 'market_signals', 'ready'];
+
   const currentIdx = phaseOrder.indexOf(result.phase);
   const totalPhases = phaseOrder.length - 1;
   const phaseLabels = {
@@ -307,6 +319,7 @@ function formatGuidedTurn(result) {
     classification: 'Economic Classification',
     characteristics: 'Maturity Characteristics',
     market_signals: 'Market & Publication Signals',
+    solution_context: 'Solution Context (12-Property Evaluation)',
   };
 
   lines.push(`### Guided Estimation — Phase ${currentIdx + 1}/${totalPhases}: ${phaseLabels[result.phase] || result.phase}`);

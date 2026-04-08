@@ -148,13 +148,75 @@ export function strategyReasoning(method, result, component = {}) {
     'sector-agent': () =>
       `Sector-specific agent analysis places this component in the **${stage.name}** stage ` +
       `considering industry-specific evolution patterns and dynamics.`,
+
+    'cpc-evolution': () =>
+      `Patent CPC classification analysis positions this component in the **${stage.name}** stage ` +
+      `based on patent filing patterns and technology classification codes.`,
+
+    'properties': () => buildSolutionPropertiesReasoning(result, stage),
+    'solution-properties': () => buildSolutionPropertiesReasoning(result, stage),
   };
 
   const generator = reasoningMap[method];
   if (generator) return generator();
 
-  // Fallback for unknown/new strategies
+  // Handle solution: prefixed methods (parallel mode key collision resolution)
+  if (method.startsWith('solution:')) {
+    const baseMethod = method.replace(/^solution:/, '');
+    const baseGenerator = reasoningMap[baseMethod];
+    if (baseGenerator) return baseGenerator();
+  }
+
+  // Fallback for unknown/new strategies (including dynamically added solution strategies)
+  // If the result has properties, it's likely a solution strategy
+  if (result.properties && Array.isArray(result.properties) && result.properties.length > 0) {
+    return buildSolutionPropertiesReasoning(result, stage);
+  }
+
   return `Strategy "${method}" estimates the component at the **${stage.name}** stage (${stage.descriptor}).`;
+}
+
+// ─── Solution Properties Reasoning ─────────────────────────────────────────
+
+/**
+ * Build reasoning text for solution property-based evaluation.
+ *
+ * @param {Object} result - Evaluation result with optional properties, phaseDistribution, meanPhase
+ * @param {Object} stage  - Wardley stage from evolutionToStage()
+ * @returns {string} Reasoning sentence
+ */
+function buildSolutionPropertiesReasoning(result, stage) {
+  const propCount = result.properties?.length || 12;
+  const parts = [
+    `12-property Wardley evolution evaluation across ${propCount} characteristics ` +
+    `(Market, Knowledge, Perception, etc.) places this solution in the **${stage.name}** stage — ` +
+    `${stage.descriptor}.`,
+  ];
+
+  // Add phase distribution insight if available (from assembler enrichment)
+  if (result.phaseDistribution) {
+    const dist = result.phaseDistribution;
+    const phaseLabels = { 1: 'Genesis', 2: 'Custom', 3: 'Product', 4: 'Commodity' };
+    const nonZero = Object.entries(dist)
+      .filter(([, count]) => count > 0)
+      .map(([phase, count]) => `${count}× ${phaseLabels[phase]}`)
+      .join(', ');
+    if (nonZero) {
+      parts.push(`Phase distribution: ${nonZero}.`);
+    }
+  }
+
+  // Add dominant phase if available
+  if (result.dominantPhase && result.dominantPhase.count > 0) {
+    const ratio = Math.round((result.dominantPhase.count / propCount) * 100);
+    if (ratio >= 50) {
+      parts.push(
+        `Dominant phase: ${result.dominantPhase.label} (${ratio}% of properties).`
+      );
+    }
+  }
+
+  return parts.join(' ');
 }
 
 // ─── Single Strategy Result Block ───────────────────────────────────────────
@@ -182,6 +244,38 @@ export function formatStrategyResult(method, evalResult, component = {}) {
     `  Confidence: ${conf.bar} ${conf.percentage} (${conf.label})`,
     `  ${reasoning}`,
   ];
+
+  // Solution strategy: show per-property phase breakdown if available
+  if (evalResult.properties && Array.isArray(evalResult.properties) && evalResult.properties.length > 0) {
+    lines.push('');
+    lines.push('  Property breakdown:');
+    const phaseLabels = { 1: 'Genesis', 2: 'Custom', 3: 'Product', 4: 'Commodity' };
+    for (const prop of evalResult.properties) {
+      const label = prop.label || phaseLabels[prop.phase] || `Phase ${prop.phase}`;
+      const reasonSuffix = prop.reason ? ` — ${prop.reason}` : '';
+      lines.push(`    - ${prop.property}: **${label}** (phase ${prop.phase})${reasonSuffix}`);
+    }
+
+    // Show summary statistics if available (from assembler enrichment)
+    if (evalResult.meanPhase != null || evalResult.stage) {
+      lines.push('');
+      const summaryParts = [];
+      if (evalResult.meanPhase != null) {
+        summaryParts.push(`Mean phase: ${evalResult.meanPhase}`);
+      }
+      if (evalResult.stage) {
+        summaryParts.push(`Overall stage: ${evalResult.stage}`);
+      }
+      if (evalResult.confidenceMetadata?.coverage != null) {
+        const coveragePct = Math.round(evalResult.confidenceMetadata.coverage * 100);
+        summaryParts.push(`Coverage: ${coveragePct}%`);
+      }
+      if (summaryParts.length > 0) {
+        lines.push(`  *${summaryParts.join(' | ')}*`);
+      }
+    }
+  }
+
   return lines.join('\n');
 }
 
@@ -219,6 +313,12 @@ export function formatResponse(result, options = {}) {
     if (cls.reason && !compact) {
       lines.push(`> ${cls.reason}`);
     }
+    lines.push('');
+  }
+
+  // ── Routing metadata (solution vs capability detection) ──
+  if (result.routing && !compact) {
+    lines.push(formatRoutingBlock(result.routing));
     lines.push('');
   }
 
@@ -316,6 +416,66 @@ function formatReQuestioningBlock(reQuestions, name, classification) {
     `💡 *Tip: If you meant a commodified or market version of this concept ` +
     `(e.g., "bottled oxygen" instead of "air"), re-specify the component with its economic context.*`
   );
+
+  return lines.join('\n');
+}
+
+/**
+ * Format routing metadata (solution vs capability detection) into a markdown block.
+ *
+ * Shows the component type detection result, confidence, method used,
+ * and which strategy pipeline(s) were dispatched.
+ *
+ * @param {Object} routing - Routing metadata from estimate-evolution.mjs
+ * @param {string} routing.type - 'solution' or 'capability'
+ * @param {number} routing.confidence - Detection confidence (0–1)
+ * @param {string} routing.method - Detection method ('known-solution', 'known-capability', 'heuristic', 'naming+llm', etc.)
+ * @param {string} routing.evalMode - 'exclusive' or 'parallel'
+ * @param {boolean} routing.usedSolutionStrategies - Whether solution strategies ran
+ * @param {boolean} routing.usedCapabilityStrategies - Whether capability strategies ran
+ * @param {boolean} [routing.verified] - Whether dual-verification confirmed the classification
+ * @param {string[]} [routing.tiersUsed] - Verification tiers invoked (e.g. ['naming', 'llm'])
+ * @returns {string} Markdown block
+ */
+function formatRoutingBlock(routing) {
+  const typeLabel = routing.type === 'solution'
+    ? 'Named Solution (product/platform)'
+    : 'Abstract Capability (activity/practice)';
+
+  const conf = formatConfidence(routing.confidence);
+
+  const methodLabels = {
+    'known-solution': 'dictionary match (known solution)',
+    'known-capability': 'dictionary match (known capability)',
+    'heuristic': 'naming convention heuristics',
+    'naming': 'naming convention',
+    'naming+llm': 'naming + LLM semantic classification',
+    'naming+web-search': 'naming + web search evidence',
+    'naming+llm+web-search': 'naming + LLM + web search (full pipeline)',
+  };
+  const methodLabel = methodLabels[routing.method] || routing.method;
+
+  const lines = [
+    `**Component Type:** ${typeLabel}`,
+    `  Detection: ${conf.bar} ${conf.percentage} confidence via ${methodLabel}`,
+  ];
+
+  // Show which strategy pipelines were dispatched
+  const pipelines = [];
+  if (routing.usedSolutionStrategies) pipelines.push('solution (12-property evaluation)');
+  if (routing.usedCapabilityStrategies) pipelines.push('capability (s-curve, publication, LLM, etc.)');
+
+  if (pipelines.length > 0) {
+    const modeLabel = routing.evalMode === 'parallel' ? 'parallel' : 'exclusive';
+    lines.push(`  Evaluation: ${pipelines.join(' + ')} [${modeLabel} mode]`);
+  }
+
+  // Show verification status if dual-verification was used
+  if (routing.verified != null) {
+    const verifiedLabel = routing.verified ? 'confirmed' : 'unverified (low agreement)';
+    const tiers = routing.tiersUsed?.join(' → ') || 'unknown';
+    lines.push(`  Verification: ${verifiedLabel} (tiers: ${tiers})`);
+  }
 
   return lines.join('\n');
 }

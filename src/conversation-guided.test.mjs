@@ -201,11 +201,12 @@ console.log('--- Test 7: Context accumulation across exchanges ---');
 {
   const session = new ConversationSession();
 
-  // Exchange 1: just name
-  session.update({ name: 'Kubernetes' });
+  // Exchange 1: just name (use a capability name, not a solution name like "Kubernetes",
+  // because solutions take a different path where certitude is not tracked)
+  session.update({ name: 'container orchestration' });
   const summary1 = session.getSummary();
   assert(summary1.exchangeCount === 1, 'Exchange 1: count is 1');
-  assert(summary1.gathered.name === 'Kubernetes', 'Exchange 1: name gathered');
+  assert(summary1.gathered.name === 'container orchestration', 'Exchange 1: name gathered');
   assert(summary1.missing.includes('certitude'), 'Exchange 1: certitude still missing');
 
   // Exchange 2: description
@@ -234,7 +235,7 @@ console.log('--- Test 7: Context accumulation across exchanges ---');
 
   // Verify all data is available in component input
   const input = session.buildComponentInput();
-  assert(input.name === 'Kubernetes', 'Component input has name');
+  assert(input.name === 'container orchestration', 'Component input has name');
   assert(input.certitude === 0.8, 'Component input has certitude');
   assert(input.ubiquity === 0.7, 'Component input has ubiquity');
   assert(input.metadata.marketDynamics != null, 'Component input has market dynamics');

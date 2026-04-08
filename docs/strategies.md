@@ -1,6 +1,17 @@
 # Strategies d'evaluation
 
-WardleyAssistant utilise 6 strategies pluggables pour estimer la position d'evolution d'un composant. Chaque strategie produit un resultat independant : `{ evolution, confidence, method }`.
+WardleyAssistant utilise deux pipelines d'evaluation complementaires, selectionnes automatiquement selon le type de composant :
+
+- **Capability Strategies** (6 strategies) — pour les capacites abstraites (CRM, container orchestration, data storage)
+- **Solution Strategies** (12 proprietes Wardley) — pour les solutions/produits nommes (Kubernetes, Salesforce, SAP ERP)
+
+Le [routage](architecture.md#detection-solution-vs-capability--pipeline-3-tiers) est transparent : l'utilisateur fournit un nom de composant et le systeme detecte automatiquement le type.
+
+---
+
+# Capability Strategies
+
+Les capability strategies evaluent les capacites abstraites via 6 strategies pluggables. Chaque strategie produit un resultat independant : `{ evolution, confidence, method }`.
 
 ## Auto-decouverte
 
@@ -192,3 +203,105 @@ Quand `strategy: "all"`, l'evaluation se fait en deux phases :
 3. **Phase C** : S-curve s'execute avec les donnees enrichies
 
 Le consensus final est la moyenne ponderee de toutes les strategies.
+
+---
+
+# Solution Strategies
+
+Les solution strategies evaluent les **produits et solutions nommes** (Kubernetes, Salesforce, SAP ERP, PostgreSQL...) via le modele des 12 proprietes d'evolution de Wardley.
+
+## Routage automatique
+
+Le systeme detecte automatiquement si un composant est une solution ou une capability via un pipeline 3-tiers :
+
+```mermaid
+flowchart LR
+    Input["Composant"] --> T1["Tier 1\nNommage"]
+    T1 -->|"conf >= 90%"| Route["Route"]
+    T1 -->|"conf < 90%"| T2["Tier 2\nLLM"]
+    T2 -->|"conf >= 85%"| Route
+    T2 -->|"conf < 85%"| T3["Tier 3\nWeb Search"]
+    T3 --> Route
+```
+
+Le routage est controle par `WARDLEY_EVAL_MODE` :
+- **`exclusive`** (defaut) : route vers un seul pipeline (solution OU capability)
+- **`parallel`** : route vers les deux pipelines, resultats fusionnes
+
+Voir [architecture.md](architecture.md#detection-solution-vs-capability--pipeline-3-tiers) pour les details du pipeline de detection.
+
+## Les 12 proprietes d'evolution
+
+Chaque solution est evaluee sur 12 proprietes, chacune classee dans une phase (1-4) :
+
+| # | Propriete | Phase 1 (Genesis) | Phase 2 (Custom) | Phase 3 (Product) | Phase 4 (Commodity) |
+|---|---|---|---|---|---|
+| 1 | **Market** | Indefini | Emergent | Etabli | Mature |
+| 2 | **Knowledge management** | Rare, tacite | Fragmente | Largement publie | Ubiquitaire |
+| 3 | **Market perception** | Inconnu, experimental | Niche, early adopter | Bien compris | Considere comme acquis |
+| 4 | **User perception** | Novel, experimental | Valeur de differenciation | Completude fonctionnelle | Commodity, "ca marche" |
+| 5 | **Industry perception** | Curiosite recherche | Potentiel reconnu | Necessite strategique | Infrastructure essentielle |
+| 6 | **Value focus** | Nouveaute, exploration | Differenciation, avantage | Fiabilite, TCO, ecosysteme | Cout, standardisation |
+| 7 | **Understanding** | Mal compris | Patterns emergents | Architectures etablies | Connaissance commoditisee |
+| 8 | **Comparison** | Impossible | Difficile, variable | Feature-by-feature standard | Triviale, interchangeable |
+| 9 | **Failure/deficiency** | Elevee, toleree | Courante, decroissante | Notable, suivie | Inacceptable, visible |
+| 10 | **Market action** | Exploration, prototypage | Vente directe, consulting | Marketing produit, partenaires | Volume, API, self-service |
+| 11 | **Efficiency** | Tres basse | En amelioration | Bonne, ROI mesure | Maximale, automatisee |
+| 12 | **Decision driver** | Vision, intuition | Avantage competitif | Feature, TCO, risque | Prix, disponibilite |
+
+Reference complete : `src/solution-strategies/evolution-properties.json`
+
+## Agregation
+
+```mermaid
+flowchart LR
+    P["12 proprietes\nevaluees par LLM"] --> Phase["Phase 1-4\npar propriete"]
+    Phase --> Mid["Midpoint par phase\n1→0.09 | 2→0.29\n3→0.55 | 4→0.85"]
+    Mid --> Agg["Moyenne ponderee\npoids egaux (1/12)"]
+    Agg --> Evo["Evolution [0-1]"]
+```
+
+- Chaque propriete est evaluee a une phase (1 a 4)
+- La phase est convertie en valeur d'evolution via les midpoints
+- La confiance depend du ratio de proprietes evaluees et du mode (auto vs conversationnel)
+
+## Properties Strategy (`solution-properties`)
+
+Seule solution strategy actuellement implementee. Supporte deux modes :
+
+| Mode | Methode | Description |
+|---|---|---|
+| **auto** (oneshot) | `_evaluateAuto()` | Un seul appel LLM evalue les 12 proprietes |
+| **conversationnel** | `_evaluateConversational()` | Une propriete par appel, pour le mode guide |
+
+### SolutionEvolutionResult
+
+Le resultat solution etend `EvolutionResult` avec des champs supplementaires :
+
+| Champ | Type | Description |
+|---|---|---|
+| `evolution` | number [0-1] | Position sur l'axe d'evolution |
+| `confidence` | number [0-1] | Score de confiance |
+| `method` | string | `"solution-properties"` |
+| `properties` | array | Detail par propriete (phase, label, confiance) |
+| `stage` | string | Genesis / Custom / Product / Commodity |
+| `meanPhase` | number | Phase moyenne (1-4) |
+| `phaseDistribution` | object | Nombre de proprietes par phase `{ 1: n, 2: n, 3: n, 4: n }` |
+| `dominantPhase` | object | Phase la plus frequente `{ phase, count, label }` |
+
+### Auto-decouverte
+
+Les solution strategies suivent le meme pattern que les capability strategies : tout fichier `*-strategy.mjs` dans `src/solution-strategies/` est decouvert automatiquement par `solution-strategies/registry.mjs`.
+
+## Fichiers
+
+| Module | Role |
+|---|---|
+| `solution-strategies/registry.mjs` | Auto-decouverte et chargement |
+| `solution-strategies/solution-base-strategy.mjs` | Classe abstraite (etend `BaseStrategy`) |
+| `solution-strategies/properties-strategy.mjs` | Evaluation des 12 proprietes |
+| `solution-strategies/evolution-properties.json` | Reference des 12 proprietes × 4 phases |
+| `solution-strategies/phase-classifier.mjs` | Mapping propriete → phase |
+| `solution-strategies/aggregate-properties.mjs` | Agregation ponderee en evolution |
+| `solution-strategies/assemble-result.mjs` | Enrichissement des resultats |
+| `solution-strategies/solution-evolution-result.mjs` | Modele de resultat avec validation |

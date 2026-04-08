@@ -23,8 +23,8 @@ export const DEFAULT_PARAMS = {
 // Used as anchors for weighted centroid (distribution → scalar)
 export const PUB_TYPE_CENTROIDS = {
   wonder:  0.09,   // Genesis midpoint   [0, 0.18]
-  build:   0.22,   // Custom midpoint    [0.18, 0.26]
-  operate: 0.48,   // Product midpoint   [0.26, 0.70]
+  build:   0.29,   // Custom midpoint    [0.18, 0.40]
+  operate: 0.48,   // Product midpoint   [0.40, 0.70]
   usage:   0.85,   // Commodity midpoint [0.70, 1.0]
 };
 
@@ -110,7 +110,7 @@ export function computeEvolution(certitude, ubiquity, params = DEFAULT_PARAMS) {
 
   const phase =
     proj.evolution <= 0.18 ? 'Genesis' :
-    proj.evolution <= 0.26 ? 'Custom' :
+    proj.evolution <= 0.40 ? 'Custom' :
     proj.evolution <= 0.70 ? 'Product' :
     'Commodity';
 

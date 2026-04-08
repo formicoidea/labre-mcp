@@ -1,0 +1,154 @@
+{
+  "$schema": "evolution-properties-schema",
+  "version": "1.0.0",
+  "description": "Wardley evolution property reference: 12 properties with 4-phase descriptions for solution evaluation. Based on Simon Wardley's evolution characteristics model.",
+  "phases": {
+    "1": { "label": "Genesis", "range": [0.00, 0.18], "midpoint": 0.09 },
+    "2": { "label": "Custom", "range": [0.18, 0.40], "midpoint": 0.29 },
+    "3": { "label": "Product", "range": [0.40, 0.70], "midpoint": 0.55 },
+    "4": { "label": "Commodity", "range": [0.70, 1.00], "midpoint": 0.85 }
+  },
+  "properties": [
+    {
+      "id": "market",
+      "name": "Market",
+      "weight": 0.0833,
+      "phases": {
+        "1": "Undefined market; no established demand or supply dynamics exist yet",
+        "2": "Emerging market with early adopters exploring custom solutions and bespoke offerings",
+        "3": "Established market with growing competition, clear demand, and multiple recognized vendors",
+        "4": "Mature, commoditized market with stable demand, high volume, and price-driven competition"
+      }
+    },
+    {
+      "id": "knowledge_management",
+      "name": "Knowledge management",
+      "weight": 0.0833,
+      "phases": {
+        "1": "Knowledge is scarce, tacit, and held by few experts or inventors; very little documented",
+        "2": "Knowledge is growing but fragmented across early practitioners; shared via informal communities",
+        "3": "Knowledge is widely published and taught; best practices, certifications, and formal training emerge",
+        "4": "Knowledge is ubiquitous, embedded in operations; considered baseline competency, extensively automated"
+      }
+    },
+    {
+      "id": "market_perception",
+      "name": "Market perception",
+      "weight": 0.0833,
+      "phases": {
+        "1": "Poorly understood or unknown to the broader market; seen as experimental or unproven",
+        "2": "Recognized as a niche solution by early adopters; increasing awareness but limited mainstream trust",
+        "3": "Well-understood and accepted across the market; perceived as a proven, reliable solution category",
+        "4": "Taken for granted; invisible infrastructure that the market expects as a standard utility"
+      }
+    },
+    {
+      "id": "user_perception",
+      "name": "User perception",
+      "weight": 0.0833,
+      "phases": {
+        "1": "Users see it as novel and experimental; willingness to tolerate imperfections for innovation",
+        "2": "Users perceive differentiation value; willing to invest in learning and customization",
+        "3": "Users expect feature completeness, reliability, and support; they compare alternatives systematically",
+        "4": "Users expect it to just work; seen as a commodity with minimal differentiation or switching cost"
+      }
+    },
+    {
+      "id": "industry_perception",
+      "name": "Industry perception",
+      "weight": 0.0833,
+      "phases": {
+        "1": "Industry views it as a research curiosity or science project; not yet taken seriously for production",
+        "2": "Industry acknowledges potential; early competitive advantages emerge for adopters",
+        "3": "Industry recognizes it as a strategic necessity; analysts track it, standards bodies engage",
+        "4": "Industry treats it as essential infrastructure; failure to adopt is a competitive disadvantage"
+      }
+    },
+    {
+      "id": "value_focus",
+      "name": "Value focus",
+      "weight": 0.0833,
+      "phases": {
+        "1": "Value derived from novelty, exploration, and future potential; high risk tolerance",
+        "2": "Value derived from differentiation and competitive advantage through tailored solutions",
+        "3": "Value derived from reliability, feature richness, total cost of ownership, and ecosystem integration",
+        "4": "Value derived from cost efficiency, operational excellence, standardization, and scale economics"
+      }
+    },
+    {
+      "id": "understanding",
+      "name": "Understanding",
+      "weight": 0.0833,
+      "phases": {
+        "1": "Very poorly understood; the problem space is still being defined and explored",
+        "2": "Increasingly understood by specialists; solution patterns emerge but vary across implementations",
+        "3": "Well-understood with established architectures, reference models, and documented trade-offs",
+        "4": "Completely understood; commoditized knowledge embedded in standard operating procedures and automation"
+      }
+    },
+    {
+      "id": "comparison",
+      "name": "Comparison",
+      "weight": 0.0833,
+      "phases": {
+        "1": "No meaningful comparison possible; each implementation is unique and bespoke",
+        "2": "Comparison is possible but difficult; solutions differ significantly in approach and scope",
+        "3": "Feature-by-feature comparison is standard; industry benchmarks, analyst reports, and reviews available",
+        "4": "Comparison is trivial; solutions are interchangeable with focus on price, SLA, and availability"
+      }
+    },
+    {
+      "id": "failure_deficiency",
+      "name": "Failure/deficiency",
+      "weight": 0.0833,
+      "phases": {
+        "1": "High failure rates expected and tolerated; experimentation inherently involves failure",
+        "2": "Failures are common but decreasing; deficiencies are specific and addressed through iteration",
+        "3": "Failures are notable events; deficiencies are tracked via SLAs, bug databases, and quality metrics",
+        "4": "Failure is unacceptable and highly visible; deficiencies are rare and demand immediate remediation"
+      }
+    },
+    {
+      "id": "market_action_engagement",
+      "name": "Market action/engagement",
+      "weight": 0.0833,
+      "phases": {
+        "1": "Exploration and experimentation; building prototypes and proofs of concept with no established channels",
+        "2": "Early sales through direct engagement; custom contracts, consulting, and bespoke delivery",
+        "3": "Product marketing and competitive positioning; standardized sales channels, partnerships, and ecosystems",
+        "4": "Volume-based procurement; API-driven consumption, self-service portals, and utility pricing models"
+      }
+    },
+    {
+      "id": "efficiency",
+      "name": "Efficiency",
+      "weight": 0.0833,
+      "phases": {
+        "1": "Very low efficiency; high resource investment per unit of output, significant waste in exploration",
+        "2": "Improving efficiency through learning; reducing waste as patterns and best practices emerge",
+        "3": "Good efficiency with established processes; measurable ROI, optimized delivery, and scaling operations",
+        "4": "Maximum efficiency through standardization, automation, and economies of scale; marginal cost approaches zero"
+      }
+    },
+    {
+      "id": "decision_driver",
+      "name": "Decision driver",
+      "weight": 0.0833,
+      "phases": {
+        "1": "Decisions driven by vision, intuition, and strategic bets on uncertain future value",
+        "2": "Decisions driven by competitive differentiation, first-mover advantage, and strategic fit",
+        "3": "Decisions driven by feature comparison, total cost of ownership, vendor stability, and risk mitigation",
+        "4": "Decisions driven by price, availability, compliance, and operational convenience"
+      }
+    }
+  ],
+  "metadata": {
+    "property_count": 12,
+    "default_weight": 0.0833,
+    "weight_model": "equal",
+    "aggregation": "weighted_average",
+    "source": "Wardley evolution characteristics (Simon Wardley)",
+    "language": "en",
+    "notes": "Weights are approximately 1/12 (0.0833...). Actual computation should use 1/N where N is the number of evaluated properties to handle partial evaluation gracefully."
+  }
+}
