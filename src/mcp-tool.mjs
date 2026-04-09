@@ -127,6 +127,18 @@ export const ESTIMATE_EVOLUTION_TOOL = {
           'Only used in "conversational" mode when you want to skip remaining questions.',
         default: false,
       },
+      pipeline: {
+        type: 'boolean',
+        description:
+          'When true, enables enriched pipeline mode that orchestrates 3 evaluations: ' +
+          '(1) capability pivot — the abstract capability is evaluated first as central anchor, ' +
+          '(2) state-of-the-art solution — a modern/SotA implementation of that capability, ' +
+          '(3) legacy solution — an older/legacy implementation. ' +
+          'Produces a complete OWM (onlinewardleymaps.com) output with pipeline syntax ' +
+          'containing component, pipeline, and label declarations. ' +
+          'When omitted or false, the default single-evaluation behavior is preserved.',
+        default: false,
+      },
     },
     required: ['name'],
     additionalProperties: false,
@@ -147,7 +159,7 @@ function validateInput(input) {
     throw new Error('Input must be a non-null object');
   }
 
-  const { name, context, strategy, certitude, ubiquity, wonder, build, operate, usage, description, space, mode } = input;
+  const { name, context, strategy, certitude, ubiquity, wonder, build, operate, usage, description, space, mode, pipeline } = input;
 
   // Required: name
   if (name == null || typeof name !== 'string' || name.trim().length === 0) {
@@ -189,6 +201,7 @@ function validateInput(input) {
     ...(operate != null && { operate }),
     ...(usage != null && { usage }),
     ...(description != null && { description: description.trim() }),
+    ...(pipeline != null && { pipeline: Boolean(pipeline) }),
   };
 }
 
@@ -231,6 +244,7 @@ export async function handleEstimateEvolution(rawInput) {
     sessionState: rawInput?.sessionState,
     forceEstimate: rawInput?.forceEstimate,
     compact: rawInput?.compact,
+    pipeline: rawInput?.pipeline,
   };
 
   const routed = await routeEstimateEvolution(routerInput);

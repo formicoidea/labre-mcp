@@ -322,6 +322,12 @@ export function formatResponse(result, options = {}) {
     lines.push('');
   }
 
+  // ── Wardley component type metadata (activity/practice/data/knowledge) ──
+  if (result.wardleyType && !compact) {
+    lines.push(formatWardleyTypeBlock(result.wardleyType));
+    lines.push('');
+  }
+
   // ── Non-economic: re-questioning ──
   if (result.reQuestions && result.reQuestions.length > 0) {
     lines.push(formatReQuestioningBlock(result.reQuestions, name, cls));
@@ -418,6 +424,32 @@ function formatReQuestioningBlock(reQuestions, name, classification) {
   );
 
   return lines.join('\n');
+}
+
+/**
+ * Format Wardley component type metadata into a markdown line.
+ *
+ * The 4 Wardley component types are:
+ *   - Activity: things you do (manage, process, deliver…)
+ *   - Practice: how you do things (methodologies, standards…)
+ *   - Data: information, metrics, records, signals
+ *   - Knowledge: expertise, skills, understanding, models
+ *
+ * @param {{ type: string, confidence: number, reason: string }} wardleyType
+ * @returns {string} Markdown line
+ */
+function formatWardleyTypeBlock(wardleyType) {
+  const typeLabels = {
+    activity: 'Activity (what you do)',
+    practice: 'Practice (how you do it)',
+    data: 'Data (information/records)',
+    knowledge: 'Knowledge (expertise/understanding)',
+  };
+
+  const label = typeLabels[wardleyType.type] || wardleyType.type;
+  const conf = formatConfidence(wardleyType.confidence);
+
+  return `**Wardley Component Type:** ${label} — ${conf.percentage} confidence (${wardleyType.reason})`;
 }
 
 /**

@@ -490,3 +490,165 @@ describe('routing accuracy', () => {
     }
   });
 });
+
+// ─── Named Components via LLM Tier 2 (broad detection) ─────────────────────
+
+describe('LLM Tier 2 named component detection', () => {
+
+  describe('methodologies and named practices are classified as solutions', () => {
+    const namedMethodologies = [
+      { name: 'Scrum', reasoning: 'Scrum is a specific agile methodology created by Ken Schwaber and Jeff Sutherland' },
+      { name: 'Kanban', reasoning: 'Kanban is a specific workflow methodology originating from Toyota' },
+      { name: 'Lean', reasoning: 'Lean is a named methodology originating from Toyota Production System' },
+      { name: 'Six Sigma', reasoning: 'Six Sigma is a specific quality methodology created at Motorola' },
+      { name: 'SAFe', reasoning: 'SAFe is the Scaled Agile Framework, a named agile scaling framework' },
+      { name: 'Design Thinking', reasoning: 'Design Thinking is a named innovation methodology popularized by IDEO and Stanford d.school' },
+      { name: 'DevOps', reasoning: 'DevOps is a named set of practices combining development and operations' },
+      { name: 'XP', reasoning: 'XP (Extreme Programming) is a specific software development methodology' },
+    ];
+
+    for (const { name, reasoning } of namedMethodologies) {
+      it(`classifies "${name}" as solution via LLM`, async () => {
+        const llm = mockLLMCall('SOLUTION', 0.90, reasoning);
+        const result = await classifySolutionLLM(name, llm);
+        assert.equal(result.classification, CLASSIFICATION.SOLUTION,
+          `"${name}" should be classified as solution (named methodology)`);
+        assert.ok(result.confidence >= 0.80,
+          `"${name}" confidence should be >= 0.80, got ${result.confidence}`);
+      });
+    }
+  });
+
+  describe('standards and specifications are classified as solutions', () => {
+    const namedStandards = [
+      { name: 'ITIL', reasoning: 'ITIL is a specific IT service management framework' },
+      { name: 'TOGAF', reasoning: 'TOGAF is The Open Group Architecture Framework' },
+      { name: 'COBIT', reasoning: 'COBIT is a specific IT governance framework by ISACA' },
+      { name: 'ISO 27001', reasoning: 'ISO 27001 is a specific information security standard' },
+      { name: 'PCI-DSS', reasoning: 'PCI-DSS is a specific payment card security standard' },
+      { name: 'SOC 2', reasoning: 'SOC 2 is a specific compliance framework by AICPA' },
+    ];
+
+    for (const { name, reasoning } of namedStandards) {
+      it(`classifies "${name}" as solution via LLM`, async () => {
+        const llm = mockLLMCall('SOLUTION', 0.92, reasoning);
+        const result = await classifySolutionLLM(name, llm);
+        assert.equal(result.classification, CLASSIFICATION.SOLUTION,
+          `"${name}" should be classified as solution (named standard)`);
+      });
+    }
+  });
+
+  describe('named models and frameworks are classified as solutions', () => {
+    const namedModels = [
+      { name: 'Wardley Mapping', reasoning: 'Wardley Mapping is a specific strategic mapping methodology created by Simon Wardley' },
+      { name: 'Wardley Maps', reasoning: 'Wardley Maps is a named strategic visualization technique' },
+      { name: 'Porter\'s Five Forces', reasoning: 'Porter\'s Five Forces is a named competitive analysis framework' },
+      { name: 'Balanced Scorecard', reasoning: 'Balanced Scorecard is a named strategic management framework' },
+      { name: 'OKR', reasoning: 'OKR is a specific goal-setting framework (Objectives and Key Results)' },
+      { name: 'Jobs to Be Done', reasoning: 'Jobs to Be Done is a named innovation framework' },
+    ];
+
+    for (const { name, reasoning } of namedModels) {
+      it(`classifies "${name}" as solution via LLM`, async () => {
+        const llm = mockLLMCall('SOLUTION', 0.88, reasoning);
+        const result = await classifySolutionLLM(name, llm);
+        assert.equal(result.classification, CLASSIFICATION.SOLUTION,
+          `"${name}" should be classified as solution (named model/framework)`);
+      });
+    }
+  });
+
+  describe('generic capabilities remain classified as capabilities', () => {
+    const genericCapabilities = [
+      { name: 'project management', reasoning: 'project management is a generic activity that can use many methodologies' },
+      { name: 'continuous improvement', reasoning: 'continuous improvement is a generic practice area' },
+      { name: 'quality management', reasoning: 'quality management is an abstract capability' },
+      { name: 'IT service management', reasoning: 'IT service management is an abstract capability domain' },
+      { name: 'agile coaching', reasoning: 'agile coaching is a generic practice' },
+      { name: 'strategic planning', reasoning: 'strategic planning is a generic business activity' },
+    ];
+
+    for (const { name, reasoning } of genericCapabilities) {
+      it(`classifies "${name}" as capability via LLM`, async () => {
+        const llm = mockLLMCall('CAPABILITY', 0.85, reasoning);
+        const result = await classifySolutionLLM(name, llm);
+        assert.equal(result.classification, CLASSIFICATION.CAPABILITY,
+          `"${name}" should remain classified as capability (generic)`);
+      });
+    }
+  });
+
+  describe('full pipeline routes named components through LLM when not in static lists', () => {
+    it('routes "Scrum" as solution via LLM fallback (not in KNOWN_SOLUTIONS)', async () => {
+      const llm = mockLLMCall('SOLUTION', 0.92, 'Scrum is a named agile methodology');
+      const result = await detectSolution('Scrum', { llmCall: llm });
+      // Scrum is not in KNOWN_SOLUTIONS, so it should go through LLM
+      assert.equal(result.classification, CLASSIFICATION.SOLUTION,
+        'Scrum should be classified as solution');
+      assert.ok(result.isSolution, 'isSolution flag should be true');
+    });
+
+    it('routes "ITIL" as solution via LLM fallback (not in KNOWN_SOLUTIONS)', async () => {
+      const llm = mockLLMCall('SOLUTION', 0.90, 'ITIL is a named IT service management framework');
+      const result = await detectSolution('ITIL', { llmCall: llm });
+      assert.equal(result.classification, CLASSIFICATION.SOLUTION,
+        'ITIL should be classified as solution');
+    });
+
+    it('routes "Wardley Maps" as solution via LLM fallback', async () => {
+      const llm = mockLLMCall('SOLUTION', 0.88, 'Wardley Maps is a named strategic mapping methodology');
+      const result = await detectSolution('Wardley Maps', { llmCall: llm });
+      assert.equal(result.classification, CLASSIFICATION.SOLUTION,
+        'Wardley Maps should be classified as solution');
+    });
+
+    it('keeps "project management" as capability even with LLM', async () => {
+      const llm = mockLLMCall('CAPABILITY', 0.88, 'project management is an abstract capability');
+      const result = await detectSolution('project management', { llmCall: llm });
+      assert.equal(result.classification, CLASSIFICATION.CAPABILITY,
+        'project management should remain capability');
+    });
+  });
+
+  describe('LLM prompt includes named component categories', () => {
+    it('prompt mentions methodologies as solution category', async () => {
+      let capturedPrompt = '';
+      const llm = async (prompt) => {
+        capturedPrompt = prompt;
+        return 'classification=SOLUTION\nconfidence=0.90\nreasoning=test';
+      };
+      await classifySolutionLLM('Scrum', llm);
+      assert.ok(capturedPrompt.includes('Methodologies'),
+        'Prompt should mention methodologies');
+      assert.ok(capturedPrompt.includes('Scrum'),
+        'Prompt should include the component name');
+    });
+
+    it('prompt mentions standards as solution category', async () => {
+      let capturedPrompt = '';
+      const llm = async (prompt) => {
+        capturedPrompt = prompt;
+        return 'classification=SOLUTION\nconfidence=0.90\nreasoning=test';
+      };
+      await classifySolutionLLM('ITIL', llm);
+      assert.ok(capturedPrompt.includes('Standards') || capturedPrompt.includes('standard'),
+        'Prompt should mention standards');
+      assert.ok(capturedPrompt.includes('ITIL'),
+        'Prompt should include ITIL as example');
+    });
+
+    it('prompt mentions named models as solution category', async () => {
+      let capturedPrompt = '';
+      const llm = async (prompt) => {
+        capturedPrompt = prompt;
+        return 'classification=SOLUTION\nconfidence=0.90\nreasoning=test';
+      };
+      await classifySolutionLLM('Wardley Mapping', llm);
+      assert.ok(
+        capturedPrompt.includes('Named models') || capturedPrompt.includes('Wardley Mapping'),
+        'Prompt should reference named models or Wardley Mapping'
+      );
+    });
+  });
+});

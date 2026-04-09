@@ -21,10 +21,12 @@ import {
   detectComponentType,
   determineRoutingTargets,
   dispatchSolutionStrategies,
+  classifyWardleyType,
   COMPONENT_TYPE,
   CONFIDENCE_THRESHOLD,
 } from './solution-capability-router.mjs';
 import { verifyClassification } from './dual-verification-orchestrator.mjs';
+import { runEnrichedPipeline } from './pipeline-enriched.mjs';
 
 // ─── Valid Spaces ────────────────────────────────────────────────────────────
 
@@ -52,6 +54,8 @@ const VALID_SPACES = ['economic', 'social_good', 'common_good'];
  * @property {import('./classification-gate.mjs').ClassificationResult} classification
  * @property {string[]|null} reQuestions - Re-questioning prompts if non-economic
  * @property {Object<string, import('./strategies/base-strategy.mjs').EvolutionResult>|null} evaluations
+ * @property {Object}    [routing]      - Solution/capability routing metadata
+ * @property {{ type: string, confidence: number, reason: string }} [wardleyType] - Wardley component type (activity/practice/data/knowledge) — informative metadata only
  * @property {string}    message        - Human-readable summary
  */
 
@@ -68,7 +72,7 @@ function validateOneShotInput(input) {
   }
 
   const {
-    name, description, space, strategy,
+    name, description, space, strategy, pipeline,
     certitude, ubiquity, wonder, build, operate, usage,
   } = input;
 
@@ -122,6 +126,7 @@ function validateOneShotInput(input) {
     ...(build != null && { build }),
     ...(operate != null && { operate }),
     ...(usage != null && { usage }),
+    ...(pipeline != null && { pipeline: Boolean(pipeline) }),
   };
 }
 
@@ -175,7 +180,7 @@ function resolveClassification(name, description, space) {
 export async function estimateEvolutionOneShot(rawInput) {
   // Step 1: Validate input
   const validated = validateOneShotInput(rawInput);
-  const { name, description, space, strategy, ...componentData } = validated;
+  const { name, description, space, strategy, pipeline, ...componentData } = validated;
 
   // ── Localized message resolver (pilot: estimateEvolution) ──────────
   const { msg, lang } = createMessageResolverFromArgs({ name, description, context: description });
@@ -380,6 +385,15 @@ export async function estimateEvolutionOneShot(rawInput) {
   const effectiveConfidence = verifiedDetection ? verifiedDetection.confidence : detection.confidence;
   const effectiveMethod = verifiedDetection ? verifiedDetection.method : detection.method;
 
+  // Classify Wardley component type (activity/practice/data/knowledge) — informative metadata only
+  const wardleyTypeResult = classifyWardleyType(name, {
+    description,
+    nature: detection.nature,
+    category: detection.category,
+  });
+
+  logDebug(TOOL, `Wardley type for "${name}": ${wardleyTypeResult.wardleyType} (confidence=${wardleyTypeResult.confidence}, ${wardleyTypeResult.reason})`);
+
   let message = `Component "${name}" classified as ${classification.space}`;
   if (effectiveType === COMPONENT_TYPE.SOLUTION) {
     message += ` (detected as solution, confidence=${effectiveConfidence})`;
@@ -390,7 +404,7 @@ export async function estimateEvolutionOneShot(rawInput) {
   }
   message += '.';
 
-  return {
+  const standardResult = {
     mode: 'oneshot',
     classification,
     reQuestions: null,
@@ -407,8 +421,34 @@ export async function estimateEvolutionOneShot(rawInput) {
         tiersUsed: verifiedDetection.tiersUsed,
       }),
     },
+    wardleyType: {
+      type: wardleyTypeResult.wardleyType,
+      confidence: wardleyTypeResult.confidence,
+      reason: wardleyTypeResult.reason,
+    },
     message,
   };
+
+  // ── Pipeline enrichment: when pipeline=true, orchestrate the 3-step evaluation
+  if (pipeline) {
+    logDebug(TOOL, `Pipeline mode enabled for "${name}" — running enriched pipeline`);
+
+    // Provide a capability evaluation function that re-uses estimateEvolutionOneShot
+    // but forces capability path (no pipeline recursion)
+    const evaluateCapabilityFn = (capInput) =>
+      estimateEvolutionOneShot({ ...capInput, pipeline: false });
+
+    const pipelineResult = await runEnrichedPipeline(standardResult, component, {
+      evaluateCapabilityFn,
+      llmCall: getLLMCall(),
+    });
+
+    logDebug(TOOL, `Pipeline complete for "${name}": capability evolution=${pipelineResult.capabilityPivot?.evolution}`);
+
+    return pipelineResult;
+  }
+
+  return standardResult;
 }
 
 // ─── Lazy LLM Singletons ────────────────────────────────────────────────────
@@ -732,6 +772,15 @@ export async function estimateEvolutionConversational(input = {}) {
     }
     message += '.';
 
+    // Classify Wardley component type (activity/practice/data/knowledge) — informative metadata
+    const convWardleyType = classifyWardleyType(session.state.name, {
+      description: session.state.description || '',
+      nature: convDetection.nature,
+      category: convDetection.category,
+    });
+
+    logDebug(TOOL, `Wardley type for "${session.state.name}": ${convWardleyType.wardleyType} (${convWardleyType.reason})`);
+
     return {
       mode: 'conversational',
       phase: 'complete',
@@ -750,6 +799,11 @@ export async function estimateEvolutionConversational(input = {}) {
           verified: convVerifiedDetection.verified,
           tiersUsed: convVerifiedDetection.tiersUsed,
         }),
+      },
+      wardleyType: {
+        type: convWardleyType.wardleyType,
+        confidence: convWardleyType.confidence,
+        reason: convWardleyType.reason,
       },
       summary,
       sessionState: session.serialize(),

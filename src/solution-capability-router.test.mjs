@@ -560,6 +560,120 @@ describe('dispatchSolutionStrategies', () => {
   });
 });
 
+// ─── Routing Rule: Named → Solution, Generic → Capability ───────────────────
+//
+// This validates the core routing invariant: named components (products,
+// frameworks, methodologies, standards, named practices) must route to
+// the solution path, while generic/abstract components route to capability.
+//
+// Components NOT in the static KNOWN_SOLUTIONS list should still route
+// correctly when the Tier 2 LLM fallback identifies them as named.
+
+describe('routing rule — named → solution, generic → capability', () => {
+  // Named components NOT in the static KNOWN_SOLUTIONS list.
+  // These should trigger needsFallback=true (heuristic confidence < 0.90)
+  // so that the Tier 2 LLM can correctly classify them as solutions.
+  const namedComponentsNotInStaticList = [
+    { name: 'ITIL', desc: 'Named framework — should need LLM fallback' },
+    { name: 'Scrum', desc: 'Named methodology — should need LLM fallback' },
+    { name: 'ISO 27001', desc: 'Named standard — should need LLM fallback' },
+    { name: 'TOGAF', desc: 'Named framework — should need LLM fallback' },
+    { name: 'Six Sigma', desc: 'Named methodology — should need LLM fallback' },
+    { name: 'COBIT', desc: 'Named framework — should need LLM fallback' },
+    { name: 'SAFe', desc: 'Named framework — should need LLM fallback' },
+    { name: 'PRINCE2', desc: 'Named methodology — should need LLM fallback' },
+  ];
+
+  for (const { name, desc } of namedComponentsNotInStaticList) {
+    it(`"${name}" triggers needsFallback for Tier 2 LLM classification (${desc})`, () => {
+      const result = detectComponentType(name);
+      // Key invariant: these are NOT in static lists, so confidence < 0.90
+      // and needsFallback=true, allowing Tier 2 LLM to correctly classify
+      assert.equal(result.needsFallback, true,
+        `"${name}" should need LLM fallback (confidence=${result.confidence})`);
+    });
+  }
+
+  // Generic/abstract descriptions should always route to capability
+  const genericCapabilities = [
+    'incident response',
+    'change management',
+    'capacity planning',
+    'risk assessment',
+    'service design',
+    'performance testing',
+    'cost optimization',
+    'disaster recovery',
+  ];
+
+  for (const name of genericCapabilities) {
+    it(`generic "${name}" routes to capability path`, () => {
+      const result = detectComponentType(name);
+      assert.equal(result.type, COMPONENT_TYPE.CAPABILITY,
+        `"${name}" should be classified as capability, got ${result.type}`);
+    });
+  }
+
+  // Verify that routing targets respect the classification
+  it('solution detection produces useSolutionStrategies=true in exclusive mode', () => {
+    delete process.env.WARDLEY_EVAL_MODE;
+    const solutionDetection = { type: COMPONENT_TYPE.SOLUTION, confidence: 0.95 };
+    const targets = determineRoutingTargets(solutionDetection);
+    assert.equal(targets.useSolutionStrategies, true);
+    assert.equal(targets.useCapabilityStrategies, false);
+  });
+
+  it('capability detection produces useCapabilityStrategies=true in exclusive mode', () => {
+    delete process.env.WARDLEY_EVAL_MODE;
+    const capabilityDetection = { type: COMPONENT_TYPE.CAPABILITY, confidence: 0.95 };
+    const targets = determineRoutingTargets(capabilityDetection);
+    assert.equal(targets.useSolutionStrategies, false);
+    assert.equal(targets.useCapabilityStrategies, true);
+  });
+
+  // Verify that the dual-verification override is respected:
+  // When Tier 2 LLM overrides the Tier 1 classification, routing targets update
+  it('dispatchWithRouting uses detection.type for routing (solution override)', async () => {
+    delete process.env.WARDLEY_EVAL_MODE;
+    let capCallbackCalled = false;
+    const mockCapCallback = async () => {
+      capCallbackCalled = true;
+      return {};
+    };
+
+    // Simulate a component that heuristics detect as solution
+    const result = await dispatchWithRouting(
+      { name: 'Kubernetes' },
+      { runCapabilityStrategies: mockCapCallback, strategy: 'all' }
+    );
+
+    // In exclusive mode, solution should NOT call capability callback
+    assert.equal(capCallbackCalled, false,
+      'Solution routing should NOT dispatch to capability strategies in exclusive mode');
+    assert.equal(result.targets.useSolutionStrategies, true);
+  });
+
+  it('dispatchWithRouting uses detection.type for routing (capability override)', async () => {
+    delete process.env.WARDLEY_EVAL_MODE;
+    let capCallbackCalled = false;
+    const mockCapCallback = async () => {
+      capCallbackCalled = true;
+      return { 'test-cap': { evolution: 0.5 } };
+    };
+
+    // CRM is a known capability
+    const result = await dispatchWithRouting(
+      { name: 'CRM' },
+      { runCapabilityStrategies: mockCapCallback, strategy: 'all' }
+    );
+
+    assert.equal(capCallbackCalled, true,
+      'Capability routing should dispatch to capability strategies');
+    assert.equal(result.targets.useCapabilityStrategies, true);
+    assert.equal(result.targets.useSolutionStrategies, false);
+  });
+});
+
 // ─── Constants Exported ───────────────────────────────────────────────────────
 
 describe('exported constants', () => {

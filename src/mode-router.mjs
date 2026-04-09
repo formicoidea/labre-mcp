@@ -175,6 +175,7 @@ async function routeOneShot(input, modeReason) {
     ...(input.build != null && { build: input.build }),
     ...(input.operate != null && { operate: input.operate }),
     ...(input.usage != null && { usage: input.usage }),
+    ...(input.pipeline != null && { pipeline: Boolean(input.pipeline) }),
   };
 
   const result = await estimateEvolutionOneShot(oneShotInput);
@@ -185,21 +186,40 @@ async function routeOneShot(input, modeReason) {
     compact: input.compact || false,
   });
 
-  return {
+  // When pipeline mode is active, the result has a different shape with
+  // pipeline-specific fields (owmOutput, capabilityPivot, sotaSolution, etc.).
+  // Standard fields live under result.standardResult in that case.
+  const std = result.pipeline ? (result.standardResult || {}) : result;
+
+  const response = {
     mode: MODES.ONESHOT,
     modeReason,
-    classification: result.classification,
-    reQuestions: result.reQuestions,
-    evaluations: result.evaluations,
-    message: result.message,
+    classification: std.classification || result.classification,
+    reQuestions: std.reQuestions || result.reQuestions,
+    evaluations: std.evaluations || result.evaluations,
+    message: std.message || result.message,
     formatted,
     // One-shot mode has no session state or questions
     sessionState: null,
     nextQuestion: null,
     phase: null,
     // Pass through routing metadata (solution/capability detection + confidence)
-    routing: result.routing || null,
+    routing: std.routing || result.routing || null,
   };
+
+  // Pass through pipeline-specific fields when pipeline mode is active
+  if (result.pipeline) {
+    response.pipeline = true;
+    response.owmOutput = result.owmOutput;
+    response.owm = result.owm;
+    response.capabilityPivot = result.capabilityPivot;
+    response.sotaSolution = result.sotaSolution;
+    response.legacySolution = result.legacySolution;
+    response.discoveredSolutions = result.discoveredSolutions;
+    response.componentName = result.componentName;
+  }
+
+  return response;
 }
 
 // ─── Guided Route ──────────────────────────────────────────────────────────

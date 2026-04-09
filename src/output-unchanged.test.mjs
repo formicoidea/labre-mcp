@@ -77,7 +77,7 @@ describe('AC 8: Existing tool output unchanged', () => {
     // Verify top-level keys include all original fields (routing is a new addition from solution-capability routing)
     const topKeys = Object.keys(result).sort();
     const requiredKeys = ['classification', 'evaluations', 'message', 'mode', 'reQuestions'];
-    const allowedKeys = [...requiredKeys, 'routing']; // routing added by solution-capability router
+    const allowedKeys = [...requiredKeys, 'routing', 'wardleyType']; // routing + wardleyType added by solution-capability router
     for (const key of requiredKeys) {
       assert.ok(topKeys.includes(key), `Required key "${key}" must be present, got: ${topKeys.join(', ')}`);
     }
