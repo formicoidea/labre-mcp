@@ -9,7 +9,7 @@
 // the evolution values are IDENTICAL (bitwise equal, not just close).
 
 import assert from 'node:assert/strict';
-import { computeEvolution } from '../s-curve.mjs';
+import { computeEvolution } from '../evolution/s-curve.mjs';
 import { CpcEvolutionStrategy } from './cpc-evolution-strategy.mjs';
 
 // ── Mock fixtures ──────────────────────────────────────────────────────────

@@ -20,7 +20,7 @@
 //   6. Each technology has a plausible indicator fingerprint
 
 import assert from 'node:assert/strict';
-import { computeEvolution } from '../s-curve.mjs';
+import { computeEvolution } from '../evolution/s-curve.mjs';
 import { CpcEvolutionStrategy } from './cpc-evolution-strategy.mjs';
 import { computeAllIndicators } from './patent-indicators.mjs';
 

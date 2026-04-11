@@ -18,7 +18,7 @@ import {
   computeConfidence,
 } from './cpc-evolution-strategy.mjs';
 import { CpcEvolutionStrategy } from './cpc-evolution-strategy.mjs';
-import { computeEvolution } from '../s-curve.mjs';
+import { computeEvolution } from '../evolution/s-curve.mjs';
 
 // ── Test runner ───────────────────────────────────────────────────────────
 

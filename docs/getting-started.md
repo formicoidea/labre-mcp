@@ -112,7 +112,9 @@ WardleyAssistant/
 │   ├── identify-capability.mjs     # Identification de capacite sous-jacente
 │   ├── skill-handler.mjs           # Bridge langage naturel → API
 │   ├── calibrate-s-curve.mjs       # Calibration parametres S-curve
-│   ├── s-curve-visualizer.html     # Visualiseur interactif S-curve
+│   ├── evolution/
+│   │   ├── s-curve-visualizer.html # Visualiseur interactif S-curve
+│   │   └── ...
 │   └── strategies/
 │       ├── registry.mjs            # Auto-decouverte des strategies
 │       ├── base-strategy.mjs       # Interface abstraite

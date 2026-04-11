@@ -3,7 +3,7 @@
 //
 // Phase 1: Capability Identification — looks behind technical labels to
 //          identify the true underlying capability or need
-//          (delegated to src/identify-capability.mjs)
+//          (delegated to src/tools/identify-capability.mjs)
 // Phase 2: Recursive Historical Timeline — iteratively builds a chronological
 //          timeline of solutions/manifestations until the current year,
 //          each milestone evaluated by LLMDirectStrategy with date context
@@ -11,7 +11,7 @@
 // Requires llmCall injection (shared with LLMDirectStrategy internally).
 
 import { BaseStrategy } from './base-strategy.mjs';
-import { identifyCapability } from '../identify-capability.mjs';
+import { identifyCapability } from '../tools/identify-capability.mjs';
 import { LLMDirectStrategy } from './llm-direct-strategy.mjs';
 
 const CURRENT_YEAR = new Date().getFullYear();

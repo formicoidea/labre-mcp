@@ -25,7 +25,7 @@ import {
 import { PatentDataSource, emptyPatentData, validatePatentData } from './patent-data-source.mjs';
 import { CpcEvolutionStrategy } from './cpc-evolution-strategy.mjs';
 import { BaseStrategy } from '../strategies/base-strategy.mjs';
-import { computeEvolution } from '../s-curve.mjs';
+import { computeEvolution } from '../evolution/s-curve.mjs';
 
 // ─── Shared mock CPC mapper ─────────────────────────────────────────────────
 

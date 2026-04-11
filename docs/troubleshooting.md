@@ -105,7 +105,7 @@ node --test --experimental-test-module-mocks src/evaluate-map-notifications.test
 
 ### Visualiser le modele S-curve
 
-Ouvrir `src/s-curve-visualizer.html` dans un navigateur pour visualiser interactivement le modele dual sigmoide et ajuster les parametres.
+Ouvrir `src/evolution/s-curve-visualizer.html` dans un navigateur pour visualiser interactivement le modele dual sigmoide et ajuster les parametres.
 
 ### Calibrer les parametres S-curve
 

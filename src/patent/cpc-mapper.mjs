@@ -17,7 +17,7 @@
 //   cpc-evolution-strategy.mjs calls mapCapabilityToCPC(capability, options)
 //   which returns 1-5 CPC codes at the most specific level discovered.
 
-import { createLLMCall } from '../llm-call.mjs';
+import { createLLMCall } from '../lib/llm/llm-call.mjs';
 
 // ─── CPC code validation ───────────────────────────────────────────────────
 
