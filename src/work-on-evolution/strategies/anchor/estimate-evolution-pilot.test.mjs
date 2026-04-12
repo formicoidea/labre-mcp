@@ -12,8 +12,8 @@
 
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { setVerbose } from '../lib/mcp-notifications.mjs';
-import { estimateEvolutionOneShot } from './estimate-evolution.mjs';
+import { setVerbose } from '../../../lib/mcp-notifications.mjs';
+import { estimateEvolutionOneShot } from '../../../evolution/estimate-evolution.mjs';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 

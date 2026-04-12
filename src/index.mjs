@@ -9,7 +9,7 @@ export { startServer, REGISTERED_TOOLS, TOOL_HANDLERS, handleRequest } from './m
 // ─── Tools ──────────────────────────────────────────────────────────────────
 export { ESTIMATE_EVOLUTION_TOOL, handleEstimateEvolution } from './mcp/mcp-tool.mjs';
 export { GENERATE_VALUE_CHAIN_TOOL, handleGenerateValueChain } from './tools/generate-value-chain.mjs';
-export { EVALUATE_MAP_TOOL, handleEvaluateMap } from './tools/evaluate-map.mjs';
+export { EVALUATE_MAP_TOOL, handleEvaluateMap } from './evaluate-map/evaluate-map.mjs';
 export { IDENTIFY_CAPABILITY_TOOL, handleIdentifyCapability } from './tools/identify-capability.mjs';
 export { ESTIMATE_ANCHOR_EVOLUTION_TOOL, handleEstimateAnchorEvolution } from './evolution/estimate-anchor-evolution.mjs';
 

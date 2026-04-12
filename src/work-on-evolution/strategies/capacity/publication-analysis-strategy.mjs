@@ -13,7 +13,7 @@
 //   4. Optionally falls back to LLM-estimated proportions if none provided
 
 import { BaseStrategy } from './base-strategy.mjs';
-import { pubEvolution, PUB_TYPE_CENTROIDS } from '../evolution/s-curve.mjs';
+import { pubEvolution, PUB_TYPE_CENTROIDS } from '../../evolution/s-curve.mjs';
 
 // --- Advanced publication-based evolution model ---
 // The simple centroid model (pubEvolution) maps dominant publication types to their
@@ -88,21 +88,35 @@ usage=U.UU`;
  * @returns {{ wonder: number, build: number, operate: number, usage: number }}
  */
 function parsePubResponse(text) {
-  const wMatch = text.match(/wonder[:\s=]*([\d.]+)/i);
-  const bMatch = text.match(/build[:\s=]*([\d.]+)/i);
-  const oMatch = text.match(/operate[:\s=]*([\d.]+)/i);
-  const uMatch = text.match(/usage[:\s=]*([\d.]+)/i);
+  // Anchor on the "MANDATORY FORMAT" contract from the prompt: one `key=value`
+  // per line. This avoids matching the keywords when they appear in multilingual
+  // prose above the final block (which caused NaN on e.g. "wonder." sentence ends).
+  const NUM = '(\\d+(?:\\.\\d+)?|\\.\\d+)';
+  const lineFor = (key) => new RegExp(`^\\s*${key}\\s*[:=]\\s*${NUM}\\s*$`, 'im');
+  const wMatch = text.match(lineFor('wonder'));
+  const bMatch = text.match(lineFor('build'));
+  const oMatch = text.match(lineFor('operate'));
+  const uMatch = text.match(lineFor('usage'));
 
   if (!wMatch || !bMatch || !oMatch || !uMatch) {
     throw new Error(`PublicationAnalysisStrategy: could not parse response: ${text.slice(0, 200)}`);
   }
 
-  return {
-    wonder: parseFloat(wMatch[1]),
-    build: parseFloat(bMatch[1]),
+  const vals = {
+    wonder:  parseFloat(wMatch[1]),
+    build:   parseFloat(bMatch[1]),
     operate: parseFloat(oMatch[1]),
-    usage: parseFloat(uMatch[1]),
+    usage:   parseFloat(uMatch[1]),
   };
+  const raw = { wonder: wMatch[1], build: bMatch[1], operate: oMatch[1], usage: uMatch[1] };
+  for (const [k, v] of Object.entries(vals)) {
+    if (!Number.isFinite(v) || v < 0) {
+      throw new Error(
+        `PublicationAnalysisStrategy: invalid ${k} value "${raw[k]}" parsed from LLM response`
+      );
+    }
+  }
+  return vals;
 }
 
 /**
@@ -188,8 +202,8 @@ export class PublicationAnalysisStrategy extends BaseStrategy {
     // Compute evolution as weighted centroid
     const evolution = pubEvolution(wonder, build, operate, usage);
 
-    if (evolution === null) {
-      throw new Error('PublicationAnalysisStrategy: pubEvolution returned null');
+    if (evolution === null || !Number.isFinite(evolution)) {
+      throw new Error('PublicationAnalysisStrategy: pubEvolution returned invalid value');
     }
 
     // Confidence from distribution concentration

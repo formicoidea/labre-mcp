@@ -24,7 +24,7 @@ process.env._WARDLEY_NESTED = '1';
 import { createInterface } from 'node:readline';
 import { ESTIMATE_EVOLUTION_TOOL, handleEstimateEvolution } from './mcp-tool.mjs';
 import { GENERATE_VALUE_CHAIN_TOOL, handleGenerateValueChain } from '../tools/generate-value-chain.mjs';
-import { EVALUATE_MAP_TOOL, handleEvaluateMap } from '../tools/evaluate-map.mjs';
+import { EVALUATE_MAP_TOOL, handleEvaluateMap } from '../evaluate-map/evaluate-map.mjs';
 import { IDENTIFY_CAPABILITY_TOOL, handleIdentifyCapability } from '../tools/identify-capability.mjs';
 import { ESTIMATE_ANCHOR_EVOLUTION_TOOL, handleEstimateAnchorEvolution } from '../evolution/estimate-anchor-evolution.mjs';
 import { logInfo, logError } from '../lib/mcp-notifications.mjs';

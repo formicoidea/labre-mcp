@@ -8,9 +8,9 @@
 //
 // Exposes an MCP tool (estimateAnchorEvolution) for direct invocation.
 
-import { createLLMCall } from '../lib/llm/llm-call.mjs';
-import { logDebug } from '../lib/mcp-notifications.mjs';
-import { evolutionToStage } from '../lib/response-formatter.mjs';
+import { createLLMCall } from '../../../lib/llm/llm-call.mjs';
+import { logDebug } from '../../../lib/mcp-notifications.mjs';
+import { evolutionToStage } from '../../../lib/response-formatter.mjs';
 
 // ─── Anchor Perception Model ───────────────────────────────────────────────
 

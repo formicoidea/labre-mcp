@@ -22,7 +22,7 @@
 // so the registry picks it up alongside other *-strategy.mjs files.
 
 import { BaseStrategy } from '../strategies/base-strategy.mjs';
-import { computeEvolution } from '../evolution/s-curve.mjs';
+import { computeEvolution } from '../work-on-evolution/s-curve/s-curve.mjs';
 import { getCpcTitle } from './cpc-taxonomy-cache.mjs';
 
 // ─── Default indicator configuration ────────────────────────────────────────

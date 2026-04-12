@@ -11,7 +11,7 @@
 // Requires llmCall injection (shared with LLMDirectStrategy internally).
 
 import { BaseStrategy } from './base-strategy.mjs';
-import { identifyCapability } from '../tools/identify-capability.mjs';
+import { identifyCapability } from '../../tools/identify-capability.mjs';
 import { LLMDirectStrategy } from './llm-direct-strategy.mjs';
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -154,6 +154,12 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
 
   static get method() {
     return 'timeline-benchmark';
+  }
+
+  static get disabled() {
+    return {
+      reason: 'High LLM latency (>30 min/run) — disabled pending optimization',
+    };
   }
 
   /**

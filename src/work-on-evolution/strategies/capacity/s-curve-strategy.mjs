@@ -5,7 +5,7 @@
 // Requires: certitude, ubiquity inputs on the component.
 
 import { BaseStrategy } from './base-strategy.mjs';
-import { computeEvolution } from '../evolution/s-curve.mjs';
+import { computeEvolution } from '../../evolution/s-curve.mjs';
 
 export class SCurveStrategy extends BaseStrategy {
 

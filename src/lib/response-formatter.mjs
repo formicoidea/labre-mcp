@@ -145,10 +145,6 @@ export function strategyReasoning(method, result, component = {}) {
       `Log-probability distribution analysis of stage tokens suggests ` +
       `the **${stage.name}** stage with the highest probability mass.`,
 
-    'sector-agent': () =>
-      `Sector-specific agent analysis places this component in the **${stage.name}** stage ` +
-      `considering industry-specific evolution patterns and dynamics.`,
-
     'cpc-evolution': () =>
       `Patent CPC classification analysis positions this component in the **${stage.name}** stage ` +
       `based on patent filing patterns and technology classification codes.`,
@@ -709,7 +705,7 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
       'llm-direct': { error: 'LLM call not configured for one-shot mode.' },
     },
     parsedInput: component,
-    availableStrategies: ['s-curve', 'publication-analysis', 'timeline-benchmark', 'llm-direct', 'logprob-distribution', 'sector-agent'],
+    availableStrategies: ['s-curve', 'publication-analysis', 'timeline-benchmark', 'llm-direct', 'logprob-distribution'],
   };
   console.log(formatResponse(economicResult));
   console.log();
@@ -754,7 +750,7 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
     reQuestions: null,
     evaluations: {
       'llm-direct': { error: 'LLM not configured' },
-      'sector-agent': { error: 'LLM not configured' },
+      'logprob-distribution': { error: 'LLM not configured' },
     },
     parsedInput: { name: 'Widget' },
   };

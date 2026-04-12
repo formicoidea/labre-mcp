@@ -56,6 +56,17 @@ export class BaseStrategy {
   }
 
   /**
+   * Disabled flag. Return falsy to enable (default), or `{ reason: string }`
+   * to disable. The registry filters disabled strategies out of
+   * loadStrategies()/getStrategy()/listStrategies() and exposes them via
+   * listDisabled()/isDisabled(). To disable a strategy, override this getter
+   * in the subclass — no other code changes needed.
+   *
+   * @returns {false | { reason: string }}
+   */
+  static get disabled() { return false; }
+
+  /**
    * Evaluate a component and return its evolution position.
    * Must be overridden by every strategy.
    *

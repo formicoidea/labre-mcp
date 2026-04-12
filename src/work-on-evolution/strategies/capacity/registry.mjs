@@ -20,6 +20,8 @@ const __dirname = dirname(__filename);
 
 /** @type {Map<string, typeof BaseStrategy> | null} */
 let _cache = null;
+/** @type {Map<string, { reason: string }> | null} */
+let _disabledCache = null;
 
 /**
  * Discover and load all strategy classes from this directory.
@@ -61,8 +63,43 @@ export async function loadStrategies() {
     }
   }
 
+  // Partition: strategies that declare `static get disabled` truthy are
+  // excluded from the active map and recorded in the disabled map.
+  /** @type {Map<string, { reason: string }>} */
+  const disabled = new Map();
+  for (const [method, Cls] of [...strategies]) {
+    const flag = Cls.disabled;
+    if (flag) {
+      const reason = (flag && typeof flag === 'object' && typeof flag.reason === 'string')
+        ? flag.reason
+        : 'disabled';
+      disabled.set(method, { reason });
+      strategies.delete(method);
+    }
+  }
+
   _cache = strategies;
+  _disabledCache = disabled;
   return strategies;
+}
+
+/**
+ * List all disabled strategies with their reasons.
+ * @returns {Promise<Array<{ method: string, reason: string }>>}
+ */
+export async function listDisabled() {
+  await loadStrategies();
+  return [..._disabledCache.entries()].map(([method, { reason }]) => ({ method, reason }));
+}
+
+/**
+ * Check whether a given method name refers to a disabled strategy.
+ * @param {string} method
+ * @returns {Promise<boolean>}
+ */
+export async function isDisabled(method) {
+  await loadStrategies();
+  return _disabledCache.has(method);
 }
 
 /**
@@ -74,6 +111,10 @@ export async function getStrategy(method) {
   const strategies = await loadStrategies();
   const Cls = strategies.get(method);
   if (!Cls) {
+    if (_disabledCache && _disabledCache.has(method)) {
+      const { reason } = _disabledCache.get(method);
+      throw new Error(`Strategy "${method}" is disabled: ${reason}`);
+    }
     const available = [...strategies.keys()].join(', ');
     throw new Error(
       `Unknown strategy "${method}". Available: ${available}`
@@ -96,4 +137,5 @@ export async function listStrategies() {
  */
 export function clearCache() {
   _cache = null;
+  _disabledCache = null;
 }

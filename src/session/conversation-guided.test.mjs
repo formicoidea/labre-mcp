@@ -361,7 +361,7 @@ console.log('--- Test 10: formatConversationalTurn for all states ---');
     reQuestions: null,
     evaluations: {
       's-curve': { evolution: 0.72, confidence: 0.85, method: 's-curve' },
-      'timeline-benchmark': { evolution: 0.68, confidence: 0.70, method: 'timeline-benchmark' },
+      'llm-direct': { evolution: 0.68, confidence: 0.70, method: 'llm-direct' },
     },
     summary: {
       gathered: { name: 'ERP', certitude: 0.9, ubiquity: 0.85 },

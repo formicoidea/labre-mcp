@@ -57,9 +57,6 @@ const STRATEGY_ALIASES = {
   direct: 'llm-direct',
   'logprob-distribution': 'logprob-distribution',
   logprob: 'logprob-distribution',
-  'sector-agent': 'sector-agent',
-  sector: 'sector-agent',
-  agent: 'sector-agent',
 };
 
 /**

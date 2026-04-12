@@ -10,7 +10,7 @@
 //   - LLM-based strategies work with mock LLM functions
 
 import assert from 'node:assert/strict';
-import { loadStrategies, clearCache, listStrategies } from './registry.mjs';
+import { loadStrategies, clearCache, listStrategies, listDisabled } from './registry.mjs';
 import { BaseStrategy } from './base-strategy.mjs';
 
 // ── Mock LLM functions ──────────────────────────────────────────────────────
@@ -19,13 +19,6 @@ import { BaseStrategy } from './base-strategy.mjs';
 function mockLLMCall(prompt) {
   return Promise.resolve(
     'evolution=0.55\nconfidence=0.75'
-  );
-}
-
-/** Mock LLM call that returns certitude/ubiquity/evolution format (for sector-agent) */
-function mockSectorAgentLLMCall(prompt) {
-  return Promise.resolve(
-    'certitude=0.75\nubiquity=0.60\nevolution=0.55'
   );
 }
 
@@ -110,7 +103,6 @@ const COMPONENT_MINIMAL = {
 const STRATEGY_OPTIONS = {
   'llm-direct':            { llmCall: mockLLMCall },
   'logprob-distribution':  { llmLogprobCall: mockLLMLogprobCall },
-  'sector-agent':          { llmCall: mockSectorAgentLLMCall },
   'publication-analysis':  { llmCall: mockPubLLMCall },
   // Analytical strategies need no special options
   's-curve':               {},
@@ -126,19 +118,19 @@ const STRATEGY_COMPONENTS = {
   'llm-direct':            COMPONENT_MINIMAL,     // uses LLM
   'logprob-distribution':  COMPONENT_MINIMAL,     // uses LLM logprobs
   'publication-analysis':  COMPONENT_FULL,        // has pub proportions
-  'sector-agent':          COMPONENT_MINIMAL,     // uses LLM
   'cpc-evolution':         COMPONENT_MINIMAL,     // graceful degradation without BigQuery
 };
 
 // ── Expected strategies ─────────────────────────────────────────────────────
-
-const EXPECTED_STRATEGIES = [
+// Full catalogue, including strategies that may be disabled at runtime.
+// The registry filters disabled entries out of listStrategies(); tests that
+// iterate over "active" strategies should use listStrategies() directly.
+const ALL_KNOWN_STRATEGIES = [
   's-curve',
   'timeline-benchmark',
   'llm-direct',
   'logprob-distribution',
   'publication-analysis',
-  'sector-agent',
   'cpc-evolution',
 ];
 
@@ -204,17 +196,21 @@ async function main() {
 
   console.log('Registry Discovery:');
 
-  await runTest('discovers exactly 7 strategies', async () => {
-    const strategies = await loadStrategies();
-    assert.equal(strategies.size, 7,
-      `Expected 7 strategies, found ${strategies.size}: [${[...strategies.keys()].join(', ')}]`);
+  await runTest('active + disabled strategies sum to the known catalogue', async () => {
+    const active = await listStrategies();
+    const disabled = (await listDisabled()).map(d => d.method);
+    const total = active.length + disabled.length;
+    assert.equal(total, ALL_KNOWN_STRATEGIES.length,
+      `Expected ${ALL_KNOWN_STRATEGIES.length} strategies total, found ${total} ` +
+      `(active=[${active.join(', ')}], disabled=[${disabled.join(', ')}])`);
   });
 
-  await runTest('all expected strategy methods are present', async () => {
-    const list = await listStrategies();
-    for (const method of EXPECTED_STRATEGIES) {
-      assert.ok(list.includes(method),
-        `Missing strategy: ${method}. Found: [${list.join(', ')}]`);
+  await runTest('every known strategy is either active or disabled', async () => {
+    const active = await listStrategies();
+    const disabled = (await listDisabled()).map(d => d.method);
+    for (const method of ALL_KNOWN_STRATEGIES) {
+      assert.ok(active.includes(method) || disabled.includes(method),
+        `Strategy "${method}" is neither active nor disabled`);
     }
   });
 
@@ -238,7 +234,8 @@ async function main() {
 
   console.log('\nStrategy Evaluation & Interface Conformance:');
 
-  for (const method of EXPECTED_STRATEGIES) {
+  const ACTIVE_STRATEGIES = await listStrategies();
+  for (const method of ACTIVE_STRATEGIES) {
     await runTest(`${method}: evaluate() returns valid {evolution, confidence, method}`, async () => {
       const strategies = await loadStrategies();
       const Cls = strategies.get(method);
@@ -265,29 +262,28 @@ async function main() {
     const sCurveResult = sCurve.evaluate(COMPONENT_FULL);
     assertEvolutionResult(sCurveResult, 's-curve');
 
-    // timeline-benchmark for "Cloud Computing" — LLM-based (capability + history loop)
-    const timeline = new (strategies.get('timeline-benchmark'))({ llmCall: mockTimelineLLMCall });
-    const timelineResult = await timeline.evaluate(COMPONENT_FULL);
-    assertEvolutionResult(timelineResult, 'timeline-benchmark');
-
     // publication-analysis with usage-heavy distribution
     const pub = new (strategies.get('publication-analysis'))();
     const pubResult = await pub.evaluate(COMPONENT_FULL);
     assertEvolutionResult(pubResult, 'publication-analysis');
 
     // publication-analysis should indicate high evolution (> 0.5) for Cloud Computing
-    // (usage-heavy distribution in COMPONENT_FULL); timeline-benchmark uses LLM-direct
-    // internally which blends S-curve and LLM estimate — mock values may produce
-    // different results depending on S-curve band positioning
+    // (usage-heavy distribution in COMPONENT_FULL)
     assert.ok(pubResult.evolution > 0.5,
       `publication evolution ${pubResult.evolution} should be > 0.5 for Cloud Computing`);
-    assert.ok(timelineResult.trace.length > 0,
-      'timeline should have at least one milestone in trace');
 
-    // All results must be valid numbers (including extra-competitive negative values)
     assert.equal(typeof sCurveResult.evolution, 'number');
-    assert.equal(typeof timelineResult.evolution, 'number');
     assert.equal(typeof pubResult.evolution, 'number');
+
+    // timeline-benchmark is exercised only when active
+    if (strategies.has('timeline-benchmark')) {
+      const timeline = new (strategies.get('timeline-benchmark'))({ llmCall: mockTimelineLLMCall });
+      const timelineResult = await timeline.evaluate(COMPONENT_FULL);
+      assertEvolutionResult(timelineResult, 'timeline-benchmark');
+      assert.ok(timelineResult.trace.length > 0,
+        'timeline should have at least one milestone in trace');
+      assert.equal(typeof timelineResult.evolution, 'number');
+    }
   });
 
   // ── Test 4: LLM strategies handle mock responses correctly ────────────
@@ -316,16 +312,6 @@ async function main() {
       `Logprob evolution should be in product range, got ${result.evolution}`);
   });
 
-  await runTest('sector-agent: blends sector analysis with S-curve', async () => {
-    const strategies = await loadStrategies();
-    const Cls = strategies.get('sector-agent');
-    const instance = new Cls({ llmCall: mockSectorAgentLLMCall });
-    const result = await instance.evaluate(COMPONENT_MINIMAL);
-    assertEvolutionResult(result, 'sector-agent');
-    assert.ok(result.evolution >= 0 && result.evolution <= 1,
-      `Sector agent evolution should be in [0, 1], got ${result.evolution}`);
-  });
-
   await runTest('publication-analysis: works with LLM fallback', async () => {
     const strategies = await loadStrategies();
     const Cls = strategies.get('publication-analysis');
@@ -336,8 +322,12 @@ async function main() {
   });
 
   await runTest('timeline-benchmark: fallback reaches present when loop stalls', async () => {
-    mockTimelineLLMCallStalling._count = 0; // reset counter
     const strategies = await loadStrategies();
+    if (!strategies.has('timeline-benchmark')) {
+      console.log('    (skipped — timeline-benchmark disabled)');
+      return;
+    }
+    mockTimelineLLMCallStalling._count = 0; // reset counter
     const Cls = strategies.get('timeline-benchmark');
     const instance = new Cls({ llmCall: mockTimelineLLMCallStalling });
     const result = await instance.evaluate({ name: 'Test', description: 'Test capability' });
@@ -393,17 +383,6 @@ async function main() {
         () => new Cls({}),
         /llmLogprobCall/i,
         'logprob-distribution should throw without llmLogprobCall'
-      );
-    });
-  });
-
-  await runTest('sector-agent: requires llmCall function', () => {
-    return loadStrategies().then(s => {
-      const Cls = s.get('sector-agent');
-      assert.throws(
-        () => new Cls({}),
-        /llmCall/i,
-        'sector-agent should throw without llmCall'
       );
     });
   });

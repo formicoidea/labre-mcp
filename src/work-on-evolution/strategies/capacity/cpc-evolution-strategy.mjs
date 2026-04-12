@@ -4,4 +4,4 @@
 // The actual implementation lives in src/patent/cpc-evolution-strategy.mjs.
 // This file re-exports the class so the plugin system auto-discovers it.
 
-export { CpcEvolutionStrategy } from '../patent/cpc-evolution-strategy.mjs';
+export { CpcEvolutionStrategy } from '../../patent/cpc-evolution-strategy.mjs';

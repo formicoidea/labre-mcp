@@ -13,15 +13,15 @@ import { buildReQuestions } from '../routing/classification-gate.mjs';
 import { loadStrategies, getStrategy, listStrategies } from '../strategies/registry.mjs';
 import { BaseStrategy } from '../strategies/base-strategy.mjs';
 import { ConversationSession } from '../session/conversation-session.mjs';
-import { createLLMCall, createOpenCodeCall, createOpenCodeLogprobCall } from '../lib/llm/llm-call.mjs';
+import { createLLMCall, createOpenCodeCall, createOpenCodeLogprobCall } from './llm/llm-call.mjs';
 import { identifyCapability } from '../tools/identify-capability.mjs';
-import { logDebug, logInfo, logError } from '../lib/mcp-notifications.mjs';
-import { createMessageResolverFromArgs } from '../lib/progress-messages.mjs';
+import { logDebug, logInfo, logError } from './mcp-notifications.mjs';
+import { createMessageResolverFromArgs } from './progress-messages.mjs';
 import {
   detectComponentType,
   COMPONENT_TYPE,
   CONFIDENCE_THRESHOLD,
-} from '../lib/component-detection.mjs';
+} from './component-detection.mjs';
 import {
   determineRoutingTargets,
   dispatchSolutionStrategies,
@@ -364,7 +364,7 @@ function getLogprobCall() {
  * - s-curve: analytical only, no LLM
  * - publication-analysis: enriched with LLM for deep research
  * - timeline-benchmark: enriched with LLM for historical reasoning
- * - llm-direct, sector-agent: require LLM call
+ * - llm-direct: requires LLM call
  * - logprob-distribution: uses OpenCode/kimi for real logprobs
  *
  * @param {typeof BaseStrategy} StrategyCls
@@ -384,7 +384,7 @@ function createStrategyInstance(StrategyCls) {
   }
 
   // LLM-required strategies: inject Agent SDK llmCall
-  if (method === 'llm-direct' || method === 'sector-agent') {
+  if (method === 'llm-direct') {
     return new StrategyCls({ llmCall: getLLMCall() });
   }
 

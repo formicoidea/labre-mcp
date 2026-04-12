@@ -14,7 +14,7 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { setVerbose } from '../lib/mcp-notifications.mjs';
 import { estimateEvolutionOneShot } from '../evolution/estimate-evolution.mjs';
-import { parseWardleyMap, formatEvaluationReport } from '../tools/evaluate-map.mjs';
+import { parseWardleyMap, formatEvaluationReport } from '../evaluate-map/evaluate-map.mjs';
 import { handleRequest, REGISTERED_TOOLS, TOOL_HANDLERS } from '../mcp/mcp-server.mjs';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
