@@ -21,7 +21,7 @@ import {
   renormalizeWeights,
   mergeIndicatorConfig,
   aggregateAxis,
-} from './cpc-evolution-strategy.mjs';
+} from '../strategies/capacity/cpc-evolution-strategy.mjs';
 
 import {
   weightedMean,
@@ -30,7 +30,7 @@ import {
   computeAllIndicators,
   CERTITUDE_INDICATORS,
   UBIQUITE_INDICATORS,
-} from './patent-indicators.mjs';
+} from '../../lib/patent/patent-indicators.mjs';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

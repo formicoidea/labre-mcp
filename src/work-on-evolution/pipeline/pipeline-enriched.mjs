@@ -11,7 +11,7 @@
 // The capability is always the pivot: it is evaluated first, and its evolution
 // score anchors the pipeline range.
 
-import { logDebug, logInfo } from '../lib/mcp-notifications.mjs';
+import { logDebug, logInfo } from '../../lib/mcp-notifications.mjs';
 import { dispatchSolutionStrategies } from '../routing/solution-dispatch.mjs';
 
 const TOOL = 'estimateEvolution:pipeline';

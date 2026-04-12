@@ -13,7 +13,7 @@
 //   - Generic: anything else
 //
 // Usage:
-//   import { classifyAndLogLLMError } from './lib/llm/llm-error-handler.mjs';
+//   import { classifyAndLogLLMError } from './llm-error-handler.mjs';
 //   try { await llmCall(prompt); }
 //   catch (err) { classifyAndLogLLMError(err, { logger, model, msg }); throw err; }
 

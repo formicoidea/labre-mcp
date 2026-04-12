@@ -22,7 +22,7 @@ import {
   defaultQueryOptions,
   checkEnvironment,
 } from './bigquery-client.mjs';
-import { logDebug, logWarning, logError } from '../lib/mcp-notifications.mjs';
+import { logDebug, logWarning, logError } from '../../lib/mcp-notifications.mjs';
 
 // Query builders extracted to bigquery-query-builders.mjs — re-export for backward compat
 export {

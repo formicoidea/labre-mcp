@@ -11,10 +11,10 @@
 import {
   detectComponentType,
   COMPONENT_TYPE,
-} from '../lib/component-detection.mjs';
+} from '../../lib/component-detection.mjs';
 import { classifySolutionLLM } from '../routing/detect-solution.mjs';
 import { verifyViaWebSearch, combineWithPriorResult } from '../routing/web-search-verification.mjs';
-import { logDebug } from '../lib/mcp-notifications.mjs';
+import { logDebug } from '../../lib/mcp-notifications.mjs';
 import {
   raceWithTimeout,
   buildSuccessSignal,
@@ -31,7 +31,7 @@ import {
 
 // Re-import thresholds from the orchestrator to avoid circular dependency —
 // we define our own copy of the constants we need.
-import { CONFIDENCE_THRESHOLD } from '../lib/component-detection.mjs';
+import { CONFIDENCE_THRESHOLD } from '../../lib/component-detection.mjs';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

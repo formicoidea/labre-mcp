@@ -5,14 +5,14 @@
 // to intermediate format and reconciling multiple verification signals
 // into a single classification decision.
 
-import { COMPONENT_TYPE } from '../lib/component-detection.mjs';
+import { COMPONENT_TYPE } from '../../lib/component-detection.mjs';
 import { determineRoutingTargets } from '../routing/solution-dispatch.mjs';
 
 /**
  * Convert a ComponentTypeDetection (from naming conventions or LLM) into an
  * intermediate result object for reconciliation.
  *
- * @param {import('../routing/component-detection.mjs').ComponentTypeDetection} detection
+ * @param {import('../../lib/component-detection.mjs').ComponentTypeDetection} detection
  * @returns {{ classification: string, confidence: number, method: string, reasoning: string }}
  */
 export function toIntermediateResult(detection) {

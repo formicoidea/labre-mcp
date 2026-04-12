@@ -5,7 +5,7 @@
 // computes residuals per phase, and reports calibration diagnostics.
 
 import { readFile } from 'node:fs/promises';
-import { computeEvolution, PUB_TYPE_CENTROIDS, pubEvolution, DEFAULT_PARAMS } from './s-curve.mjs';
+import { computeEvolution, PUB_TYPE_CENTROIDS, pubEvolution, DEFAULT_PARAMS } from '../src/work-on-evolution/s-curve/s-curve.mjs';
 
 const file = process.argv[2] || 'results.json';
 

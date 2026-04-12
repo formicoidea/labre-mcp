@@ -11,7 +11,7 @@
 // Requires llmCall injection (shared with LLMDirectStrategy internally).
 
 import { BaseStrategy } from './base-strategy.mjs';
-import { identifyCapability } from '../../tools/identify-capability.mjs';
+import { identifyCapability } from '../../../work-on-value-chain/identify-capability.mjs';
 import { LLMDirectStrategy } from './llm-direct-strategy.mjs';
 
 const CURRENT_YEAR = new Date().getFullYear();

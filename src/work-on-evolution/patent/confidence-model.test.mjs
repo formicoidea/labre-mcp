@@ -16,9 +16,9 @@ import {
   computeDataQuality,
   computeModelConfidence,
   computeConfidence,
-} from './cpc-evolution-strategy.mjs';
-import { CpcEvolutionStrategy } from './cpc-evolution-strategy.mjs';
-import { computeEvolution } from '../evolution/s-curve.mjs';
+} from '../strategies/capacity/cpc-evolution-strategy.mjs';
+import { CpcEvolutionStrategy } from '../strategies/capacity/cpc-evolution-strategy.mjs';
+import { computeEvolution } from '../s-curve/s-curve.mjs';
 
 // ── Test runner ───────────────────────────────────────────────────────────
 

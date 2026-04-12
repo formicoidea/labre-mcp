@@ -37,13 +37,13 @@ import {
   detectComponentType,
   COMPONENT_TYPE,
   CONFIDENCE_THRESHOLD,
-} from '../lib/component-detection.mjs';
+} from '../../lib/component-detection.mjs';
 import {
   determineRoutingTargets,
 } from '../routing/solution-dispatch.mjs';
 import { classifySolutionLLM } from '../routing/detect-solution.mjs';
 import { verifyViaWebSearch, combineWithPriorResult } from '../routing/web-search-verification.mjs';
-import { logDebug } from '../lib/mcp-notifications.mjs';
+import { logDebug } from '../../lib/mcp-notifications.mjs';
 import {
   raceWithTimeout,
   buildSuccessSignal,
@@ -104,7 +104,7 @@ export const THRESHOLDS = {
  * @property {boolean} isSolution      - Convenience flag: classification === 'solution'
  * @property {boolean} verified        - true if at least two tiers agreed or a single tier had >= 90% confidence
  * @property {string[]} tiersUsed      - Which tiers were actually invoked: ['naming'], ['naming', 'llm'], etc.
- * @property {import('./solution-capability-router.mjs').ComponentTypeDetection} routingDetection
+ * @property {import('../routing/solution-capability-router.mjs').ComponentTypeDetection} routingDetection
  *   - Full detection result from Tier 1 (solution-capability-router), preserved for downstream routing
  * @property {{ useSolutionStrategies: boolean, useCapabilityStrategies: boolean, mode: string }} routingTargets
  *   - Pre-computed routing targets based on the verified classification

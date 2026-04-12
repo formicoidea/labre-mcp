@@ -18,7 +18,7 @@ import {
   clearPropertiesCache,
 } from './properties-strategy.mjs';
 import { SolutionBaseStrategy } from './solution-base-strategy.mjs';
-import { BaseStrategy } from '../base-strategy.mjs';
+import { BaseStrategy } from '../capacity/base-strategy.mjs';
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 

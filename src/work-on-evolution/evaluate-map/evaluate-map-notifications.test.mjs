@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { writeFile, unlink, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { setVerbose } from '../lib/mcp-notifications.mjs';
+import { setVerbose } from '../../lib/mcp-notifications.mjs';
 import { evaluateMapFile } from './evaluate-map.mjs';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────

@@ -15,7 +15,7 @@
 // It sits within the verification pipeline, consuming verification signal
 // outputs and producing a reconciled classification.
 
-import { logDebug } from '../lib/mcp-notifications.mjs';
+import { logDebug } from '../../lib/mcp-notifications.mjs';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 

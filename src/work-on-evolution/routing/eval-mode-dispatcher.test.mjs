@@ -25,7 +25,7 @@ import {
 import {
   detectComponentType,
   CONFIDENCE_THRESHOLD,
-} from '../lib/component-detection.mjs';
+} from '../../lib/component-detection.mjs';
 import {
   determineRoutingTargets,
   getEvalMode,

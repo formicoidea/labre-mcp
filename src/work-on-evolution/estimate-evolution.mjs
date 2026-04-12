@@ -9,34 +9,34 @@
 // adding explicit one-shot mode support with a `space` parameter that
 // allows callers to pre-classify components and bypass the classification gate.
 
-import { buildReQuestions } from '../routing/classification-gate.mjs';
-import { loadStrategies, getStrategy, listStrategies } from '../strategies/registry.mjs';
-import { BaseStrategy } from '../strategies/base-strategy.mjs';
+import { buildReQuestions } from './routing/classification-gate.mjs';
+import { loadStrategies, getStrategy, listStrategies } from './strategies/capacity/registry.mjs';
+import { BaseStrategy } from './strategies/capacity/base-strategy.mjs';
 import { ConversationSession } from '../session/conversation-session.mjs';
-import { createLLMCall, createOpenCodeCall, createOpenCodeLogprobCall } from './llm/llm-call.mjs';
-import { identifyCapability } from '../tools/identify-capability.mjs';
-import { logDebug, logInfo, logError } from './mcp-notifications.mjs';
-import { createMessageResolverFromArgs } from './progress-messages.mjs';
+import { createLLMCall, createOpenCodeCall, createOpenCodeLogprobCall } from '../lib/llm/llm-call.mjs';
+import { identifyCapability } from '../work-on-value-chain/identify-capability.mjs';
+import { logDebug, logInfo, logError } from '../lib/mcp-notifications.mjs';
+import { createMessageResolverFromArgs } from '../lib/progress-messages.mjs';
 import {
   detectComponentType,
   COMPONENT_TYPE,
   CONFIDENCE_THRESHOLD,
-} from './component-detection.mjs';
+} from '../lib/component-detection.mjs';
 import {
   determineRoutingTargets,
   dispatchSolutionStrategies,
-} from '../routing/solution-dispatch.mjs';
-import { classifyWardleyType } from '../routing/wardley-type-classification.mjs';
-import { verifyClassification } from '../pipeline/dual-verification-orchestrator.mjs';
-import { runEnrichedPipeline } from '../pipeline/pipeline-enriched.mjs';
-import { validateOneShotInput, resolveClassification, VALID_SPACES } from './evolution-input-validation.mjs';
+} from './routing/solution-dispatch.mjs';
+import { classifyWardleyType } from './routing/wardley-type-classification.mjs';
+import { verifyClassification } from './pipeline/dual-verification-orchestrator.mjs';
+import { runEnrichedPipeline } from './pipeline/pipeline-enriched.mjs';
+import { validateOneShotInput, resolveClassification, VALID_SPACES } from './lib/evolution-input-validation.mjs';
 
 /**
  * @typedef {Object} OneShotResult
  * @property {'oneshot'}  mode          - Always 'oneshot' for this entry point
- * @property {import('./classification-gate.mjs').ClassificationResult} classification
+ * @property {import('./routing/classification-gate.mjs').ClassificationResult} classification
  * @property {string[]|null} reQuestions - Re-questioning prompts if non-economic
- * @property {Object<string, import('./strategies/base-strategy.mjs').EvolutionResult>|null} evaluations
+ * @property {Object<string, import('./strategies/capacity/base-strategy.mjs').EvolutionResult>|null} evaluations
  * @property {Object}    [routing]      - Solution/capability routing metadata
  * @property {{ type: string, confidence: number, reason: string }} [wardleyType] - Wardley component type (activity/practice/data/knowledge) — informative metadata only
  * @property {string}    message        - Human-readable summary
@@ -409,9 +409,9 @@ function createStrategyInstance(StrategyCls) {
  * @property {'conversational'} mode
  * @property {string} phase - Current conversation phase
  * @property {import('../session/conversation-session.mjs').QuestionSet | null} nextQuestion
- * @property {import('./classification-gate.mjs').ClassificationResult | null} classification
+ * @property {import('./routing/classification-gate.mjs').ClassificationResult | null} classification
  * @property {string[] | null} reQuestions
- * @property {Object<string, import('./strategies/base-strategy.mjs').EvolutionResult> | null} evaluations
+ * @property {Object<string, import('./strategies/capacity/base-strategy.mjs').EvolutionResult> | null} evaluations
  * @property {Object} summary - Gathered/missing data summary
  * @property {string} sessionState - Serialized session for persistence
  * @property {string} message

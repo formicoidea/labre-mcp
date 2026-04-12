@@ -12,11 +12,11 @@
 
 import { loadSolutionStrategies } from '../strategies/solution/registry.mjs';
 import { assembleSolutionResult } from '../strategies/solution/assemble-result.mjs';
-import { logDebug } from '../lib/mcp-notifications.mjs';
+import { logDebug } from '../../lib/mcp-notifications.mjs';
 import {
   COMPONENT_TYPE,
   detectComponentType,
-} from '../lib/component-detection.mjs';
+} from '../../lib/component-detection.mjs';
 
 /** Routing modes */
 export const EVAL_MODES = {

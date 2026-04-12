@@ -5,7 +5,7 @@
 //   2. OpenCode API gateway — for kimi-k2.5 with real logprobs
 //
 // Usage:
-//   import { createLLMCall, createOpenCodeLogprobCall } from './lib/llm/llm-call.mjs';
+//   import { createLLMCall, createOpenCodeLogprobCall } from './llm-call.mjs';
 //   const llmCall = createLLMCall();
 //   const text = await llmCall('Analyze {{component}}', { component: 'ERP' });
 //

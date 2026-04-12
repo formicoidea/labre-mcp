@@ -13,7 +13,7 @@
 //   4. Optionally falls back to LLM-estimated proportions if none provided
 
 import { BaseStrategy } from './base-strategy.mjs';
-import { pubEvolution, PUB_TYPE_CENTROIDS } from '../../evolution/s-curve.mjs';
+import { pubEvolution, PUB_TYPE_CENTROIDS } from '../../s-curve/s-curve.mjs';
 
 // --- Advanced publication-based evolution model ---
 // The simple centroid model (pubEvolution) maps dominant publication types to their

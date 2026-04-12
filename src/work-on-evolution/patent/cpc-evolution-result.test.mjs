@@ -7,8 +7,8 @@
 // from BigQuery and LLM dependencies.
 
 import assert from 'node:assert/strict';
-import { BaseStrategy } from '../strategies/base-strategy.mjs';
-import { CpcEvolutionStrategy } from './cpc-evolution-strategy.mjs';
+import { BaseStrategy } from '../strategies/capacity/base-strategy.mjs';
+import { CpcEvolutionStrategy } from '../strategies/capacity/cpc-evolution-strategy.mjs';
 import {
   computeDataQuality,
   computeModelConfidence,
@@ -16,7 +16,7 @@ import {
   renormalizeWeights,
   aggregateAxis,
   mergeIndicatorConfig,
-} from './cpc-evolution-strategy.mjs';
+} from '../strategies/capacity/cpc-evolution-strategy.mjs';
 
 // ── Mock fixtures ──────────────────────────────────────────────────────────
 

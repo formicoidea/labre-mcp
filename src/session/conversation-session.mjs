@@ -31,7 +31,7 @@
 //   // ... exchange more turns ...
 //   if (session.isReadyForEstimation()) { ... }
 
-import { classifyComponent, buildReQuestions } from '../routing/classification-gate.mjs';
+import { classifyComponent, buildReQuestions } from '../work-on-evolution/routing/classification-gate.mjs';
 import {
   detectComponentType,
   COMPONENT_TYPE,
@@ -456,7 +456,7 @@ export class ConversationSession {
 
   /**
    * Get the classification result for the current component.
-   * @returns {import('./classification-gate.mjs').ClassificationResult | null}
+   * @returns {import('../work-on-evolution/routing/classification-gate.mjs').ClassificationResult | null}
    */
   getClassification() {
     if (!this.state.name) return null;
@@ -489,7 +489,7 @@ export class ConversationSession {
    * Build the component input object for strategy evaluation.
    * Merges all gathered and inferred data.
    *
-   * @returns {import('./strategies/base-strategy.mjs').ComponentInput}
+   * @returns {import('../work-on-evolution/strategies/capacity/base-strategy.mjs').ComponentInput}
    */
   buildComponentInput() {
     const input = {

@@ -27,7 +27,7 @@
 //   const llmResult = await classifySolutionLLM('ERP', llmCall, { context: '...' });
 //   // → { classification: 'capability', confidence: 0.82, reasoning: '...' }
 
-import { logDebug } from '../lib/mcp-notifications.mjs';
+import { logDebug } from '../../lib/mcp-notifications.mjs';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

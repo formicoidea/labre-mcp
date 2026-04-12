@@ -13,8 +13,8 @@
 // Both the normal path and the fallback path must satisfy this contract.
 
 import assert from 'node:assert/strict';
-import { BaseStrategy } from '../strategies/base-strategy.mjs';
-import { CpcEvolutionStrategy } from './cpc-evolution-strategy.mjs';
+import { BaseStrategy } from '../strategies/capacity/base-strategy.mjs';
+import { CpcEvolutionStrategy } from '../strategies/capacity/cpc-evolution-strategy.mjs';
 
 // ── Mock fixtures ──────────────────────────────────────────────────────────
 

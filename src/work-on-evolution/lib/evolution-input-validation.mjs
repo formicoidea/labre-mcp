@@ -5,7 +5,7 @@
 //   - resolveClassification: resolves classification via pre-set space or classification gate
 //   - VALID_SPACES: canonical list of valid Wardley spaces
 
-import { classifyComponent } from '../../routing/classification-gate.mjs';
+import { classifyComponent } from '../routing/classification-gate.mjs';
 
 // ─── Valid Spaces ────────────────────────────────────────────────────────────
 
@@ -106,7 +106,7 @@ export function validateOneShotInput(input) {
  * @param {string} name - Component name
  * @param {string} description - Context/description
  * @param {string|undefined} space - Pre-classified space or undefined
- * @returns {import('../../routing/classification-gate.mjs').ClassificationResult}
+ * @returns {import('../routing/classification-gate.mjs').ClassificationResult}
  */
 export function resolveClassification(name, description, space) {
   if (space) {

@@ -26,15 +26,15 @@
 import {
   detectComponentType,
   COMPONENT_TYPE,
-} from '../lib/component-detection.mjs';
+} from '../../lib/component-detection.mjs';
 import {
   determineRoutingTargets,
   getEvalMode,
   EVAL_MODES,
 } from './solution-dispatch.mjs';
-import { loadStrategies } from '../strategies/registry.mjs';
+import { loadStrategies } from '../strategies/capacity/registry.mjs';
 import { loadSolutionStrategies } from '../strategies/solution/registry.mjs';
-import { logDebug } from '../lib/mcp-notifications.mjs';
+import { logDebug } from '../../lib/mcp-notifications.mjs';
 
 const TOOL = 'evalModeDispatcher';
 
@@ -50,7 +50,7 @@ const TOOL = 'evalModeDispatcher';
 
 /**
  * @typedef {Object} DispatchResult
- * @property {Object<string, import('./strategies/base-strategy.mjs').EvolutionResult>} evaluations
+ * @property {Object<string, import('../strategies/capacity/base-strategy.mjs').EvolutionResult>} evaluations
  *   - Keyed by strategy method name. In parallel mode, solution strategy keys are
  *     prefixed with "solution:" (e.g. "solution:solution-properties")
  * @property {import('./solution-capability-router.mjs').ComponentTypeDetection} detection
@@ -68,7 +68,7 @@ const TOOL = 'evalModeDispatcher';
  *
  * @param {Object} component - Component input
  * @param {function} createInstance - Factory for capability strategy instances
- * @returns {Promise<Object<string, import('./strategies/base-strategy.mjs').EvolutionResult>>}
+ * @returns {Promise<Object<string, import('../strategies/capacity/base-strategy.mjs').EvolutionResult>>}
  */
 async function runCapabilityStrategies(component, createInstance) {
   const strategies = await loadStrategies();
@@ -129,7 +129,7 @@ async function runCapabilityStrategies(component, createInstance) {
  *
  * @param {Object} component - Component input (with isSolution flag)
  * @param {function} createInstance - Factory for solution strategy instances
- * @returns {Promise<Object<string, import('./strategies/base-strategy.mjs').EvolutionResult>>}
+ * @returns {Promise<Object<string, import('../strategies/capacity/base-strategy.mjs').EvolutionResult>>}
  */
 async function runSolutionStrategies(component, createInstance) {
   const strategies = await loadSolutionStrategies();

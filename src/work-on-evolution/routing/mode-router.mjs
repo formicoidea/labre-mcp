@@ -13,8 +13,8 @@
 //
 // Both modes share the same response formatter for consistent output.
 
-import { estimateEvolutionOneShot, estimateEvolutionConversational } from '../evolution/estimate-evolution.mjs';
-import { formatResponse } from '../lib/response-formatter.mjs';
+import { estimateEvolutionOneShot, estimateEvolutionConversational } from '../estimate-evolution.mjs';
+import { formatResponse } from '../../lib/response-formatter.mjs';
 
 // ─── Mode Constants ────────────────────────────────────────────────────────
 

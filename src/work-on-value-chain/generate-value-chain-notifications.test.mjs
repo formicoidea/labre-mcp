@@ -50,7 +50,7 @@ mock.module('@anthropic-ai/claude-agent-sdk', {
 });
 
 // Now import modules that depend on the mocked SDK
-const { setVerbose } = await import('../mcp/mcp-notifications.mjs');
+const { setVerbose } = await import('../lib/mcp-notifications.mjs');
 const { generateValueChain } = await import('./generate-value-chain.mjs');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────

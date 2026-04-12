@@ -17,7 +17,7 @@
 //   cpc-evolution-strategy.mjs calls mapCapabilityToCPC(capability, options)
 //   which returns 1-5 CPC codes at the most specific level discovered.
 
-import { createLLMCall } from '../lib/llm/llm-call.mjs';
+import { createLLMCall } from '../../lib/llm/llm-call.mjs';
 
 // ─── CPC code validation ───────────────────────────────────────────────────
 
@@ -324,7 +324,7 @@ export async function mapCapabilityToCPC(capability, options = {}) {
  * Uses component.capability (from identify-capability pipeline) if available,
  * otherwise falls back to component.name.
  *
- * @param {import('../strategies/base-strategy.mjs').ComponentInput} component
+ * @param {import('../strategies/capacity/base-strategy.mjs').ComponentInput} component
  * @param {function} [llmCall] - Optional LLM call function
  * @param {Object} [options]
  * @param {import('./cpc-taxonomy-cache.mjs').CpcTaxonomyCache} [options.taxonomyCache]

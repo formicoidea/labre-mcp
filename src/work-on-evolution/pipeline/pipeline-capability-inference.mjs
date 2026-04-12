@@ -31,8 +31,8 @@
 //   //   justification: '...',
 //   // }
 
-import { identifyCapability, parseCapabilityResponse } from '../tools/identify-capability.mjs';
-import { logDebug } from '../lib/mcp-notifications.mjs';
+import { identifyCapability, parseCapabilityResponse } from '../../work-on-value-chain/identify-capability.mjs';
+import { logDebug } from '../../lib/mcp-notifications.mjs';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

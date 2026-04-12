@@ -23,9 +23,9 @@ import {
   createErrorSource,
 } from './mock-patent-source.mjs';
 import { PatentDataSource, emptyPatentData, validatePatentData } from './patent-data-source.mjs';
-import { CpcEvolutionStrategy } from './cpc-evolution-strategy.mjs';
-import { BaseStrategy } from '../strategies/base-strategy.mjs';
-import { computeEvolution } from '../evolution/s-curve.mjs';
+import { CpcEvolutionStrategy } from '../../work-on-evolution/strategies/capacity/cpc-evolution-strategy.mjs';
+import { BaseStrategy } from '../../work-on-evolution/strategies/capacity/base-strategy.mjs';
+import { computeEvolution } from '../../work-on-evolution/s-curve/s-curve.mjs';
 
 // ─── Shared mock CPC mapper ─────────────────────────────────────────────────
 

@@ -12,9 +12,9 @@
 //
 // Parsing is intentionally lenient — designed for conversational, not programmatic, use.
 
-import { estimateEvolutionOneShot, estimateEvolutionConversational, listStrategies } from '../evolution/estimate-evolution.mjs';
+import { estimateEvolutionOneShot, estimateEvolutionConversational, listStrategies } from './estimate-evolution.mjs';
 import { formatResponse, evolutionToStage, formatConfidence, strategyReasoning } from '../lib/response-formatter.mjs';
-import { routeEstimateEvolution, detectMode, MODES } from '../routing/mode-router.mjs';
+import { routeEstimateEvolution, detectMode, MODES } from '../work-on-evolution/routing/mode-router.mjs';
 
 // ─── Conversational Input Parsing ──────────────────────────────────────────
 

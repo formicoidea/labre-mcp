@@ -9,8 +9,8 @@
 //   6. Preserves session state across serialization
 
 import { ConversationSession, inferFromMaturitySignals, inferFromMarketSignals } from './conversation-session.mjs';
-import { estimateEvolutionConversational } from '../evolution/estimate-evolution.mjs';
-import { handleConversationalInvocation, formatConversationalTurn } from '../mcp/skill-handler.mjs';
+import { estimateEvolutionConversational } from '../work-on-evolution/estimate-evolution.mjs';
+import { handleConversationalInvocation, formatConversationalTurn } from '../work-on-evolution/skill-handler.mjs';
 
 let passed = 0;
 let failed = 0;

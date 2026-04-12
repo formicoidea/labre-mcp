@@ -18,7 +18,7 @@ import {
   computeDataQuality,
   computeConfidence,
   CpcEvolutionStrategy,
-} from './cpc-evolution-strategy.mjs';
+} from '../strategies/capacity/cpc-evolution-strategy.mjs';
 
 // ── Test runner ───────────────────────────────────────────────────────────
 

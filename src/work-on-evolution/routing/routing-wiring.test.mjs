@@ -7,7 +7,7 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { routeEstimateEvolution, detectMode, MODES } from './mode-router.mjs';
-import { formatResponse, formatStrategyResult, evolutionToStage, strategyReasoning } from '../lib/response-formatter.mjs';
+import { formatResponse, formatStrategyResult, evolutionToStage, strategyReasoning } from '../../lib/response-formatter.mjs';
 
 // ─── Test Suite ──────────────────────────────────────────────────────────────
 

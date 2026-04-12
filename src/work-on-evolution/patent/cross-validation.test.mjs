@@ -20,9 +20,9 @@
 //   6. Each technology has a plausible indicator fingerprint
 
 import assert from 'node:assert/strict';
-import { computeEvolution } from '../evolution/s-curve.mjs';
-import { CpcEvolutionStrategy } from './cpc-evolution-strategy.mjs';
-import { computeAllIndicators } from './patent-indicators.mjs';
+import { computeEvolution } from '../s-curve/s-curve.mjs';
+import { CpcEvolutionStrategy } from '../strategies/capacity/cpc-evolution-strategy.mjs';
+import { computeAllIndicators } from '../../lib/patent/patent-indicators.mjs';
 
 // ── Phase boundary constants (from s-curve.mjs) ──────────────────────────
 const PHASE_BOUNDARIES = {

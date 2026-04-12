@@ -19,12 +19,12 @@ import {
   computePhaseDistribution,
   computeMeanPhase,
   dominantPhase,
-} from '../strategies/solution/assemble-result.mjs';
+} from '../work-on-evolution/strategies/solution/assemble-result.mjs';
 import {
   SolutionEvolutionResult,
   PropertyScore,
   PROPERTY_COUNT,
-} from '../strategies/solution/solution-evolution-result.mjs';
+} from '../work-on-evolution/strategies/solution/solution-evolution-result.mjs';
 import {
   detectComponentType,
   COMPONENT_TYPE,
@@ -32,14 +32,14 @@ import {
 import {
   dispatchSolutionStrategies,
   determineRoutingTargets,
-} from '../routing/solution-dispatch.mjs';
+} from '../work-on-evolution/routing/solution-dispatch.mjs';
 import {
   formatResponse,
   formatStrategyResult,
   strategyReasoning,
   evolutionToStage,
 } from '../lib/response-formatter.mjs';
-import { estimateEvolutionOneShot } from '../evolution/estimate-evolution.mjs';
+import { estimateEvolutionOneShot } from '../work-on-evolution/estimate-evolution.mjs';
 
 // ─── Mock LLM ───────────────────────────────────────────────────────────────
 

@@ -9,7 +9,7 @@
 // This classification is informative metadata only -- it does NOT change routing
 // or evaluation logic. It enriches the output for Wardley Map construction.
 
-import { KNOWN_CAPABILITIES } from '../lib/known-dictionaries.mjs';
+import { KNOWN_CAPABILITIES } from '../../lib/known-dictionaries.mjs';
 
 /** @typedef {'activity'|'practice'|'data'|'knowledge'} WardleyComponentType */
 

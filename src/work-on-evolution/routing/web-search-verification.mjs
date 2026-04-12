@@ -32,8 +32,8 @@
 //   // → { classification: 'capability', confidence: 0.88, evidence: [...], references: [...] }
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import { logDebug, logWarning } from '../lib/mcp-notifications.mjs';
-import { classifyAndLogLLMError } from '../lib/llm/llm-error-handler.mjs';
+import { logDebug, logWarning } from '../../lib/mcp-notifications.mjs';
+import { classifyAndLogLLMError } from '../../lib/llm/llm-error-handler.mjs';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

@@ -12,7 +12,7 @@
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { createLLMCall } from '../lib/llm/llm-call.mjs';
-import { estimateEvolutionOneShot } from '../evolution/estimate-evolution.mjs';
+import { estimateEvolutionOneShot } from '../work-on-evolution/estimate-evolution.mjs';
 import { logDebug, logInfo, logError } from '../lib/mcp-notifications.mjs';
 import { createMessageResolverFromArgs } from '../lib/progress-messages.mjs';
 

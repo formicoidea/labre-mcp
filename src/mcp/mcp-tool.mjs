@@ -7,11 +7,11 @@
 //
 // The tool is designed for integration with Claude Code and other MCP-compatible clients.
 
-import { classifyComponent, buildReQuestions } from '../routing/classification-gate.mjs';
-import { loadStrategies, getStrategy, listStrategies } from '../strategies/registry.mjs';
-import { BaseStrategy } from '../strategies/base-strategy.mjs';
-import { estimateEvolutionOneShot, estimateEvolutionConversational } from '../evolution/estimate-evolution.mjs';
-import { routeEstimateEvolution, detectMode, MODES } from '../routing/mode-router.mjs';
+import { classifyComponent, buildReQuestions } from '../work-on-evolution/routing/classification-gate.mjs';
+import { loadStrategies, getStrategy, listStrategies } from '../work-on-evolution/strategies/capacity/registry.mjs';
+import { BaseStrategy } from '../work-on-evolution/strategies/capacity/base-strategy.mjs';
+import { estimateEvolutionOneShot, estimateEvolutionConversational } from '../work-on-evolution/estimate-evolution.mjs';
+import { routeEstimateEvolution, detectMode, MODES } from '../work-on-evolution/routing/mode-router.mjs';
 
 // ─── MCP Tool Definition Schema ──────────────────────────────────────────────
 

@@ -23,7 +23,7 @@
 //     trace:       array     // Trace of reasoning steps (optional)
 //   }
 
-import { BaseStrategy } from '../base-strategy.mjs';
+import { BaseStrategy } from '../capacity/base-strategy.mjs';
 import { aggregatePropertyScores as _aggregatePropertyScores } from './aggregate-properties.mjs';
 
 // ─── Type Definitions ──────────────────────────────────────────────────────────

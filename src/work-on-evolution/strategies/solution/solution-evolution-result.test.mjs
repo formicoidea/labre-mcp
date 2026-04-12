@@ -25,7 +25,7 @@ import {
   PROPERTY_ID_TO_NAME,
   PROPERTY_NAME_TO_ID,
 } from './solution-evolution-result.mjs';
-import { BaseStrategy } from '../base-strategy.mjs';
+import { BaseStrategy } from '../capacity/base-strategy.mjs';
 import { SolutionBaseStrategy, PHASE_TO_EVOLUTION, PHASE_LABELS } from './solution-base-strategy.mjs';
 
 // ─── Test Data Helpers ───────────────────────────────────────────────────────

@@ -28,7 +28,7 @@
 //   result.validate(); // throws if contract violated
 //   const plain = result.toEvolutionResult(); // interoperable with capability pipeline
 
-import { BaseStrategy } from '../base-strategy.mjs';
+import { BaseStrategy } from '../capacity/base-strategy.mjs';
 import {
   SolutionBaseStrategy,
   PHASE_TO_EVOLUTION,

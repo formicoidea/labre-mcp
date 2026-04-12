@@ -36,13 +36,13 @@ export {
   applyHeuristics,
   COMPONENT_TYPE,
   CONFIDENCE_THRESHOLD,
-} from '../lib/component-detection.mjs';
+} from '../../lib/component-detection.mjs';
 
 import {
   COMPONENT_TYPE,
   CONFIDENCE_THRESHOLD,
   detectComponentType,
-} from '../lib/component-detection.mjs';
+} from '../../lib/component-detection.mjs';
 
 // ─── Dispatch functions extracted to routing/solution-dispatch.mjs ───────────
 // Re-exported here for backward compatibility with existing consumers.

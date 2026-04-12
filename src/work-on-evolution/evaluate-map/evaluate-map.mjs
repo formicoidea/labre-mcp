@@ -13,9 +13,9 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { classifyComponent } from '../routing/classification-gate.mjs';
-import { estimateEvolutionOneShot } from '../evolution/estimate-evolution.mjs';
-import { logDebug, logInfo, logError } from '../lib/mcp-notifications.mjs';
-import { createMessageResolverFromArgs } from '../lib/progress-messages.mjs';
+import { estimateEvolutionOneShot } from '../estimate-evolution.mjs';
+import { logDebug, logInfo, logError } from '../../lib/mcp-notifications.mjs';
+import { createMessageResolverFromArgs } from '../../lib/progress-messages.mjs';
 
 // ─── .wm Parser ─────────────────────────────────────────────────────────────
 

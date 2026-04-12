@@ -329,7 +329,7 @@ export class CpcTaxonomyCache {
  */
 export async function createTaxonomyCache(options = {}) {
   try {
-    const { resolveConfig, getClient, defaultQueryOptions } = await import('./bigquery-client.mjs');
+    const { resolveConfig, getClient, defaultQueryOptions } = await import('../../lib/patent/bigquery-client.mjs');
     const config = resolveConfig();
     const client = await getClient(config);
     const queryOptions = defaultQueryOptions(config);
