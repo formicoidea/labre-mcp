@@ -257,11 +257,10 @@ const PHASE_LABELS = { 1: 'Genesis', 2: 'Custom', 3: 'Product', 4: 'Commodity' }
  *   // → { property: 'Market', phase: 4, confidence: 0.85, ... }
  */
 export class PhaseClassifier {
+  _properties: any;
+  _signalBank: any;
 
-  /**
-   * @param {object[]} propertiesRef - Array of property definitions from evolution-properties.json
-   */
-  constructor(propertiesRef) {
+  constructor(propertiesRef: any) {
     if (!Array.isArray(propertiesRef) || propertiesRef.length === 0) {
       throw new Error('PhaseClassifier requires a non-empty properties reference array');
     }
@@ -472,9 +471,9 @@ export class PhaseClassifier {
    * @returns {{ phase: number, confidence: number, reason: string }}
    * @private
    */
-  _selectPhase(scores, propName) {
+  _selectPhase(scores: any, propName: string) {
     const entries = Object.entries(scores)
-      .map(([p, s]) => ({ phase: parseInt(p, 10), score: s }))
+      .map(([p, s]) => ({ phase: parseInt(p, 10), score: s as number }))
       .sort((a, b) => b.score - a.score);
 
     const topScore = entries[0].score;

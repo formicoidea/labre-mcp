@@ -139,14 +139,9 @@ function concentration(w, b, o, u) {
 }
 
 export class PublicationAnalysisStrategy extends BaseStrategy {
+  _llmCall: any;
 
-  /**
-   * @param {Object} [options]
-   * @param {function(string): Promise<string>} [options.llmCall]
-   *   Optional async function for estimating publication proportions via LLM.
-   *   If not provided, the strategy requires publication proportions on the component.
-   */
-  constructor({ llmCall } = {}) {
+  constructor({ llmCall }: any = {}) {
     super();
     this._llmCall = llmCall || null;
   }

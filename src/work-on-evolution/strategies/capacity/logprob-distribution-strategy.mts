@@ -51,7 +51,7 @@ Reply with EXACTLY ONE WORD — the phase name:`;
  */
 function extractPhaseProbabilities(logprobs) {
   // Map each phase to its best matching logprob
-  const phaseLogprobs = {};
+  const phaseLogprobs: Record<string, number> = {};
 
   for (const phase of PHASE_NAMES) {
     phaseLogprobs[phase] = -Infinity; // default: impossible
@@ -76,7 +76,7 @@ function extractPhaseProbabilities(logprobs) {
   if (!hasAnyMatch) {
     // Uniform fallback
     const uniform = 1 / PHASE_NAMES.length;
-    const result = {};
+    const result: Record<string, number> = {};
     for (const phase of PHASE_NAMES) {
       result[phase] = uniform;
     }
@@ -86,7 +86,7 @@ function extractPhaseProbabilities(logprobs) {
   // Softmax: exp(logprob) / sum(exp(logprobs))
   // logprobs are already in log-space, so exp gives probabilities
   const maxLp = Math.max(...Object.values(phaseLogprobs).filter(v => v > -Infinity));
-  const expValues = {};
+  const expValues: Record<string, number> = {};
   let sumExp = 0;
 
   for (const phase of PHASE_NAMES) {
@@ -99,7 +99,7 @@ function extractPhaseProbabilities(logprobs) {
     sumExp += expValues[phase];
   }
 
-  const probabilities = {};
+  const probabilities: Record<string, number> = {};
   for (const phase of PHASE_NAMES) {
     probabilities[phase] = sumExp > 0 ? expValues[phase] / sumExp : 1 / PHASE_NAMES.length;
   }
@@ -112,7 +112,7 @@ function extractPhaseProbabilities(logprobs) {
  * @param {Object<string, number>} probs
  * @returns {number} Normalized entropy in [0, 1] (0 = certain, 1 = uniform)
  */
-function normalizedEntropy(probs) {
+function normalizedEntropy(probs: Record<string, number>) {
   const values = Object.values(probs).filter(p => p > 0);
   if (values.length <= 1) return 0;
   const maxEntropy = Math.log(values.length);
@@ -129,7 +129,9 @@ export class LogprobDistributionStrategy extends BaseStrategy {
    *   and an array of top token logprobs for the first generated token(s).
    *   The logprobs array should contain objects with `token` and `logprob` fields.
    */
-  constructor({ llmLogprobCall } = {}) {
+  _llmLogprobCall: any;
+
+  constructor({ llmLogprobCall }: any = {}) {
     super();
     if (typeof llmLogprobCall !== 'function') {
       throw new Error('LogprobDistributionStrategy requires an llmLogprobCall function');

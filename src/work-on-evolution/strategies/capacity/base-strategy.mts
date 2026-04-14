@@ -51,7 +51,7 @@ export class BaseStrategy {
    * Strategy identifier. Must be overridden by each subclass.
    * @returns {string}
    */
-  static get method() {
+  static get method(): string {
     throw new Error('BaseStrategy.method must be overridden by subclass');
   }
 
@@ -64,7 +64,7 @@ export class BaseStrategy {
    *
    * @returns {false | { reason: string }}
    */
-  static get disabled() { return false; }
+  static get disabled(): boolean | { reason: string } { return false; }
 
   /**
    * Evaluate a component and return its evolution position.

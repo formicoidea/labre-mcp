@@ -141,13 +141,9 @@ export function computeTimelineConfidence(history) {
 }
 
 export class TimelineBenchmarkStrategy extends BaseStrategy {
+  _llmCall: any;
 
-  /**
-   * @param {Object} [options]
-   * @param {function(string): Promise<string>} [options.llmCall]
-   *   Async function for LLM calls. Required for both phases.
-   */
-  constructor({ llmCall } = {}) {
+  constructor({ llmCall }: any = {}) {
     super();
     this._llmCall = llmCall || null;
   }

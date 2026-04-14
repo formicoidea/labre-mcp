@@ -126,7 +126,16 @@ export class PropertyScore {
    * @param {string}  [data.reason]         - Reasoning for the phase assignment
    * @param {string}  [data.phaseDescription] - Phase description text from reference
    */
-  constructor({ id, property, phase, label, weight, confidence, reason, phaseDescription }) {
+  id: any;
+  property: any;
+  phase: any;
+  label: any;
+  weight: any;
+  confidence: any;
+  reason: any;
+  phaseDescription: any;
+
+  constructor({ id, property, phase, label, weight, confidence, reason, phaseDescription }: any) {
     if (!id || typeof id !== 'string') {
       throw new TypeError(`PropertyScore.id must be a non-empty string, got "${id}"`);
     }
@@ -204,7 +213,7 @@ export class PropertyScore {
    * @param {string} [id]     - Property ID (derived from name if omitted)
    * @returns {PropertyScore}
    */
-  static fromPropertyEvaluation(evalObj, id) {
+  static fromPropertyEvaluation(evalObj: any, id?: string) {
     const resolvedId = id
       || PROPERTY_NAME_TO_ID.get(evalObj.property?.toLowerCase())
       || evalObj.property?.toLowerCase().replace(/[\s/]+/g, '_')
@@ -227,7 +236,7 @@ export class PropertyScore {
    * @returns {{ property: string, phase: number, label: string, weight: number, reason?: string }}
    */
   toPropertyEvaluation() {
-    const result = {
+    const result: any = {
       property: this.property,
       phase: this.phase,
       label: this.label,
@@ -286,6 +295,14 @@ export class ConfidenceMetadata {
    * @param {string}  [data.aggregationMethod]     - How properties were aggregated
    * @param {number}  [data.phaseAgreement]        - Inter-property phase consistency (0–1)
    */
+  coverage: any;
+  evaluatedCount: any;
+  totalCount: any;
+  mode: any;
+  meanPropertyConfidence: any;
+  aggregationMethod: any;
+  phaseAgreement: any;
+
   constructor({
     coverage,
     evaluatedCount,
@@ -294,7 +311,7 @@ export class ConfidenceMetadata {
     meanPropertyConfidence,
     aggregationMethod,
     phaseAgreement,
-  }) {
+  }: any) {
     if (typeof coverage !== 'number' || coverage < 0 || coverage > 1) {
       throw new TypeError(`ConfidenceMetadata.coverage must be 0–1, got ${coverage}`);
     }
@@ -383,17 +400,14 @@ export class ConfidenceMetadata {
  *   BaseStrategy.validateResult(plain); // passes
  */
 export class SolutionEvolutionResult {
+  evolution: any;
+  confidence: any;
+  method: any;
+  trace: any;
+  properties: any;
+  confidenceMetadata: any;
 
-  /**
-   * @param {Object} data
-   * @param {number}  data.evolution           - Overall evolution position (0–1)
-   * @param {number}  data.confidence          - Overall confidence score (0–1)
-   * @param {string}  data.method              - Strategy identifier
-   * @param {Array}   [data.trace]             - Reasoning trace (strategy-specific)
-   * @param {Array<PropertyScore|Object>} [data.properties] - Per-property evaluations
-   * @param {ConfidenceMetadata|Object}   [data.confidenceMetadata] - Confidence breakdown
-   */
-  constructor({ evolution, confidence, method, trace, properties, confidenceMetadata }) {
+  constructor({ evolution, confidence, method, trace, properties, confidenceMetadata }: any) {
     if (typeof evolution !== 'number' || Number.isNaN(evolution)) {
       throw new TypeError(`SolutionEvolutionResult.evolution must be a number, got ${evolution}`);
     }
@@ -488,7 +502,7 @@ export class SolutionEvolutionResult {
    * @param {Array}   [options.trace]  - Additional trace entries
    * @returns {SolutionEvolutionResult}
    */
-  static fromPropertyScores(scores, { method, mode = 'auto', trace = [] }) {
+  static fromPropertyScores(scores: any, { method, mode = 'auto', trace = [] }: any) {
     if (!Array.isArray(scores) || scores.length === 0) {
       throw new Error('fromPropertyScores requires a non-empty array of PropertyScore instances');
     }
@@ -559,7 +573,7 @@ export class SolutionEvolutionResult {
    * @param {Object} plainResult - Plain { evolution, confidence, method, trace?, properties? }
    * @returns {SolutionEvolutionResult}
    */
-  static fromEvolutionResult(plainResult) {
+  static fromEvolutionResult(plainResult: any) {
     const properties = (plainResult.properties || []).map(p => {
       if (p instanceof PropertyScore) return p;
       return PropertyScore.fromPropertyEvaluation(p);

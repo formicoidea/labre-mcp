@@ -111,7 +111,7 @@ export class SolutionBaseStrategy extends BaseStrategy {
    * Strategy identifier. Must be overridden by each subclass.
    * @returns {string}
    */
-  static get method() {
+  static get method(): string {
     throw new Error('SolutionBaseStrategy.method must be overridden by subclass');
   }
 
@@ -174,7 +174,7 @@ export class SolutionBaseStrategy extends BaseStrategy {
    *   - evolution: weighted average of phase midpoints, rounded to 3 decimals
    *   - confidence: coverage-based confidence (proportion of properties evaluated)
    */
-  static aggregateProperties(properties, options) {
+  static aggregateProperties(properties: any, options?: any) {
     const result = _aggregatePropertyScores(properties, options);
     return { evolution: result.evolution, confidence: result.confidence };
   }
@@ -189,7 +189,7 @@ export class SolutionBaseStrategy extends BaseStrategy {
    * @param {Object} [options={}] - Same options as aggregateProperties
    * @returns {import('./aggregate-properties.mjs').AggregationResult}
    */
-  static aggregatePropertiesFull(properties, options) {
+  static aggregatePropertiesFull(properties: any, options?: any) {
     return _aggregatePropertyScores(properties, options);
   }
 

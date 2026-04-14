@@ -52,10 +52,10 @@ function computePhaseDistribution(properties) {
  * @param {{ 1: number, 2: number, 3: number, 4: number }} distribution
  * @returns {{ phase: number, count: number, label: string }}
  */
-function dominantPhase(distribution) {
+function dominantPhase(distribution: any) {
   let maxPhase = 1;
   let maxCount = 0;
-  for (const [phase, count] of Object.entries(distribution)) {
+  for (const [phase, count] of Object.entries(distribution) as [string, number][]) {
     if (count > maxCount) {
       maxCount = count;
       maxPhase = parseInt(phase, 10);
@@ -110,7 +110,7 @@ function computeMeanPhase(properties) {
  * @param {AssemblyOptions} [options={}]
  * @returns {Object} Enriched result with all original fields plus metadata
  */
-export function assembleSolutionResult(rawResult, options = {}) {
+export function assembleSolutionResult(rawResult: any, options: any = {}): any {
   if (!rawResult || rawResult.error) {
     // Error results pass through unchanged
     return rawResult;
@@ -206,7 +206,7 @@ export function assembleSolutionEvaluations(evaluations, options = {}) {
  * @returns {SolutionEvolutionResult}
  * @throws {Error} If rawResult doesn't have required fields or properties
  */
-export function buildStructuredResult(rawResult, options = {}) {
+export function buildStructuredResult(rawResult: any, options: any = {}): any {
   if (!rawResult || rawResult.error) {
     throw new Error('Cannot build structured result from error or null result');
   }

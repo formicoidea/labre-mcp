@@ -396,17 +396,10 @@ function fuzzyMatchProperty(rawName, properties) {
  *   // → { evolution: 0.62, confidence: 0.85, method: 'solution-properties', properties: [...] }
  */
 export class PropertiesStrategy extends SolutionBaseStrategy {
+  _llmCall: any;
+  _mode: any;
 
-  /**
-   * @param {Object} options
-   * @param {function(string): Promise<string>} options.llmCall
-   *   Async function that takes a prompt string and returns the LLM text response.
-   *   Required: the strategy uses LLM to evaluate each property.
-   * @param {string} [options.mode='auto']
-   *   Evaluation mode: 'auto' evaluates all 12 properties in one LLM call;
-   *   'conversational' evaluates one property per call (for guided mode).
-   */
-  constructor({ llmCall, mode = 'auto' } = {}) {
+  constructor({ llmCall, mode = 'auto' }: any = {}) {
     super();
     if (typeof llmCall !== 'function') {
       throw new Error('PropertiesStrategy requires an llmCall function');

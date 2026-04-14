@@ -60,18 +60,18 @@ const DEFAULT_UBIQUITY_INDICATORS = {
  * @param {Record<string, { weight: number, enabled: boolean }>} indicators
  * @returns {Record<string, number>} Map of indicator name → renormalized weight (enabled only)
  */
-function renormalizeWeights(indicators) {
+function renormalizeWeights(indicators: any) {
   const enabled = Object.entries(indicators)
-    .filter(([, cfg]) => cfg.enabled);
+    .filter(([, cfg]: [string, any]) => cfg.enabled);
 
   if (enabled.length === 0) {
     return {};
   }
 
-  const totalWeight = enabled.reduce((sum, [, cfg]) => sum + cfg.weight, 0);
+  const totalWeight = enabled.reduce((sum, [, cfg]: [string, any]) => sum + cfg.weight, 0);
 
-  const normalized = {};
-  for (const [name, cfg] of enabled) {
+  const normalized: Record<string, number> = {};
+  for (const [name, cfg] of enabled as [string, any][]) {
     normalized[name] = totalWeight > 0 ? cfg.weight / totalWeight : 1 / enabled.length;
   }
   return normalized;
@@ -138,7 +138,7 @@ function computeConfidence(dataQuality, modelConfidence) {
  * @param {Record<string, number>} weights - Renormalized weights (enabled indicators only)
  * @returns {number} Weighted aggregate score in [0, 1]
  */
-function aggregateAxis(indicatorValues, weights) {
+function aggregateAxis(indicatorValues: any, weights: Record<string, number>) {
   let sum = 0;
   let totalWeight = 0;
 
@@ -185,7 +185,13 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    * @param {Record<string, { weight?: number, enabled?: boolean }>} [options.config.ubiquityIndicators]
    *   Override ubiquity indicator weights/toggles.
    */
-  constructor(options = {}) {
+  _llmCall: any;
+  _patentSource: any;
+  _cpcMapper: any;
+  _certitudeIndicators: any;
+  _ubiquityIndicators: any;
+
+  constructor(options: any = {}) {
     super();
     this._llmCall = options.llmCall || null;
     this._patentSource = options.patentSource || null;
@@ -387,7 +393,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    * @param {Record<string, boolean>} [toggles.certitude] - Certitude indicator toggles
    * @param {Record<string, boolean>} [toggles.ubiquity] - Ubiquity indicator toggles
    */
-  setIndicatorsEnabled(toggles = {}) {
+  setIndicatorsEnabled(toggles: any = {}) {
     if (toggles.certitude) {
       for (const [key, enabled] of Object.entries(toggles.certitude)) {
         if (key in this._certitudeIndicators) {
@@ -418,13 +424,13 @@ export class CpcEvolutionStrategy extends BaseStrategy {
     const ubiquityWeights = renormalizeWeights(this._ubiquityIndicators);
 
     return {
-      certitude: Object.entries(this._certitudeIndicators).map(([key, cfg]) => ({
+      certitude: Object.entries(this._certitudeIndicators).map(([key, cfg]: [string, any]) => ({
         key,
         weight: cfg.weight,
         enabled: cfg.enabled,
         weightNormalized: certitudeWeights[key] ?? 0,
       })),
-      ubiquity: Object.entries(this._ubiquityIndicators).map(([key, cfg]) => ({
+      ubiquity: Object.entries(this._ubiquityIndicators).map(([key, cfg]: [string, any]) => ({
         key,
         weight: cfg.weight,
         enabled: cfg.enabled,
@@ -689,15 +695,15 @@ NAME | SHORT_DESCRIPTION | EVOLUTION
    * @param {string[]} cpcCodes - CPC codes used for the query
    * @returns {Promise<{ certitude: Record<string, number>, ubiquity: Record<string, number> }>}
    */
-  async _computeIndicators(patentData, cpcCodes) {
+  async _computeIndicators(patentData: any, cpcCodes: string[]) {
     try {
       const indicators = await import('../../../lib/patent/patent-indicators.mjs');
 
       // Build certitude indicator config from strategy config (for toggling)
       const certitudeConfig = Object.entries(this._certitudeIndicators)
-        .map(([key, cfg]) => ({ key, weight: cfg.weight, enabled: cfg.enabled }));
+        .map(([key, cfg]: [string, any]) => ({ key, weight: cfg.weight, enabled: cfg.enabled }));
       const ubiquiteConfig = Object.entries(this._ubiquityIndicators)
-        .map(([key, cfg]) => ({ key, weight: cfg.weight, enabled: cfg.enabled }));
+        .map(([key, cfg]: [string, any]) => ({ key, weight: cfg.weight, enabled: cfg.enabled }));
 
       // Delegate to computeAllIndicators which calls each pure function
       const result = indicators.computeAllIndicators(patentData, {
@@ -750,11 +756,11 @@ NAME | SHORT_DESCRIPTION | EVOLUTION
  * @param {Record<string, { weight?: number, enabled?: boolean }>} [overrides]
  * @returns {Record<string, { weight: number, enabled: boolean }>}
  */
-function mergeIndicatorConfig(defaults, overrides) {
+function mergeIndicatorConfig(defaults: any, overrides: any): any {
   if (!overrides) return { ...defaults };
 
-  const merged = {};
-  for (const [name, defaultCfg] of Object.entries(defaults)) {
+  const merged: Record<string, any> = {};
+  for (const [name, defaultCfg] of Object.entries(defaults) as [string, any][]) {
     const override = overrides[name] || {};
     merged[name] = {
       weight: override.weight ?? defaultCfg.weight,

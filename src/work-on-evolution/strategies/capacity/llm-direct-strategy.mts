@@ -79,7 +79,9 @@ export class LLMDirectStrategy extends BaseStrategy {
    *   Async function that takes a prompt string and returns the LLM's text response.
    *   This allows the strategy to be LLM-provider agnostic.
    */
-  constructor({ llmCall } = {}) {
+  _llmCall: any;
+
+  constructor({ llmCall }: any = {}) {
     super();
     if (typeof llmCall !== 'function') {
       throw new Error('LLMDirectStrategy requires an llmCall function');
@@ -102,11 +104,11 @@ export class LLMDirectStrategy extends BaseStrategy {
       ? PROMPT_WITH_CAPABILITY
           .replace('{{capability}}', component.capability)
           .replace('{{context}}', component.description || component.context || '')
-          .replace('{{date}}', component.date ? new Date(component.date).getFullYear() : 'unknown')
+          .replace('{{date}}', String(component.date ? new Date(component.date).getFullYear() : 'unknown'))
       : PROMPT_WITHOUT_CAPABILITY
           .replace('{{component}}', component.name || '')
           .replace('{{context}}', component.description || component.context || '')
-          .replace('{{date}}', component.date ? new Date(component.date).getFullYear() : 'unknown');
+          .replace('{{date}}', String(component.date ? new Date(component.date).getFullYear() : 'unknown'));
 
     const response = await this._llmCall(prompt);
     const parsed = parseLLMResponse(response);

@@ -43,7 +43,7 @@
  * Map discrete phase (1–4) to continuous evolution midpoint on the Wardley axis.
  * @type {Readonly<Record<number, number>>}
  */
-const PHASE_TO_EVOLUTION = Object.freeze({
+const PHASE_TO_EVOLUTION: Record<number, number> = Object.freeze({
   1: 0.09,   // Genesis   [0.00, 0.18]
   2: 0.29,   // Custom    [0.18, 0.40]
   3: 0.55,   // Product   [0.40, 0.70]
@@ -103,18 +103,18 @@ export const MAX_CONFIDENCE = 0.95;
  *   const weights = renormalizeWeights(config);
  *   // efficiency excluded, others get proportionally higher weights summing to 1.0
  */
-export function renormalizeWeights(weightConfig) {
+export function renormalizeWeights(weightConfig: any) {
   const enabled = Object.entries(weightConfig)
-    .filter(([, cfg]) => cfg.enabled !== false);
+    .filter(([, cfg]: [string, any]) => cfg.enabled !== false);
 
   if (enabled.length === 0) {
     return {};
   }
 
-  const totalWeight = enabled.reduce((sum, [, cfg]) => sum + (cfg.weight || 0), 0);
+  const totalWeight = enabled.reduce((sum, [, cfg]: [string, any]) => sum + (cfg.weight || 0), 0);
 
-  const normalized = {};
-  for (const [name, cfg] of enabled) {
+  const normalized: Record<string, number> = {};
+  for (const [name, cfg] of enabled as [string, any][]) {
     normalized[name] = totalWeight > 0
       ? cfg.weight / totalWeight
       : 1 / enabled.length;
@@ -133,13 +133,13 @@ export function renormalizeWeights(weightConfig) {
  * @param {Record<string, number>} [options.customWeights={}] - Custom weight overrides by property name/ID
  * @returns {Record<string, PropertyWeightConfig>}
  */
-export function buildWeightConfig(properties, options = {}) {
+export function buildWeightConfig(properties: any, options: any = {}) {
   const disabled = new Set(
-    (options.disabled || []).map(n => n.toLowerCase().trim())
+    (options.disabled || []).map((n: string) => n.toLowerCase().trim())
   );
   const customWeights = options.customWeights || {};
 
-  const config = {};
+  const config: Record<string, any> = {};
   for (const prop of properties) {
     const key = (prop.id || prop.property || '').toLowerCase().replace(/[\s/]+/g, '_');
     const displayKey = prop.id || prop.property || key;
@@ -251,7 +251,7 @@ export function buildWeightConfig(properties, options = {}) {
  *     customWeights: { market: 0.2, market_perception: 0.15 },
  *   });
  */
-export function aggregatePropertyScores(properties, options = {}) {
+export function aggregatePropertyScores(properties: any, options: any = {}): any {
   if (!Array.isArray(properties) || properties.length === 0) {
     throw new Error('aggregatePropertyScores requires a non-empty array of property evaluations');
   }
@@ -408,11 +408,11 @@ function computeAggregationConfidence(coverage, phaseDistribution, evaluatedCoun
  * @param {number} total - Total count of evaluated properties
  * @returns {number} Phase agreement score (0–1), where 1 = perfect agreement
  */
-export function computePhaseAgreement(distribution, total) {
+export function computePhaseAgreement(distribution: any, total: number) {
   if (total === 0) return 0;
 
   let entropy = 0;
-  for (const count of Object.values(distribution)) {
+  for (const count of Object.values(distribution) as number[]) {
     if (count > 0) {
       const p = count / total;
       entropy -= p * Math.log2(p);
@@ -439,7 +439,7 @@ export function computePhaseAgreement(distribution, total) {
  * @param {Object} [options={}] - Same options as aggregatePropertyScores.
  * @returns {AggregationResult}
  */
-export function aggregatePropertyScoreInstances(scores, options = {}) {
+export function aggregatePropertyScoreInstances(scores: any, options: any = {}): any {
   const propEvals = scores.map(s => {
     if (typeof s.toPropertyEvaluation === 'function') {
       const eval_ = s.toPropertyEvaluation();
