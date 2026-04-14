@@ -4,8 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "mcp": "node src/mcp/mcp-server.mjs"
+    "mcp": "node src/mcp/mcp-server.mjs",
+    "build": "tsc",
+    "dev": "tsx src/mcp/mcp-server.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"src/**/*.test.mjs\""
   },
   "keywords": [],
   "author": "",
@@ -14,5 +17,10 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.87",
     "@google-cloud/bigquery": "^8.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
   }
 }
