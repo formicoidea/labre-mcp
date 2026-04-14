@@ -3,7 +3,7 @@
 // Transcribed from JSDoc @typedef blocks in
 // src/work-on-evolution/strategies/solution/solution-base-strategy.mjs.
 
-import type { EvolutionResult, CapabilityNature } from './evolution.js';
+import type { EvolutionResult, CapabilityNature } from './evolution.mjs';
 
 /** Phase discrète (1–4) du modèle Wardley. */
 export type WardleyPhase = 1 | 2 | 3 | 4;

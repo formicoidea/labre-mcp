@@ -4,9 +4,9 @@
 // src/work-on-evolution/routing/mode-router.mjs, with the conditional
 // pipeline fields promoted to a proper discriminated union.
 
-import type { EvolutionResult } from './evolution.js';
-import type { ClassificationResult } from './classification.js';
-import type { CapabilityPivotResult, SolutionDiscoveryResult } from './pipeline.js';
+import type { EvolutionResult } from './evolution.mjs';
+import type { ClassificationResult } from './classification.mjs';
+import type { CapabilityPivotResult, SolutionDiscoveryResult } from './pipeline.mjs';
 
 export type RoutingMode = 'oneshot' | 'guided';
 

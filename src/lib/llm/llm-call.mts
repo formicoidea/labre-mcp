@@ -14,6 +14,17 @@
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { classifyAndLogLLMError } from './llm-error-handler.mjs';
+import type {
+  LLMCall,
+  StructuredLLMCall,
+  LogprobLLMCall,
+  LogprobResult,
+  ClaudeLLMConfig,
+  StructuredLLMConfig,
+  OpenCodeConfig,
+  OpenCodeLogprobConfig,
+  TemplateVariables,
+} from '../../types/llm.mjs';
 
 // ─── Retry Configuration (aligned with Ouroboros claude_code_adapter) ───────
 
@@ -25,25 +36,21 @@ const RETRYABLE_PATTERNS = [
   'unknown error',
 ];
 
-function isRetryableError(err) {
-  const msg = String(err.message || err).toLowerCase();
+function isRetryableError(err: unknown): boolean {
+  const msg = String((err as { message?: string })?.message ?? err).toLowerCase();
   return RETRYABLE_PATTERNS.some(p => msg.includes(p));
 }
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function sleep(ms: number): Promise<void> {
+  return new Promise(r => setTimeout(r, ms));
+}
 
 // ─── Template Interpolation ─────────────────────────────────────────────────
 
-/**
- * Replace {{variable}} placeholders in a template string.
- *
- * @param {string} template - Prompt with {{variable}} placeholders
- * @param {Object<string, string>} [variables] - Key-value map
- * @returns {string} Interpolated string
- */
-export function interpolate(template, variables) {
+/** Replace {{variable}} placeholders in a template string. */
+export function interpolate(template: string, variables?: TemplateVariables): string {
   if (!variables || Object.keys(variables).length === 0) return template;
-  return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+  return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => {
     return variables[key] !== undefined ? String(variables[key]) : match;
   });
 }
@@ -53,15 +60,8 @@ export function interpolate(template, variables) {
 /**
  * Create a reusable LLM call function backed by the Claude Agent SDK.
  * Uses query() with tools disabled for pure text completion.
- *
- * @param {Object} [config={}]
- * @param {string} [config.model='claude-sonnet-4-6']
- * @param {string} [config.effort='high'] - 'low' | 'medium' | 'high'
- * @param {number} [config.maxBudgetUsd=0.10]
- * @param {string} [config.systemPrompt] - Optional system prompt
- * @returns {function(string, Object?): Promise<string>}
  */
-export function createLLMCall(config = {}) {
+export function createLLMCall(config: ClaudeLLMConfig = {}): LLMCall {
   const {
     model = 'claude-sonnet-4-6',
     effort = 'high',
@@ -77,7 +77,7 @@ export function createLLMCall(config = {}) {
       delete process.env.CLAUDECODE;
     }
 
-    const options = {
+    const options: Record<string, unknown> = {
       model,
       maxTurns: 1,
       effort,
@@ -92,16 +92,17 @@ export function createLLMCall(config = {}) {
 
     const errorContext = { logger: 'llm-call', model };
 
-    let lastError;
+    let lastError: unknown;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
         let resultText = '';
-        for await (const message of query({ prompt: interpolatedPrompt, options })) {
-          if (message.type === 'result') {
-            if (message.subtype === 'success') {
-              resultText = message.result || '';
+        for await (const message of query({ prompt: interpolatedPrompt, options } as Parameters<typeof query>[0])) {
+          const msg = message as { type: string; subtype?: string; result?: string; errors?: string[] };
+          if (msg.type === 'result') {
+            if (msg.subtype === 'success') {
+              resultText = msg.result || '';
             } else {
-              const errors = message.errors || [];
+              const errors = msg.errors || [];
               throw new Error(`LLM call failed: ${errors.join(', ') || 'unknown error'}`);
             }
           }
@@ -126,17 +127,10 @@ export function createLLMCall(config = {}) {
   };
 }
 
-/**
- * Create an LLM call that returns structured JSON via the Agent SDK.
- *
- * @param {Object} [config={}]
- * @param {Object} config.schema - JSON Schema for the output
- * @param {string} [config.model='claude-sonnet-4-6']
- * @param {string} [config.effort='high']
- * @param {number} [config.maxBudgetUsd=0.10]
- * @returns {function(string, Object?): Promise<Object>}
- */
-export function createStructuredLLMCall(config = {}) {
+/** Create an LLM call that returns structured JSON via the Agent SDK. */
+export function createStructuredLLMCall<T = unknown>(
+  config: StructuredLLMConfig,
+): StructuredLLMCall<T> {
   const {
     schema,
     model = 'claude-sonnet-4-6',
@@ -151,12 +145,11 @@ export function createStructuredLLMCall(config = {}) {
   return async function structuredLLMCall(prompt, variables) {
     const interpolatedPrompt = interpolate(prompt, variables);
 
-    // Prevent nested session detection that causes silent empty responses
     if (process.env.CLAUDECODE) {
       delete process.env.CLAUDECODE;
     }
 
-    const options = {
+    const options: Record<string, unknown> = {
       model,
       maxTurns: 1,
       effort,
@@ -168,16 +161,17 @@ export function createStructuredLLMCall(config = {}) {
 
     const errorContext = { logger: 'llm-call-structured', model };
 
-    let lastError;
+    let lastError: unknown;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
         let resultText = '';
-        for await (const message of query({ prompt: interpolatedPrompt, options })) {
-          if (message.type === 'result') {
-            if (message.subtype === 'success') {
-              resultText = message.result || '';
+        for await (const message of query({ prompt: interpolatedPrompt, options } as Parameters<typeof query>[0])) {
+          const msg = message as { type: string; subtype?: string; result?: string; errors?: string[] };
+          if (msg.type === 'result') {
+            if (msg.subtype === 'success') {
+              resultText = msg.result || '';
             } else {
-              const errors = message.errors || [];
+              const errors = msg.errors || [];
               throw new Error(`Structured LLM call failed: ${errors.join(', ') || 'unknown error'}`);
             }
           }
@@ -185,7 +179,7 @@ export function createStructuredLLMCall(config = {}) {
         if (!resultText) {
           throw new Error('Structured LLM call returned empty response');
         }
-        return JSON.parse(resultText);
+        return JSON.parse(resultText) as T;
       } catch (err) {
         lastError = err;
         if (isRetryableError(err) && attempt < MAX_RETRIES - 1) {
@@ -207,15 +201,8 @@ export function createStructuredLLMCall(config = {}) {
 /**
  * Create an LLM call function backed by the OpenCode API gateway.
  * Uses standard OpenAI-compatible chat completions endpoint.
- *
- * @param {Object} [config={}]
- * @param {string} [config.model='kimi-k2.5']
- * @param {string} [config.baseUrl='https://opencode.ai/zen/v1']
- * @param {string} [config.apiKey] - Falls back to process.env.OPENCODE_API_KEY
- * @param {number} [config.temperature=0]
- * @returns {function(string, Object?): Promise<string>}
  */
-export function createOpenCodeCall(config = {}) {
+export function createOpenCodeCall(config: OpenCodeConfig = {}): LLMCall {
   const {
     model = 'kimi-k2.5',
     baseUrl = 'https://opencode.ai/zen/v1',
@@ -234,7 +221,7 @@ export function createOpenCodeCall(config = {}) {
       throw authErr;
     }
 
-    let response;
+    let response: Response;
     try {
       response = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
@@ -249,7 +236,6 @@ export function createOpenCodeCall(config = {}) {
         }),
       });
     } catch (fetchErr) {
-      // Network errors (ECONNREFUSED, DNS, timeout, etc.)
       classifyAndLogLLMError(fetchErr, errorContext);
       throw fetchErr;
     }
@@ -261,7 +247,9 @@ export function createOpenCodeCall(config = {}) {
       throw apiErr;
     }
 
-    const data = await response.json();
+    const data = await response.json() as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
     const text = data.choices?.[0]?.message?.content;
 
     if (!text) {
@@ -274,17 +262,10 @@ export function createOpenCodeCall(config = {}) {
   };
 }
 
-/**
- * Create an LLM call that returns real token logprobs via OpenCode + kimi-k2.5.
- *
- * @param {Object} [config={}]
- * @param {string} [config.model='kimi-k2.5']
- * @param {string} [config.baseUrl='https://opencode.ai/zen/v1']
- * @param {string} [config.apiKey] - Falls back to process.env.OPENCODE_API_KEY
- * @param {number} [config.topLogprobs=5] - Number of top logprobs to return per token
- * @returns {function(string, Object?): Promise<{text: string, logprobs: Array<{token: string, logprob: number}>}>}
- */
-export function createOpenCodeLogprobCall(config = {}) {
+/** Create an LLM call that returns real token logprobs via OpenCode + kimi-k2.5. */
+export function createOpenCodeLogprobCall(
+  config: OpenCodeLogprobConfig = {},
+): LogprobLLMCall {
   const {
     model = 'kimi-k2.5',
     baseUrl = 'https://opencode.ai/zen/v1',
@@ -292,7 +273,7 @@ export function createOpenCodeLogprobCall(config = {}) {
     topLogprobs = 5,
   } = config;
 
-  return async function openCodeLogprobCall(prompt, variables) {
+  return async function openCodeLogprobCall(prompt, variables): Promise<LogprobResult> {
     const interpolatedPrompt = interpolate(prompt, variables);
 
     const errorContext = { logger: 'opencode-logprob', model };
@@ -303,7 +284,7 @@ export function createOpenCodeLogprobCall(config = {}) {
       throw authErr;
     }
 
-    let response;
+    let response: Response;
     try {
       response = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
@@ -332,28 +313,33 @@ export function createOpenCodeLogprobCall(config = {}) {
       throw apiErr;
     }
 
-    const data = await response.json();
+    const data = await response.json() as {
+      choices?: Array<{
+        message?: { content?: string };
+        logprobs?: {
+          content?: Array<{
+            token: string;
+            logprob: number;
+            top_logprobs?: Array<{ token: string; logprob: number }>;
+          }>;
+        };
+      }>;
+    };
     const text = data.choices?.[0]?.message?.content || '';
 
-    // Extract logprobs from the first token's top_logprobs
     const contentLogprobs = data.choices?.[0]?.logprobs?.content;
-    let logprobs = [];
+    const logprobs: LogprobResult['logprobs'] = [];
 
     if (contentLogprobs && contentLogprobs.length > 0) {
       const firstToken = contentLogprobs[0];
-      // Include the chosen token
       logprobs.push({
         token: firstToken.token,
         logprob: firstToken.logprob,
       });
-      // Include alternatives from top_logprobs
       if (firstToken.top_logprobs) {
         for (const alt of firstToken.top_logprobs) {
           if (alt.token !== firstToken.token) {
-            logprobs.push({
-              token: alt.token,
-              logprob: alt.logprob,
-            });
+            logprobs.push({ token: alt.token, logprob: alt.logprob });
           }
         }
       }
@@ -366,9 +352,8 @@ export function createOpenCodeLogprobCall(config = {}) {
 // ─── Self-test ──────────────────────────────────────────────────────────────
 
 if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}`) {
-  console.log('=== llm-call.mjs self-test ===\n');
+  console.log('=== llm-call self-test ===\n');
 
-  // Test interpolation
   console.log('--- Test: interpolation ---');
   const t1 = interpolate('Hello {{name}}, you are {{age}}', { name: 'World', age: '42' });
   console.assert(t1 === 'Hello World, you are 42', `Expected interpolation, got: ${t1}`);
@@ -382,7 +367,6 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
   console.assert(t3 === 'Missing {{unknown}}', `Expected preserved placeholder, got: ${t3}`);
   console.log(`  ✓ missing var preserved: "${t3}"`);
 
-  // Test Agent SDK LLM call
   console.log('\n--- Test: Agent SDK LLM call ---');
   try {
     const llmCall = createLLMCall({ model: 'claude-sonnet-4-6', effort: 'low', maxBudgetUsd: 0.02 });
@@ -390,10 +374,9 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
     console.log(`  ✓ LLM result: "${result.trim()}"`);
     console.assert(result.includes('4'), 'Should contain 4');
   } catch (err) {
-    console.log(`  ✗ LLM call error: ${err.message}`);
+    console.log(`  ✗ LLM call error: ${(err as Error).message}`);
   }
 
-  // Test OpenCode call (only if API key is available)
   console.log('\n--- Test: OpenCode call ---');
   if (process.env.OPENCODE_API_KEY) {
     try {
@@ -401,10 +384,9 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
       const result = await openCall('What is 3 + 3? Reply with just the number.');
       console.log(`  ✓ OpenCode result: "${result.trim()}"`);
     } catch (err) {
-      console.log(`  ✗ OpenCode error: ${err.message}`);
+      console.log(`  ✗ OpenCode error: ${(err as Error).message}`);
     }
 
-    // Test logprob call
     console.log('\n--- Test: OpenCode logprob call ---');
     try {
       const logprobCall = createOpenCodeLogprobCall();
@@ -415,7 +397,7 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
         console.log(`    ${lp.token}: ${lp.logprob.toFixed(4)}`);
       }
     } catch (err) {
-      console.log(`  ✗ Logprob error: ${err.message}`);
+      console.log(`  ✗ Logprob error: ${(err as Error).message}`);
     }
   } else {
     console.log('  ⊘ OPENCODE_API_KEY not set, skipping OpenCode tests');

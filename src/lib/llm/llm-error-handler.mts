@@ -21,31 +21,57 @@ import { logError, logWarning } from '../mcp-notifications.mjs';
 
 // ─── Error Types ──────────────────────────────────────────────────────────
 
-/**
- * @typedef {'timeout' | 'rate_limit' | 'auth' | 'api_error' | 'empty_response' | 'network' | 'generic'} LLMErrorType
- */
+export type LLMErrorType =
+  | 'timeout'
+  | 'rate_limit'
+  | 'auth'
+  | 'api_error'
+  | 'empty_response'
+  | 'network'
+  | 'generic';
 
-/**
- * @typedef {Object} ClassifiedError
- * @property {LLMErrorType} type - Error category
- * @property {number|null} status - HTTP status code if available
- * @property {string} message - Original error message
- * @property {string|null} retryAfter - Retry-After header value if available
- */
+export interface ClassifiedError {
+  /** Error category */
+  type: LLMErrorType;
+  /** HTTP status code if available */
+  status: number | null;
+  /** Original error message */
+  message: string;
+  /** Retry-After header value if available */
+  retryAfter: string | null;
+}
+
+/** Localized message resolver (id + params → string). */
+export type MessageResolver = (
+  id: string,
+  params?: Record<string, unknown>,
+) => string;
+
+export interface ErrorLoggingOptions {
+  /** Logger name (tool or module name) */
+  logger?: string;
+  /** LLM model name for context */
+  model?: string;
+  /** Message resolver from progress-messages.mjs; falls back to English plain messages */
+  msg?: MessageResolver | null;
+}
+
+/** Narrowed error shape: any thrown value with possible Node.js error codes. */
+type ErrorLike = {
+  message?: string;
+  name?: string;
+  code?: string;
+} & Record<string, unknown>;
 
 // ─── Error Classification ─────────────────────────────────────────────────
 
 /**
  * Classify an LLM error into a specific category.
- *
- * Uses heuristics on the error object properties and message string
- * to determine the error type.
- *
- * @param {Error} error - The caught error
- * @returns {ClassifiedError} Classified error with type and metadata
+ * Uses heuristics on the error object properties and message string.
  */
-export function classifyLLMError(error) {
-  const message = error?.message || String(error);
+export function classifyLLMError(error: unknown): ClassifiedError {
+  const err = (error ?? {}) as ErrorLike;
+  const message = err.message || String(error);
   const lowerMsg = message.toLowerCase();
 
   // Extract HTTP status code from error message if present
@@ -54,12 +80,12 @@ export function classifyLLMError(error) {
 
   // ── Timeout ─────────────────────────────────────────────────────────
   if (
-    error?.name === 'AbortError' ||
-    error?.code === 'ETIMEDOUT' ||
-    error?.code === 'ESOCKETTIMEDOUT' ||
-    error?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
-    error?.code === 'UND_ERR_HEADERS_TIMEOUT' ||
-    error?.code === 'UND_ERR_BODY_TIMEOUT' ||
+    err.name === 'AbortError' ||
+    err.code === 'ETIMEDOUT' ||
+    err.code === 'ESOCKETTIMEDOUT' ||
+    err.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+    err.code === 'UND_ERR_HEADERS_TIMEOUT' ||
+    err.code === 'UND_ERR_BODY_TIMEOUT' ||
     lowerMsg.includes('timeout') ||
     lowerMsg.includes('timed out') ||
     lowerMsg.includes('aborted')
@@ -76,7 +102,6 @@ export function classifyLLMError(error) {
     lowerMsg.includes('quota exceeded') ||
     lowerMsg.includes('throttl')
   ) {
-    // Try to extract retry-after from error message
     const retryMatch = message.match(/retry.?after[:\s]*(\d+)/i);
     const retryAfter = retryMatch ? retryMatch[1] : null;
     return { type: 'rate_limit', status: status || 429, message, retryAfter };
@@ -95,10 +120,10 @@ export function classifyLLMError(error) {
 
   // ── Network errors ──────────────────────────────────────────────────
   if (
-    error?.code === 'ECONNREFUSED' ||
-    error?.code === 'ECONNRESET' ||
-    error?.code === 'ENOTFOUND' ||
-    error?.code === 'EAI_AGAIN' ||
+    err.code === 'ECONNREFUSED' ||
+    err.code === 'ECONNRESET' ||
+    err.code === 'ENOTFOUND' ||
+    err.code === 'EAI_AGAIN' ||
     lowerMsg.includes('fetch failed') ||
     lowerMsg.includes('network') ||
     lowerMsg.includes('dns') ||
@@ -132,16 +157,11 @@ export function classifyLLMError(error) {
  *
  * Emits localized, context-rich error messages using the progress message catalog.
  * The error is logged but NOT re-thrown — the caller is responsible for propagation.
- *
- * @param {Error} error - The caught error
- * @param {Object} options - Logging context
- * @param {string} options.logger - Logger name (tool or module name)
- * @param {string} [options.model='unknown'] - LLM model name for context
- * @param {function} [options.msg] - Message resolver from progress-messages.mjs
- *   If not provided, falls back to English-only plain messages.
- * @returns {ClassifiedError} The classified error (for caller use)
  */
-export function classifyAndLogLLMError(error, options = {}) {
+export function classifyAndLogLLMError(
+  error: unknown,
+  options: ErrorLoggingOptions = {},
+): ClassifiedError {
   const {
     logger = 'llm',
     model = 'unknown',
@@ -150,8 +170,7 @@ export function classifyAndLogLLMError(error, options = {}) {
 
   const classified = classifyLLMError(error);
 
-  // Build the log message based on error type, using localized messages if available
-  let logMessage;
+  let logMessage: string;
 
   switch (classified.type) {
     case 'timeout':
@@ -211,16 +230,13 @@ export function classifyAndLogLLMError(error, options = {}) {
 
 /**
  * Wrap an async function with LLM error classification and logging.
- *
- * Calls the function, and if it throws, classifies the error,
- * emits an MCP error notification, and re-throws the original error.
- *
- * @param {function(): Promise<*>} fn - Async function to wrap
- * @param {Object} options - Same options as classifyAndLogLLMError
- * @returns {Promise<*>} Result of fn()
- * @throws {Error} Re-throws the original error after logging
+ * Calls the function, and if it throws, classifies the error, emits an MCP
+ * error notification, and re-throws the original error.
  */
-export async function withLLMErrorLogging(fn, options = {}) {
+export async function withLLMErrorLogging<T>(
+  fn: () => Promise<T>,
+  options: ErrorLoggingOptions = {},
+): Promise<T> {
   try {
     return await fn();
   } catch (error) {
@@ -232,23 +248,22 @@ export async function withLLMErrorLogging(fn, options = {}) {
 // ─── Self-test ────────────────────────────────────────────────────────────
 
 if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}`) {
-  console.log('=== llm-error-handler.mjs self-test ===\n');
+  console.log('=== llm-error-handler self-test ===\n');
 
   // Suppress actual stdout MCP notifications during tests
-  const origWrite = process.stdout.write;
-  const captured = [];
-  process.stdout.write = function (data) {
+  const origWrite = process.stdout.write.bind(process.stdout);
+  const captured: Array<{ params: { level: string; logger: string; data: string } }> = [];
+  process.stdout.write = function (data: unknown): boolean {
     if (typeof data === 'string' && data.includes('"notifications/message"')) {
       captured.push(JSON.parse(data.trim()));
       return true;
     }
-    return origWrite.call(this, data);
-  };
+    return origWrite(data as string);
+  } as typeof process.stdout.write;
 
-  // Test classification
   console.log('--- Test: Error classification ---');
 
-  const tests = [
+  const tests: Array<{ error: Error; expectedType: LLMErrorType }> = [
     { error: new Error('Request timed out after 30000ms'), expectedType: 'timeout' },
     { error: Object.assign(new Error('connect timeout'), { code: 'ETIMEDOUT' }), expectedType: 'timeout' },
     { error: new Error('OpenCode API error 429: Too many requests'), expectedType: 'rate_limit' },
@@ -269,7 +284,6 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
     console.log(`  ${ok ? '✓' : '✗'} "${error.message}" → ${classified.type}${ok ? '' : ` (expected: ${expectedType})`}`);
   }
 
-  // Test classifyAndLogLLMError emits notifications
   console.log('\n--- Test: Error logging emits MCP notifications ---');
   captured.length = 0;
 
@@ -277,12 +291,10 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
     logger: 'estimateEvolution',
     model: 'kimi-k2.5',
   });
-
   classifyAndLogLLMError(new Error('Request timed out'), {
     logger: 'evaluateMap',
     model: 'kimi-k2.5',
   });
-
   classifyAndLogLLMError(new Error('OpenCode API error 500: Internal Server Error'), {
     logger: 'generateValueChain',
     model: 'kimi-k2.5',
@@ -293,57 +305,29 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
     console.log(`    [${n.params.level}] ${n.params.logger}: ${n.params.data}`);
   }
 
-  // Test with localized message resolver
-  console.log('\n--- Test: Localized error messages ---');
-  captured.length = 0;
-
-  // Simulate a French message resolver
-  const frenchMsg = (id, params) => {
-    const templates = {
-      'error.llm.timeout': `Appel LLM expiré après ${params.duration} ms (modèle : ${params.model})`,
-      'error.llm.ratelimit': `Limite de débit LLM dépassée (modèle : ${params.model}). Réessayer dans ${params.retryAfter}s`,
-      'error.llm.api': `Erreur API LLM (${params.status}) : ${params.message}`,
-      'error.generic': `Erreur dans ${params.tool} : ${params.error}`,
-    };
-    return templates[id] || `[${id}]`;
-  };
-
-  classifyAndLogLLMError(new Error('OpenCode API error 429: rate limit'), {
-    logger: 'estimateEvolution',
-    model: 'kimi-k2.5',
-    msg: frenchMsg,
-  });
-
-  console.log(`  ✓ Captured ${captured.length} localized notification(s)`);
-  for (const n of captured) {
-    console.log(`    [${n.params.level}] ${n.params.logger}: ${n.params.data}`);
-  }
-
-  // Test withLLMErrorLogging wrapper
   console.log('\n--- Test: withLLMErrorLogging wrapper ---');
   captured.length = 0;
 
   try {
     await withLLMErrorLogging(
       async () => { throw new Error('OpenCode API error 503: Service Unavailable'); },
-      { logger: 'estimateEvolution', model: 'kimi-k2.5' }
+      { logger: 'estimateEvolution', model: 'kimi-k2.5' },
     );
     console.log('  ✗ Should have thrown');
   } catch (err) {
-    console.log(`  ✓ Re-threw error: "${err.message}"`);
+    console.log(`  ✓ Re-threw error: "${(err as Error).message}"`);
     console.log(`  ✓ Emitted ${captured.length} notification(s) before re-throw`);
   }
 
-  // Test successful call doesn't emit anything
   captured.length = 0;
   const result = await withLLMErrorLogging(
     async () => 'success!',
-    { logger: 'test', model: 'test' }
+    { logger: 'test', model: 'test' },
   );
   console.log(`\n  ✓ Successful call returned: "${result}", notifications: ${captured.length}`);
 
   // Restore stdout
-  process.stdout.write = origWrite;
+  process.stdout.write = origWrite as typeof process.stdout.write;
 
   console.log('\n=== self-test complete ===');
 }

@@ -3,8 +3,8 @@
 // Transcribed from JSDoc @typedef in
 // src/work-on-evolution/pipeline/pipeline-enriched.mjs.
 
-import type { CapabilityNature } from './evolution.js';
-import type { EvaluationsMap, RoutingMetadata } from './routing.js';
+import type { CapabilityNature } from './evolution.mjs';
+import type { EvaluationsMap, RoutingMetadata } from './routing.mjs';
 
 /** Résultat du capability pivot — étape 1 du pipeline enrichi. */
 export interface CapabilityPivotResult {

@@ -4,11 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "mcp": "node src/mcp/mcp-server.mjs",
+    "mcp": "tsx src/mcp/mcp-server.mjs",
+    "mcp:prod": "node dist/mcp/mcp-server.mjs",
     "build": "tsc",
     "dev": "tsx src/mcp/mcp-server.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --test \"src/**/*.test.mjs\""
+    "test": "tsx --test \"src/**/*.test.mjs\""
   },
   "keywords": [],
   "author": "",
