@@ -184,7 +184,7 @@ export class PatentDataSource {
    * @returns {Promise<PatentData>} Patent data for the given CPC codes
    * @throws {Error} If not implemented by subclass
    */
-  async fetchByCpc(cpcCodes) {
+  async fetchByCpc(cpcCodes: string[]): Promise<any> {
     throw new Error(
       `${this.constructor.name}.fetchByCpc() must be implemented by subclass`
     );

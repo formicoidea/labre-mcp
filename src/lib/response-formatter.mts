@@ -106,7 +106,7 @@ export function formatConfidence(confidence) {
  * @param {Object} [component] - Original component input (for context)
  * @returns {string} Reasoning sentence
  */
-export function strategyReasoning(method, result, component = {}) {
+export function strategyReasoning(method: string, result: any, component: any = {}) {
   const stage = evolutionToStage(result.evolution);
 
   const reasoningMap = {
@@ -192,9 +192,9 @@ function buildSolutionPropertiesReasoning(result, stage) {
   // Add phase distribution insight if available (from assembler enrichment)
   if (result.phaseDistribution) {
     const dist = result.phaseDistribution;
-    const phaseLabels = { 1: 'Genesis', 2: 'Custom', 3: 'Product', 4: 'Commodity' };
+    const phaseLabels: Record<string, string> = { 1: 'Genesis', 2: 'Custom', 3: 'Product', 4: 'Commodity' };
     const nonZero = Object.entries(dist)
-      .filter(([, count]) => count > 0)
+      .filter(([, count]) => (count as number) > 0)
       .map(([phase, count]) => `${count}× ${phaseLabels[phase]}`)
       .join(', ');
     if (nonZero) {
@@ -292,7 +292,7 @@ export function formatStrategyResult(method, evalResult, component = {}) {
  * @param {boolean} [options.compact] - If true, use shorter format
  * @returns {string} Markdown-formatted conversational output
  */
-export function formatResponse(result, options = {}) {
+export function formatResponse(result: any, options: any = {}) {
   const component = options.component || result.parsedInput || {};
   const compact = options.compact || false;
   const name = component.name || result.classification?.space || 'Unknown';
@@ -333,8 +333,8 @@ export function formatResponse(result, options = {}) {
   // ── Economic: evaluation results ──
   if (result.evaluations) {
     const entries = Object.entries(result.evaluations);
-    const successful = entries.filter(([, ev]) => !ev.error);
-    const errors = entries.filter(([, ev]) => ev.error);
+    const successful = entries.filter(([, ev]) => !(ev as any).error);
+    const errors = entries.filter(([, ev]) => (ev as any).error);
 
     if (successful.length === 0 && errors.length > 0) {
       // All strategies errored
@@ -343,7 +343,7 @@ export function formatResponse(result, options = {}) {
       lines.push('All strategies encountered errors:');
       lines.push('');
       for (const [method, ev] of errors) {
-        lines.push(`- **${method}**: ${ev.error}`);
+        lines.push(`- **${method}**: ${(ev as any).error}`);
       }
       lines.push('');
       lines.push('*Try providing more parameters (certitude, ubiquity, publication proportions) or use a specific strategy.*');

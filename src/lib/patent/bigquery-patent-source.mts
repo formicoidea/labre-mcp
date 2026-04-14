@@ -147,7 +147,7 @@ export function isRetryableError(error) {
  * @throws {Error} The last error if all retries are exhausted, or non-retryable error immediately
  * @template T
  */
-export async function withRetry(fn, options = {}) {
+export async function withRetry<T>(fn: () => Promise<T>, options: any = {}): Promise<T> {
   const {
     maxRetries = DEFAULT_MAX_RETRIES,
     baseDelayMs = DEFAULT_BASE_DELAY_MS,
@@ -323,7 +323,7 @@ export function transformExpirationData(rows) {
  *
  * @type {Record<string, (rows: Object[]) => *>}
  */
-export const RESULT_TRANSFORMERS = {
+export const RESULT_TRANSFORMERS: Record<string, (rows: any) => any> = {
   cpcDistribution:       transformCpcDistribution,
   yearlyClassifications: transformYearlyClassifications,
   citationData:          transformCitationData,
@@ -358,6 +358,14 @@ export const RESULT_TRANSFORMERS = {
  *   const data = await source.fetchByCpc(['H04W']);
  */
 export class BigQueryPatentSource extends PatentDataSource {
+  _config: any;
+  _client: any;
+  _dataset: any;
+  _minYear: any;
+  _maxPatents: any;
+  _exclude: any;
+  _maxRetries: any;
+  _baseDelayMs: any;
 
   /**
    * @param {Object} [options]
@@ -370,7 +378,7 @@ export class BigQueryPatentSource extends PatentDataSource {
    * @param {number} [options.maxRetries]  - Max retry attempts for transient errors (default: 3)
    * @param {number} [options.baseDelayMs] - Base backoff delay in ms (default: 1000)
    */
-  constructor(options = {}) {
+  constructor(options: any = {}) {
     super();
     this._config = resolveConfig(options);
     this._dataset = options.dataset || this._config.dataset;
@@ -468,8 +476,8 @@ export class BigQueryPatentSource extends PatentDataSource {
     );
 
     // Map results by query key, tracking errors for diagnostics
-    const resultMap = {};
-    const queryErrors = [];
+    const resultMap: Record<string, any> = {};
+    const queryErrors: any[] = [];
 
     for (let i = 0; i < queryEntries.length; i++) {
       const [key] = queryEntries[i];

@@ -192,6 +192,18 @@ export const FIXTURES = Object.freeze({
  * @extends PatentDataSource
  */
 export class MockPatentSource extends PatentDataSource {
+  // Class field declarations (TypeScript requires these to exist on the type).
+  // Runtime values are set in the constructor — types are intentionally loose
+  // at this migration step.
+  _data: any;
+  _error: any;
+  _delay: any;
+  _perCpc: any;
+  _onFetch: any;
+  callCount: any;
+  lastArgs: any;
+  calls: any;
+  closed: any;
 
   /**
    * @param {Object} [options]
@@ -208,7 +220,7 @@ export class MockPatentSource extends PatentDataSource {
    * @param {function(string[]): void} [options.onFetch]
    *   Optional callback invoked with the CPC codes on each fetchByCpc call.
    */
-  constructor(options = {}) {
+  constructor(options: any = {}) {
     super();
 
     // Configuration

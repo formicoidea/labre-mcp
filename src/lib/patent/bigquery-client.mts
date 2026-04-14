@@ -87,7 +87,7 @@ export const DEFAULTS = Object.freeze({
  * @returns {ResolvedConfig} Fully resolved configuration
  * @throws {Error} If BIGQUERY_PROJECT_ID is missing from both options and env
  */
-export function resolveConfig(options = {}) {
+export function resolveConfig(options: any = {}): any {
   const env = typeof process !== 'undefined' ? process.env : {};
 
   // ── Project ID (required) ────────────────────────────────────────────────
@@ -152,8 +152,8 @@ export function resolveConfig(options = {}) {
  * @param {ResolvedConfig} config - Configuration to validate
  * @returns {{ valid: boolean, errors: string[] }}
  */
-export function validateConfig(config) {
-  const errors = [];
+export function validateConfig(config: any) {
+  const errors: string[] = [];
 
   if (!config || typeof config !== 'object') {
     return { valid: false, errors: ['Config must be a non-null object'] };
@@ -263,7 +263,7 @@ export async function getClient(config) {
     projectId: config.projectId,
     location: config.location,
     scopes: config.scopes,
-  };
+  } as any;
 
   // Add service account key file if provided (otherwise relies on ADC)
   if (config.keyFilename) {
@@ -285,7 +285,7 @@ export async function getClient(config) {
  * @param {string} projectId - GCP project ID whose client to destroy
  * @returns {boolean} true if a client was removed, false if none existed
  */
-export function destroyClient(projectId) {
+export function destroyClient(projectId: string) {
   return clientPool.delete(projectId);
 }
 
@@ -315,7 +315,7 @@ export function poolSize() {
  * @param {ResolvedConfig} config - Resolved BigQuery configuration
  * @returns {Object} Base query options for BigQuery .query() calls
  */
-export function defaultQueryOptions(config) {
+export function defaultQueryOptions(config: any) {
   return {
     location: config.location,
     maximumBytesBilled: config.maxBytesBilled,

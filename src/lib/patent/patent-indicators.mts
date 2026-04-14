@@ -399,7 +399,7 @@ export function aggregateUbiquite(scores, config = UBIQUITE_INDICATORS) {
  * @param {Array} [options.ubiquiteConfig] - Custom ubiquité indicator config
  * @returns {{ certitude: {value, breakdown, enabledCount}, ubiquite: {value, breakdown, enabledCount}, scores: Object }}
  */
-export function computeAllIndicators(patentData, options = {}) {
+export function computeAllIndicators(patentData: any, options: any = {}) {
   const {
     certitudeConfig = CERTITUDE_INDICATORS,
     ubiquiteConfig = UBIQUITE_INDICATORS,
