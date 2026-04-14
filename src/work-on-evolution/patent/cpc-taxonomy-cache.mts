@@ -154,15 +154,14 @@ export function setCpcTitle(code, title) {
 // ─── CpcTaxonomyCache class ────────────────────────────────────────────────
 
 export class CpcTaxonomyCache {
+  _client: any;
+  _queryOptions: any;
+  _cachePath: any;
+  _ttlMs: any;
+  _memory: any;
+  _diskLoaded: any;
 
-  /**
-   * @param {Object} options
-   * @param {Object} options.bigqueryClient - BigQuery client instance
-   * @param {Object} options.queryOptions - Default query options
-   * @param {string} [options.cachePath] - Path to on-disk cache file
-   * @param {number} [options.ttlMs] - Cache TTL in milliseconds (default: 30 days)
-   */
-  constructor({ bigqueryClient, queryOptions, cachePath, ttlMs } = {}) {
+  constructor({ bigqueryClient, queryOptions, cachePath, ttlMs }: any = {}) {
     this._client = bigqueryClient || null;
     this._queryOptions = queryOptions || {};
     this._cachePath = cachePath || DEFAULT_CACHE_PATH;
@@ -279,7 +278,7 @@ export class CpcTaxonomyCache {
       const data = JSON.parse(raw);
 
       if (data && typeof data === 'object') {
-        for (const [key, entry] of Object.entries(data)) {
+        for (const [key, entry] of Object.entries(data) as [string, any][]) {
           if (entry?.children && entry?.fetchedAt) {
             this._memory.set(key, entry);
             // Register titles from disk cache
@@ -327,7 +326,7 @@ export class CpcTaxonomyCache {
  * @param {Object} [options]
  * @returns {Promise<CpcTaxonomyCache>}
  */
-export async function createTaxonomyCache(options = {}) {
+export async function createTaxonomyCache(options: any = {}) {
   try {
     const { resolveConfig, getClient, defaultQueryOptions } = await import('../../lib/patent/bigquery-client.mjs');
     const config = resolveConfig();

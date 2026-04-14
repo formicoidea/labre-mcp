@@ -51,7 +51,7 @@ const TOOL = 'estimateEvolution:pipeline';
  * @param {Function} options.evaluateCapabilityFn - Function to evaluate a capability (accepts {name, description, strategy})
  * @returns {Promise<CapabilityPivotResult>}
  */
-export async function evaluateCapabilityPivot(standardResult, component, options = {}) {
+export async function evaluateCapabilityPivot(standardResult: any, component: any, options: any = {}): Promise<any> {
   const { evaluateCapabilityFn } = options;
 
   const isSolution = standardResult.routing?.usedSolutionStrategies === true;
@@ -112,12 +112,12 @@ export async function evaluateCapabilityPivot(standardResult, component, options
  * @param {Object<string, { evolution?: number, confidence?: number, error?: string }>} evaluations
  * @returns {{ evolution: number, confidence: number, method: string }}
  */
-function extractBestEvolution(evaluations) {
+function extractBestEvolution(evaluations: any) {
   let bestEvolution = 0.5;
   let bestConfidence = 0;
   let bestMethod = 'unknown';
 
-  for (const [method, result] of Object.entries(evaluations)) {
+  for (const [method, result] of Object.entries(evaluations) as [string, any][]) {
     if (result.error || result.evolution == null) continue;
     if (result.confidence > bestConfidence) {
       bestEvolution = result.evolution;
@@ -145,7 +145,7 @@ function extractBestEvolution(evaluations) {
  * @param {number|null} legacyEvolution - Legacy solution evolution (lower bound), or null
  * @returns {{ evolution: number, clamped: boolean, originalEvolution: number }}
  */
-export function clampCapabilityEvolution(capabilityEvolution, sotaEvolution, legacyEvolution) {
+export function clampCapabilityEvolution(capabilityEvolution: number, sotaEvolution: number, legacyEvolution: number) {
   const original = capabilityEvolution;
   let clamped = false;
   let evolution = capabilityEvolution;
@@ -235,7 +235,7 @@ function round2(n) {
  * @param {string} [params.nature]         - Component nature (activity/practice/data/knowledge) — metadata only
  * @returns {string} Valid OWM syntax string
  */
-export function generateOwmSyntax(params) {
+export function generateOwmSyntax(params: any) {
   const {
     capabilityLabel = 'Capability',
     capabilityEvolution = 0.5,
@@ -389,7 +389,7 @@ reasoning=<one sentence explaining your choices>`;
  * @param {string} capabilityName - Capability used for context in error messages
  * @returns {SolutionDiscoveryResult}
  */
-export function parseSolutionDiscoveryResponse(text, capabilityName) {
+export function parseSolutionDiscoveryResponse(text: string, capabilityName: string): any {
   const sotaNameMatch = text.match(/^sota_name\s*=\s*(.+)/mi);
   const sotaDescMatch = text.match(/^sota_description\s*=\s*(.+)/mi);
   const legacyNameMatch = text.match(/^legacy_name\s*=\s*(.+)/mi);
@@ -454,7 +454,7 @@ export function parseSolutionDiscoveryResponse(text, capabilityName) {
  * @param {string}   [options.excludeName]    - Original component name to exclude from results
  * @returns {Promise<SolutionDiscoveryResult>}
  */
-export async function discoverPipelineSolutions(capabilityName, options = {}) {
+export async function discoverPipelineSolutions(capabilityName: string, options: any = {}): Promise<any> {
   const { llmCall, description = '', excludeName = '' } = options;
 
   if (!capabilityName || typeof capabilityName !== 'string') {
@@ -511,7 +511,7 @@ export async function discoverPipelineSolutions(capabilityName, options = {}) {
  * @param {Function} options.llmCall - LLM call function
  * @returns {Promise<{ evolution: number|null, confidence: number, method: string, evaluations: Object }>}
  */
-export async function evaluateDiscoveredSolution(solution, options = {}) {
+export async function evaluateDiscoveredSolution(solution: any, options: any = {}): Promise<any> {
   const { llmCall } = options;
 
   if (!solution || !solution.name) {
@@ -572,7 +572,7 @@ export async function evaluateDiscoveredSolution(solution, options = {}) {
  * @param {Function} [options.llmCall]            - LLM call function for solution discovery
  * @returns {Promise<Object>} Pipeline result with capability pivot, OWM output, and discovered solutions
  */
-export async function runEnrichedPipeline(standardResult, component, options = {}) {
+export async function runEnrichedPipeline(standardResult: any, component: any, options: any = {}): Promise<any> {
   logInfo(TOOL, `Starting enriched pipeline for "${component.name}"`);
 
   // Step 1: Capability pivot — always first

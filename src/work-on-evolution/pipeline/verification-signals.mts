@@ -19,7 +19,7 @@
  * @param {string}  label      - Human-readable label (for debugging)
  * @returns {Promise<{ value: any, timedOut: boolean, error?: Error }>}
  */
-export function raceWithTimeout(promise, timeoutMs, label) {
+export function raceWithTimeout(promise: Promise<any>, timeoutMs: number, label: string): Promise<any> {
   return new Promise((resolve) => {
     let settled = false;
     const timer = setTimeout(() => {
@@ -58,7 +58,7 @@ export function raceWithTimeout(promise, timeoutMs, label) {
  * @param {number} durationMs - Duration in milliseconds
  * @returns {VerificationSignal}
  */
-export function buildSuccessSignal(result, method, durationMs) {
+export function buildSuccessSignal(result: any, method: string, durationMs: number) {
   return {
     classification: result.classification || null,
     confidence: typeof result.confidence === 'number' ? result.confidence : 0,
@@ -78,7 +78,7 @@ export function buildSuccessSignal(result, method, durationMs) {
  * @param {number} durationMs - Actual elapsed time
  * @returns {VerificationSignal}
  */
-export function buildTimeoutSignal(method, timeoutMs, durationMs) {
+export function buildTimeoutSignal(method: string, timeoutMs: number, durationMs: number) {
   return {
     classification: null,
     confidence: 0,
@@ -98,7 +98,7 @@ export function buildTimeoutSignal(method, timeoutMs, durationMs) {
  * @param {number} durationMs - Duration before failure
  * @returns {VerificationSignal}
  */
-export function buildErrorSignal(method, err, durationMs) {
+export function buildErrorSignal(method: string, err: any, durationMs: number) {
   return {
     classification: null,
     confidence: 0,
@@ -117,7 +117,7 @@ export function buildErrorSignal(method, err, durationMs) {
  * @param {string} reason - Why the signal was skipped
  * @returns {VerificationSignal}
  */
-export function buildSkippedSignal(method, reason) {
+export function buildSkippedSignal(method: string, reason: string) {
   return {
     classification: null,
     confidence: 0,

@@ -106,7 +106,7 @@ export const SIGNAL_STATUS = {
  * @param {ClassificationSignal} signal - Signal to check
  * @returns {boolean} true if the signal provides a usable classification
  */
-export function isSignalUsable(signal) {
+export function isSignalUsable(signal: any) {
   if (!signal) return false;
 
   // Status check: success or absent status field (backward compatibility)
@@ -190,7 +190,7 @@ function normalizeSignal(signal, defaultMethod = 'unknown') {
  * @param {number} [options.minVerified=0.70]           - Min confidence for verified flag
  * @returns {CombinedClassificationResult} Combined classification with confidence
  */
-export function combineSignals(llmSignal, webSearchSignal, options = {}) {
+export function combineSignals(llmSignal: any, webSearchSignal: any, options: any = {}): any {
   const params = {
     agreementBonus: options.agreementBonus ?? COMBINATION_PARAMS.AGREEMENT_BONUS,
     disagreementPenalty: options.disagreementPenalty ?? COMBINATION_PARAMS.DISAGREEMENT_PENALTY,
@@ -347,7 +347,7 @@ export function combineSignals(llmSignal, webSearchSignal, options = {}) {
  * @param {Object} [options={}]                   - Same options as combineSignals
  * @returns {CombinedClassificationResult} Combined classification from all three signals
  */
-export function combineAllSignals(namingSignal, llmSignal, webSearchSignal, options = {}) {
+export function combineAllSignals(namingSignal: any, llmSignal: any, webSearchSignal: any, options: any = {}): any {
   const params = {
     agreementBonus: options.agreementBonus ?? COMBINATION_PARAMS.AGREEMENT_BONUS,
     maxConfidence: options.maxConfidence ?? COMBINATION_PARAMS.MAX_CONFIDENCE,

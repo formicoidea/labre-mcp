@@ -106,7 +106,7 @@ export const DEFAULT_SIGNAL_TIMEOUT_MS = 15_000;
  * @param {number}   [context.webSearchTimeoutMs]
  * @returns {Promise<DualSignalPair>}
  */
-export async function verifyConcurrent(componentName, context = {}) {
+export async function verifyConcurrent(componentName: string, context: any = {}): Promise<any> {
   const name = (componentName || '').trim();
   const concurrentStart = Date.now();
 
@@ -188,7 +188,7 @@ export async function verifyConcurrent(componentName, context = {}) {
   const webSearchPromise = canUseWebSearch
     ? (async () => {
         const t0 = Date.now();
-        const webSearchOptions = {};
+        const webSearchOptions: any = {};
         if (typeof context.webSearchCall === 'function') {
           webSearchOptions.webSearchCall = context.webSearchCall;
         }
@@ -277,7 +277,7 @@ export async function verifyConcurrent(componentName, context = {}) {
  * @param {Object} [context={}]  - Same context shape as verifyConcurrent
  * @returns {Promise<Object>}
  */
-export async function verifyConcurrentFull(componentName, context = {}) {
+export async function verifyConcurrentFull(componentName: string, context: any = {}): Promise<any> {
   const name = (componentName || '').trim();
 
   if (!name) {

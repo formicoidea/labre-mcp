@@ -15,7 +15,7 @@ import { determineRoutingTargets } from '../routing/solution-dispatch.mjs';
  * @param {import('../../lib/component-detection.mjs').ComponentTypeDetection} detection
  * @returns {{ classification: string, confidence: number, method: string, reasoning: string }}
  */
-export function toIntermediateResult(detection) {
+export function toIntermediateResult(detection: any) {
   return {
     classification: detection.type,
     confidence: detection.confidence,
@@ -41,7 +41,7 @@ export function toIntermediateResult(detection) {
  * @param {{ classification: string, confidence: number, method: string, reasoning: string }} tierB
  * @returns {{ classification: string, confidence: number, method: string, reasoning: string }}
  */
-export function reconcileTwoTiers(tierA, tierB) {
+export function reconcileTwoTiers(tierA: any, tierB: any): any {
   if (tierA.classification === tierB.classification) {
     // Agreement: boost confidence
     const boosted = Math.round(
@@ -85,7 +85,7 @@ export function reconcileTwoTiers(tierA, tierB) {
  * @param {import('./dual-verification-orchestrator.mjs').VerificationSignal} webSearchSignal
  * @returns {{ classification: string, confidence: number, method: string, reasoning: string }}
  */
-export function reconcileSignalPair(llmSignal, webSearchSignal) {
+export function reconcileSignalPair(llmSignal: any, webSearchSignal: any): any {
   const llmOk = llmSignal.status === 'success' && llmSignal.classification != null;
   const webOk = webSearchSignal.status === 'success' && webSearchSignal.classification != null;
 
@@ -173,7 +173,7 @@ export function reconcileSignalPair(llmSignal, webSearchSignal) {
  * @param {Object} [params.webSearchResult] - Tier 3 web search result
  * @returns {import('./dual-verification-orchestrator.mjs').VerifiedClassificationResult}
  */
-export function buildResult(params) {
+export function buildResult(params: any): any {
   const {
     classification,
     confidence,

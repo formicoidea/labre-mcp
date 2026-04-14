@@ -133,7 +133,7 @@ export const THRESHOLDS = {
  * @param {ClassificationContext} [context={}] - Partial classification context
  * @returns {Promise<VerifiedClassificationResult>} Verified classification result
  */
-export async function verifyClassification(componentName, context = {}) {
+export async function verifyClassification(componentName: string, context: any = {}): Promise<any> {
   const name = (componentName || '').trim();
 
   if (!name) {
@@ -239,7 +239,7 @@ export async function verifyClassification(componentName, context = {}) {
     tiersUsed.push('web-search');
 
     try {
-      const webSearchOptions = {};
+      const webSearchOptions: any = {};
       if (typeof context.webSearchCall === 'function') {
         webSearchOptions.webSearchCall = context.webSearchCall;
       }
@@ -320,7 +320,7 @@ export { verifyConcurrent, verifyConcurrentFull };
  * @param {string} [description] - Optional business context
  * @returns {VerifiedClassificationResult}
  */
-export function classifyNamingOnly(componentName, description = '') {
+export function classifyNamingOnly(componentName: string, description: string = '') {
   const name = (componentName || '').trim();
   const namingResult = detectComponentType(name, description);
 

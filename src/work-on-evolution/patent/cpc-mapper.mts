@@ -35,7 +35,7 @@ export const CPC_CODE_REGEX = /^[A-H]\d{2}[A-Z](\d+\/([\d]+)?)?$/;
  * @param {string} code
  * @returns {boolean}
  */
-export function isValidCpcCode(code) {
+export function isValidCpcCode(code: any) {
   return typeof code === 'string' && CPC_CODE_REGEX.test(code);
 }
 
@@ -100,7 +100,7 @@ async function llmPickClass(capability, llmCall) {
  * @param {Array<{code: string, title: string}>} [options.parentPath] - Breadcrumb of parent selections
  * @returns {Promise<string[]>} Selected codes (1-3)
  */
-async function llmPickFromList(capability, codeEntries, llmCall, options = {}) {
+async function llmPickFromList(capability: string, codeEntries: any[], llmCall: any, options: any = {}): Promise<string[]> {
   if (codeEntries.length === 0) return [];
   if (codeEntries.length === 1) return [codeEntries[0].code];
 
@@ -114,7 +114,7 @@ async function llmPickFromList(capability, codeEntries, llmCall, options = {}) {
 
   // Format parent context as breadcrumb
   const parentContext = options.parentPath?.length
-    ? `\nParent classification path:\n${options.parentPath.map(p => `  ${p.code} (${p.title})`).join(' > ')}\n`
+    ? `\nParent classification path:\n${options.parentPath.map((p: any) => `  ${p.code} (${p.title})`).join(' > ')}\n`
     : '';
 
   const prompt = PROMPT_PICK_FROM_LIST
@@ -132,7 +132,7 @@ async function llmPickFromList(capability, codeEntries, llmCall, options = {}) {
     .filter(s => availableCodes.has(s));
 
   // Deduplicate, cap at 3
-  return [...new Set(selected)].slice(0, 3);
+  return [...new Set(selected)].slice(0, 3) as string[];
 }
 
 /**
@@ -283,7 +283,7 @@ const ULTIMATE_DEFAULT_CODES = ['G06F'];
  * @param {import('./cpc-taxonomy-cache.mjs').CpcTaxonomyCache} [options.taxonomyCache] - CPC cache
  * @returns {Promise<{codes: string[], titles: Record<string, string>}>}
  */
-export async function mapCapabilityToCPC(capability, options = {}) {
+export async function mapCapabilityToCPC(capability: string, options: any = {}): Promise<any> {
   const cap = (typeof capability === 'string' ? capability : '').trim();
   if (!cap) return { codes: [...ULTIMATE_DEFAULT_CODES], titles: {} };
 
@@ -330,7 +330,7 @@ export async function mapCapabilityToCPC(capability, options = {}) {
  * @param {import('./cpc-taxonomy-cache.mjs').CpcTaxonomyCache} [options.taxonomyCache]
  * @returns {Promise<{codes: string[], titles: Record<string, string>}>}
  */
-export async function mapComponentToCpc(component, llmCall, options = {}) {
+export async function mapComponentToCpc(component: any, llmCall: any, options: any = {}): Promise<any> {
   const capability = component.capability || component.name || '';
   return mapCapabilityToCPC(capability, {
     llmCall,

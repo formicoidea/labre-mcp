@@ -182,7 +182,7 @@ function titleCase(str) {
  * @param {function} options.llmCall       - LLM call function (from llm-call.mjs)
  * @returns {Promise<PipelineCapabilityInferenceResult>}
  */
-export async function inferCapabilityFromSolution(solutionName, options = {}) {
+export async function inferCapabilityFromSolution(solutionName: string, options: any = {}): Promise<any> {
   const { description = '', llmCall } = options;
 
   if (!solutionName || typeof solutionName !== 'string') {
