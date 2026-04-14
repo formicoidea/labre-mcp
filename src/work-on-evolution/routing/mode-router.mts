@@ -77,7 +77,7 @@ function hasEvaluationParams(input) {
  * @param {Object} input - Raw request input
  * @returns {{ mode: string, reason: string }} Detected mode and reason for the choice
  */
-export function detectMode(input) {
+export function detectMode(input: any) {
   if (!input || typeof input !== 'object') {
     return { mode: MODES.GUIDED, reason: 'no valid input — defaulting to guided mode' };
   }
@@ -143,7 +143,7 @@ export function detectMode(input) {
  * @param {Object} input - Request input with optional mode parameter
  * @returns {Promise<RoutedResponse>} Unified response with mode, results, and formatting
  */
-export async function routeEstimateEvolution(input = {}) {
+export async function routeEstimateEvolution(input: any = {}): Promise<any> {
   const { mode, reason } = detectMode(input);
 
   if (mode === MODES.ONESHOT) {
@@ -162,7 +162,7 @@ export async function routeEstimateEvolution(input = {}) {
  * @param {string} modeReason - Why one-shot was selected
  * @returns {Promise<RoutedResponse>}
  */
-async function routeOneShot(input, modeReason) {
+async function routeOneShot(input: any, modeReason: string): Promise<any> {
   // Map input to one-shot API format
   const oneShotInput = {
     name: input.name,
@@ -189,34 +189,35 @@ async function routeOneShot(input, modeReason) {
   // When pipeline mode is active, the result has a different shape with
   // pipeline-specific fields (owmOutput, capabilityPivot, sotaSolution, etc.).
   // Standard fields live under result.standardResult in that case.
-  const std = result.pipeline ? (result.standardResult || {}) : result;
+  const r = result as any;
+  const std: any = r.pipeline ? (r.standardResult || {}) : r;
 
-  const response = {
+  const response: any = {
     mode: MODES.ONESHOT,
     modeReason,
-    classification: std.classification || result.classification,
-    reQuestions: std.reQuestions || result.reQuestions,
-    evaluations: std.evaluations || result.evaluations,
-    message: std.message || result.message,
+    classification: std.classification || r.classification,
+    reQuestions: std.reQuestions || r.reQuestions,
+    evaluations: std.evaluations || r.evaluations,
+    message: std.message || r.message,
     formatted,
     // One-shot mode has no session state or questions
     sessionState: null,
     nextQuestion: null,
     phase: null,
     // Pass through routing metadata (solution/capability detection + confidence)
-    routing: std.routing || result.routing || null,
+    routing: std.routing || r.routing || null,
   };
 
   // Pass through pipeline-specific fields when pipeline mode is active
-  if (result.pipeline) {
+  if (r.pipeline) {
     response.pipeline = true;
-    response.owmOutput = result.owmOutput;
-    response.owm = result.owm;
-    response.capabilityPivot = result.capabilityPivot;
-    response.sotaSolution = result.sotaSolution;
-    response.legacySolution = result.legacySolution;
-    response.discoveredSolutions = result.discoveredSolutions;
-    response.componentName = result.componentName;
+    response.owmOutput = r.owmOutput;
+    response.owm = r.owm;
+    response.capabilityPivot = r.capabilityPivot;
+    response.sotaSolution = r.sotaSolution;
+    response.legacySolution = r.legacySolution;
+    response.discoveredSolutions = r.discoveredSolutions;
+    response.componentName = r.componentName;
   }
 
   return response;
@@ -231,11 +232,11 @@ async function routeOneShot(input, modeReason) {
  * @param {string} modeReason - Why guided was selected
  * @returns {Promise<RoutedResponse>}
  */
-async function routeGuided(input, modeReason) {
+async function routeGuided(input: any, modeReason: string): Promise<any> {
   // Build conversational input
-  const conversationalInput = {
+  const conversationalInput: any = {
     sessionState: input.sessionState || null,
-    data: {},
+    data: {} as Record<string, any>,
     forceEstimate: input.forceEstimate || false,
     strategy: input.strategy,
   };
@@ -283,7 +284,7 @@ async function routeGuided(input, modeReason) {
     nextQuestion: result.nextQuestion || null,
     phase: result.phase,
     // Pass through routing metadata (solution/capability detection + confidence)
-    routing: result.routing || null,
+    routing: (result as any).routing || null,
   };
 }
 

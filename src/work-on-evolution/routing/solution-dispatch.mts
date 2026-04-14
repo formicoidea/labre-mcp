@@ -102,7 +102,7 @@ export function determineRoutingTargets(detection) {
  * @param {string}   [deps.mode]   - 'auto' or 'conversational'
  * @returns {import('../strategies/solution/solution-base-strategy.mjs').SolutionBaseStrategy}
  */
-export function createSolutionStrategyInstance(StrategyCls, deps = {}) {
+export function createSolutionStrategyInstance(StrategyCls: any, deps: any = {}) {
   // All solution strategies currently use LLM for evaluation
   if (deps.llmCall) {
     return new StrategyCls({
@@ -128,9 +128,9 @@ export function createSolutionStrategyInstance(StrategyCls, deps = {}) {
  * @param {string}   [options.mode='auto']    - 'auto' or 'conversational'
  * @returns {Promise<Object<string, import('../strategies/solution/solution-base-strategy.mjs').SolutionEvolutionResult>>}
  */
-export async function dispatchSolutionStrategies(component, options = {}) {
+export async function dispatchSolutionStrategies(component: any, options: any = {}): Promise<any> {
   const { llmCall, strategy = 'all', mode = 'auto' } = options;
-  const evaluations = {};
+  const evaluations: Record<string, any> = {};
 
   // Tag the component for solution strategies
   const solutionComponent = { ...component, isSolution: true };
@@ -205,7 +205,7 @@ export async function dispatchSolutionStrategies(component, options = {}) {
  * @param {string}   [options.description]     - Component description for detection
  * @returns {Promise<RoutedEvaluationResult>}
  */
-export async function dispatchWithRouting(component, options = {}) {
+export async function dispatchWithRouting(component: any, options: any = {}): Promise<any> {
   const {
     llmCall,
     runCapabilityStrategies: capabilityCallback,

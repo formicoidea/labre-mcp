@@ -204,7 +204,7 @@ const CAPABILITY_INDICATORS = [
  * @param {string} [options.context] - Additional context (boosts confidence if consistent)
  * @returns {SolutionDetectionResult}
  */
-export function classifySolutionNaming(name, options = {}) {
+export function classifySolutionNaming(name: string, options: any = {}) {
   const trimmed = (name || '').trim();
   if (!trimmed) {
     return {
@@ -370,7 +370,7 @@ reasoning=<one sentence explaining your classification>`;
  * @param {string} [options.context] - Additional context about the component
  * @returns {Promise<SolutionDetectionResult>}
  */
-export async function classifySolutionLLM(name, llmCall, options = {}) {
+export async function classifySolutionLLM(name: string, llmCall: any, options: any = {}): Promise<any> {
   const trimmed = (name || '').trim();
 
   if (!trimmed) {
@@ -417,7 +417,7 @@ export async function classifySolutionLLM(name, llmCall, options = {}) {
  * @param {string} name - Original component name (for error messages)
  * @returns {SolutionDetectionResult}
  */
-export function parseLLMClassificationResponse(text, name) {
+export function parseLLMClassificationResponse(text: string, name: string) {
   const classMatch = text.match(/^classification\s*=\s*(solution|capability)/mi);
   const confMatch = text.match(/^confidence\s*=\s*(-?[\d.]+)/mi);
   const reasonMatch = text.match(/^reasoning\s*=\s*(.+)/mi);
@@ -491,7 +491,7 @@ export function parseLLMClassificationResponse(text, name) {
  *   heuristics are uncertain, returns the uncertain naming result.
  * @returns {Promise<SolutionDetectionResult>}
  */
-export async function detectSolution(name, options = {}) {
+export async function detectSolution(name: string, options: any = {}): Promise<any> {
   const TOOL = 'detectSolution';
 
   // Tier 1: Naming convention heuristics

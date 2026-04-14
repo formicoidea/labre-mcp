@@ -141,7 +141,7 @@ Keep references to 2-4 most relevant sources.`;
  * @param {string} name - Component name (for fallback messages)
  * @returns {WebSearchVerificationResult}
  */
-export function parseWebSearchResponse(text, name) {
+export function parseWebSearchResponse(text: string, name: string) {
   if (!text || typeof text !== 'string' || text.trim().length === 0) {
     return createFallbackResult(name, 'Empty web search response');
   }
@@ -187,8 +187,8 @@ export function parseWebSearchResponse(text, name) {
  * @param {string} text - Full LLM response
  * @returns {WebSearchEvidence[]}
  */
-function parseEvidenceBlock(text) {
-  const evidence = [];
+function parseEvidenceBlock(text: string) {
+  const evidence: any[] = [];
   const evidenceMatch = text.match(/EVIDENCE_START\s*\n([\s\S]*?)\nEVIDENCE_END/i);
 
   if (!evidenceMatch) return evidence;
@@ -196,7 +196,7 @@ function parseEvidenceBlock(text) {
   const lines = evidenceMatch[1].split('\n').filter(l => l.trim().length > 0);
 
   for (const line of lines) {
-    const fields = {};
+    const fields: Record<string, string> = {};
     // Parse pipe-separated key=value pairs
     const parts = line.split('|');
     for (const part of parts) {
@@ -229,8 +229,8 @@ function parseEvidenceBlock(text) {
  * @param {string} text - Full LLM response
  * @returns {WebSearchReference[]}
  */
-function parseReferencesBlock(text) {
-  const references = [];
+function parseReferencesBlock(text: string) {
+  const references: any[] = [];
   const refMatch = text.match(/REFERENCES_START\s*\n([\s\S]*?)\nREFERENCES_END/i);
 
   if (!refMatch) return references;
@@ -238,7 +238,7 @@ function parseReferencesBlock(text) {
   const lines = refMatch[1].split('\n').filter(l => l.trim().length > 0);
 
   for (const line of lines) {
-    const fields = {};
+    const fields: Record<string, string> = {};
     const parts = line.split('|');
     for (const part of parts) {
       const eqIdx = part.indexOf('=');
@@ -370,20 +370,20 @@ function createFallbackResult(name, reason) {
  * @param {number} [config.maxTurns=3]                 - Max tool-use turns (search + analyze)
  * @returns {function(string, Object?): Promise<string>}
  */
-export function createWebSearchCall(config = {}) {
+export function createWebSearchCall(config: any = {}) {
   const {
     model = 'claude-sonnet-4-6',
     maxBudgetUsd = 0.08,
     maxTurns = 3,
   } = config;
 
-  return async function webSearchCall(prompt) {
+  return async function webSearchCall(prompt: string): Promise<string> {
     // Prevent nested session detection
     if (process.env.CLAUDECODE) {
       delete process.env.CLAUDECODE;
     }
 
-    const options = {
+    const options: any = {
       model,
       maxTurns,
       effort: 'high',
@@ -395,16 +395,17 @@ export function createWebSearchCall(config = {}) {
 
     const errorContext = { logger: TOOL, model };
 
-    let lastError;
+    let lastError: unknown;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
         let resultText = '';
-        for await (const message of query({ prompt, options })) {
-          if (message.type === 'result') {
-            if (message.subtype === 'success') {
-              resultText = message.result || '';
+        for await (const message of query({ prompt, options } as Parameters<typeof query>[0])) {
+          const msg = message as any;
+          if (msg.type === 'result') {
+            if (msg.subtype === 'success') {
+              resultText = msg.result || '';
             } else {
-              const errors = message.errors || [];
+              const errors = msg.errors || [];
               throw new Error(`Web search call failed: ${errors.join(', ') || 'unknown error'}`);
             }
           }
@@ -449,7 +450,7 @@ export function createWebSearchCall(config = {}) {
  * @param {string} [options.context] - Additional context about the component
  * @returns {Promise<WebSearchVerificationResult>}
  */
-export async function verifyViaWebSearch(name, options = {}) {
+export async function verifyViaWebSearch(name: string, options: any = {}) {
   const trimmed = (name || '').trim();
 
   if (!trimmed) {
@@ -514,7 +515,7 @@ export async function verifyViaWebSearch(name, options = {}) {
  * @param {WebSearchVerificationResult} webResult - Web search result
  * @returns {WebSearchVerificationResult} Combined result
  */
-export function combineWithPriorResult(priorResult, webResult) {
+export function combineWithPriorResult(priorResult: any, webResult: any) {
   if (!priorResult || !webResult) {
     return webResult || priorResult || createFallbackResult('unknown', 'No results to combine');
   }
@@ -676,7 +677,7 @@ used for container orchestration. There is pricing for managed versions like GKE
   const r8 = await verifyViaWebSearch('SomeProduct', { webSearchCall: failingSearch });
   console.assert(r8.classification === 'capability', 'Error → capability fallback');
   console.assert(r8.confidence <= 0.40, `Error → low confidence, got ${r8.confidence}`);
-  console.assert(r8.error === 'Network timeout', `Expected error message, got ${r8.error}`);
+  console.assert((r8 as any).error === 'Network timeout', `Expected error message, got ${(r8 as any).error}`);
   console.log(`  \u2713 Error handled gracefully (confidence=${r8.confidence})`);
 
   // ── Test 9: combineWithPriorResult ─────────────────────────────────

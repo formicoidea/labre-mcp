@@ -83,7 +83,7 @@ export const WARDLEY_TYPE_PATTERNS = {
  * @param {string} [options.category] - Category from KNOWN_SOLUTIONS
  * @returns {{ wardleyType: WardleyComponentType, confidence: number, reason: string }}
  */
-export function classifyWardleyType(name, options = {}) {
+export function classifyWardleyType(name: string, options: any = {}) {
   const trimmed = (name || '').trim();
 
   // Layer 1: Use pre-existing nature from dictionary lookup

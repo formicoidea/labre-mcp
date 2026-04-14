@@ -70,9 +70,9 @@ const TOOL = 'evalModeDispatcher';
  * @param {function} createInstance - Factory for capability strategy instances
  * @returns {Promise<Object<string, import('../strategies/capacity/base-strategy.mjs').EvolutionResult>>}
  */
-async function runCapabilityStrategies(component, createInstance) {
+async function runCapabilityStrategies(component: any, createInstance: any) {
   const strategies = await loadStrategies();
-  const evaluations = {};
+  const evaluations: Record<string, any> = {};
 
   // Phase A: Run all non-s-curve strategies first
   for (const [method, StrategyCls] of strategies) {
@@ -84,23 +84,23 @@ async function runCapabilityStrategies(component, createInstance) {
       evaluations[method] = result;
       logDebug(TOOL, `Capability strategy "${method}": evolution=${result.evolution}, confidence=${result.confidence}`);
     } catch (err) {
-      evaluations[method] = { error: err.message };
-      logDebug(TOOL, `Capability strategy "${method}" failed: ${err.message}`);
+      evaluations[method] = { error: (err as Error).message };
+      logDebug(TOOL, `Capability strategy "${method}" failed: ${(err as Error).message}`);
     }
   }
 
   // Phase B: Enrich component with certitude/ubiquity from LLM results
-  const enrichedComponent = { ...component };
+  const enrichedComponent: any = { ...component };
   if (enrichedComponent.certitude == null || enrichedComponent.ubiquity == null) {
-    const llmResults = Object.values(evaluations).filter(
+    const llmResults = (Object.values(evaluations) as any[]).filter(
       e => !e.error && e.certitude != null && e.ubiquity != null
     );
     if (llmResults.length > 0) {
       enrichedComponent.certitude = Math.round(
-        llmResults.reduce((s, r) => s + r.certitude, 0) / llmResults.length * 1000
+        llmResults.reduce((s: number, r: any) => s + r.certitude, 0) / llmResults.length * 1000
       ) / 1000;
       enrichedComponent.ubiquity = Math.round(
-        llmResults.reduce((s, r) => s + r.ubiquity, 0) / llmResults.length * 1000
+        llmResults.reduce((s: number, r: any) => s + r.ubiquity, 0) / llmResults.length * 1000
       ) / 1000;
       logDebug(TOOL, `Enriched "${component.name}": certitude=${enrichedComponent.certitude}, ubiquity=${enrichedComponent.ubiquity}`);
     }
@@ -131,9 +131,9 @@ async function runCapabilityStrategies(component, createInstance) {
  * @param {function} createInstance - Factory for solution strategy instances
  * @returns {Promise<Object<string, import('../strategies/capacity/base-strategy.mjs').EvolutionResult>>}
  */
-async function runSolutionStrategies(component, createInstance) {
+async function runSolutionStrategies(component: any, createInstance: any) {
   const strategies = await loadSolutionStrategies();
-  const evaluations = {};
+  const evaluations: Record<string, any> = {};
 
   for (const [method, StrategyCls] of strategies) {
     try {
@@ -143,8 +143,8 @@ async function runSolutionStrategies(component, createInstance) {
       evaluations[method] = result;
       logDebug(TOOL, `Solution strategy "${method}": evolution=${result.evolution}, confidence=${result.confidence}`);
     } catch (err) {
-      evaluations[method] = { error: err.message };
-      logDebug(TOOL, `Solution strategy "${method}" failed: ${err.message}`);
+      evaluations[method] = { error: (err as Error).message };
+      logDebug(TOOL, `Solution strategy "${method}" failed: ${(err as Error).message}`);
     }
   }
 
@@ -192,7 +192,7 @@ function namespaceResults(evaluations, namespace) {
  * @param {DispatchOptions} [options={}]
  * @returns {Promise<DispatchResult>}
  */
-export async function dispatchEvaluation(component, detection = null, options = {}) {
+export async function dispatchEvaluation(component: any, detection: any = null, options: any = {}): Promise<any> {
   const {
     createCapabilityInstance = defaultInstanceFactory,
     createSolutionInstance = defaultInstanceFactory,
@@ -295,7 +295,7 @@ export function isParallelMode() {
  * @param {string} [description] - Description
  * @returns {{ detection: Object, targets: Object, evalMode: string }}
  */
-export function previewDispatch(name, description = '') {
+export function previewDispatch(name: string, description: string = '') {
   const detection = detectComponentType(name, description);
   const targets = determineRoutingTargets(detection);
   return {
