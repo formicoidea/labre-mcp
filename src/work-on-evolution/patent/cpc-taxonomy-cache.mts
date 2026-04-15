@@ -120,7 +120,7 @@ const _titleStore = new Map();
  * @param {string} code - CPC code at any hierarchy level
  * @returns {string}
  */
-export function getCpcTitle(code) {
+export function getCpcTitle(code: string): string {
   if (_titleStore.has(code)) return _titleStore.get(code);
 
   // Try trimming trailing zeros (BigQuery: G06F9/50 → cpc.definition: G06F9/5)
@@ -146,7 +146,7 @@ export function getCpcTitle(code) {
  * @param {string} code
  * @param {string} title
  */
-export function setCpcTitle(code, title) {
+export function setCpcTitle(code: string, title: string): void {
   if (code && title && title !== code) {
     _titleStore.set(code, title);
   }
@@ -178,7 +178,7 @@ export class CpcTaxonomyCache {
    * @param {string} classCode - 3-char class code (e.g., "G06")
    * @returns {Promise<CpcEntry[]>}
    */
-  async getSubclasses(classCode) {
+  async getSubclasses(classCode: string): Promise<any[]> {
     const key = classCode.toUpperCase();
     return this._getOrFetch(key, SQL_SUBCLASSES);
   }
@@ -188,7 +188,7 @@ export class CpcTaxonomyCache {
    * @param {string} subclassCode - 4-char subclass code (e.g., "G06F")
    * @returns {Promise<CpcEntry[]>}
    */
-  async getGroups(subclassCode) {
+  async getGroups(subclassCode: string): Promise<any[]> {
     const key = subclassCode.toUpperCase();
     return this._getOrFetch(key, SQL_GROUPS);
   }
@@ -198,7 +198,7 @@ export class CpcTaxonomyCache {
    * @param {string} groupCode - Group prefix (e.g., "G06F9/")
    * @returns {Promise<CpcEntry[]>}
    */
-  async getSubgroups(groupCode) {
+  async getSubgroups(groupCode: string): Promise<any[]> {
     const key = groupCode.toUpperCase();
     return this._getOrFetch(key, SQL_SUBGROUPS);
   }
@@ -208,7 +208,7 @@ export class CpcTaxonomyCache {
    * Registers titles in the global store on load.
    * @private
    */
-  async _getOrFetch(parentCode, sql) {
+  async _getOrFetch(parentCode: string, sql: string): Promise<any[]> {
     // Check memory cache first
     const cached = this._memory.get(parentCode);
     if (cached && (Date.now() - cached.fetchedAt) < this._ttlMs) {
@@ -247,7 +247,7 @@ export class CpcTaxonomyCache {
    * Fetch CPC hierarchy data from BigQuery (with titles from cpc.definition).
    * @private
    */
-  async _fetchFromBigQuery(parentCode, sql) {
+  async _fetchFromBigQuery(parentCode: string, sql: string): Promise<any[]> {
     if (!this._client) return [];
 
     try {
@@ -258,8 +258,8 @@ export class CpcTaxonomyCache {
       });
 
       return rows
-        .filter(r => r.code)
-        .map(r => ({
+        .filter((r: any) => r.code)
+        .map((r: any) => ({
           code: r.code,
           cnt: Number(r.cnt) || 0,
           title: r.title || r.code,

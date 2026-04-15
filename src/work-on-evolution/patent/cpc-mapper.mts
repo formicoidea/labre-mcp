@@ -82,7 +82,7 @@ Select 1-3 most relevant codes. Return ONLY the codes, one per line. Nothing els
  * @param {function} llmCall
  * @returns {Promise<string|null>} 3-char class code or null
  */
-async function llmPickClass(capability, llmCall) {
+async function llmPickClass(capability: string, llmCall: any): Promise<string | null> {
   const prompt = PROMPT_PICK_CLASS.replace('{{capability}}', capability);
   const response = await llmCall(prompt);
 
@@ -125,11 +125,11 @@ async function llmPickFromList(capability: string, codeEntries: any[], llmCall: 
   const response = await llmCall(prompt);
 
   // Extract codes that match entries in our list
-  const availableCodes = new Set(codeEntries.map(e => e.code));
+  const availableCodes = new Set(codeEntries.map((e: any) => e.code));
   const selected = response
     .split(/[\s,;\n]+/)
-    .map(s => s.trim())
-    .filter(s => availableCodes.has(s));
+    .map((s: string) => s.trim())
+    .filter((s: string) => availableCodes.has(s));
 
   // Deduplicate, cap at 3
   return [...new Set(selected)].slice(0, 3) as string[];
@@ -140,7 +140,7 @@ async function llmPickFromList(capability: string, codeEntries: any[], llmCall: 
  * @param {number} n
  * @returns {string}
  */
-function formatCount(n) {
+function formatCount(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
   if (n >= 1_000) return (n / 1_000).toFixed(0) + 'K';
   return String(n);
@@ -161,16 +161,16 @@ Return ONLY the codes, one per line. Nothing else.`;
  * @param {function} llmCall
  * @returns {Promise<string[]>} Array of 4-char CPC codes
  */
-async function llmFallbackMapping(capability, llmCall) {
+async function llmFallbackMapping(capability: string, llmCall: any): Promise<string[]> {
   const prompt = LLM_FALLBACK_PROMPT.replace('{{capability}}', capability);
   const response = await llmCall(prompt);
 
   const codes = response
     .split(/[\s,;\n]+/)
-    .map(s => s.trim().toUpperCase())
-    .filter(s => /^[A-H]\d{2}[A-Z]$/.test(s));
+    .map((s: string) => s.trim().toUpperCase())
+    .filter((s: string) => /^[A-H]\d{2}[A-Z]$/.test(s));
 
-  return [...new Set(codes)].slice(0, 5);
+  return [...new Set(codes)].slice(0, 5) as string[];
 }
 
 // ─── Progressive discovery engine ───────────────────────────────────────────
@@ -193,12 +193,12 @@ async function llmFallbackMapping(capability, llmCall) {
  * @param {import('./cpc-taxonomy-cache.mjs').CpcTaxonomyCache} taxonomyCache
  * @returns {Promise<{codes: string[], titles: Record<string, string>}>}
  */
-async function progressiveDiscovery(capability, llmCall, taxonomyCache) {
-  const parentPath = [];
-  const titles = {};
+async function progressiveDiscovery(capability: string, llmCall: any, taxonomyCache: any): Promise<{ codes: string[]; titles: Record<string, string> }> {
+  const parentPath: Array<{ code: string; title: string }> = [];
+  const titles: Record<string, string> = {};
 
   // Helper: find entry by code in a list
-  const findEntry = (list, code) => list.find(e => e.code === code);
+  const findEntry = (list: any[], code: string) => list.find((e: any) => e.code === code);
 
   // Step 1: LLM identifies the class
   const classCode = await llmPickClass(capability, llmCall);

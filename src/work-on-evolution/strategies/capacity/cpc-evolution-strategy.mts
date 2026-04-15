@@ -645,7 +645,7 @@ NAME | SHORT_DESCRIPTION | EVOLUTION
       // Register titles from discovery into the global title store
       if (result.titles) {
         for (const [code, title] of Object.entries(result.titles)) {
-          setCpcTitle(code, title);
+          setCpcTitle(code, title as string);
         }
       }
 
