@@ -32,13 +32,13 @@ export const UBIQUITE_INDICATORS = [
 
 // ─── Helper: clamp to [0, 1] ───────────────────────────────────────────────────
 
-function clamp01(v) {
+function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
 }
 
 // ─── Helper: safe round to 4 decimals ───────────────────────────────────────────
 
-function round4(v) {
+function round4(v: number): number {
   return Math.round(v * 10000) / 10000;
 }
 
@@ -57,7 +57,7 @@ function round4(v) {
  *   Example: [{ cpc: 'H04L', count: 120 }, { cpc: 'G06F', count: 80 }]
  * @returns {number} Score in [0, 1]. Higher = more concentrated = higher certitude.
  */
-export function convergenceHHI(cpcDistribution) {
+export function convergenceHHI(cpcDistribution: any[]): number {
   if (!Array.isArray(cpcDistribution) || cpcDistribution.length === 0) return 0;
 
   const total = cpcDistribution.reduce((sum, d) => sum + (d.count || 0), 0);
@@ -91,7 +91,7 @@ export function convergenceHHI(cpcDistribution) {
  *   Example: [{ year: 2018, cpcCodes: ['H04L', 'G06F'] }, { year: 2019, cpcCodes: ['H04L', 'G06F', 'H04W'] }]
  * @returns {number} Score in [0, 1]. Higher = more stable = higher certitude.
  */
-export function stabiliteTaxonomique(yearlyClassifications) {
+export function stabiliteTaxonomique(yearlyClassifications: any[]): number {
   if (!Array.isArray(yearlyClassifications) || yearlyClassifications.length < 2) return 0;
 
   // Sort by year to ensure correct order
@@ -132,7 +132,7 @@ export function stabiliteTaxonomique(yearlyClassifications) {
  * @param {number} citationData.patentCount - Number of patents in the CPC class
  * @returns {number} Score in [0, 1]. Higher = more cited = higher certitude.
  */
-export function densiteCitation(citationData) {
+export function densiteCitation(citationData: any): number {
   if (!citationData || typeof citationData !== 'object') return 0;
 
   const { totalForwardCitations = 0, patentCount = 0 } = citationData;
@@ -159,7 +159,7 @@ export function densiteCitation(citationData) {
  *   Example: [{ year: 2015, avgIndependentClaims: 8.5 }, { year: 2020, avgIndependentClaims: 4.2 }]
  * @returns {number} Score in [0, 1]. Higher = more narrowing = higher certitude.
  */
-export function retrecissementClaims(claimsTimeline) {
+export function retrecissementClaims(claimsTimeline: any[]): number {
   if (!Array.isArray(claimsTimeline) || claimsTimeline.length < 2) return 0;
 
   const sorted = [...claimsTimeline].sort((a, b) => a.year - b.year);
@@ -208,7 +208,7 @@ export function retrecissementClaims(claimsTimeline) {
  * @param {number} assigneeData.totalPatents - Total patents in the class
  * @returns {number} Score in [0, 1]. Higher = more diverse = higher ubiquity.
  */
-export function diversiteAssignees(assigneeData) {
+export function diversiteAssignees(assigneeData: any): number {
   if (!assigneeData || typeof assigneeData !== 'object') return 0;
 
   const { uniqueAssignees = 0, totalPatents = 0 } = assigneeData;
@@ -231,7 +231,7 @@ export function diversiteAssignees(assigneeData) {
  * @param {string[]} [geoData.jurisdictions] - Optional list of jurisdiction codes
  * @returns {number} Score in [0, 1]. Higher = broader coverage = higher ubiquity.
  */
-export function couvertureGeo(geoData) {
+export function couvertureGeo(geoData: any): number {
   if (!geoData || typeof geoData !== 'object') return 0;
 
   const count = geoData.jurisdictionCount || (geoData.jurisdictions || []).length;
@@ -255,7 +255,7 @@ export function couvertureGeo(geoData) {
  * @param {number} sectorData.uniqueClasses - Number of unique CPC main classes
  * @returns {number} Score in [0, 1]. Higher = more cross-sector = higher ubiquity.
  */
-export function diffusionSectorielle(sectorData) {
+export function diffusionSectorielle(sectorData: any): number {
   if (!sectorData || typeof sectorData !== 'object') return 0;
 
   const sections = sectorData.uniqueSections || 0;
@@ -285,7 +285,7 @@ export function diffusionSectorielle(sectorData) {
  * @param {number} expirationData.totalPatents - Total patents (expired + active)
  * @returns {number} Score in [0, 1]. Higher = more expired = higher ubiquity.
  */
-export function ratioExpires(expirationData) {
+export function ratioExpires(expirationData: any): number {
   if (!expirationData || typeof expirationData !== 'object') return 0;
 
   const { expiredCount = 0, totalPatents = 0 } = expirationData;
@@ -314,7 +314,7 @@ export function ratioExpires(expirationData) {
  *   Indicator definitions with weights and enabled flags.
  * @returns {{ value: number, breakdown: Array<{key: string, score: number, weight: number, weightNormalized: number}>, enabledCount: number }}
  */
-export function weightedMean(scores, indicatorConfig) {
+export function weightedMean(scores: Record<string, number>, indicatorConfig: any[]): { value: number; breakdown: any[]; enabledCount: number } {
   const enabled = indicatorConfig.filter(ind => ind.enabled !== false);
 
   if (enabled.length === 0) {
@@ -325,7 +325,7 @@ export function weightedMean(scores, indicatorConfig) {
   const totalWeight = enabled.reduce((sum, ind) => sum + ind.weight, 0);
 
   let weightedSum = 0;
-  const breakdown = [];
+  const breakdown: any[] = [];
 
   for (const ind of enabled) {
     const score = scores[ind.key] ?? 0;
@@ -360,7 +360,7 @@ export function weightedMean(scores, indicatorConfig) {
  *   Optional custom indicator config (for toggling/reweighting). Defaults to CERTITUDE_INDICATORS.
  * @returns {{ value: number, breakdown: Array, enabledCount: number }}
  */
-export function aggregateCertitude(scores, config = CERTITUDE_INDICATORS) {
+export function aggregateCertitude(scores: Record<string, number>, config: any[] = CERTITUDE_INDICATORS) {
   return weightedMean(scores, config);
 }
 
@@ -378,7 +378,7 @@ export function aggregateCertitude(scores, config = CERTITUDE_INDICATORS) {
  *   Optional custom indicator config (for toggling/reweighting). Defaults to UBIQUITE_INDICATORS.
  * @returns {{ value: number, breakdown: Array, enabledCount: number }}
  */
-export function aggregateUbiquite(scores, config = UBIQUITE_INDICATORS) {
+export function aggregateUbiquite(scores: Record<string, number>, config: any[] = UBIQUITE_INDICATORS) {
   return weightedMean(scores, config);
 }
 

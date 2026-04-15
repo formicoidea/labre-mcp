@@ -130,15 +130,15 @@
  *
  * @returns {PatentData}
  */
-export function emptyPatentData() {
+export function emptyPatentData(): any {
   return {
     totalPatents: 0,
-    cpcDistribution: [],
-    yearlyClassifications: [],
+    cpcDistribution: [] as any[],
+    yearlyClassifications: [] as any[],
     citationData: { totalForwardCitations: 0, patentCount: 0 },
-    claimsTimeline: [],
+    claimsTimeline: [] as any[],
     assigneeData: { uniqueAssignees: 0, totalPatents: 0 },
-    geoData: { jurisdictionCount: 0, jurisdictions: [] },
+    geoData: { jurisdictionCount: 0, jurisdictions: [] as any[] },
     sectorData: { uniqueSections: 0, uniqueClasses: 0 },
     expirationData: { expiredCount: 0, totalPatents: 0 },
   };
@@ -205,7 +205,7 @@ export class PatentDataSource {
    *   Custom ubiquity indicator config (for toggling/reweighting)
    * @returns {Promise<IndicatorResults>} Computed indicator results for both axes
    */
-  async fetchIndicators(cpcCodes, options = {}) {
+  async fetchIndicators(cpcCodes: string[], options: Record<string, unknown> = {}) {
     const patentData = await this.fetchByCpc(cpcCodes);
 
     // Lazy-load to avoid circular dependencies and keep base class lightweight
@@ -236,8 +236,8 @@ export class PatentDataSource {
  * @param {*} data - Object to validate
  * @returns {{ valid: boolean, errors: string[] }}
  */
-export function validatePatentData(data) {
-  const errors = [];
+export function validatePatentData(data: any): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
 
   if (data === null || typeof data !== 'object') {
     return { valid: false, errors: ['PatentData must be a non-null object'] };

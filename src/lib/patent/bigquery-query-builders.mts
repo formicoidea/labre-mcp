@@ -41,6 +41,20 @@ import {
  * @property {string} name   - Human-readable query name (for logging/tracing)
  */
 
+export interface QueryContext {
+  dataset: string;
+  cpcCodes: string[];
+  minYear: number;
+  maxPatents: number;
+}
+
+export interface BuiltQuery {
+  sql: string;
+  params: Record<string, unknown>;
+  types: Record<string, unknown>;
+  name: string;
+}
+
 // ─── Query context factory ──────────────────────────────────────────────────
 
 /**
@@ -104,7 +118,7 @@ export function createQueryContext(cpcCodes: string[], options: any = {}) {
  * @param {QueryContext} ctx
  * @returns {BuiltQuery}
  */
-export function buildCpcDistributionQuery(ctx) {
+export function buildCpcDistributionQuery(ctx: QueryContext): BuiltQuery {
   const sql = `
     -- Indicator 1: CPC subclass distribution -> convergenceHHI (certitude)
     -- Returns patent counts per 4-char CPC subclass for HHI concentration analysis
@@ -145,7 +159,7 @@ export function buildCpcDistributionQuery(ctx) {
  * @param {QueryContext} ctx
  * @returns {BuiltQuery}
  */
-export function buildYearlyClassificationsQuery(ctx) {
+export function buildYearlyClassificationsQuery(ctx: QueryContext): BuiltQuery {
   const sql = `
     -- Indicator 2: Yearly CPC classification snapshots -> stabiliteTaxonomique (certitude)
     -- Returns distinct CPC subclasses per filing year for Jaccard stability analysis
@@ -192,7 +206,7 @@ export function buildYearlyClassificationsQuery(ctx) {
  * @param {QueryContext} ctx
  * @returns {BuiltQuery}
  */
-export function buildCitationDataQuery(ctx) {
+export function buildCitationDataQuery(ctx: QueryContext): BuiltQuery {
   const sql = `
     -- Indicator 3: Forward citation density -> densiteCitation (certitude)
     -- Counts forward citations received by patents in the target CPC class
@@ -259,7 +273,7 @@ export function buildCitationDataQuery(ctx) {
  * @param {QueryContext} ctx
  * @returns {BuiltQuery}
  */
-export function buildClaimsTimelineQuery(ctx) {
+export function buildClaimsTimelineQuery(ctx: QueryContext): BuiltQuery {
   const sql = `
     -- Indicator 4: Claims narrowing over time -> retrecissementClaims (certitude)
     -- Estimates average independent claims per patent per filing year
@@ -316,7 +330,7 @@ export function buildClaimsTimelineQuery(ctx) {
  * @param {QueryContext} ctx
  * @returns {BuiltQuery}
  */
-export function buildAssigneeDataQuery(ctx) {
+export function buildAssigneeDataQuery(ctx: QueryContext): BuiltQuery {
   const sql = `
     -- Indicator 5: Assignee diversity -> diversiteAssignees (ubiquity)
     -- Counts unique patent assignees (holders) in the target CPC class
@@ -363,7 +377,7 @@ export function buildAssigneeDataQuery(ctx) {
  * @param {QueryContext} ctx
  * @returns {BuiltQuery}
  */
-export function buildGeoDataQuery(ctx) {
+export function buildGeoDataQuery(ctx: QueryContext): BuiltQuery {
   const sql = `
     -- Indicator 6: Geographic filing breadth -> couvertureGeo (ubiquity)
     -- Counts distinct filing jurisdictions for patents in the target CPC class
@@ -409,7 +423,7 @@ export function buildGeoDataQuery(ctx) {
  * @param {QueryContext} ctx
  * @returns {BuiltQuery}
  */
-export function buildSectorDataQuery(ctx) {
+export function buildSectorDataQuery(ctx: QueryContext): BuiltQuery {
   const sql = `
     -- Indicator 7: Cross-sector CPC diffusion -> diffusionSectorielle (ubiquity)
     -- Counts distinct CPC sections and main classes across co-classified patents
@@ -477,7 +491,7 @@ export function buildSectorDataQuery(ctx) {
  * @param {QueryContext} ctx
  * @returns {BuiltQuery}
  */
-export function buildExpirationDataQuery(ctx) {
+export function buildExpirationDataQuery(ctx: QueryContext): BuiltQuery {
   const sql = `
     -- Indicator 8: Patent expiration ratio -> ratioExpires (ubiquity)
     -- Classifies patents as expired (filing + 20yr <= current year) vs active
@@ -526,7 +540,7 @@ export function buildExpirationDataQuery(ctx) {
  * @param {QueryContext} ctx
  * @returns {BuiltQuery}
  */
-export function buildTotalPatentsQuery(ctx) {
+export function buildTotalPatentsQuery(ctx: QueryContext): BuiltQuery {
   const sql = `
     -- Baseline: total patent count for data quality assessment
     SELECT

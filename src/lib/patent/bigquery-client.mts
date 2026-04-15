@@ -231,7 +231,7 @@ const clientPool = new Map();
  * @throws {Error} If @google-cloud/bigquery is not installed
  * @throws {Error} If configuration is invalid
  */
-export async function getClient(config) {
+export async function getClient(config: Record<string, unknown> = {}) {
   // Validate config before attempting client creation
   const validation = validateConfig(config);
   if (!validation.valid) {

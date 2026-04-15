@@ -112,18 +112,19 @@ const RETRYABLE_ERROR_PATTERNS = [
  * @param {Error} error - The error to classify
  * @returns {boolean} true if the error is transient and should be retried
  */
-export function isRetryableError(error) {
+export function isRetryableError(error: unknown): boolean {
   if (!error) return false;
+  const e = error as { code?: unknown; status?: unknown; statusCode?: unknown; message?: unknown; name?: unknown };
 
   // Check HTTP status code if available (BigQuery errors often have .code or .status)
-  const status = error.code || error.status || error.statusCode;
+  const status = e.code || e.status || e.statusCode;
   if (typeof status === 'number' && RETRYABLE_STATUS_CODES.has(status)) {
     return true;
   }
 
   // Check error message against known retryable patterns
-  const message = String(error.message || '');
-  const name = String(error.name || '');
+  const message = String(e.message || '');
+  const name = String(e.name || '');
   const combined = `${name} ${message}`;
 
   return RETRYABLE_ERROR_PATTERNS.some(pattern => pattern.test(combined));
@@ -201,7 +202,7 @@ export async function withRetry<T>(fn: () => Promise<T>, options: any = {}): Pro
  * @param {Object[]} rows - BigQuery result rows
  * @returns {Array<{cpc: string, count: number}>}
  */
-export function transformCpcDistribution(rows) {
+export function transformCpcDistribution(rows: any[]): any[] {
   if (!Array.isArray(rows)) return [];
   return rows
     .filter(r => r.cpc && typeof r.count === 'number')
@@ -213,7 +214,7 @@ export function transformCpcDistribution(rows) {
  * @param {Object[]} rows - BigQuery result rows
  * @returns {Array<{year: number, cpcCodes: string[]}>}
  */
-export function transformYearlyClassifications(rows) {
+export function transformYearlyClassifications(rows: any[]): any[] {
   if (!Array.isArray(rows)) return [];
   return rows
     .filter(r => typeof r.year === 'number')
@@ -228,7 +229,7 @@ export function transformYearlyClassifications(rows) {
  * @param {Object[]} rows - BigQuery result rows (single row expected)
  * @returns {{totalForwardCitations: number, patentCount: number}}
  */
-export function transformCitationData(rows) {
+export function transformCitationData(rows: any[]): any {
   if (!Array.isArray(rows) || rows.length === 0) {
     return { totalForwardCitations: 0, patentCount: 0 };
   }
@@ -244,7 +245,7 @@ export function transformCitationData(rows) {
  * @param {Object[]} rows - BigQuery result rows
  * @returns {Array<{year: number, avgIndependentClaims: number}>}
  */
-export function transformClaimsTimeline(rows) {
+export function transformClaimsTimeline(rows: any[]): any[] {
   if (!Array.isArray(rows)) return [];
   return rows
     .filter(r => typeof r.year === 'number' && typeof r.avg_independent_claims === 'number')
@@ -259,7 +260,7 @@ export function transformClaimsTimeline(rows) {
  * @param {Object[]} rows - BigQuery result rows (single row expected)
  * @returns {{uniqueAssignees: number, totalPatents: number}}
  */
-export function transformAssigneeData(rows) {
+export function transformAssigneeData(rows: any[]): any {
   if (!Array.isArray(rows) || rows.length === 0) {
     return { uniqueAssignees: 0, totalPatents: 0 };
   }
@@ -275,7 +276,7 @@ export function transformAssigneeData(rows) {
  * @param {Object[]} rows - BigQuery result rows (single row expected)
  * @returns {{jurisdictionCount: number, jurisdictions: string[]}}
  */
-export function transformGeoData(rows) {
+export function transformGeoData(rows: any[]): any {
   if (!Array.isArray(rows) || rows.length === 0) {
     return { jurisdictionCount: 0, jurisdictions: [] };
   }
@@ -291,7 +292,7 @@ export function transformGeoData(rows) {
  * @param {Object[]} rows - BigQuery result rows (single row expected)
  * @returns {{uniqueSections: number, uniqueClasses: number}}
  */
-export function transformSectorData(rows) {
+export function transformSectorData(rows: any[]): any {
   if (!Array.isArray(rows) || rows.length === 0) {
     return { uniqueSections: 0, uniqueClasses: 0 };
   }
@@ -307,7 +308,7 @@ export function transformSectorData(rows) {
  * @param {Object[]} rows - BigQuery result rows (single row expected)
  * @returns {{expiredCount: number, totalPatents: number}}
  */
-export function transformExpirationData(rows) {
+export function transformExpirationData(rows: any[]): any {
   if (!Array.isArray(rows) || rows.length === 0) {
     return { expiredCount: 0, totalPatents: 0 };
   }
@@ -409,7 +410,7 @@ export class BigQueryPatentSource extends PatentDataSource {
    * @returns {Promise<Object[]>} Array of result rows
    * @throws {Error} On query failure (auth, syntax, network, etc.)
    */
-  async _executeQuery(builtQuery) {
+  async _executeQuery(builtQuery: any): Promise<any[]> {
     const client = await this._getClient();
     const queryOptions = {
       ...defaultQueryOptions(this._config),
@@ -435,7 +436,7 @@ export class BigQueryPatentSource extends PatentDataSource {
    * @returns {Promise<Object[]>} Array of result rows
    * @throws {Error} Non-retryable error immediately, or last error after all retries exhausted
    */
-  async _executeQueryWithRetry(builtQuery) {
+  async _executeQueryWithRetry(builtQuery: any): Promise<any[]> {
     return withRetry(
       () => this._executeQuery(builtQuery),
       {
@@ -457,7 +458,7 @@ export class BigQueryPatentSource extends PatentDataSource {
    * @param {string[]} cpcCodes - Array of 4-char CPC sub-class codes (e.g. ['H04L', 'G06F'])
    * @returns {Promise<import('./patent-data-source.mjs').PatentData>} Patent data with optional _queryErrors metadata
    */
-  async fetchByCpc(cpcCodes) {
+  async fetchByCpc(cpcCodes: string[]): Promise<any> {
     if (!Array.isArray(cpcCodes) || cpcCodes.length === 0) {
       return emptyPatentData();
     }

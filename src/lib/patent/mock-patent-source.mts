@@ -253,7 +253,7 @@ export class MockPatentSource extends PatentDataSource {
    * @param {string[]} cpcCodes - Array of 4-char CPC sub-class codes
    * @returns {Promise<import('./patent-data-source.mjs').PatentData>}
    */
-  async fetchByCpc(cpcCodes) {
+  async fetchByCpc(cpcCodes: string[]): Promise<unknown> {
     // Record the call
     this.callCount++;
     this.lastArgs = cpcCodes;
@@ -324,8 +324,8 @@ export class MockPatentSource extends PatentDataSource {
  * @param {Object} [options] - Additional MockPatentSource options (merged with fixture)
  * @returns {MockPatentSource}
  */
-export function createMockSource(fixtureName, options = {}) {
-  const factory = FIXTURES[fixtureName];
+export function createMockSource(fixtureName: string, options: Record<string, unknown> = {}) {
+  const factory = (FIXTURES as Record<string, () => unknown>)[fixtureName];
   if (!factory) {
     throw new Error(
       `Unknown fixture "${fixtureName}". Available: ${Object.keys(FIXTURES).join(', ')}`
