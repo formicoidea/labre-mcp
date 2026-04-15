@@ -7,9 +7,17 @@ Serveur MCP (Model Context Protocol) pour l'estimation de la position d'evolutio
 ```bash
 pnpm install
 # Configurer OPENCODE_API_KEY dans .env
+
+# Dev (charge les sources .mts via tsx)
+pnpm run dev
+
+# Prod (consomme dist/ apres build)
+pnpm run build && pnpm run mcp:prod
 ```
 
 Le serveur est automatiquement disponible dans Claude Code via `.mcp.json`.
+
+> **Note Windows** : `.mcp.json` utilise `cmd /c npx tsx ...` — le wrapper `cmd /c` est requis sous Windows pour exécuter `npx` depuis un client MCP.
 
 ## Outils MCP
 
