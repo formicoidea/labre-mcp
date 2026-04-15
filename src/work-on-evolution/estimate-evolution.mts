@@ -474,6 +474,10 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
   if (session.isReadyForEstimation() && session.isNonEconomic()) {
     const classification = session.getClassification();
     const reQuestions = session.getReQuestions();
+    // invariant: isNonEconomic() ⇒ classification was set
+    if (!classification) {
+      throw new Error('estimateEvolutionConversational: isNonEconomic() but no classification');
+    }
 
     logDebug(TOOL, `Component "${session.state.name}" classified as ${classification.space} — re-questioning`);
 

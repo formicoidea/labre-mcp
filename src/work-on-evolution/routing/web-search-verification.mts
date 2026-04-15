@@ -640,7 +640,8 @@ used for container orchestration. There is pricing for managed versions like GKE
   console.assert(r5a.classification === 'capability', 'Empty → capability');
   console.assert(r5a.confidence === 0.40, 'Empty → 0.40 confidence');
 
-  const r5b = parseWebSearchResponse(null, 'test');
+  // Self-test verifies graceful handling of null input — cast bypasses signature
+  const r5b = parseWebSearchResponse(null as unknown as string, 'test');
   console.assert(r5b.classification === 'capability', 'Null → capability');
 
   console.log('  \u2713 Empty/null responses handled');

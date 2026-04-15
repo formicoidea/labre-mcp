@@ -376,7 +376,9 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
   ];
   for (const vt of validationTests) {
     try {
-      await handleEstimateEvolution(vt.input);
+      // Self-test passes intentionally invalid inputs (null, missing fields) to
+      // verify that validateInput rejects them. Cast bypasses the strict signature.
+      await handleEstimateEvolution(vt.input as Record<string, unknown>);
       console.log(`  ✗ Expected error for ${JSON.stringify(vt.input)}`);
     } catch (err) {
       const ok = toErrorMessage(err).includes(vt.expectError);

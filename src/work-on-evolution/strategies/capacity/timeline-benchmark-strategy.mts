@@ -94,7 +94,7 @@ export function formatPacingGuidance(history: any[], iteration: number, maxItera
   if (remaining <= 3) {
     return `IMPORTANT: Only ${remaining} iterations remain to reach ${CURRENT_YEAR}. ${yearsToGo != null ? `You still need to cover ~${yearsToGo} years. ` : ''}Your next milestone should jump significantly forward in time.`;
   }
-  if (lastDate != null && yearsToGo > 0) {
+  if (lastDate != null && yearsToGo != null && yearsToGo > 0) {
     const avgGap = Math.ceil(yearsToGo / remaining);
     return `PACING: ${remaining} iterations remaining to reach ${CURRENT_YEAR}. Last milestone was in ${lastDate} (~${yearsToGo} years to go). Aim for roughly ${avgGap}-year gaps between milestones.`;
   }
