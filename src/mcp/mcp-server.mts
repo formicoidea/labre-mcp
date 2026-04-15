@@ -37,6 +37,7 @@ import type {
   McpServerInfo,
   McpServerCapabilities,
 } from '../types/mcp.mjs';
+import { toErrorMessage, errorCode } from '../lib/errors.mjs';
 
 // ─── Tool Registry ──────────────────────────────────────────────────────────
 
@@ -191,8 +192,8 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
         // Error-level: tool invocation failure with specific error type
         const typeLabel = isLLMError ? ` [${classified.type}]` : '';
         const errMsg = toolSubject
-          ? `${toolName} failed for "${toolSubject}" after ${elapsed}s${typeLabel}: ${err.message}`
-          : `${toolName} failed after ${elapsed}s${typeLabel}: ${err.message}`;
+          ? `${toolName} failed for "${toolSubject}" after ${elapsed}s${typeLabel}: ${toErrorMessage(err)}`
+          : `${toolName} failed after ${elapsed}s${typeLabel}: ${toErrorMessage(err)}`;
         logError(toolName, errMsg);
 
         return {
@@ -202,7 +203,7 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
             content: [
               {
                 type: 'text',
-                text: JSON.stringify({ error: err.message }, null, 2),
+                text: JSON.stringify({ error: toErrorMessage(err) }, null, 2),
               },
             ],
             isError: true,

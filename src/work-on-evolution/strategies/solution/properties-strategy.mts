@@ -21,6 +21,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { SolutionBaseStrategy } from './solution-base-strategy.mjs';
+import { toErrorMessage, errorCode } from '../../../lib/errors.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -52,7 +53,7 @@ async function loadPropertiesReference() {
     _propertiesRef = properties;
     return _propertiesRef;
   } catch (err) {
-    if (err.code === 'ENOENT') {
+    if (errorCode(err) === 'ENOENT') {
       // Fallback: use the embedded reference when JSON file is missing
       _propertiesRef = FALLBACK_PROPERTIES;
       return _propertiesRef;

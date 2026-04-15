@@ -34,6 +34,7 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { logDebug, logWarning } from '../../lib/mcp-notifications.mjs';
 import { classifyAndLogLLMError } from '../../lib/llm/llm-error-handler.mjs';
+import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -50,7 +51,7 @@ const RETRYABLE_PATTERNS = [
 ];
 
 function isRetryableError(err) {
-  const msg = String(err.message || err).toLowerCase();
+  const msg = String(toErrorMessage(err) || err).toLowerCase();
   return RETRYABLE_PATTERNS.some(p => msg.includes(p));
 }
 
@@ -486,17 +487,17 @@ export async function verifyViaWebSearch(name: string, options: any = {}) {
 
     return result;
   } catch (err) {
-    logWarning(TOOL, `Web search verification failed for "${trimmed}": ${err.message}`);
+    logWarning(TOOL, `Web search verification failed for "${trimmed}": ${toErrorMessage(err)}`);
 
     return {
       classification: 'capability',
       confidence: 0.35,
       method: 'web-search',
-      reasoning: `Web search verification failed for "${trimmed}": ${err.message} — defaulting to capability`,
+      reasoning: `Web search verification failed for "${trimmed}": ${toErrorMessage(err)} — defaulting to capability`,
       isSolution: false,
       evidence: [],
       references: [],
-      error: err.message,
+      error: toErrorMessage(err),
     };
   }
 }

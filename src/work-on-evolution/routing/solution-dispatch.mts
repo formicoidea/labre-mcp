@@ -17,6 +17,7 @@ import {
   COMPONENT_TYPE,
   detectComponentType,
 } from '../../lib/component-detection.mjs';
+import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
 
 /** Routing modes */
 export const EVAL_MODES = {
@@ -152,8 +153,8 @@ export async function dispatchSolutionStrategies(component: any, options: any = 
         logDebug('solution-dispatch',
           `Solution "${method}": evolution=${rawResult.evolution}, confidence=${rawResult.confidence}`);
       } catch (err) {
-        evaluations[method] = { error: err.message };
-        logDebug('solution-dispatch', `Solution "${method}" failed: ${err.message}`);
+        evaluations[method] = { error: toErrorMessage(err) };
+        logDebug('solution-dispatch', `Solution "${method}" failed: ${toErrorMessage(err)}`);
       }
     }
   } else {
@@ -169,8 +170,8 @@ export async function dispatchSolutionStrategies(component: any, options: any = 
       logDebug('solution-dispatch',
         `Solution "${strategy}": evolution=${rawResult.evolution}, confidence=${rawResult.confidence}`);
     } catch (err) {
-      evaluations[strategy] = { error: err.message };
-      logDebug('solution-dispatch', `Solution "${strategy}" failed: ${err.message}`);
+      evaluations[strategy] = { error: toErrorMessage(err) };
+      logDebug('solution-dispatch', `Solution "${strategy}" failed: ${toErrorMessage(err)}`);
     }
   }
 

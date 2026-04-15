@@ -33,6 +33,7 @@
 
 import { identifyCapability, parseCapabilityResponse } from '../../work-on-value-chain/identify-capability.mjs';
 import { logDebug } from '../../lib/mcp-notifications.mjs';
+import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -271,14 +272,14 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
     await inferCapabilityFromSolution('', {});
     console.log('  ✗ Should have thrown for empty name');
   } catch (e) {
-    console.log(`  ✓ Empty name rejected: ${e.message}`);
+    console.log(`  ✓ Empty name rejected: ${toErrorMessage(e)}`);
   }
 
   try {
     await inferCapabilityFromSolution('Kubernetes', {});
     console.log('  ✗ Should have thrown for missing llmCall');
   } catch (e) {
-    console.log(`  ✓ Missing llmCall rejected: ${e.message}`);
+    console.log(`  ✓ Missing llmCall rejected: ${toErrorMessage(e)}`);
   }
 
   // ── Test 4: Mock LLM inference ─────────────────────────────────────

@@ -1,3 +1,5 @@
+import { toErrorMessage, errorCode } from '../errors.mjs';
+
 // BigQuery client configuration and authentication helper.
 //
 // Isolated module responsible for:
@@ -254,7 +256,7 @@ export async function getClient(config) {
     throw new Error(
       'The @google-cloud/bigquery package is required for patent data access. ' +
       'Install it with: pnpm add @google-cloud/bigquery\n' +
-      `Original error: ${err.message}`
+      `Original error: ${toErrorMessage(err)}`
     );
   }
 

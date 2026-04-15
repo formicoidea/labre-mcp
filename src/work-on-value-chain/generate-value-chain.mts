@@ -16,6 +16,7 @@ import { createLLMCall } from '../lib/llm/llm-call.mjs';
 import { estimateEvolutionOneShot } from '../work-on-evolution/estimate-evolution.mjs';
 import { logDebug, logInfo, logError } from '../lib/mcp-notifications.mjs';
 import { createMessageResolverFromArgs } from '../lib/progress-messages.mjs';
+import { toErrorMessage, errorCode } from '../lib/errors.mjs';
 
 // ─── Value Chain Decomposition Prompt ───────────────────────────────────────
 
@@ -160,8 +161,8 @@ export async function generateValueChain(description: string, options: any = {})
   try {
     chain = JSON.parse(jsonStr);
   } catch (err) {
-    logError(TOOL, msg('error.generic', { tool: TOOL, error: `Failed to parse LLM response: ${err.message}` }));
-    throw new Error(`Failed to parse LLM value chain response: ${err.message}\nRaw: ${rawResponse.slice(0, 500)}`);
+    logError(TOOL, msg('error.generic', { tool: TOOL, error: `Failed to parse LLM response: ${toErrorMessage(err)}` }));
+    throw new Error(`Failed to parse LLM value chain response: ${toErrorMessage(err)}\nRaw: ${rawResponse.slice(0, 500)}`);
   }
 
   // Validate chain structure
@@ -214,7 +215,7 @@ export async function generateValueChain(description: string, options: any = {})
       // Log but skip failed evaluations — will use default 0.5
       logDebug(TOOL, msg('step.evaluation.skipped', {
         component: item.name,
-        reason: err.message || 'evaluation failed',
+        reason: toErrorMessage(err) || 'evaluation failed',
       }));
     }
   }
@@ -314,6 +315,6 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
       console.log(`  ${name}: ${evo}`);
     }
   } catch (err) {
-    console.error('Self-test failed:', err.message);
+    console.error('Self-test failed:', toErrorMessage(err));
   }
 }

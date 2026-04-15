@@ -30,6 +30,7 @@ import { classifyWardleyType } from './routing/wardley-type-classification.mjs';
 import { verifyClassification } from './pipeline/dual-verification-orchestrator.mjs';
 import { runEnrichedPipeline } from './pipeline/pipeline-enriched.mjs';
 import { validateOneShotInput, resolveClassification, VALID_SPACES } from './lib/evolution-input-validation.mjs';
+import { toErrorMessage, errorCode } from '../lib/errors.mjs';
 
 /**
  * @typedef {Object} OneShotResult
@@ -149,7 +150,7 @@ export async function estimateEvolutionOneShot(rawInput) {
     } catch (err) {
       // Fallback failed — continue with the naming-only detection
       logDebug(TOOL,
-        `Dual-verification fallback failed for "${name}": ${err.message} — using naming-only routing`);
+        `Dual-verification fallback failed for "${name}": ${toErrorMessage(err)} — using naming-only routing`);
     }
   }
 
@@ -179,8 +180,8 @@ export async function estimateEvolutionOneShot(rawInput) {
           evaluations[method] = result;
           logDebug(TOOL, msg('step.strategy.result', { strategy: method, evolution: result.evolution, confidence: result.confidence }));
         } catch (err) {
-          evaluations[method] = { error: err.message };
-          logDebug(TOOL, msg('step.strategy.error', { strategy: method, error: err.message }));
+          evaluations[method] = { error: toErrorMessage(err) };
+          logDebug(TOOL, msg('step.strategy.error', { strategy: method, error: toErrorMessage(err) }));
         }
       }
 
@@ -212,8 +213,8 @@ export async function estimateEvolutionOneShot(rawInput) {
           evaluations['s-curve'] = result;
           logDebug(TOOL, msg('step.strategy.result', { strategy: 's-curve', evolution: result.evolution, confidence: result.confidence }));
         } catch (err) {
-          evaluations['s-curve'] = { error: err.message };
-          logDebug(TOOL, msg('step.strategy.error', { strategy: 's-curve', error: err.message }));
+          evaluations['s-curve'] = { error: toErrorMessage(err) };
+          logDebug(TOOL, msg('step.strategy.error', { strategy: 's-curve', error: toErrorMessage(err) }));
         }
       }
     } else {
@@ -225,8 +226,8 @@ export async function estimateEvolutionOneShot(rawInput) {
         evaluations[strategy] = result;
         logDebug(TOOL, msg('step.strategy.result', { strategy, evolution: result.evolution, confidence: result.confidence }));
       } catch (err) {
-        evaluations[strategy] = { error: err.message };
-        logDebug(TOOL, msg('step.strategy.error', { strategy, error: err.message }));
+        evaluations[strategy] = { error: toErrorMessage(err) };
+        logDebug(TOOL, msg('step.strategy.error', { strategy, error: toErrorMessage(err) }));
       }
     }
   }
@@ -246,8 +247,8 @@ export async function estimateEvolutionOneShot(rawInput) {
         evaluations[key] = result;
       }
     } catch (err) {
-      evaluations['solution-dispatch-error'] = { error: err.message };
-      logDebug(TOOL, `Solution strategy dispatch failed: ${err.message}`);
+      evaluations['solution-dispatch-error'] = { error: toErrorMessage(err) };
+      logDebug(TOOL, `Solution strategy dispatch failed: ${toErrorMessage(err)}`);
     }
   }
 
@@ -571,7 +572,7 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
           `verified=${convVerifiedDetection.verified}, tiers=${convVerifiedDetection.tiersUsed.join('+')}`);
       } catch (err) {
         logDebug(TOOL,
-          `Dual-verification fallback failed for "${session.state.name}": ${err.message} — ` +
+          `Dual-verification fallback failed for "${session.state.name}": ${toErrorMessage(err)} — ` +
           `using naming-only routing`);
       }
     }
@@ -594,8 +595,8 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
             evaluations[method] = result;
             logDebug(TOOL, `Strategy "${method}": evolution=${result.evolution}, confidence=${result.confidence}`);
           } catch (err) {
-            evaluations[method] = { error: err.message };
-            logDebug(TOOL, `Strategy "${method}" failed: ${err.message}`);
+            evaluations[method] = { error: toErrorMessage(err) };
+            logDebug(TOOL, `Strategy "${method}" failed: ${toErrorMessage(err)}`);
           }
         }
       } else {
@@ -607,8 +608,8 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
           evaluations[selectedStrategy] = result;
           logDebug(TOOL, `Strategy "${selectedStrategy}": evolution=${result.evolution}, confidence=${result.confidence}`);
         } catch (err) {
-          evaluations[selectedStrategy] = { error: err.message };
-          logDebug(TOOL, `Strategy "${selectedStrategy}" failed: ${err.message}`);
+          evaluations[selectedStrategy] = { error: toErrorMessage(err) };
+          logDebug(TOOL, `Strategy "${selectedStrategy}" failed: ${toErrorMessage(err)}`);
         }
       }
     }
@@ -627,8 +628,8 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
           evaluations[key] = result;
         }
       } catch (err) {
-        evaluations['solution-dispatch-error'] = { error: err.message };
-        logDebug(TOOL, `Solution strategy dispatch failed: ${err.message}`);
+        evaluations['solution-dispatch-error'] = { error: toErrorMessage(err) };
+        logDebug(TOOL, `Solution strategy dispatch failed: ${toErrorMessage(err)}`);
       }
     }
 
@@ -815,8 +816,8 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
       await estimateEvolutionOneShot(vt.input);
       console.log(`  ✗ Expected error for ${JSON.stringify(vt.input)}`);
     } catch (err) {
-      const ok = err.message.includes(vt.expectError);
-      console.log(`  ${ok ? '✓' : '✗'} ${JSON.stringify(vt.input)} → ${err.message}`);
+      const ok = toErrorMessage(err).includes(vt.expectError);
+      console.log(`  ${ok ? '✓' : '✗'} ${JSON.stringify(vt.input)} → ${toErrorMessage(err)}`);
     }
   }
 

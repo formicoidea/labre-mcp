@@ -13,6 +13,7 @@ import { loadStrategies, getStrategy, listStrategies } from '../work-on-evolutio
 import { BaseStrategy } from '../work-on-evolution/strategies/capacity/base-strategy.mjs';
 import { estimateEvolutionOneShot, estimateEvolutionConversational } from '../work-on-evolution/estimate-evolution.mjs';
 import { routeEstimateEvolution, detectMode, MODES } from '../work-on-evolution/routing/mode-router.mjs';
+import { toErrorMessage, errorCode } from '../lib/errors.mjs';
 
 // ─── MCP Tool Definition Schema ──────────────────────────────────────────────
 
@@ -286,7 +287,7 @@ export function registerMcpTool(server) {
         content: [
           {
             type: 'text',
-            text: JSON.stringify({ error: err.message }, null, 2),
+            text: JSON.stringify({ error: toErrorMessage(err) }, null, 2),
           },
         ],
         isError: true,
@@ -378,8 +379,8 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
       await handleEstimateEvolution(vt.input);
       console.log(`  ✗ Expected error for ${JSON.stringify(vt.input)}`);
     } catch (err) {
-      const ok = err.message.includes(vt.expectError);
-      console.log(`  ${ok ? '✓' : '✗'} ${JSON.stringify(vt.input)} → ${err.message}`);
+      const ok = toErrorMessage(err).includes(vt.expectError);
+      console.log(`  ${ok ? '✓' : '✗'} ${JSON.stringify(vt.input)} → ${toErrorMessage(err)}`);
     }
   }
 

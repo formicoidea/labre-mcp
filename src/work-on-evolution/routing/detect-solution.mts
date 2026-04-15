@@ -28,6 +28,7 @@
 //   // → { classification: 'capability', confidence: 0.82, reasoning: '...' }
 
 import { logDebug } from '../../lib/mcp-notifications.mjs';
+import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -545,10 +546,10 @@ export async function detectSolution(name: string, options: any = {}): Promise<a
     };
   } catch (err) {
     // LLM failed — fall back to naming result
-    logDebug(TOOL, `LLM fallback failed for "${name}": ${err.message} — using naming result`);
+    logDebug(TOOL, `LLM fallback failed for "${name}": ${toErrorMessage(err)} — using naming result`);
     return {
       ...namingResult,
-      reasoning: `${namingResult.reasoning} (LLM fallback unavailable: ${err.message})`,
+      reasoning: `${namingResult.reasoning} (LLM fallback unavailable: ${toErrorMessage(err)})`,
     };
   }
 }

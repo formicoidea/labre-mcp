@@ -17,6 +17,7 @@ import { classifyComponent } from '../routing/classification-gate.mjs';
 import { estimateEvolutionOneShot } from '../estimate-evolution.mjs';
 import { logDebug, logInfo, logError } from '../../lib/mcp-notifications.mjs';
 import { createMessageResolverFromArgs } from '../../lib/progress-messages.mjs';
+import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
 
 // ─── .wm Parser ─────────────────────────────────────────────────────────────
 
@@ -254,8 +255,8 @@ export async function evaluateMapComponents(parsedMap: any, options: any = {}): 
       });
     } catch (err) {
       logError(TOOL, msg
-        ? msg('error.generic', { tool: TOOL, error: err.message })
-        : `Error evaluating "${item.name}": ${err.message}`);
+        ? msg('error.generic', { tool: TOOL, error: toErrorMessage(err) })
+        : `Error evaluating "${item.name}": ${toErrorMessage(err)}`);
       evaluations.push({
         name: item.name,
         type: item.type,
@@ -264,7 +265,7 @@ export async function evaluateMapComponents(parsedMap: any, options: any = {}): 
         classification: 'economic',
         strategies: null,
         skipped: true,
-        reason: err.message,
+        reason: toErrorMessage(err),
       });
     }
   }
@@ -397,7 +398,7 @@ export async function evaluateMapFile(filePath: string, options: any = {}): Prom
   try {
     content = await readFile(filePath, 'utf-8');
   } catch (err) {
-    logError(TOOL, msg('error.parse', { error: `Cannot read file "${filePath}": ${err.message}` }));
+    logError(TOOL, msg('error.parse', { error: `Cannot read file "${filePath}": ${toErrorMessage(err)}` }));
     throw err;
   }
 

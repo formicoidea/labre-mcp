@@ -35,6 +35,7 @@ import {
 import { loadStrategies } from '../strategies/capacity/registry.mjs';
 import { loadSolutionStrategies } from '../strategies/solution/registry.mjs';
 import { logDebug } from '../../lib/mcp-notifications.mjs';
+import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
 
 const TOOL = 'evalModeDispatcher';
 
@@ -116,8 +117,8 @@ async function runCapabilityStrategies(component: any, createInstance: any) {
       evaluations['s-curve'] = result;
       logDebug(TOOL, `Capability strategy "s-curve": evolution=${result.evolution}, confidence=${result.confidence}`);
     } catch (err) {
-      evaluations['s-curve'] = { error: err.message };
-      logDebug(TOOL, `Capability strategy "s-curve" failed: ${err.message}`);
+      evaluations['s-curve'] = { error: toErrorMessage(err) };
+      logDebug(TOOL, `Capability strategy "s-curve" failed: ${toErrorMessage(err)}`);
     }
   }
 

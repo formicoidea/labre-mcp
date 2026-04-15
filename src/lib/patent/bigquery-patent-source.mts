@@ -41,6 +41,7 @@ export {
 } from './bigquery-query-builders.mjs';
 
 import { buildAllQueries } from './bigquery-query-builders.mjs';
+import { toErrorMessage, errorCode } from '../errors.mjs';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -180,7 +181,7 @@ export async function withRetry<T>(fn: () => Promise<T>, options: any = {}): Pro
       logWarning(
         'BigQueryPatentSource',
         `Retrying "${label}" (attempt ${attempt + 1}/${maxRetries}) ` +
-        `after ${Math.round(delay)}ms — ${error.message}`
+        `after ${Math.round(delay)}ms — ${toErrorMessage(error)}`
       );
 
       await new Promise(resolve => setTimeout(resolve, delay));

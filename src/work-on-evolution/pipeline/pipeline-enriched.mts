@@ -13,6 +13,7 @@
 
 import { logDebug, logInfo } from '../../lib/mcp-notifications.mjs';
 import { dispatchSolutionStrategies } from '../routing/solution-dispatch.mjs';
+import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
 
 const TOOL = 'estimateEvolution:pipeline';
 
@@ -494,7 +495,7 @@ export async function discoverPipelineSolutions(capabilityName: string, options:
 
     return result;
   } catch (err) {
-    logDebug(TOOL, `Solution discovery failed for "${trimmed}": ${err.message}`);
+    logDebug(TOOL, `Solution discovery failed for "${trimmed}": ${toErrorMessage(err)}`);
     return { sota: null, legacy: null, capabilityUsed: trimmed, confidence: 0 };
   }
 }
@@ -547,8 +548,8 @@ export async function evaluateDiscoveredSolution(solution: any, options: any = {
 
     return { evolution, confidence, method, evaluations };
   } catch (err) {
-    logDebug(TOOL, `evaluateDiscoveredSolution failed for "${solution.name}": ${err.message}`);
-    return { evolution: null, confidence: 0, method: 'error', evaluations: { error: err.message } };
+    logDebug(TOOL, `evaluateDiscoveredSolution failed for "${solution.name}": ${toErrorMessage(err)}`);
+    return { evolution: null, confidence: 0, method: 'error', evaluations: { error: toErrorMessage(err) } };
   }
 }
 

@@ -19,6 +19,7 @@
     "strict": false,
     "noImplicitAny": false,
     "strictNullChecks": false,
+    "useUnknownInCatchVariables": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
 

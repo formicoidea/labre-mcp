@@ -19,6 +19,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
+import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -265,7 +266,7 @@ export class CpcTaxonomyCache {
         }));
     } catch (err) {
       if (typeof process !== 'undefined' && process.env.WARDLEY_VERBOSE) {
-        console.error(`CpcTaxonomyCache: BigQuery fetch failed for "${parentCode}":`, err.message);
+        console.error(`CpcTaxonomyCache: BigQuery fetch failed for "${parentCode}":`, toErrorMessage(err));
       }
       return [];
     }

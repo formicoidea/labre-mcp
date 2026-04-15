@@ -15,6 +15,7 @@
 import { estimateEvolutionOneShot, estimateEvolutionConversational, listStrategies } from './estimate-evolution.mjs';
 import { formatResponse, evolutionToStage, formatConfidence, strategyReasoning } from '../lib/response-formatter.mjs';
 import { routeEstimateEvolution, detectMode, MODES } from '../work-on-evolution/routing/mode-router.mjs';
+import { toErrorMessage, errorCode } from '../lib/errors.mjs';
 
 // ─── Conversational Input Parsing ──────────────────────────────────────────
 
@@ -746,13 +747,13 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
     parseConversationalInput('');
     console.log('  ✗ Expected error for empty input');
   } catch (err) {
-    console.log(`  ✓ Empty input error: ${err.message}`);
+    console.log(`  ✓ Empty input error: ${toErrorMessage(err)}`);
   }
   try {
     parseConversationalInput(null);
     console.log('  ✗ Expected error for null input');
   } catch (err) {
-    console.log(`  ✓ Null input error: ${err.message}`);
+    console.log(`  ✓ Null input error: ${toErrorMessage(err)}`);
   }
 
   console.log('\n=== Self-test completed ===');

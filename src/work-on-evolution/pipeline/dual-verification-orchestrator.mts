@@ -221,8 +221,8 @@ export async function verifyClassification(componentName: string, context: any =
         });
       }
     } catch (err) {
-      logDebug(TOOL, `Tier 2 (LLM) failed for "${name}": ${err.message}`);
-      llmResult = { error: err.message };
+      logDebug(TOOL, `Tier 2 (LLM) failed for "${name}": ${toErrorMessage(err)}`);
+      llmResult = { error: toErrorMessage(err) };
     }
   } else {
     logDebug(TOOL, `Tier 2 (LLM) skipped: ${context.skipLLM ? 'forced skip' : 'no llmCall provided'}`);
@@ -264,8 +264,8 @@ export async function verifyClassification(componentName: string, context: any =
       logDebug(TOOL,
         `After web search reconciliation: ${currentBest.classification} (confidence=${currentBest.confidence})`);
     } catch (err) {
-      logDebug(TOOL, `Tier 3 (web search) failed for "${name}": ${err.message}`);
-      webSearchResult = { error: err.message };
+      logDebug(TOOL, `Tier 3 (web search) failed for "${name}": ${toErrorMessage(err)}`);
+      webSearchResult = { error: toErrorMessage(err) };
     }
   } else {
     logDebug(TOOL,
@@ -302,6 +302,7 @@ import {
   verifyConcurrentFull,
   DEFAULT_SIGNAL_TIMEOUT_MS,
 } from './concurrent-verification.mjs';
+import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
 
 export { verifyConcurrent, verifyConcurrentFull };
 
