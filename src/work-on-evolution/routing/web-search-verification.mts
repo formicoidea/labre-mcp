@@ -34,6 +34,7 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { logDebug, logWarning } from '../../lib/mcp-notifications.mjs';
 import { classifyAndLogLLMError } from '../../lib/llm/llm-error-handler.mjs';
+import type { WebSearchVerificationResult, WebSearchEvidence, WebSearchReference } from '../../types/routing.mjs';
 import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -189,7 +190,7 @@ export function parseWebSearchResponse(text: string, name: string) {
  * @returns {WebSearchEvidence[]}
  */
 function parseEvidenceBlock(text: string) {
-  const evidence: any[] = [];
+  const evidence: WebSearchEvidence[] = [];
   const evidenceMatch = text.match(/EVIDENCE_START\s*\n([\s\S]*?)\nEVIDENCE_END/i);
 
   if (!evidenceMatch) return evidence;
@@ -231,7 +232,7 @@ function parseEvidenceBlock(text: string) {
  * @returns {WebSearchReference[]}
  */
 function parseReferencesBlock(text: string) {
-  const references: any[] = [];
+  const references: WebSearchReference[] = [];
   const refMatch = text.match(/REFERENCES_START\s*\n([\s\S]*?)\nREFERENCES_END/i);
 
   if (!refMatch) return references;
@@ -253,7 +254,7 @@ function parseReferencesBlock(text: string) {
     if (fields.title) {
       references.push({
         title: fields.title,
-        url: fields.url || undefined,
+        url: fields.url || '',
         snippet: fields.snippet || undefined,
       });
     }
@@ -285,7 +286,7 @@ function normalizeEvidenceType(raw: string | null | undefined): string {
  * @param {WebSearchReference[]} references - Any references parsed
  * @returns {WebSearchVerificationResult}
  */
-function inferFromKeywords(text: string, name: string, evidence: any[], references: any[]): any {
+function inferFromKeywords(text: string, name: string, evidence: WebSearchEvidence[], references: WebSearchReference[]): WebSearchVerificationResult {
   const lower = text.toLowerCase();
 
   // Count solution vs capability evidence keywords
@@ -345,15 +346,15 @@ function inferFromKeywords(text: string, name: string, evidence: any[], referenc
  * @param {string} reason - Why the fallback was triggered
  * @returns {WebSearchVerificationResult}
  */
-function createFallbackResult(name: string, reason: string): any {
+function createFallbackResult(name: string, reason: string): WebSearchVerificationResult {
   return {
     classification: 'capability',
     confidence: 0.40,
     method: 'web-search',
     reasoning: `Could not verify "${name}" via web search: ${reason} — defaulting to capability`,
     isSolution: false,
-    evidence: [] as any[],
-    references: [] as any[],
+    evidence: [],
+    references: [],
   };
 }
 
@@ -371,6 +372,7 @@ function createFallbackResult(name: string, reason: string): any {
  * @param {number} [config.maxTurns=3]                 - Max tool-use turns (search + analyze)
  * @returns {function(string, Object?): Promise<string>}
  */
+// any: config bag accepts diverse Claude Agent SDK options (model, effort, maxBudgetUsd, maxTurns, ...)
 export function createWebSearchCall(config: any = {}) {
   const {
     model = 'claude-sonnet-4-6',
@@ -384,6 +386,7 @@ export function createWebSearchCall(config: any = {}) {
       delete process.env.CLAUDECODE;
     }
 
+    // any: Claude Agent SDK options bag with diverse fields
     const options: any = {
       model,
       maxTurns,
@@ -451,7 +454,7 @@ export function createWebSearchCall(config: any = {}) {
  * @param {string} [options.context] - Additional context about the component
  * @returns {Promise<WebSearchVerificationResult>}
  */
-export async function verifyViaWebSearch(name: string, options: any = {}) {
+export async function verifyViaWebSearch(name: string, options: { description?: string; context?: string; webSearchCall?: any; timeoutMs?: number } = {}): Promise<WebSearchVerificationResult> {
   const trimmed = (name || '').trim();
 
   if (!trimmed) {
@@ -482,8 +485,8 @@ export async function verifyViaWebSearch(name: string, options: any = {}) {
 
     logDebug(TOOL,
       `Web search result for "${trimmed}": ${result.classification} ` +
-      `(confidence=${result.confidence}, evidence=${result.evidence.length}, ` +
-      `references=${result.references.length})`);
+      `(confidence=${result.confidence}, evidence=${result.evidence?.length ?? 0}, ` +
+      `references=${result.references?.length ?? 0})`);
 
     return result;
   } catch (err) {
@@ -516,7 +519,8 @@ export async function verifyViaWebSearch(name: string, options: any = {}) {
  * @param {WebSearchVerificationResult} webResult - Web search result
  * @returns {WebSearchVerificationResult} Combined result
  */
-export function combineWithPriorResult(priorResult: any, webResult: any) {
+// any: priorResult/webResult are heterogeneous; combination merges loose fields
+export function combineWithPriorResult(priorResult: any, webResult: WebSearchVerificationResult): any {
   if (!priorResult || !webResult) {
     return webResult || priorResult || createFallbackResult('unknown', 'No results to combine');
   }
@@ -582,10 +586,10 @@ REFERENCES_END`;
   console.assert(r1.confidence === 0.94, `Expected 0.94, got ${r1.confidence}`);
   console.assert(r1.isSolution === true, 'Expected isSolution=true');
   console.assert(r1.method === 'web-search', `Expected web-search, got ${r1.method}`);
-  console.assert(r1.evidence.length === 3, `Expected 3 evidence items, got ${r1.evidence.length}`);
-  console.assert(r1.references.length === 2, `Expected 2 references, got ${r1.references.length}`);
-  console.assert(r1.evidence[0].type === 'product-page', `Expected product-page, got ${r1.evidence[0].type}`);
-  console.assert(r1.evidence[0].supports === 'solution', `Expected solution, got ${r1.evidence[0].supports}`);
+  console.assert(r1.evidence!.length === 3, `Expected 3 evidence items, got ${r1.evidence!.length}`);
+  console.assert(r1.references!.length === 2, `Expected 2 references, got ${r1.references!.length}`);
+  console.assert(r1.evidence![0].type === 'product-page', `Expected product-page, got ${r1.evidence![0].type}`);
+  console.assert(r1.evidence![0].supports === 'solution', `Expected solution, got ${r1.evidence![0].supports}`);
   console.log('  \u2713 Solution response parsed correctly');
 
   // ── Test 2: Parse well-formatted capability response ───────────────
@@ -606,8 +610,8 @@ REFERENCES_END`;
   console.assert(r2.classification === 'capability', `Expected capability, got ${r2.classification}`);
   console.assert(r2.confidence === 0.88, `Expected 0.88, got ${r2.confidence}`);
   console.assert(r2.isSolution === false, 'Expected isSolution=false');
-  console.assert(r2.evidence.length === 2, `Expected 2 evidence items, got ${r2.evidence.length}`);
-  console.assert(r2.evidence[1].type === 'multi-implementation', `Expected multi-implementation, got ${r2.evidence[1].type}`);
+  console.assert(r2.evidence!.length === 2, `Expected 2 evidence items, got ${r2.evidence!.length}`);
+  console.assert(r2.evidence![1].type === 'multi-implementation', `Expected multi-implementation, got ${r2.evidence![1].type}`);
   console.log('  \u2713 Capability response parsed correctly');
 
   // ── Test 3: Parse response without evidence/references blocks ──────
@@ -619,8 +623,8 @@ reasoning=Docker is a well-known containerization platform`;
   const r3 = parseWebSearchResponse(minimalResponse, 'Docker');
   console.assert(r3.classification === 'solution', `Expected solution, got ${r3.classification}`);
   console.assert(r3.confidence === 0.75, `Expected 0.75, got ${r3.confidence}`);
-  console.assert(r3.evidence.length === 0, `Expected 0 evidence, got ${r3.evidence.length}`);
-  console.assert(r3.references.length === 0, `Expected 0 references, got ${r3.references.length}`);
+  console.assert(r3.evidence!.length === 0, `Expected 0 evidence, got ${r3.evidence!.length}`);
+  console.assert(r3.references!.length === 0, `Expected 0 references, got ${r3.references!.length}`);
   console.log('  \u2713 Minimal response parsed correctly');
 
   // ── Test 4: Parse unstructured response ────────────────────────────
@@ -658,8 +662,8 @@ used for container orchestration. There is pricing for managed versions like GKE
   const r6a = await verifyViaWebSearch('Kubernetes', { webSearchCall: mockWebSearch });
   console.assert(r6a.classification === 'solution', `Expected solution, got ${r6a.classification}`);
   console.assert(r6a.confidence === 0.95, `Expected 0.95, got ${r6a.confidence}`);
-  console.assert(r6a.evidence.length === 1, `Expected 1 evidence, got ${r6a.evidence.length}`);
-  console.assert(r6a.references.length === 1, `Expected 1 reference, got ${r6a.references.length}`);
+  console.assert(r6a.evidence!.length === 1, `Expected 1 evidence, got ${r6a.evidence!.length}`);
+  console.assert(r6a.references!.length === 1, `Expected 1 reference, got ${r6a.references!.length}`);
   console.log(`  \u2713 Kubernetes: ${r6a.classification} (${r6a.confidence})`);
 
   const r6b = await verifyViaWebSearch('data warehousing', { webSearchCall: mockWebSearch });

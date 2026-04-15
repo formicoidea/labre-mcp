@@ -18,6 +18,7 @@ import {
   detectComponentType,
 } from '../../lib/component-detection.mjs';
 import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
+import type { ComponentTypeDetection } from '../../types/routing.mjs';
 
 /** Routing modes */
 export const EVAL_MODES = {
@@ -56,7 +57,7 @@ export function getEvalMode() {
  *   or from the dual-verification orchestrator (routingDetection field)
  * @returns {{ useSolutionStrategies: boolean, useCapabilityStrategies: boolean, mode: string }}
  */
-export function determineRoutingTargets(detection: any): { useSolutionStrategies: boolean; useCapabilityStrategies: boolean; mode: string } {
+export function determineRoutingTargets(detection: ComponentTypeDetection | null): { useSolutionStrategies: boolean; useCapabilityStrategies: boolean; mode: string } {
   const mode = getEvalMode();
 
   if (mode === EVAL_MODES.PARALLEL) {
@@ -68,7 +69,7 @@ export function determineRoutingTargets(detection: any): { useSolutionStrategies
   }
 
   // Exclusive mode (default)
-  if (detection.type === COMPONENT_TYPE.SOLUTION) {
+  if (detection?.type === COMPONENT_TYPE.SOLUTION) {
     return {
       useSolutionStrategies: true,
       useCapabilityStrategies: false,
@@ -103,7 +104,8 @@ export function determineRoutingTargets(detection: any): { useSolutionStrategies
  * @param {string}   [deps.mode]   - 'auto' or 'conversational'
  * @returns {import('../strategies/solution/solution-base-strategy.mjs').SolutionBaseStrategy}
  */
-export function createSolutionStrategyInstance(StrategyCls: any, deps: any = {}) {
+// any: StrategyCls is a constructor and deps is a DI bag with diverse shapes
+export function createSolutionStrategyInstance(StrategyCls: any, deps: any = {}): any {
   // All solution strategies currently use LLM for evaluation
   if (deps.llmCall) {
     return new StrategyCls({
@@ -129,7 +131,8 @@ export function createSolutionStrategyInstance(StrategyCls: any, deps: any = {})
  * @param {string}   [options.mode='auto']    - 'auto' or 'conversational'
  * @returns {Promise<Object<string, import('../strategies/solution/solution-base-strategy.mjs').SolutionEvolutionResult>>}
  */
-export async function dispatchSolutionStrategies(component: any, options: any = {}): Promise<any> {
+// any: options is a heterogeneous bag (llmCall, strategy, mode, etc.)
+export async function dispatchSolutionStrategies(component: any, options: any = {}): Promise<Record<string, any>> {
   const { llmCall, strategy = 'all', mode = 'auto' } = options;
   const evaluations: Record<string, any> = {};
 
@@ -206,6 +209,7 @@ export async function dispatchSolutionStrategies(component: any, options: any = 
  * @param {string}   [options.description]     - Component description for detection
  * @returns {Promise<RoutedEvaluationResult>}
  */
+// any: options is a heterogeneous bag and the response includes legacy fields (detection, mode, …)
 export async function dispatchWithRouting(component: any, options: any = {}): Promise<any> {
   const {
     llmCall,

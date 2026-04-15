@@ -29,6 +29,8 @@
 
 import { logDebug } from '../../lib/mcp-notifications.mjs';
 import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
+import type { ComponentTypeDetection } from '../../types/routing.mjs';
+import type { LLMCall } from '../../types/llm.mjs';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -205,7 +207,7 @@ const CAPABILITY_INDICATORS = [
  * @param {string} [options.context] - Additional context (boosts confidence if consistent)
  * @returns {SolutionDetectionResult}
  */
-export function classifySolutionNaming(name: string, options: any = {}) {
+export function classifySolutionNaming(name: string, options: { description?: string; context?: string } = {}): ComponentTypeDetection {
   const trimmed = (name || '').trim();
   if (!trimmed) {
     return {
@@ -371,7 +373,7 @@ reasoning=<one sentence explaining your classification>`;
  * @param {string} [options.context] - Additional context about the component
  * @returns {Promise<SolutionDetectionResult>}
  */
-export async function classifySolutionLLM(name: string, llmCall: any, options: any = {}): Promise<any> {
+export async function classifySolutionLLM(name: string, llmCall: LLMCall, options: { description?: string; context?: string } = {}): Promise<ComponentTypeDetection> {
   const trimmed = (name || '').trim();
 
   if (!trimmed) {
@@ -492,7 +494,7 @@ export function parseLLMClassificationResponse(text: string, name: string) {
  *   heuristics are uncertain, returns the uncertain naming result.
  * @returns {Promise<SolutionDetectionResult>}
  */
-export async function detectSolution(name: string, options: any = {}): Promise<any> {
+export async function detectSolution(name: string, options: { description?: string; context?: string; llmCall?: LLMCall; useLlmFallback?: boolean; useWebSearch?: boolean } = {}): Promise<ComponentTypeDetection> {
   const TOOL = 'detectSolution';
 
   // Tier 1: Naming convention heuristics

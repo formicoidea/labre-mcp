@@ -15,6 +15,7 @@
 
 import { estimateEvolutionOneShot, estimateEvolutionConversational } from '../estimate-evolution.mjs';
 import { formatResponse } from '../../lib/response-formatter.mjs';
+import type { RoutedResponse } from '../../types/routing.mjs';
 
 // ─── Mode Constants ────────────────────────────────────────────────────────
 
@@ -49,6 +50,7 @@ const MODE_ALIASES = {
  * @param {Object} input - Request input
  * @returns {boolean} True if there are enough params for one-shot evaluation
  */
+// any: input is the raw MCP arguments bag (validated downstream)
 function hasEvaluationParams(input: any): boolean {
   if (!input || typeof input !== 'object') return false;
 
@@ -77,7 +79,8 @@ function hasEvaluationParams(input: any): boolean {
  * @param {Object} input - Raw request input
  * @returns {{ mode: string, reason: string }} Detected mode and reason for the choice
  */
-export function detectMode(input: any) {
+// any: input is the raw MCP arguments bag (mode/space/sessionState/eval params auto-detected)
+export function detectMode(input: any): { mode: string; reason: string } {
   if (!input || typeof input !== 'object') {
     return { mode: MODES.GUIDED, reason: 'no valid input — defaulting to guided mode' };
   }
@@ -143,6 +146,7 @@ export function detectMode(input: any) {
  * @param {Object} input - Request input with optional mode parameter
  * @returns {Promise<RoutedResponse>} Unified response with mode, results, and formatting
  */
+// any: input is MCP raw arguments; output is RoutedResponse | guided-turn shape
 export async function routeEstimateEvolution(input: any = {}): Promise<any> {
   const { mode, reason } = detectMode(input);
 
@@ -162,7 +166,7 @@ export async function routeEstimateEvolution(input: any = {}): Promise<any> {
  * @param {string} modeReason - Why one-shot was selected
  * @returns {Promise<RoutedResponse>}
  */
-async function routeOneShot(input: any, modeReason: string): Promise<any> {
+async function routeOneShot(input: any, modeReason: string): Promise<RoutedResponse> {
   // Map input to one-shot API format
   const oneShotInput = {
     name: input.name,
@@ -232,7 +236,7 @@ async function routeOneShot(input: any, modeReason: string): Promise<any> {
  * @param {string} modeReason - Why guided was selected
  * @returns {Promise<RoutedResponse>}
  */
-async function routeGuided(input: any, modeReason: string): Promise<any> {
+async function routeGuided(input: any, modeReason: string): Promise<any> {  // any: guided-turn shape
   // Build conversational input
   const conversationalInput: any = {
     sessionState: input.sessionState || null,
@@ -297,6 +301,7 @@ async function routeGuided(input: any, modeReason: string): Promise<any> {
  * @param {Object} result - Result from estimateEvolutionConversational
  * @returns {string} Markdown-formatted response
  */
+// any: result is the conversational session output (loose shape)
 function formatGuidedTurn(result: any): string {
   const lines = [];
 

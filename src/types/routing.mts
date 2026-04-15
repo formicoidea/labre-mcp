@@ -79,3 +79,36 @@ export interface PipelineResponse extends RoutedResponseBase {
  * Consommateurs : `if (response.pipeline) { ... response.capabilityPivot ... }`.
  */
 export type RoutedResponse = StandardResponse | PipelineResponse;
+
+// ─── Component type detection ──────────────────────────────────────────────
+
+export type ComponentTypeKind = 'solution' | 'capability';
+
+export interface WebSearchEvidence {
+  type: string;
+  description?: string;
+  source?: string;
+  supports?: string;
+}
+
+export interface WebSearchReference {
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
+export interface ComponentTypeDetection {
+  /** Some callers use `type`, others `classification` — both optional, at least one is set */
+  type?: ComponentTypeKind | string;
+  classification?: ComponentTypeKind | string;
+  confidence: number;
+  method: string;
+  reasoning?: string;
+  isSolution?: boolean;
+  evidence?: WebSearchEvidence[] | undefined;
+  references?: WebSearchReference[] | undefined;
+  /** Loose extension fields tolerated by various callers */
+  [key: string]: unknown;
+}
+
+export type WebSearchVerificationResult = ComponentTypeDetection;

@@ -83,7 +83,8 @@ export const WARDLEY_TYPE_PATTERNS = {
  * @param {string} [options.category] - Category from KNOWN_SOLUTIONS
  * @returns {{ wardleyType: WardleyComponentType, confidence: number, reason: string }}
  */
-export function classifyWardleyType(name: string, options: any = {}) {
+// any: options accept loose ad-hoc fields (nature, category) and return is heterogeneous
+export function classifyWardleyType(name: string, options: any = {}): any {
   const trimmed = (name || '').trim();
 
   // Layer 1: Use pre-existing nature from dictionary lookup

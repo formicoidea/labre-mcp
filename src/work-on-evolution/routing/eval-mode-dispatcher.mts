@@ -33,6 +33,7 @@ import {
   EVAL_MODES,
 } from './solution-dispatch.mjs';
 import { loadStrategies } from '../strategies/capacity/registry.mjs';
+import type { ComponentTypeDetection } from '../../types/routing.mjs';
 import { loadSolutionStrategies } from '../strategies/solution/registry.mjs';
 import { logDebug } from '../../lib/mcp-notifications.mjs';
 import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
@@ -71,7 +72,8 @@ const TOOL = 'evalModeDispatcher';
  * @param {function} createInstance - Factory for capability strategy instances
  * @returns {Promise<Object<string, import('../strategies/capacity/base-strategy.mjs').EvolutionResult>>}
  */
-async function runCapabilityStrategies(component: any, createInstance: any) {
+// any: createInstance is a strategy-class factory closure with diverse callbacks
+async function runCapabilityStrategies(component: any, createInstance: (cls: any) => any): Promise<any> {
   const strategies = await loadStrategies();
   const evaluations: Record<string, any> = {};
 
@@ -132,7 +134,7 @@ async function runCapabilityStrategies(component: any, createInstance: any) {
  * @param {function} createInstance - Factory for solution strategy instances
  * @returns {Promise<Object<string, import('../strategies/capacity/base-strategy.mjs').EvolutionResult>>}
  */
-async function runSolutionStrategies(component: any, createInstance: any) {
+async function runSolutionStrategies(component: any, createInstance: (cls: any) => any): Promise<Record<string, any>> {
   const strategies = await loadSolutionStrategies();
   const evaluations: Record<string, any> = {};
 
@@ -193,7 +195,8 @@ function namespaceResults(evaluations: Record<string, unknown>, namespace: strin
  * @param {DispatchOptions} [options={}]
  * @returns {Promise<DispatchResult>}
  */
-export async function dispatchEvaluation(component: any, detection: any = null, options: any = {}): Promise<any> {
+// any: options bag includes createInstance, createSolutionInstance, strategy, etc.; response shape varies
+export async function dispatchEvaluation(component: any, detection: ComponentTypeDetection | null = null, options: any = {}): Promise<any> {
   const {
     createCapabilityInstance = defaultInstanceFactory,
     createSolutionInstance = defaultInstanceFactory,
@@ -214,13 +217,15 @@ export async function dispatchEvaluation(component: any, detection: any = null, 
     `solution=${targets.useSolutionStrategies}, capability=${targets.useCapabilityStrategies}`);
 
   // Step 3: Prepare solution-enriched component
+  // any: effectiveDetection has loose extension fields (canonical, vendor, category) typed as unknown
+  const det = effectiveDetection as any;
   const solutionComponent = {
     ...component,
-    isSolution: effectiveDetection.type === COMPONENT_TYPE.SOLUTION,
-    routerConfidence: effectiveDetection.confidence,
-    ...(effectiveDetection.canonical && { canonicalName: effectiveDetection.canonical }),
-    ...(effectiveDetection.vendor && { vendor: effectiveDetection.vendor }),
-    ...(effectiveDetection.category && { solutionCategory: effectiveDetection.category }),
+    isSolution: det.type === COMPONENT_TYPE.SOLUTION,
+    routerConfidence: det.confidence,
+    ...(det.canonical ? { canonicalName: det.canonical } : {}),
+    ...(det.vendor ? { vendor: det.vendor } : {}),
+    ...(det.category ? { solutionCategory: det.category } : {}),
   };
 
   // Step 4: Execute strategy set(s)
