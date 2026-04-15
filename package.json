@@ -10,7 +10,7 @@
     "build": "tsc",
     "dev": "tsx src/mcp/mcp-server.mts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test \"src/**/*.test.mjs\""
+    "test": "tsx --test \"src/**/*.test.mts\""
   },
   "keywords": [],
   "author": "",
