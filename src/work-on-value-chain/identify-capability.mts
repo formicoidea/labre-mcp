@@ -7,7 +7,9 @@
 // Also exposes an MCP tool definition (IDENTIFY_CAPABILITY_TOOL) and
 // handler (handleIdentifyCapability) for direct invocation via MCP clients.
 
-import type { McpToolDefinition } from '../types/mcp.mjs';
+import { z } from 'zod';
+import type { McpToolDefinition, JsonSchema } from '../types/mcp.mjs';
+import { IdentifyCapabilityInputSchema, type IdentifyCapabilityInput } from '../schemas/identify-capability.schema.mjs';
 import { createLLMCall } from '../lib/llm/llm-call.mjs';
 import { logDebug } from '../lib/mcp-notifications.mjs';
 
@@ -166,33 +168,13 @@ export const IDENTIFY_CAPABILITY_TOOL: McpToolDefinition = {
     'Decodes technical solution names (CRM, ERP, Kubernetes...) into the capability they serve, ' +
     'classified by nature (activity, practice, knowledge, data). ' +
     'Only works for component and pipeline types — other types (anchor, market, ecosystem) are returned as-is.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description: 'Component name or label (e.g. "CRM", "Kubernetes", "Data Warehouse")',
-      },
-      type: {
-        type: 'string',
-        enum: ['anchor', 'component', 'pipeline', 'market', 'ecosystem'],
-        description: 'Component type from the OWM DSL. If provided, takes priority over LLM estimation. Non-eligible types (anchor, market, ecosystem) are skipped immediately.',
-      },
-      description: {
-        type: 'string',
-        description: 'Free-text description or business context for the component',
-      },
-      context: {
-        type: 'string',
-        description: 'Additional context about how the component is used in the value chain',
-      },
-    },
-    required: ['name'],
-    additionalProperties: false,
-  },
+  inputSchema: z.toJSONSchema(IdentifyCapabilityInputSchema, { io: 'input' }) as JsonSchema,
 };
 
 export async function handleIdentifyCapability(args: Record<string, unknown>): Promise<unknown> {
+  const parsed: IdentifyCapabilityInput = IdentifyCapabilityInputSchema.parse(args);
+  // Map parsed input onto the legacy local `args` name for minimal downstream diff
+  args = parsed as Record<string, unknown>;
   if (!args?.name || typeof args.name !== 'string' || args.name.trim().length === 0) {
     throw new Error('Required parameter "name" must be a non-empty string');
   }

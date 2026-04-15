@@ -7,7 +7,9 @@
 //
 // The tool is designed for integration with Claude Code and other MCP-compatible clients.
 
-import type { McpToolDefinition } from '../types/mcp.mjs';
+import { z } from 'zod';
+import type { McpToolDefinition, JsonSchema } from '../types/mcp.mjs';
+import { EstimateEvolutionInputSchema, type EstimateEvolutionInput } from '../schemas/estimate-evolution.schema.mjs';
 import { classifyComponent, buildReQuestions } from '../work-on-evolution/routing/classification-gate.mjs';
 import { loadStrategies, getStrategy, listStrategies } from '../work-on-evolution/strategies/capacity/registry.mjs';
 import { BaseStrategy } from '../work-on-evolution/strategies/capacity/base-strategy.mjs';
@@ -32,119 +34,7 @@ export const ESTIMATE_EVOLUTION_TOOL: McpToolDefinition = {
     'Pre-filters by economic space (social good / common good / economic) via a classification gate. ' +
     'Social good and common good components trigger re-questioning instead of evaluation. ' +
     'Returns {evolution, confidence, method} for each strategy, plus routing metadata showing which pipeline was used.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description: 'Component name (e.g. "ERP", "LLM", "Electricity", "Air")',
-      },
-      context: {
-        type: 'string',
-        description:
-          'Business or usage context for the component (e.g. "Enterprise software for sales teams", "Western power supply today")',
-      },
-      certitude: {
-        type: 'number',
-        minimum: 0,
-        maximum: 1,
-        description:
-          'How well-understood and defined the component is (0 = novel/uncertain, 1 = fully understood). Required by s-curve strategy.',
-      },
-      ubiquity: {
-        type: 'number',
-        minimum: 0,
-        maximum: 1,
-        description:
-          'How widespread the component is (0 = rare, 1 = ubiquitous). Required by s-curve strategy.',
-      },
-      wonder: {
-        type: 'number',
-        minimum: 0,
-        maximum: 1,
-        description:
-          'Proportion of publications describing novelty/wonder (0–1). Used by pub-distribution strategy.',
-      },
-      build: {
-        type: 'number',
-        minimum: 0,
-        maximum: 1,
-        description:
-          'Proportion of publications focused on building/learning/experimenting (0–1). Used by pub-distribution strategy.',
-      },
-      operate: {
-        type: 'number',
-        minimum: 0,
-        maximum: 1,
-        description:
-          'Proportion of publications about maintenance/operations/features (0–1). Used by pub-distribution strategy.',
-      },
-      usage: {
-        type: 'number',
-        minimum: 0,
-        maximum: 1,
-        description:
-          'Proportion of publications about commodity usage (0–1). Used by pub-distribution strategy.',
-      },
-      description: {
-        type: 'string',
-        description:
-          'Free-text description of the component for strategies that use semantic analysis.',
-      },
-      space: {
-        type: 'string',
-        enum: ['economic', 'social_good', 'common_good'],
-        description:
-          'Pre-classification of the component\'s economic space. ' +
-          'If provided, bypasses the classification gate. ' +
-          'If omitted, the gate auto-detects from name + context.',
-      },
-      strategy: {
-        type: 'string',
-        description:
-          'Strategy to use for evaluation. Use "all" to run all available strategies. ' +
-          'If omitted, defaults to "all". Available strategies are auto-discovered from the strategies directory.',
-        default: 'all',
-      },
-      mode: {
-        type: 'string',
-        enum: ['oneshot', 'guided', 'conversational', 'auto', 'default'],
-        description:
-          'Execution mode. "oneshot" accepts all parameters in a single call. ' +
-          '"guided" (or "conversational") enables multi-turn interaction that progressively asks clarifying questions. ' +
-          '"auto" (or "default") auto-detects: uses one-shot when space or evaluation params are provided, guided otherwise. ' +
-          'If omitted, auto-detection is used.',
-        default: 'auto',
-      },
-      sessionState: {
-        type: 'string',
-        description:
-          'Serialized session state from a previous conversational exchange. ' +
-          'Only used when mode is "conversational". Pass the sessionState from the previous response to continue the conversation.',
-      },
-      forceEstimate: {
-        type: 'boolean',
-        description:
-          'When true, forces estimation with whatever data has been gathered so far. ' +
-          'Only used in "conversational" mode when you want to skip remaining questions.',
-        default: false,
-      },
-      pipeline: {
-        type: 'boolean',
-        description:
-          'When true, enables enriched pipeline mode that orchestrates 3 evaluations: ' +
-          '(1) capability pivot — the abstract capability is evaluated first as central anchor, ' +
-          '(2) state-of-the-art solution — a modern/SotA implementation of that capability, ' +
-          '(3) legacy solution — an older/legacy implementation. ' +
-          'Produces a complete OWM (onlinewardleymaps.com) output with pipeline syntax ' +
-          'containing component, pipeline, and label declarations. ' +
-          'When omitted or false, the default single-evaluation behavior is preserved.',
-        default: false,
-      },
-    },
-    required: ['name'],
-    additionalProperties: false,
-  },
+  inputSchema: z.toJSONSchema(EstimateEvolutionInputSchema, { io: 'input' }) as JsonSchema,
 };
 
 // ─── Input Validation ────────────────────────────────────────────────────────
@@ -156,57 +46,6 @@ export const ESTIMATE_EVOLUTION_TOOL: McpToolDefinition = {
  * @param {*} input - Raw tool input
  * @returns {Object} Validated and normalized input
  */
-function validateInput(input: any): any {
-  if (input == null || typeof input !== 'object') {
-    throw new Error('Input must be a non-null object');
-  }
-
-  const { name, context, strategy, certitude, ubiquity, wonder, build, operate, usage, description, space, mode, pipeline } = input;
-
-  // Required: name
-  if (name == null || typeof name !== 'string' || name.trim().length === 0) {
-    throw new Error('Required parameter "name" must be a non-empty string');
-  }
-
-  // Optional strings
-  if (context != null && typeof context !== 'string') {
-    throw new Error('Parameter "context" must be a string');
-  }
-  if (strategy != null && typeof strategy !== 'string') {
-    throw new Error('Parameter "strategy" must be a string');
-  }
-  if (description != null && typeof description !== 'string') {
-    throw new Error('Parameter "description" must be a string');
-  }
-
-  // Optional numeric fields in [0, 1]
-  const numericFields = { certitude, ubiquity, wonder, build, operate, usage };
-  for (const [field, value] of Object.entries(numericFields)) {
-    if (value != null) {
-      if (typeof value !== 'number' || Number.isNaN(value)) {
-        throw new Error(`Parameter "${field}" must be a number, got ${typeof value}`);
-      }
-      if (value < 0 || value > 1) {
-        throw new Error(`Parameter "${field}" must be between 0 and 1, got ${value}`);
-      }
-    }
-  }
-
-  return {
-    name: name.trim(),
-    context: (context || '').trim(),
-    strategy: (strategy || 'all').trim(),
-    ...(certitude != null && { certitude }),
-    ...(ubiquity != null && { ubiquity }),
-    ...(wonder != null && { wonder }),
-    ...(build != null && { build }),
-    ...(operate != null && { operate }),
-    ...(usage != null && { usage }),
-    ...(description != null && { description: description.trim() }),
-    ...(pipeline != null && { pipeline: Boolean(pipeline) }),
-  };
-}
-
 // ─── MCP Tool Handler ─────────────────────────────────────────────────────────
 
 /**
@@ -224,8 +63,8 @@ function validateInput(input: any): any {
  * @returns {Promise<Object>} MCP tool response with classification, evaluations, and message
  */
 export async function handleEstimateEvolution(rawInput: Record<string, unknown>): Promise<unknown> {
-  // Step 0: Validate and normalize input
-  const validated = validateInput(rawInput);
+  // Step 0: Validate and normalize input via Zod (throws ZodError on invalid input)
+  const validated: EstimateEvolutionInput = EstimateEvolutionInputSchema.parse(rawInput);
   const { name, context, strategy, ...componentData } = validated;
 
   // ── Mode Router: unified mode selection and dispatch ───────────────

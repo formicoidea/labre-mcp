@@ -9,8 +9,10 @@
 //   import { generateValueChain } from './generate-value-chain.mjs';
 //   const result = await generateValueChain('A tea shop serving customers');
 
-import type { McpToolDefinition } from '../types/mcp.mjs';
+import { z } from 'zod';
+import type { McpToolDefinition, JsonSchema } from '../types/mcp.mjs';
 import type { DecomposedValueChain, ValueChainComponent } from '../types/wm-map.mjs';
+import { GenerateValueChainInputSchema, type GenerateValueChainInput } from '../schemas/generate-value-chain.schema.mjs';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { createLLMCall } from '../lib/llm/llm-call.mjs';
@@ -260,31 +262,7 @@ export const GENERATE_VALUE_CHAIN_TOOL: McpToolDefinition = {
     'Generate a Wardley Map .wm file from a business description. ' +
     'Decomposes the business into a value chain, evaluates component evolution, ' +
     'and produces a valid .wm file for the VSCode Online Wardley Maps extension.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      description: {
-        type: 'string',
-        description: 'Business description or user need to map',
-      },
-      filename: {
-        type: 'string',
-        description: 'Output filename without extension (auto-generated if omitted)',
-      },
-      outputDir: {
-        type: 'string',
-        description: 'Output directory (default: maps/myMaps)',
-        default: 'maps/myMaps',
-      },
-      strategy: {
-        type: 'string',
-        description: 'Evolution evaluation strategy (default: timeline-benchmark)',
-        default: 'timeline-benchmark',
-      },
-    },
-    required: ['description'],
-    additionalProperties: false,
-  },
+  inputSchema: z.toJSONSchema(GenerateValueChainInputSchema, { io: 'input' }) as JsonSchema,
 };
 
 /**
@@ -293,10 +271,11 @@ export const GENERATE_VALUE_CHAIN_TOOL: McpToolDefinition = {
  * @returns {Promise<Object>} Result with wmContent, filePath, evaluations
  */
 export async function handleGenerateValueChain(args: Record<string, unknown>): Promise<unknown> {
-  return generateValueChain(args.description as string, {
-    filename: args.filename as string | undefined,
-    outputDir: args.outputDir as string | undefined,
-    strategy: args.strategy as string | undefined,
+  const input: GenerateValueChainInput = GenerateValueChainInputSchema.parse(args);
+  return generateValueChain(input.description, {
+    filename: input.filename,
+    outputDir: input.outputDir,
+    strategy: input.strategy,
   });
 }
 

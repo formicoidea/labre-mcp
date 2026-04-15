@@ -77,7 +77,7 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
   logDebug(TOOL, `Input validated: component="${name}", strategy="${strategy}"${space ? `, space="${space}"` : ''} [lang=${lang}]`);
 
   // Step 2: Classify
-  const classification = resolveClassification(name, description, space);
+  const classification = resolveClassification(name, description ?? '', space);
 
   logDebug(TOOL, msg('step.classification', { component: name, space: classification.space }));
 

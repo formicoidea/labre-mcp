@@ -11,8 +11,10 @@
 //   import { evaluateMapFile } from './evaluate-map.mjs';
 //   const result = await evaluateMapFile('maps/myMaps/tea-shop.wm');
 
-import type { McpToolDefinition } from '../../types/mcp.mjs';
+import { z } from 'zod';
+import type { McpToolDefinition, JsonSchema } from '../../types/mcp.mjs';
 import type { ParsedWardleyMap, MapItemEvaluation, EvaluateMapOptions } from '../../types/wm-map.mjs';
+import { EvaluateMapInputSchema, type EvaluateMapInput } from '../../schemas/evaluate-map.schema.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { classifyComponent } from '../routing/classification-gate.mjs';
 import { estimateEvolutionOneShot } from '../estimate-evolution.mjs';
@@ -437,27 +439,7 @@ export const EVALUATE_MAP_TOOL: McpToolDefinition = {
     'Evaluate all components in a .wm Wardley Map file, estimate their evolution positions, ' +
     'and update the file with new maturity values. Uses the classification gate to skip non-economic ' +
     'components and runs pluggable evaluation strategies on economic ones.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      filePath: {
-        type: 'string',
-        description: 'Path to the .wm file to evaluate',
-      },
-      strategy: {
-        type: 'string',
-        description: 'Evaluation strategy (default: all)',
-        default: 'all',
-      },
-      updateFile: {
-        type: 'boolean',
-        description: 'Whether to update the .wm file with new positions (default: true)',
-        default: true,
-      },
-    },
-    required: ['filePath'],
-    additionalProperties: false,
-  },
+  inputSchema: z.toJSONSchema(EvaluateMapInputSchema, { io: 'input' }) as JsonSchema,
 };
 
 /**
@@ -466,9 +448,10 @@ export const EVALUATE_MAP_TOOL: McpToolDefinition = {
  * @returns {Promise<Object>}
  */
 export async function handleEvaluateMap(args: Record<string, unknown>): Promise<unknown> {
-  return evaluateMapFile(args.filePath as string, {
-    strategy: args.strategy as string | undefined,
-    updateFile: args.updateFile as boolean | undefined,
+  const input: EvaluateMapInput = EvaluateMapInputSchema.parse(args);
+  return evaluateMapFile(input.filePath, {
+    strategy: input.strategy,
+    updateFile: input.updateFile,
   });
 }
 

@@ -1,0 +1,69 @@
+// Zod schema for the estimateEvolution MCP tool input.
+// Source of truth for the JSON Schema exposed to MCP clients AND for runtime
+// validation of incoming tool/call arguments.
+
+import { z } from 'zod';
+
+export const EstimateEvolutionInputSchema = z.object({
+  name: z.string().min(1).describe(
+    'Component name (e.g. "ERP", "LLM", "Electricity", "Air")'
+  ),
+  context: z.string().optional().describe(
+    'Business or usage context for the component (e.g. "Enterprise software for sales teams", "Western power supply today")'
+  ),
+  certitude: z.number().min(0).max(1).optional().describe(
+    'How well-understood and defined the component is (0 = novel/uncertain, 1 = fully understood). Required by s-curve strategy.'
+  ),
+  ubiquity: z.number().min(0).max(1).optional().describe(
+    'How widespread the component is (0 = rare, 1 = ubiquitous). Required by s-curve strategy.'
+  ),
+  wonder: z.number().min(0).max(1).optional().describe(
+    'Proportion of publications describing novelty/wonder (0–1). Used by pub-distribution strategy.'
+  ),
+  build: z.number().min(0).max(1).optional().describe(
+    'Proportion of publications focused on building/learning/experimenting (0–1). Used by pub-distribution strategy.'
+  ),
+  operate: z.number().min(0).max(1).optional().describe(
+    'Proportion of publications about maintenance/operations/features (0–1). Used by pub-distribution strategy.'
+  ),
+  usage: z.number().min(0).max(1).optional().describe(
+    'Proportion of publications about commodity usage (0–1). Used by pub-distribution strategy.'
+  ),
+  description: z.string().optional().describe(
+    'Free-text description of the component for strategies that use semantic analysis.'
+  ),
+  space: z.enum(['economic', 'social_good', 'common_good']).optional().describe(
+    'Pre-classification of the component\'s economic space. ' +
+    'If provided, bypasses the classification gate. ' +
+    'If omitted, the gate auto-detects from name + context.'
+  ),
+  strategy: z.string().default('all').describe(
+    'Strategy to use for evaluation. Use "all" to run all available strategies. ' +
+    'If omitted, defaults to "all". Available strategies are auto-discovered from the strategies directory.'
+  ),
+  mode: z.enum(['oneshot', 'guided', 'conversational', 'auto', 'default']).default('auto').describe(
+    'Execution mode. "oneshot" accepts all parameters in a single call. ' +
+    '"guided" (or "conversational") enables multi-turn interaction that progressively asks clarifying questions. ' +
+    '"auto" (or "default") auto-detects: uses one-shot when space or evaluation params are provided, guided otherwise. ' +
+    'If omitted, auto-detection is used.'
+  ),
+  sessionState: z.string().optional().describe(
+    'Serialized session state from a previous conversational exchange. ' +
+    'Only used when mode is "conversational". Pass the sessionState from the previous response to continue the conversation.'
+  ),
+  forceEstimate: z.boolean().default(false).describe(
+    'When true, forces estimation with whatever data has been gathered so far. ' +
+    'Only used in "conversational" mode when you want to skip remaining questions.'
+  ),
+  pipeline: z.boolean().default(false).describe(
+    'When true, enables enriched pipeline mode that orchestrates 3 evaluations: ' +
+    '(1) capability pivot — the abstract capability is evaluated first as central anchor, ' +
+    '(2) state-of-the-art solution — a modern/SotA implementation of that capability, ' +
+    '(3) legacy solution — an older/legacy implementation. ' +
+    'Produces a complete OWM (onlinewardleymaps.com) output with pipeline syntax ' +
+    'containing component, pipeline, and label declarations. ' +
+    'When omitted or false, the default single-evaluation behavior is preserved.'
+  ),
+}).strict();
+
+export type EstimateEvolutionInput = z.infer<typeof EstimateEvolutionInputSchema>;

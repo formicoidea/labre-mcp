@@ -8,7 +8,9 @@
 //
 // Exposes an MCP tool (estimateAnchorEvolution) for direct invocation.
 
-import type { McpToolDefinition } from '../../../types/mcp.mjs';
+import { z } from 'zod';
+import type { McpToolDefinition, JsonSchema } from '../../../types/mcp.mjs';
+import { EstimateAnchorEvolutionInputSchema, type EstimateAnchorEvolutionInput } from '../../../schemas/estimate-anchor-evolution.schema.mjs';
 import { createLLMCall } from '../../../lib/llm/llm-call.mjs';
 import { logDebug } from '../../../lib/mcp-notifications.mjs';
 import { evolutionToStage } from '../../../lib/response-formatter.mjs';
@@ -158,53 +160,10 @@ export const ESTIMATE_ANCHOR_EVOLUTION_TOOL: McpToolDefinition = {
     'the consumption culture lens (user perception + industry perception). ' +
     'The LLM determines a single evolution phase (1–4, Genesis → Commodity). ' +
     'A phase can be provided directly to skip LLM assessment.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description: 'Anchor name — the user need (e.g. "Hot Beverage", "Urban Mobility", "Project Management")',
-      },
-      context: {
-        type: 'string',
-        description: 'Business/market context (required — anchor evaluation is highly context-dependent)',
-      },
-      phase: {
-        type: 'integer',
-        minimum: 1,
-        maximum: 4,
-        description:
-          'Pre-assessed evolution phase combining user and industry perception. ' +
-          '1=Genesis (novel/unknown), 2=Custom (emerging/ROI), 3=Product (common/implementation advantage), 4=Commodity (standard/cost of entry). ' +
-          'If omitted, LLM assesses it.',
-      },
-    },
-    required: ['name', 'context'],
-    additionalProperties: false,
-  },
+  inputSchema: z.toJSONSchema(EstimateAnchorEvolutionInputSchema, { io: 'input' }) as JsonSchema,
 };
 
 export async function handleEstimateAnchorEvolution(args: Record<string, unknown>): Promise<unknown> {
-  if (!args?.name || typeof args.name !== 'string' || args.name.trim().length === 0) {
-    throw new Error('Required parameter "name" must be a non-empty string');
-  }
-  if (!args?.context || typeof args.context !== 'string' || args.context.trim().length === 0) {
-    throw new Error('Required parameter "context" must be a non-empty string');
-  }
-
-  // any: validated args bag — heterogeneous fields
-  const validated: any = {
-    name: args.name.trim(),
-    context: args.context.trim(),
-  };
-
-  if (args.phase != null) {
-    const p = Number(args.phase);
-    if (!Number.isInteger(p) || p < 1 || p > 4) {
-      throw new Error('phase must be an integer between 1 and 4');
-    }
-    validated.phase = p;
-  }
-
-  return estimateAnchorEvolution(validated, getLLMCall());
+  const input: EstimateAnchorEvolutionInput = EstimateAnchorEvolutionInputSchema.parse(args);
+  return estimateAnchorEvolution(input, getLLMCall());
 }
