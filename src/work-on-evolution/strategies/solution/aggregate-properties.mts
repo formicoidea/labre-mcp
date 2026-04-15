@@ -103,7 +103,8 @@ export const MAX_CONFIDENCE = 0.95;
  *   const weights = renormalizeWeights(config);
  *   // efficiency excluded, others get proportionally higher weights summing to 1.0
  */
-export function renormalizeWeights(weightConfig: any) {
+// any: weightConfig is a loose { key: { weight, enabled } } bag with dynamic key set
+export function renormalizeWeights(weightConfig: any): any {
   const enabled = Object.entries(weightConfig)
     .filter(([, cfg]: [string, any]) => cfg.enabled !== false);
 
@@ -133,7 +134,8 @@ export function renormalizeWeights(weightConfig: any) {
  * @param {Record<string, number>} [options.customWeights={}] - Custom weight overrides by property name/ID
  * @returns {Record<string, PropertyWeightConfig>}
  */
-export function buildWeightConfig(properties: any, options: any = {}) {
+// any: builder output is a heterogeneous weight config map
+export function buildWeightConfig(properties: any, options: any = {}): any {
   const disabled = new Set(
     (options.disabled || []).map((n: string) => n.toLowerCase().trim())
   );
@@ -295,7 +297,7 @@ export function aggregatePropertyScores(properties: Array<{ property?: string; p
   let phaseSum = 0;
   let enabledEvaluated = 0;
 
-  for (const [key, weight] of Object.entries(weightMap)) {
+  for (const [key, weight] of Object.entries(weightMap) as Array<[string, number]>) {
     // Find the property data for this key
     const prop = propertyByKey.get(key)
       || propertyByKey.get(key.toLowerCase())
@@ -409,7 +411,7 @@ function computeAggregationConfidence(coverage: number, phaseDistribution: Recor
  * @param {number} total - Total count of evaluated properties
  * @returns {number} Phase agreement score (0–1), where 1 = perfect agreement
  */
-export function computePhaseAgreement(distribution: any, total: number) {
+export function computePhaseAgreement(distribution: Record<number, number>, total: number): number {
   if (total === 0) return 0;
 
   let entropy = 0;
@@ -440,7 +442,8 @@ export function computePhaseAgreement(distribution: any, total: number) {
  * @param {Object} [options={}] - Same options as aggregatePropertyScores.
  * @returns {AggregationResult}
  */
-export function aggregatePropertyScoreInstances(scores: any, options: any = {}): any {
+// any: scores can be PropertyScore[] or plain eval[] — duck-typed via toPropertyEvaluation()
+export function aggregatePropertyScoreInstances(scores: any[], options: any = {}): any {
   const propEvals = scores.map((s: any) => {
     if (typeof s.toPropertyEvaluation === 'function') {
       const eval_ = s.toPropertyEvaluation();

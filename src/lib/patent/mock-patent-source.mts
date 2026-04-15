@@ -196,15 +196,15 @@ export class MockPatentSource extends PatentDataSource {
   // Class field declarations (TypeScript requires these to exist on the type).
   // Runtime values are set in the constructor — types are intentionally loose
   // at this migration step.
-  _data: any;
-  _error: any;
-  _delay: any;
-  _perCpc: any;
-  _onFetch: any;
-  callCount: any;
-  lastArgs: any;
-  calls: any;
-  closed: any;
+  _data: PatentData | (() => PatentData) | null;
+  _error: Error | null;
+  _delay: number;
+  _perCpc: Map<string, PatentData | (() => PatentData)> | null;
+  _onFetch: ((cpcCodes: string[]) => void) | null;
+  callCount: number;
+  lastArgs: string[] | null;
+  calls: Array<{ cpcCodes: string[]; timestamp: number }>;
+  closed: boolean;
 
   /**
    * @param {Object} [options]
@@ -221,7 +221,13 @@ export class MockPatentSource extends PatentDataSource {
    * @param {function(string[]): void} [options.onFetch]
    *   Optional callback invoked with the CPC codes on each fetchByCpc call.
    */
-  constructor(options: any = {}) {
+  constructor(options: {
+    data?: PatentData | (() => PatentData);
+    error?: Error;
+    delay?: number;
+    perCpc?: Map<string, PatentData | (() => PatentData)> | Record<string, PatentData | (() => PatentData)>;
+    onFetch?: (cpcCodes: string[]) => void;
+  } = {}) {
     super();
 
     // Configuration
@@ -279,7 +285,7 @@ export class MockPatentSource extends PatentDataSource {
     if (this._perCpc && cpcCodes) {
       for (const code of cpcCodes) {
         if (this._perCpc.has(code)) {
-          const entry = this._perCpc.get(code);
+          const entry = this._perCpc.get(code)!;
           return typeof entry === 'function' ? entry() : entry;
         }
       }
@@ -326,7 +332,7 @@ export class MockPatentSource extends PatentDataSource {
  * @returns {MockPatentSource}
  */
 export function createMockSource(fixtureName: string, options: Record<string, unknown> = {}) {
-  const factory = (FIXTURES as Record<string, () => unknown>)[fixtureName];
+  const factory = (FIXTURES as Record<string, () => PatentData>)[fixtureName];
   if (!factory) {
     throw new Error(
       `Unknown fixture "${fixtureName}". Available: ${Object.keys(FIXTURES).join(', ')}`

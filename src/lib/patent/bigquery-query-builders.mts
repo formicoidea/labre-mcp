@@ -67,7 +67,7 @@ export interface BuiltQuery {
  * @param {number}   [options.maxPatents] - Maximum patents per query
  * @returns {QueryContext}
  */
-export function createQueryContext(cpcCodes: string[], options: any = {}) {
+export function createQueryContext(cpcCodes: string[], options: { dataset?: string; minYear?: number; maxPatents?: number } = {}): QueryContext {
   if (!Array.isArray(cpcCodes) || cpcCodes.length === 0) {
     throw new Error('cpcCodes must be a non-empty array of CPC codes');
   }
@@ -599,11 +599,11 @@ export const QUERY_BUILDERS = {
  * @param {Set<string>} [options.exclude] - Set of indicator keys to skip
  * @returns {Record<string, BuiltQuery>} Map of query name -> built query
  */
-export function buildAllQueries(cpcCodes: string[], options: any = {}) {
+export function buildAllQueries(cpcCodes: string[], options: { dataset?: string; minYear?: number; maxPatents?: number; exclude?: Set<string> } = {}): Record<string, BuiltQuery> {
   const ctx = createQueryContext(cpcCodes, options);
   const exclude = options.exclude || new Set();
 
-  const queries: Record<string, any> = {};
+  const queries: Record<string, BuiltQuery> = {};
 
   // Always include total patents baseline (needed for confidence model)
   queries.totalPatents = buildTotalPatentsQuery(ctx);

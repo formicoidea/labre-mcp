@@ -73,6 +73,7 @@ const TOOL = 'evalModeDispatcher';
  * @returns {Promise<Object<string, import('../strategies/capacity/base-strategy.mjs').EvolutionResult>>}
  */
 // any: createInstance is a strategy-class factory closure with diverse callbacks
+// any: component is a ComponentInput superset; response shape varies
 async function runCapabilityStrategies(component: any, createInstance: (cls: any) => any): Promise<any> {
   const strategies = await loadStrategies();
   const evaluations: Record<string, any> = {};
@@ -93,6 +94,7 @@ async function runCapabilityStrategies(component: any, createInstance: (cls: any
   }
 
   // Phase B: Enrich component with certitude/ubiquity from LLM results
+  // any: ComponentInput + derived LLM averages (certitude, ubiquity)
   const enrichedComponent: any = { ...component };
   if (enrichedComponent.certitude == null || enrichedComponent.ubiquity == null) {
     const llmResults = // any: evaluations values are heterogeneous strategy results
@@ -101,10 +103,10 @@ async function runCapabilityStrategies(component: any, createInstance: (cls: any
     );
     if (llmResults.length > 0) {
       enrichedComponent.certitude = Math.round(
-        llmResults.reduce((s: number, r: any) => s + r.certitude, 0) / llmResults.length * 1000
+        llmResults.reduce((s: number, r: { certitude: number }) => s + r.certitude, 0) / llmResults.length * 1000
       ) / 1000;
       enrichedComponent.ubiquity = Math.round(
-        llmResults.reduce((s: number, r: any) => s + r.ubiquity, 0) / llmResults.length * 1000
+        llmResults.reduce((s: number, r: { ubiquity: number }) => s + r.ubiquity, 0) / llmResults.length * 1000
       ) / 1000;
       logDebug(TOOL, `Enriched "${component.name}": certitude=${enrichedComponent.certitude}, ubiquity=${enrichedComponent.ubiquity}`);
     }
@@ -135,6 +137,7 @@ async function runCapabilityStrategies(component: any, createInstance: (cls: any
  * @param {function} createInstance - Factory for solution strategy instances
  * @returns {Promise<Object<string, import('../strategies/capacity/base-strategy.mjs').EvolutionResult>>}
  */
+// any: component is a SolutionInput superset; createInstance is a DI closure
 async function runSolutionStrategies(component: any, createInstance: (cls: any) => any): Promise<Record<string, any>> {
   const strategies = await loadSolutionStrategies();
   const evaluations: Record<string, any> = {};

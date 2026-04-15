@@ -1,4 +1,5 @@
 import { toErrorMessage, errorCode } from '../errors.mjs';
+import type { BigQueryClientConfig, BigQueryClientOptions } from '../../types/patent.mjs';
 
 // BigQuery client configuration and authentication helper.
 //
@@ -89,7 +90,7 @@ export const DEFAULTS = Object.freeze({
  * @returns {ResolvedConfig} Fully resolved configuration
  * @throws {Error} If BIGQUERY_PROJECT_ID is missing from both options and env
  */
-export function resolveConfig(options: any = {}): any {
+export function resolveConfig(options: BigQueryClientOptions = {}): BigQueryClientConfig {
   const env = typeof process !== 'undefined' ? process.env : {};
 
   // ── Project ID (required) ────────────────────────────────────────────────
@@ -154,7 +155,7 @@ export function resolveConfig(options: any = {}): any {
  * @param {ResolvedConfig} config - Configuration to validate
  * @returns {{ valid: boolean, errors: string[] }}
  */
-export function validateConfig(config: any) {
+export function validateConfig(config: BigQueryClientConfig): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   if (!config || typeof config !== 'object') {
@@ -231,9 +232,9 @@ const clientPool = new Map();
  * @throws {Error} If @google-cloud/bigquery is not installed
  * @throws {Error} If configuration is invalid
  */
-export async function getClient(config: Record<string, unknown> = {}) {
+export async function getClient(config: BigQueryClientConfig | BigQueryClientOptions = {}) {
   // Validate config before attempting client creation
-  const validation = validateConfig(config);
+  const validation = validateConfig(config as BigQueryClientConfig);
   if (!validation.valid) {
     throw new Error(
       `Invalid BigQuery configuration: ${validation.errors.join('; ')}`
@@ -317,7 +318,7 @@ export function poolSize() {
  * @param {ResolvedConfig} config - Resolved BigQuery configuration
  * @returns {Object} Base query options for BigQuery .query() calls
  */
-export function defaultQueryOptions(config: any) {
+export function defaultQueryOptions(config: BigQueryClientConfig): Record<string, unknown> {
   return {
     location: config.location,
     maximumBytesBilled: config.maxBytesBilled,

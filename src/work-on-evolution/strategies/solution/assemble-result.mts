@@ -77,7 +77,7 @@ function dominantPhase(distribution: Record<number, number>): { phase: number; c
  */
 function computeMeanPhase(properties: PropertyEvaluation[]): number {
   if (properties.length === 0) return 0;
-  const sum = properties.reduce((s: number, p: any) => s + (p.phase || 0), 0);
+  const sum = properties.reduce((s: number, p: PropertyEvaluation) => s + (p.phase || 0), 0);
   return Math.round((sum / properties.length) * 100) / 100;
 }
 
@@ -111,6 +111,7 @@ function computeMeanPhase(properties: PropertyEvaluation[]): number {
  * @param {AssemblyOptions} [options={}]
  * @returns {Object} Enriched result with all original fields plus metadata
  */
+// any: rawResult is a SolutionEvolutionResult-like bag with assembler-added extension fields
 export function assembleSolutionResult(rawResult: any, options: any = {}): any {
   if (!rawResult || rawResult.error) {
     // Error results pass through unchanged
@@ -147,7 +148,7 @@ export function assembleSolutionResult(rawResult: any, options: any = {}): any {
   // Build confidence metadata if not already present
   if (!enriched.confidenceMetadata) {
     const evaluatedProperties = rawResult.properties.filter(
-      (p: any) => !p.reason?.startsWith('Not evaluated')
+      (p: PropertyEvaluation) => !p.reason?.startsWith('Not evaluated')
     );
     const evaluatedCount = evaluatedProperties.length || rawResult.properties.length;
     const coverage = evaluatedCount / PROPERTY_COUNT;
@@ -162,7 +163,7 @@ export function assembleSolutionResult(rawResult: any, options: any = {}): any {
   }
 
   // Ensure each property has a label
-  enriched.properties = rawResult.properties.map((prop: any) => {
+  enriched.properties = rawResult.properties.map((prop: PropertyEvaluation) => {
     if (prop.label) return prop;
     return {
       ...prop,
@@ -207,6 +208,7 @@ export function assembleSolutionEvaluations(evaluations: Record<string, any>, op
  * @returns {SolutionEvolutionResult}
  * @throws {Error} If rawResult doesn't have required fields or properties
  */
+// any: rawResult/options shapes mirror assembleSolutionResult — loose assembler contract
 export function buildStructuredResult(rawResult: any, options: any = {}): any {
   if (!rawResult || rawResult.error) {
     throw new Error('Cannot build structured result from error or null result');

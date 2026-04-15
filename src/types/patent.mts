@@ -115,3 +115,17 @@ export interface CpcMappingResult {
   codes: string[];
   titles: Record<string, string>;
 }
+
+// ─── BigQuery client configuration ──────────────────────────────────────────
+
+export interface BigQueryClientConfig {
+  projectId: string;
+  keyFilename?: string;
+  dataset: string;
+  location: string;
+  maxBytesBilled: string;
+  timeoutMs: number;
+  scopes: string[];
+}
+
+export type BigQueryClientOptions = Partial<BigQueryClientConfig>;

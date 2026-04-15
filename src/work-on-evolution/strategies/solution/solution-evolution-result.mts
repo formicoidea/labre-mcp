@@ -245,6 +245,7 @@ export class PropertyScore {
    * @returns {{ property: string, phase: number, label: string, weight: number, reason?: string }}
    */
   toPropertyEvaluation() {
+    // any: serialized PropertyEvaluation with optional extension fields (reason, phaseDescription, confidence)
     const result: any = {
       property: this.property,
       phase: this.phase,
@@ -492,7 +493,7 @@ export class SolutionEvolutionResult {
    */
   get meanPhase() {
     if (this.properties.length === 0) return null;
-    const sum = this.properties.reduce((s: number, p: any) => s + (p.phase || 0), 0);
+    const sum = this.properties.reduce((s: number, p: PropertyScore | { phase: number }) => s + (p.phase || 0), 0);
     return Math.round((sum / this.properties.length) * 100) / 100;
   }
 
@@ -598,6 +599,7 @@ export class SolutionEvolutionResult {
    * @returns {SolutionEvolutionResult}
    */
   static fromEvolutionResult(plainResult: { evolution: number; confidence: number; method: string; trace?: unknown[]; properties?: unknown[]; confidenceMetadata?: unknown }): SolutionEvolutionResult {
+    // any: incoming properties are plain objects being converted to PropertyScore
     const properties = (plainResult.properties || []).map((p: any) => {
       if (p instanceof PropertyScore) return p;
       return PropertyScore.fromPropertyEvaluation(p);
@@ -660,6 +662,7 @@ export class SolutionEvolutionResult {
       confidence: this.confidence,
       method: this.method,
       trace: this.trace,
+      // any: this.properties union includes PropertyScore instances and plain PropertyEvaluation
       properties: this.properties.map((p: any) =>
         p instanceof PropertyScore ? p.toPropertyEvaluation() : p
       ),
@@ -681,6 +684,7 @@ export class SolutionEvolutionResult {
       meanPhase: this.meanPhase,
       phaseDistribution: this.phaseDistribution,
       trace: this.trace,
+      // any: this.properties union includes PropertyScore instances and plain PropertyEvaluation
       properties: this.properties.map((p: any) =>
         (p instanceof PropertyScore || typeof p.toJSON === 'function')
           ? p.toJSON()
@@ -703,6 +707,7 @@ export class SolutionEvolutionResult {
    */
   toString() {
     const propsText = this.properties.length > 0
+      // any: this.properties union includes PropertyScore instances and plain PropertyEvaluation
       ? this.properties.map((p: any) =>
           `  ${p.property || p.id}: Phase ${p.phase} (${p.label || (PHASE_LABELS as Record<number, string>)[p.phase]})`
         ).join('\n')
