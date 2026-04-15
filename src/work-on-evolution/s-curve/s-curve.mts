@@ -128,17 +128,3 @@ export function computeEvolution(certitude: number, ubiquity: number, params: Ba
     distToCenter: proj.distToCenter,
   };
 }
-
-// Self-test when run directly
-if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}`) {
-  const pointA = { c: 0.28, u: 0.50, label: 'Point A (should be extra-competitive-market)' };
-  const pointB = { c: 0.63, u: 0.74, label: 'Point B (should be competitive)' };
-
-  for (const p of [pointA, pointB]) {
-    const result = computeEvolution(p.c, p.u);
-    console.log(`${p.label}`);
-    console.log(`  (c=${p.c}, u=${p.u}) → zone=${result.zone}, evolution=${result.evolution}, phase=${result.phase}, bandDistance=${result.bandDistance}`);
-    console.log(`  In band: ${isInBand(p.c, p.u)}`);
-    console.log();
-  }
-}
