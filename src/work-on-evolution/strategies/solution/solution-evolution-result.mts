@@ -126,16 +126,25 @@ export class PropertyScore {
    * @param {string}  [data.reason]         - Reasoning for the phase assignment
    * @param {string}  [data.phaseDescription] - Phase description text from reference
    */
-  id: any;
-  property: any;
-  phase: any;
-  label: any;
-  weight: any;
-  confidence: any;
-  reason: any;
-  phaseDescription: any;
+  id: string;
+  property: string;
+  phase: number;
+  label: string;
+  weight: number;
+  confidence: number | null;
+  reason: string | null;
+  phaseDescription: string | null;
 
-  constructor({ id, property, phase, label, weight, confidence, reason, phaseDescription }: any) {
+  constructor({ id, property, phase, label, weight, confidence, reason, phaseDescription }: {
+    id: string;
+    property: string;
+    phase: number;
+    label?: string;
+    weight?: number;
+    confidence?: number | null;
+    reason?: string | null;
+    phaseDescription?: string | null;
+  }) {
     if (!id || typeof id !== 'string') {
       throw new TypeError(`PropertyScore.id must be a non-empty string, got "${id}"`);
     }
@@ -195,7 +204,7 @@ export class PropertyScore {
    * @param {Object} [extra]  - Optional extra fields (confidence, phaseDescription, weight)
    * @returns {PropertyScore}
    */
-  static create(id: string, property: string, phase: number, reason?: string, extra: any = {}): any {
+  static create(id: string, property: string, phase: number, reason?: string, extra: Partial<{ confidence: number | null; phaseDescription: string | null; weight: number; label: string }> = {}): PropertyScore {
     return new PropertyScore({
       id,
       property,
@@ -213,7 +222,7 @@ export class PropertyScore {
    * @param {string} [id]     - Property ID (derived from name if omitted)
    * @returns {PropertyScore}
    */
-  static fromPropertyEvaluation(evalObj: any, id?: string) {
+  static fromPropertyEvaluation(evalObj: { property: string; phase: number; label?: string; weight?: number; reason?: string }, id?: string): PropertyScore {
     const resolvedId = id
       || PROPERTY_NAME_TO_ID.get(evalObj.property?.toLowerCase())
       || evalObj.property?.toLowerCase().replace(/[\s/]+/g, '_')
@@ -295,13 +304,13 @@ export class ConfidenceMetadata {
    * @param {string}  [data.aggregationMethod]     - How properties were aggregated
    * @param {number}  [data.phaseAgreement]        - Inter-property phase consistency (0–1)
    */
-  coverage: any;
-  evaluatedCount: any;
-  totalCount: any;
-  mode: any;
-  meanPropertyConfidence: any;
-  aggregationMethod: any;
-  phaseAgreement: any;
+  coverage: number;
+  evaluatedCount: number;
+  totalCount: number;
+  mode: string;
+  meanPropertyConfidence: number | null;
+  aggregationMethod: string;
+  phaseAgreement: number | null;
 
   constructor({
     coverage,
@@ -311,7 +320,15 @@ export class ConfidenceMetadata {
     meanPropertyConfidence,
     aggregationMethod,
     phaseAgreement,
-  }: any) {
+  }: {
+    coverage: number;
+    evaluatedCount: number;
+    totalCount?: number;
+    mode?: string;
+    meanPropertyConfidence?: number | null;
+    aggregationMethod?: string;
+    phaseAgreement?: number | null;
+  }) {
     if (typeof coverage !== 'number' || coverage < 0 || coverage > 1) {
       throw new TypeError(`ConfidenceMetadata.coverage must be 0–1, got ${coverage}`);
     }
@@ -400,14 +417,21 @@ export class ConfidenceMetadata {
  *   BaseStrategy.validateResult(plain); // passes
  */
 export class SolutionEvolutionResult {
-  evolution: any;
-  confidence: any;
-  method: any;
-  trace: any;
-  properties: any;
-  confidenceMetadata: any;
+  evolution: number;
+  confidence: number;
+  method: string;
+  trace: unknown[];
+  properties: Array<PropertyScore | { property: string; phase: number; label?: string; weight?: number; reason?: string }>;
+  confidenceMetadata: ConfidenceMetadata | null;
 
-  constructor({ evolution, confidence, method, trace, properties, confidenceMetadata }: any) {
+  constructor({ evolution, confidence, method, trace, properties, confidenceMetadata }: {
+    evolution: number;
+    confidence: number;
+    method: string;
+    trace?: unknown[];
+    properties?: Array<PropertyScore | { property: string; phase: number; label?: string; weight?: number; reason?: string }>;
+    confidenceMetadata?: ConfidenceMetadata | null;
+  }) {
     if (typeof evolution !== 'number' || Number.isNaN(evolution)) {
       throw new TypeError(`SolutionEvolutionResult.evolution must be a number, got ${evolution}`);
     }
@@ -502,7 +526,7 @@ export class SolutionEvolutionResult {
    * @param {Array}   [options.trace]  - Additional trace entries
    * @returns {SolutionEvolutionResult}
    */
-  static fromPropertyScores(scores: any, { method, mode = 'auto', trace = [] }: any) {
+  static fromPropertyScores(scores: PropertyScore[], { method, mode = 'auto', trace = [] }: { method: string; mode?: string; trace?: unknown[] }): SolutionEvolutionResult {
     if (!Array.isArray(scores) || scores.length === 0) {
       throw new Error('fromPropertyScores requires a non-empty array of PropertyScore instances');
     }
@@ -524,7 +548,7 @@ export class SolutionEvolutionResult {
     const coverage = evaluatedCount / PROPERTY_COUNT;
 
     const meanPropertyConfidence = withConfidence.length > 0
-      ? withConfidence.reduce((sum, s) => sum + s.confidence, 0) / withConfidence.length
+      ? withConfidence.reduce((sum, s) => sum + (s.confidence ?? 0), 0) / withConfidence.length
       : null;
 
     // Compute phase agreement: how concentrated are phases?
@@ -573,7 +597,7 @@ export class SolutionEvolutionResult {
    * @param {Object} plainResult - Plain { evolution, confidence, method, trace?, properties? }
    * @returns {SolutionEvolutionResult}
    */
-  static fromEvolutionResult(plainResult: any) {
+  static fromEvolutionResult(plainResult: { evolution: number; confidence: number; method: string; trace?: unknown[]; properties?: unknown[]; confidenceMetadata?: unknown }): SolutionEvolutionResult {
     const properties = (plainResult.properties || []).map((p: any) => {
       if (p instanceof PropertyScore) return p;
       return PropertyScore.fromPropertyEvaluation(p);
@@ -585,7 +609,8 @@ export class SolutionEvolutionResult {
       method: plainResult.method,
       trace: plainResult.trace,
       properties,
-      confidenceMetadata: plainResult.confidenceMetadata || null,
+      // any: confidenceMetadata may arrive as a plain object — handled in toJSON via narrow
+      confidenceMetadata: (plainResult.confidenceMetadata as ConfidenceMetadata) || null,
     });
   }
 
@@ -606,7 +631,7 @@ export class SolutionEvolutionResult {
     if (this.properties.length > 0) {
       for (const prop of this.properties) {
         const phase = prop.phase;
-        const name = prop.property || prop.id;
+        const name = prop.property || (prop as PropertyScore).id;
         if (typeof phase !== 'number' || phase < 1 || phase > 4) {
           throw new TypeError(
             `Property "${name}" phase must be 1–4, got ${phase}`
@@ -662,10 +687,11 @@ export class SolutionEvolutionResult {
           : p
       ),
       ...(this.confidenceMetadata != null && {
+        // any: confidenceMetadata may be a plain object passed in, narrow at runtime
         confidenceMetadata:
           (this.confidenceMetadata instanceof ConfidenceMetadata ||
-           typeof this.confidenceMetadata.toJSON === 'function')
-            ? this.confidenceMetadata.toJSON()
+           typeof (this.confidenceMetadata as any).toJSON === 'function')
+            ? (this.confidenceMetadata as any).toJSON()
             : this.confidenceMetadata,
       }),
     };

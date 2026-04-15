@@ -176,7 +176,7 @@ export class SolutionBaseStrategy extends BaseStrategy {
    *   - evolution: weighted average of phase midpoints, rounded to 3 decimals
    *   - confidence: coverage-based confidence (proportion of properties evaluated)
    */
-  static aggregateProperties(properties: any, options?: any) {
+  static aggregateProperties(properties: PropertyEvaluation[], options?: { mode?: string; method?: string }): { evolution: number; confidence: number } {
     const result = _aggregatePropertyScores(properties, options);
     return { evolution: result.evolution, confidence: result.confidence };
   }
@@ -191,7 +191,8 @@ export class SolutionBaseStrategy extends BaseStrategy {
    * @param {Object} [options={}] - Same options as aggregateProperties
    * @returns {import('./aggregate-properties.mjs').AggregationResult}
    */
-  static aggregatePropertiesFull(properties: any, options?: any) {
+  // any: returns the rich aggregation bag from aggregatePropertyScores (not a SolutionEvolutionResult instance)
+  static aggregatePropertiesFull(properties: PropertyEvaluation[], options?: { mode?: string; method?: string }): any {
     return _aggregatePropertyScores(properties, options);
   }
 
@@ -204,12 +205,12 @@ export class SolutionBaseStrategy extends BaseStrategy {
    * @param {string} [reason] - Optional reasoning
    * @returns {PropertyEvaluation}
    */
-  static buildPropertyEvaluation(property: string, phase: number, reason?: string): any {
-    const rounded = Math.round(Math.max(1, Math.min(4, phase)));
+  static buildPropertyEvaluation(property: string, phase: number, reason?: string): PropertyEvaluation {
+    const rounded = Math.round(Math.max(1, Math.min(4, phase))) as WardleyPhase;
     return {
       property,
       phase: rounded,
-      label: SolutionBaseStrategy.phaseLabel(rounded),
+      label: SolutionBaseStrategy.phaseLabel(rounded) as PhaseLabel,
       weight: 1 / 12,  // Default: 12 properties with equal weight
       ...(reason != null && { reason }),
     };
@@ -223,7 +224,7 @@ export class SolutionBaseStrategy extends BaseStrategy {
    * @param {SolutionEvolutionResult} result
    * @returns {SolutionEvolutionResult} the validated result (pass-through)
    */
-  static validateSolutionResult(result: any): any {
+  static validateSolutionResult(result: SolutionEvolutionResult): SolutionEvolutionResult {
     // First: enforce the core EvolutionResult contract
     BaseStrategy.validateResult(result);
 

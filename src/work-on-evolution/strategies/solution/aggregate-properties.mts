@@ -251,7 +251,8 @@ export function buildWeightConfig(properties: any, options: any = {}) {
  *     customWeights: { market: 0.2, market_perception: 0.15 },
  *   });
  */
-export function aggregatePropertyScores(properties: any, options: any = {}): any {
+// any: returns a heterogeneous result bag (evolution, confidence, properties, dist, dominant, coverage, weightMap…) — typed by caller via assembleSolutionResult
+export function aggregatePropertyScores(properties: Array<{ property?: string; phase: number; weight?: number; reason?: string; confidence?: number | null; id?: string }>, options: { mode?: string; method?: string; weightConfig?: Record<string, number>; totalExpected?: number; disabled?: string[]; customWeights?: Record<string, number> } = {}): any {
   if (!Array.isArray(properties) || properties.length === 0) {
     throw new Error('aggregatePropertyScores requires a non-empty array of property evaluations');
   }
@@ -384,7 +385,7 @@ export function aggregatePropertyScores(properties: any, options: any = {}): any
  * @param {number} evaluatedCount    - Number of properties with valid evaluations
  * @returns {number} Confidence score (0–1)
  */
-function computeAggregationConfidence(coverage: number, phaseDistribution: any, evaluatedCount: number): number {
+function computeAggregationConfidence(coverage: number, phaseDistribution: Record<number, number>, evaluatedCount: number): number {
   // Base confidence from coverage
   // Full coverage → MAX_BASE_CONFIDENCE (0.85)
   // Partial → proportionally lower
@@ -461,7 +462,7 @@ export function aggregatePropertyScoreInstances(scores: any, options: any = {}):
  * @param {Array<{ property: string, phase: number, weight?: number }>} properties
  * @returns {{ evolution: number, confidence: number }}
  */
-export function simpleAggregate(properties: any[]): any {
+export function simpleAggregate(properties: Array<{ property?: string; phase: number; weight?: number }>): { evolution: number; confidence: number } {
   const result = aggregatePropertyScores(properties);
   return {
     evolution: result.evolution,

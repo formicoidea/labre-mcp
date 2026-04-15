@@ -30,7 +30,8 @@ const __dirname = dirname(__filename);
 // ─── Reference Data ────────────────────────────────────────────────────────
 
 /** @type {object[]|null} Cached property reference from evolution-properties.json */
-let _propertiesRef: any[] | null = null;
+interface PropertyDef { name: string; id?: string; phases?: Record<string, string> }
+let _propertiesRef: PropertyDef[] | null = null;
 
 /**
  * Load the 12-property phase reference from evolution-properties.json.
@@ -195,7 +196,7 @@ const FALLBACK_PROPERTIES = [
  * @param {object[]} properties  - The 12-property reference
  * @returns {string} LLM prompt
  */
-function buildAutoPrompt(solutionName: string, context: string, properties: any[]): string {
+function buildAutoPrompt(solutionName: string, context: string, properties: PropertyDef[]): string {
   const propertyBlock = properties.map((prop, i) => {
     const phases = prop.phases || {};
     return [
@@ -238,7 +239,7 @@ Example: Market=3|Growing competitive market with multiple established vendors`;
  * @param {object} property      - Single property definition
  * @returns {string} LLM prompt
  */
-function buildSinglePropertyPrompt(solutionName: string, context: string, property: any): string {
+function buildSinglePropertyPrompt(solutionName: string, context: string, property: PropertyDef): string {
   const phases = property.phases || {};
   return `You are a Wardley Mapping evolution expert.
 
@@ -268,7 +269,8 @@ ${property.name}=PHASE|reason`;
  * @param {object[]} properties - Property reference for name matching
  * @returns {Array<{property: string, phase: number, reason: string}>}
  */
-export function parseAutoResponse(text: string, properties: any[]): any {
+// any: returns parser-shaped { propertyName, phase, reason } objects (loose contract)
+export function parseAutoResponse(text: string, properties: PropertyDef[]): any {
   const results = [];
   const propertyNames = properties.map(p => p.name.toLowerCase());
 
@@ -308,7 +310,7 @@ export function parseAutoResponse(text: string, properties: any[]): any {
  * @param {object} property - Property definition for name matching
  * @returns {{ property: string, phase: number, reason: string }|null}
  */
-export function parseSinglePropertyResponse(text: string, property: any): any {
+export function parseSinglePropertyResponse(text: string, property: PropertyDef): any {
   const linePattern = /^(.+?)\s*=\s*(\d)\s*\|\s*(.+)$/;
 
   for (const line of text.split('\n').reverse()) {
@@ -353,7 +355,7 @@ export function parseSinglePropertyResponse(text: string, property: any): any {
  * @param {object[]} properties - Reference property list
  * @returns {string|null} Matched property name or null
  */
-function fuzzyMatchProperty(rawName: string, properties: any[]): any {
+function fuzzyMatchProperty(rawName: string, properties: PropertyDef[]): string | null {
   const lower = rawName.toLowerCase().trim();
 
   // Exact match (case-insensitive)
@@ -398,10 +400,11 @@ function fuzzyMatchProperty(rawName: string, properties: any[]): any {
  *   // → { evolution: 0.62, confidence: 0.85, method: 'solution-properties', properties: [...] }
  */
 export class PropertiesStrategy extends SolutionBaseStrategy {
+  // any: llmCall is a closure with diverse signatures across backends
   _llmCall: any;
-  _mode: any;
+  _mode: string;
 
-  constructor({ llmCall, mode = 'auto' }: any = {}) {
+  constructor({ llmCall, mode = 'auto' }: { llmCall?: any; mode?: string } = {}) {
     super();
     if (typeof llmCall !== 'function') {
       throw new Error('PropertiesStrategy requires an llmCall function');
@@ -519,7 +522,7 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
    * @returns {Promise<Array<{property: string, phase: number, reason: string}>>}
    * @private
    */
-  async _evaluateAuto(solutionName: string, context: string, properties: any[]): Promise<any> {
+  async _evaluateAuto(solutionName: string, context: string, properties: PropertyDef[]): Promise<any> {
     const prompt = buildAutoPrompt(solutionName, context, properties);
     const response = await this._llmCall(prompt);
     return parseAutoResponse(response, properties);
@@ -534,7 +537,7 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
    * @returns {Promise<Array<{property: string, phase: number, reason: string}>>}
    * @private
    */
-  async _evaluateConversational(solutionName: string, context: string, properties: any[]): Promise<any> {
+  async _evaluateConversational(solutionName: string, context: string, properties: PropertyDef[]): Promise<any> {
     const results = [];
 
     for (const prop of properties) {

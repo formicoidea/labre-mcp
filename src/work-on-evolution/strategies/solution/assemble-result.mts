@@ -28,6 +28,7 @@ import {
   PROPERTY_NAME_TO_ID,
 } from './solution-evolution-result.mjs';
 import { PHASE_LABELS } from './solution-base-strategy.mjs';
+import type { PropertyEvaluation } from '../../../types/solution.mjs';
 
 // ─── Phase Distribution Helper ──────────────────────────────────────────────
 
@@ -37,7 +38,7 @@ import { PHASE_LABELS } from './solution-base-strategy.mjs';
  * @param {Array<{ phase: number }>} properties
  * @returns {{ 1: number, 2: number, 3: number, 4: number }}
  */
-function computePhaseDistribution(properties: any[]): Record<number, number> {
+function computePhaseDistribution(properties: PropertyEvaluation[]): Record<number, number> {
   const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
   for (const prop of properties) {
     const p = Math.round(prop.phase);
@@ -52,7 +53,7 @@ function computePhaseDistribution(properties: any[]): Record<number, number> {
  * @param {{ 1: number, 2: number, 3: number, 4: number }} distribution
  * @returns {{ phase: number, count: number, label: string }}
  */
-function dominantPhase(distribution: any) {
+function dominantPhase(distribution: Record<number, number>): { phase: number; count: number; label: string } {
   let maxPhase = 1;
   let maxCount = 0;
   for (const [phase, count] of Object.entries(distribution) as [string, number][]) {
@@ -74,7 +75,7 @@ function dominantPhase(distribution: any) {
  * @param {Array<{ phase: number }>} properties
  * @returns {number} Mean phase (1–4), rounded to 2 decimals
  */
-function computeMeanPhase(properties: any[]): number {
+function computeMeanPhase(properties: PropertyEvaluation[]): number {
   if (properties.length === 0) return 0;
   const sum = properties.reduce((s: number, p: any) => s + (p.phase || 0), 0);
   return Math.round((sum / properties.length) * 100) / 100;

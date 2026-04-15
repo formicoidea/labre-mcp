@@ -155,7 +155,11 @@ function extractBigrams(text: string): string[] {
  * @param {object} property - Property definition with name and phases
  * @returns {PropertySignals}
  */
-function buildPropertySignals(property: any): any {
+interface PropertyDef { name: string; id?: string; phases?: Record<string, string> }
+interface SignalEntry { term: string; weight: number; source: string }
+interface PropertySignalBank { propertyName: string; propertyId: string; phases: Map<number, SignalEntry[]> }
+
+function buildPropertySignals(property: PropertyDef): PropertySignalBank {
   const phases = property.phases || {};
 
   // Step 1: Extract all unigram tokens per phase
@@ -257,10 +261,10 @@ const PHASE_LABELS = { 1: 'Genesis', 2: 'Custom', 3: 'Product', 4: 'Commodity' }
  *   // → { property: 'Market', phase: 4, confidence: 0.85, ... }
  */
 export class PhaseClassifier {
-  _properties: any;
-  _signalBank: any;
+  _properties: PropertyDef[];
+  _signalBank: PropertySignalBank[];
 
-  constructor(propertiesRef: any) {
+  constructor(propertiesRef: PropertyDef[]) {
     if (!Array.isArray(propertiesRef) || propertiesRef.length === 0) {
       throw new Error('PhaseClassifier requires a non-empty properties reference array');
     }
