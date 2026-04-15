@@ -10,6 +10,9 @@
 //     method:     string   // Strategy identifier (e.g. 's-curve', 'pub-distribution')
 //   }
 
+import type { EvolutionResult, ComponentInput } from '../../../types/evolution.mjs';
+export type { EvolutionResult, ComponentInput };
+
 /**
  * @typedef {Object} EvolutionResult
  * @property {number} evolution  - Evolution position (0–1 competitive, outside = extra-competitive)
@@ -73,7 +76,7 @@ export class BaseStrategy {
    * @param {ComponentInput} component
    * @returns {EvolutionResult}
    */
-  evaluate(component) {
+  evaluate(component: ComponentInput): EvolutionResult | Promise<EvolutionResult> {
     throw new Error(`${this.constructor.name}.evaluate() must be implemented`);
   }
 
@@ -84,12 +87,12 @@ export class BaseStrategy {
    * @param {*} result
    * @returns {EvolutionResult} the validated result (pass-through)
    */
-  static validateResult(result) {
+  static validateResult(result: unknown): EvolutionResult {
     if (result === null || typeof result !== 'object') {
       throw new TypeError('EvolutionResult must be a non-null object');
     }
 
-    const { evolution, confidence, method, trace } = result;
+    const { evolution, confidence, method, trace } = result as Partial<EvolutionResult>;
 
     if (typeof evolution !== 'number' || Number.isNaN(evolution)) {
       throw new TypeError(`EvolutionResult.evolution must be a number, got ${evolution}`);
@@ -104,6 +107,6 @@ export class BaseStrategy {
       throw new TypeError(`EvolutionResult.method must be a non-empty string, got ${method}`);
     }
 
-    return result;
+    return result as EvolutionResult;
   }
 }

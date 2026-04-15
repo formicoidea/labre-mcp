@@ -29,11 +29,19 @@ import { IDENTIFY_CAPABILITY_TOOL, handleIdentifyCapability } from '../work-on-v
 import { ESTIMATE_ANCHOR_EVOLUTION_TOOL, handleEstimateAnchorEvolution } from '../work-on-evolution/strategies/anchor/estimate-anchor-evolution.mjs';
 import { logInfo, logError } from '../lib/mcp-notifications.mjs';
 import { classifyAndLogLLMError, classifyLLMError } from '../lib/llm/llm-error-handler.mjs';
+import type {
+  McpToolDefinition,
+  ToolHandler,
+  JsonRpcRequest,
+  JsonRpcResponse,
+  McpServerInfo,
+  McpServerCapabilities,
+} from '../types/mcp.mjs';
 
 // ─── Tool Registry ──────────────────────────────────────────────────────────
 
 /** All registered MCP tools. Add new tools here if needed. */
-const REGISTERED_TOOLS = [
+const REGISTERED_TOOLS: McpToolDefinition[] = [
   ESTIMATE_EVOLUTION_TOOL,
   GENERATE_VALUE_CHAIN_TOOL,
   EVALUATE_MAP_TOOL,
@@ -42,7 +50,7 @@ const REGISTERED_TOOLS = [
 ];
 
 /** Map of tool name → handler for fast dispatch */
-const TOOL_HANDLERS = new Map([
+const TOOL_HANDLERS: Map<string, ToolHandler> = new Map<string, ToolHandler>([
   [ESTIMATE_EVOLUTION_TOOL.name, handleEstimateEvolution],
   [GENERATE_VALUE_CHAIN_TOOL.name, handleGenerateValueChain],
   [EVALUATE_MAP_TOOL.name, handleEvaluateMap],
@@ -52,12 +60,12 @@ const TOOL_HANDLERS = new Map([
 
 // ─── MCP Server Implementation ─────────────────────────────────────────────
 
-const SERVER_INFO = {
+const SERVER_INFO: McpServerInfo = {
   name: 'wardley-assistant',
   version: '1.0.0',
 };
 
-const SERVER_CAPABILITIES = {
+const SERVER_CAPABILITIES: McpServerCapabilities = {
   tools: {},
   logging: {},
   experimental: {
@@ -78,7 +86,7 @@ const SERVER_CAPABILITIES = {
  * @param {Object} request - JSON-RPC 2.0 request
  * @returns {Promise<Object|null>} JSON-RPC 2.0 response, or null for notifications
  */
-async function handleRequest(request) {
+async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse | null> {
   const { id, method, params } = request;
 
   // Notifications (no id) — no response expected
@@ -116,7 +124,8 @@ async function handleRequest(request) {
 
     // ── Call a tool ──────────────────────────────────────────────────
     case 'tools/call': {
-      const toolName = params?.name;
+      const callParams = (params ?? {}) as { name?: string; arguments?: Record<string, unknown> };
+      const toolName = callParams.name ?? '';
       const handler = TOOL_HANDLERS.get(toolName);
 
       if (!handler) {
@@ -138,8 +147,9 @@ async function handleRequest(request) {
       }
 
       // Build a concise description of the invocation for log messages
-      const toolArgs = params?.arguments ?? {};
-      const toolSubject = toolArgs.name || toolArgs.filePath || toolArgs.description?.slice(0, 60) || '';
+      const toolArgs = (callParams.arguments ?? {}) as Record<string, unknown>;
+      const subjectRaw = (toolArgs.name ?? toolArgs.filePath ?? toolArgs.description) as string | undefined;
+      const toolSubject = typeof subjectRaw === 'string' ? subjectRaw.slice(0, 60) : '';
       const startMsg = toolSubject
         ? `Starting ${toolName} for "${toolSubject}"...`
         : `Starting ${toolName}...`;

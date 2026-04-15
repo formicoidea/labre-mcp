@@ -25,6 +25,8 @@
 
 import { BaseStrategy } from '../capacity/base-strategy.mjs';
 import { aggregatePropertyScores as _aggregatePropertyScores } from './aggregate-properties.mjs';
+import type { SolutionInput, SolutionEvolutionResult, PropertyEvaluation, WardleyPhase, PhaseLabel } from '../../../types/solution.mjs';
+export type { SolutionInput, SolutionEvolutionResult, PropertyEvaluation };
 
 // ─── Type Definitions ──────────────────────────────────────────────────────────
 
@@ -122,7 +124,7 @@ export class SolutionBaseStrategy extends BaseStrategy {
    * @param {SolutionInput} component - The solution to evaluate
    * @returns {Promise<SolutionEvolutionResult>} Result conforming to EvolutionResult contract
    */
-  async evaluate(component) {
+  async evaluate(component: SolutionInput): Promise<SolutionEvolutionResult> {
     throw new Error(`${this.constructor.name}.evaluate() must be implemented`);
   }
 
@@ -135,8 +137,8 @@ export class SolutionBaseStrategy extends BaseStrategy {
    * @returns {number} Evolution midpoint for the phase
    * @throws {Error} If phase is not in [1, 4]
    */
-  static phaseToEvolution(phase) {
-    const rounded = Math.round(phase);
+  static phaseToEvolution(phase: number): number {
+    const rounded = Math.round(phase) as WardleyPhase;
     if (rounded < 1 || rounded > 4) {
       throw new RangeError(`Phase must be between 1 and 4, got ${phase}`);
     }

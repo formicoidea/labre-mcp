@@ -11,6 +11,7 @@
 //   import { evaluateMapFile } from './evaluate-map.mjs';
 //   const result = await evaluateMapFile('maps/myMaps/tea-shop.wm');
 
+import type { McpToolDefinition } from '../../types/mcp.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { classifyComponent } from '../routing/classification-gate.mjs';
 import { estimateEvolutionOneShot } from '../estimate-evolution.mjs';
@@ -425,7 +426,7 @@ export async function evaluateMapFile(filePath: string, options: any = {}): Prom
 
 // ─── MCP Tool Definition ────────────────────────────────────────────────────
 
-export const EVALUATE_MAP_TOOL = {
+export const EVALUATE_MAP_TOOL: McpToolDefinition = {
   name: 'evaluateMap',
   description:
     'Evaluate all components in a .wm Wardley Map file, estimate their evolution positions, ' +
@@ -459,10 +460,10 @@ export const EVALUATE_MAP_TOOL = {
  * @param {Object} args - Tool arguments
  * @returns {Promise<Object>}
  */
-export async function handleEvaluateMap(args) {
-  return evaluateMapFile(args.filePath, {
-    strategy: args.strategy,
-    updateFile: args.updateFile,
+export async function handleEvaluateMap(args: Record<string, unknown>): Promise<unknown> {
+  return evaluateMapFile(args.filePath as string, {
+    strategy: args.strategy as string | undefined,
+    updateFile: args.updateFile as boolean | undefined,
   });
 }
 

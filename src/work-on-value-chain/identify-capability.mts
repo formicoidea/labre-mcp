@@ -7,6 +7,7 @@
 // Also exposes an MCP tool definition (IDENTIFY_CAPABILITY_TOOL) and
 // handler (handleIdentifyCapability) for direct invocation via MCP clients.
 
+import type { McpToolDefinition } from '../types/mcp.mjs';
 import { createLLMCall } from '../lib/llm/llm-call.mjs';
 import { logDebug } from '../lib/mcp-notifications.mjs';
 
@@ -156,7 +157,7 @@ function getLLMCall() {
 
 // ─── MCP Tool Definition ───────────────────────────────────────────────────
 
-export const IDENTIFY_CAPABILITY_TOOL = {
+export const IDENTIFY_CAPABILITY_TOOL: McpToolDefinition = {
   name: 'identifyCapability',
   description:
     'Identify the true underlying capability or need behind a Wardley Map component label. ' +
@@ -189,16 +190,20 @@ export const IDENTIFY_CAPABILITY_TOOL = {
   },
 };
 
-export async function handleIdentifyCapability(args) {
+export async function handleIdentifyCapability(args: Record<string, unknown>): Promise<unknown> {
   if (!args?.name || typeof args.name !== 'string' || args.name.trim().length === 0) {
     throw new Error('Required parameter "name" must be a non-empty string');
   }
 
+  const name = args.name as string;
+  const type = args.type as string | undefined;
+  const description = args.description as string | undefined;
+  const context = args.context as string | undefined;
   const component = {
-    name: args.name.trim(),
-    ...(args.type && { type: args.type }),
-    ...(args.description && { description: args.description.trim() }),
-    ...(args.context && { context: args.context.trim() }),
+    name: name.trim(),
+    ...(type && { type }),
+    ...(description && { description: description.trim() }),
+    ...(context && { context: context.trim() }),
   };
 
   return identifyCapability(component, getLLMCall());

@@ -8,6 +8,7 @@
 //
 // Exposes an MCP tool (estimateAnchorEvolution) for direct invocation.
 
+import type { McpToolDefinition } from '../../../types/mcp.mjs';
 import { createLLMCall } from '../../../lib/llm/llm-call.mjs';
 import { logDebug } from '../../../lib/mcp-notifications.mjs';
 import { evolutionToStage } from '../../../lib/response-formatter.mjs';
@@ -148,7 +149,7 @@ function getLLMCall() {
 
 // ─── MCP Tool Definition ───────────────────────────────────────────────────
 
-export const ESTIMATE_ANCHOR_EVOLUTION_TOOL = {
+export const ESTIMATE_ANCHOR_EVOLUTION_TOOL: McpToolDefinition = {
   name: 'estimateAnchorEvolution',
   description:
     'Estimate the evolution position of an anchor (user need / stakeholder) in a Wardley Map. ' +
@@ -182,7 +183,7 @@ export const ESTIMATE_ANCHOR_EVOLUTION_TOOL = {
   },
 };
 
-export async function handleEstimateAnchorEvolution(args: any): Promise<any> {
+export async function handleEstimateAnchorEvolution(args: Record<string, unknown>): Promise<unknown> {
   if (!args?.name || typeof args.name !== 'string' || args.name.trim().length === 0) {
     throw new Error('Required parameter "name" must be a non-empty string');
   }

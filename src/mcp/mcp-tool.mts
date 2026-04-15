@@ -7,6 +7,7 @@
 //
 // The tool is designed for integration with Claude Code and other MCP-compatible clients.
 
+import type { McpToolDefinition } from '../types/mcp.mjs';
 import { classifyComponent, buildReQuestions } from '../work-on-evolution/routing/classification-gate.mjs';
 import { loadStrategies, getStrategy, listStrategies } from '../work-on-evolution/strategies/capacity/registry.mjs';
 import { BaseStrategy } from '../work-on-evolution/strategies/capacity/base-strategy.mjs';
@@ -19,7 +20,7 @@ import { routeEstimateEvolution, detectMode, MODES } from '../work-on-evolution/
  * MCP tool definition for estimateEvolution.
  * Conforms to the Model Context Protocol tool schema specification.
  */
-export const ESTIMATE_EVOLUTION_TOOL = {
+export const ESTIMATE_EVOLUTION_TOOL: McpToolDefinition = {
   name: 'estimateEvolution',
   description:
     'Estimate the Wardley Map evolution position of a component. ' +
@@ -221,7 +222,7 @@ function validateInput(input) {
  * @param {Object} rawInput - Tool input matching ESTIMATE_EVOLUTION_TOOL.inputSchema
  * @returns {Promise<Object>} MCP tool response with classification, evaluations, and message
  */
-export async function handleEstimateEvolution(rawInput) {
+export async function handleEstimateEvolution(rawInput: Record<string, unknown>): Promise<unknown> {
   // Step 0: Validate and normalize input
   const validated = validateInput(rawInput);
   const { name, context, strategy, ...componentData } = validated;
@@ -389,7 +390,7 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
     context: 'Enterprise resource planning for large corporations',
     certitude: 0.9,
     ubiquity: 0.85,
-  });
+  }) as { evaluations: Record<string, unknown> };
   console.log(`  Strategies evaluated: ${Object.keys(allResult.evaluations).join(', ')}`);
   for (const [method, evRaw] of Object.entries(allResult.evaluations)) {
     const ev = evRaw as { error?: string; evolution?: number; confidence?: number };

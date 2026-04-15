@@ -9,6 +9,7 @@
 //   import { generateValueChain } from './generate-value-chain.mjs';
 //   const result = await generateValueChain('A tea shop serving customers');
 
+import type { McpToolDefinition } from '../types/mcp.mjs';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { createLLMCall } from '../lib/llm/llm-call.mjs';
@@ -249,7 +250,7 @@ export async function generateValueChain(description: string, options: any = {})
 
 // ─── MCP Tool Definition ────────────────────────────────────────────────────
 
-export const GENERATE_VALUE_CHAIN_TOOL = {
+export const GENERATE_VALUE_CHAIN_TOOL: McpToolDefinition = {
   name: 'generateValueChain',
   description:
     'Generate a Wardley Map .wm file from a business description. ' +
@@ -287,11 +288,11 @@ export const GENERATE_VALUE_CHAIN_TOOL = {
  * @param {Object} args - Tool arguments
  * @returns {Promise<Object>} Result with wmContent, filePath, evaluations
  */
-export async function handleGenerateValueChain(args: any): Promise<any> {
-  return generateValueChain(args.description, {
-    filename: args.filename,
-    outputDir: args.outputDir,
-    strategy: args.strategy,
+export async function handleGenerateValueChain(args: Record<string, unknown>): Promise<unknown> {
+  return generateValueChain(args.description as string, {
+    filename: args.filename as string | undefined,
+    outputDir: args.outputDir as string | undefined,
+    strategy: args.strategy as string | undefined,
   });
 }
 

@@ -13,6 +13,8 @@
 // Components classified as social_good or common_good trigger user re-questioning
 // rather than proceeding to evolution evaluation.
 
+import type { ClassificationResult, EconomicSpace } from '../../types/classification.mjs';
+
 /**
  * @typedef {Object} ClassificationResult
  * @property {'social_good' | 'common_good' | 'economic'} space
@@ -94,7 +96,7 @@ function matchIndicators(text, indicators) {
  * @param {string} context       - Business / usage context
  * @returns {ClassificationResult}
  */
-export function classifyComponent(componentName, context = '') {
+export function classifyComponent(componentName: string, context: string = ''): ClassificationResult {
   const name = normalize(componentName);
   const ctx  = normalize(context);
   const combined = `${name} ${ctx}`;
@@ -189,7 +191,7 @@ export function classifyComponent(componentName, context = '') {
  * @param {string} componentName
  * @returns {string[]}
  */
-export function buildReQuestions(classification, componentName) {
+export function buildReQuestions(classification: ClassificationResult, componentName: string): string[] {
   if (!classification.requiresReQuestion) return [];
 
   if (classification.space === 'social_good') {
