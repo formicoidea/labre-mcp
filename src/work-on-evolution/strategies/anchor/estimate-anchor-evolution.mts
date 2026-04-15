@@ -88,6 +88,7 @@ function parseAnchorResponse(text: string): { phase: number; justification: stri
 
 // ─── Core Evaluation ───────────────────────────────────────────────────────
 
+// any: args is the raw MCP arguments bag; llmCall is a closure with diverse signatures
 export async function estimateAnchorEvolution(args: any, llmCall: any): Promise<any> {
   const { name, context } = args;
 
@@ -191,6 +192,7 @@ export async function handleEstimateAnchorEvolution(args: Record<string, unknown
     throw new Error('Required parameter "context" must be a non-empty string');
   }
 
+  // any: validated args bag — heterogeneous fields
   const validated: any = {
     name: args.name.trim(),
     context: args.context.trim(),

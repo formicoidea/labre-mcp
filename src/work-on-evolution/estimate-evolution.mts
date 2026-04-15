@@ -526,7 +526,7 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
     let convDetection;
     const sessionDetection = session.getComponentTypeDetection();
 
-    if (sessionDetection.type && sessionDetection.confidence >= CONFIDENCE_THRESHOLD) {
+    if (sessionDetection.type && (sessionDetection.confidence ?? 0) >= CONFIDENCE_THRESHOLD) {
       // Session already has high-confidence detection — reuse it directly
       convDetection = {
         type: sessionDetection.type,
@@ -540,7 +540,7 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
     } else {
       // Re-detect (session had low confidence or no detection)
       convDetection = detectComponentType(
-        session.state.name,
+        session.state.name ?? '',
         session.state.description || ''
       );
       logDebug(TOOL,
@@ -548,7 +548,8 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
         `confidence=${convDetection.confidence}, needsFallback=${convDetection.needsFallback}`);
     }
 
-    let convRoutingTargets = determineRoutingTargets(convDetection);
+    // any: convDetection has 'type' string from runtime, ComponentTypeDetection accepts string union via [key: string]
+    let convRoutingTargets = determineRoutingTargets(convDetection as any);
     let convVerifiedDetection = null;
 
     logDebug(TOOL, `Routing targets "${session.state.name}": ` +
@@ -567,11 +568,11 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
         const convPartialContext = {
           description: session.state.description || '',
           llmCall: getLLMCall(),
-          ...(component.capability && { capability: component.capability }),
-          ...(component.nature && { nature: component.nature }),
+          ...(component.capability ? { capability: component.capability } : {}),
+          ...(component.nature ? { nature: component.nature } : {}),
         };
 
-        convVerifiedDetection = await verifyClassification(session.state.name, convPartialContext);
+        convVerifiedDetection = await verifyClassification(session.state.name ?? '', convPartialContext);
 
         // Use verified result for routing (overrides naming-only detection)
         convRoutingTargets = convVerifiedDetection.routingTargets;
@@ -665,7 +666,7 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
     message += '.';
 
     // Classify Wardley component type (activity/practice/data/knowledge) — informative metadata
-    const convWardleyType = classifyWardleyType(session.state.name, {
+    const convWardleyType = classifyWardleyType(session.state.name ?? '', {
       description: session.state.description || '',
       nature: convDetection.nature,
       category: convDetection.category,

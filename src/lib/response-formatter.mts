@@ -114,6 +114,7 @@ export function formatConfidence(confidence: number): { label: string; bar: stri
  * @param {Object} [component] - Original component input (for context)
  * @returns {string} Reasoning sentence
  */
+// any: result/component shapes vary across strategies (capability vs solution vs anchor)
 export function strategyReasoning(method: string, result: any, component: any = {}) {
   const stage = evolutionToStage(result.evolution);
 
@@ -189,6 +190,7 @@ export function strategyReasoning(method: string, result: any, component: any = 
  * @param {Object} stage  - Wardley stage from evolutionToStage()
  * @returns {string} Reasoning sentence
  */
+// any: result is a SolutionEvolutionResult-like bag with optional dist/dominant fields
 function buildSolutionPropertiesReasoning(result: any, stage: EvolutionStage): string {
   const propCount = result.properties?.length || 12;
   const parts = [
@@ -233,6 +235,7 @@ function buildSolutionPropertiesReasoning(result: any, stage: EvolutionStage): s
  * @param {Object} [component] - Original component input
  * @returns {string} Markdown block
  */
+// any: evalResult is heterogeneous (EvolutionResult|SolutionEvolutionResult|{error}); component is loose
 export function formatStrategyResult(method: string, evalResult: any, component: any = {}): string {
   if (evalResult.error) {
     return `**${method}**: ⚠️ ${evalResult.error}`;
@@ -300,7 +303,8 @@ export function formatStrategyResult(method: string, evalResult: any, component:
  * @param {boolean} [options.compact] - If true, use shorter format
  * @returns {string} Markdown-formatted conversational output
  */
-export function formatResponse(result: any, options: any = {}) {
+// any: result is a RoutedResponse-like bag; options carry compact/locale tunables
+export function formatResponse(result: any, options: any = {}): string {
   const component = options.component || result.parsedInput || {};
   const compact = options.compact || false;
   const name = component.name || result.classification?.space || 'Unknown';
@@ -404,7 +408,7 @@ function formatSpaceName(space: string): string {
  * @param {Object} classification
  * @returns {string}
  */
-function formatReQuestioningBlock(reQuestions: string[], name: string, classification: any): string {
+function formatReQuestioningBlock(reQuestions: string[], name: string, classification: { space: string; reason: string }): string {
   const spaceLabel = classification?.space === 'social_good' ? 'social good' : 'common good';
   const lines = [
     `### ⚠️ Component Outside Economic Space`,
@@ -442,6 +446,7 @@ function formatReQuestioningBlock(reQuestions: string[], name: string, classific
  * @param {{ type: string, confidence: number, reason: string }} wardleyType
  * @returns {string} Markdown line
  */
+// any: wardleyType is the heterogeneous output of classifyWardleyType
 function formatWardleyTypeBlock(wardleyType: any): string {
   const typeLabels: Record<string, string> = {
     activity: 'Activity (what you do)',
@@ -473,6 +478,7 @@ function formatWardleyTypeBlock(wardleyType: any): string {
  * @param {string[]} [routing.tiersUsed] - Verification tiers invoked (e.g. ['naming', 'llm'])
  * @returns {string} Markdown block
  */
+// any: routing carries diverse fields from RoutingMetadata + dispatch extensions
 function formatRoutingBlock(routing: any): string {
   const typeLabel = routing.type === 'solution'
     ? 'Named Solution (product/platform)'
@@ -524,6 +530,7 @@ function formatRoutingBlock(routing: any): string {
  * @param {Object} component
  * @returns {string}
  */
+// any: successful/errors arrays mix strategy result entries; component is loose
 function formatDetailedResults(successful: any[], errors: any[], component: any): string {
   const lines = [];
 
@@ -561,6 +568,7 @@ function formatDetailedResults(successful: any[], errors: any[], component: any)
  * @param {Object} component
  * @returns {string}
  */
+// any: same shapes as formatDetailedResults — compact variant
 function formatCompactResults(successful: any[], errors: any[], component: any): string {
   const lines = [];
 
@@ -595,6 +603,7 @@ function formatCompactResults(successful: any[], errors: any[], component: any):
  * @param {Array} successful - [[method, result], ...]
  * @returns {string}
  */
+// any: successful is a list of strategy result entries
 function formatConsensus(successful: any[]): string {
   const evolutions = successful.map(([, ev]) => ev.evolution);
   const confidences = successful.map(([, ev]) => ev.confidence);
@@ -642,6 +651,7 @@ function formatConsensus(successful: any[]): string {
  * @param {Object} result - Conversational result with phase, nextQuestion, summary
  * @returns {string}
  */
+// any: result is a guided-turn shape (nextQuestion, phase, gathered, ...)
 function formatConversationalGuidance(result: any): string {
   const lines = [];
 
@@ -703,6 +713,7 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
 
   // Test 4: Full economic response
   console.log('--- Test 4: Full economic response ---');
+  // any: self-test fixture with loose RoutedResponse-like shape
   const economicResult: any = {
     classification: { space: 'economic', reason: '"ERP" classified as economic.', requiresReQuestion: false },
     reQuestions: null,
@@ -720,6 +731,7 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
 
   // Test 5: Re-questioning response
   console.log('--- Test 5: Re-questioning response ---');
+  // any: self-test fixture with loose RoutedResponse-like shape
   const socialResult: any = {
     classification: { space: 'social_good', reason: '"Air" is a naturally available resource.', requiresReQuestion: true },
     reQuestions: [
@@ -740,6 +752,7 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
 
   // Test 7: Single strategy
   console.log('--- Test 7: Single strategy ---');
+  // any: self-test fixture
   const singleResult: any = {
     classification: { space: 'economic', reason: 'economic component', requiresReQuestion: false },
     reQuestions: null,
@@ -753,6 +766,7 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
 
   // Test 8: All errors
   console.log('--- Test 8: All errors ---');
+  // any: self-test fixture
   const errorResult: any = {
     classification: { space: 'economic', reason: 'economic component', requiresReQuestion: false },
     reQuestions: null,

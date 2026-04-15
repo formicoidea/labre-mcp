@@ -32,6 +32,7 @@
 //   if (session.isReadyForEstimation()) { ... }
 
 import { classifyComponent, buildReQuestions } from '../work-on-evolution/routing/classification-gate.mjs';
+import type { SessionState, SessionExchange } from '../types/session.mjs';
 import {
   detectComponentType,
   COMPONENT_TYPE,
@@ -164,10 +165,11 @@ const SOLUTION_PHASE_QUESTIONS = {
  * @param {string} text - Free-text description of maturity signals
  * @returns {{ certitude?: number, ubiquity?: number }}
  */
-export function inferFromMaturitySignals(text: string): any {
+// any: returns a partial set of inferred numeric scores (certitude/ubiquity/...)
+export function inferFromMaturitySignals(text: string): Record<string, number> {
   if (!text) return {};
   const t = text.toLowerCase();
-  const inferred: any = {};
+  const inferred: Record<string, number> = {};
 
   // Certitude signals
   const highCertitude = [
@@ -267,10 +269,10 @@ export function inferFromMarketSignals(marketDynamics: string, adoptionPattern: 
  * enough context has been accumulated to produce an estimation.
  */
 export class ConversationSession {
-  state: any;
-  exchanges: any;
+  state: SessionState;
+  exchanges: SessionExchange[] = [];
 
-  constructor(initial: any = {}) {
+  constructor(initial: Partial<SessionState> = {}) {
     /** @type {SessionState} */
     this.state = {
       name: null,
@@ -320,7 +322,7 @@ export class ConversationSession {
     }
 
     if (gathered.length > 0) {
-      this.state.history.push(`Exchange ${this.state.history.length + 1}: gathered ${gathered.join(', ')}`);
+      (this.state.history ??= []).push(`Exchange ${this.state.history.length + 1}: gathered ${gathered.join(', ')}`);
     }
 
     // Attempt to infer additional data from free-text fields
@@ -382,7 +384,7 @@ export class ConversationSession {
     // Solution-specific phase: add component type detection info
     if (this.state.phase === 'solution_context') {
       const typeInfo = this.state.componentType === COMPONENT_TYPE.SOLUTION
-        ? `✓ Detected as solution (confidence: ${(this.state.componentTypeConfidence * 100).toFixed(0)}%, method: ${this.state.componentTypeMethod})`
+        ? `✓ Detected as solution (confidence: ${((this.state.componentTypeConfidence ?? 0) * 100).toFixed(0)}%, method: ${this.state.componentTypeMethod})`
         : `✓ Component type: ${this.state.componentType}`;
       customized.hints.unshift(typeInfo);
 
@@ -461,8 +463,9 @@ export class ConversationSession {
 
     if (this.state.space) {
       const requiresReQuestion = this.state.space !== 'economic';
+      // any: state.space narrowed at runtime to a valid EconomicSpace literal
       return {
-        space: this.state.space,
+        space: this.state.space as any,
         reason: requiresReQuestion
           ? `"${this.state.name}" classified as ${this.state.space} during conversation.`
           : `"${this.state.name}" classified as economic — suitable for evolution evaluation.`,
@@ -480,7 +483,7 @@ export class ConversationSession {
   getReQuestions() {
     const classification = this.getClassification();
     if (!classification || !classification.requiresReQuestion) return [];
-    return buildReQuestions(classification, this.state.name);
+    return buildReQuestions(classification, this.state.name ?? '');
   }
 
   /**
@@ -489,6 +492,7 @@ export class ConversationSession {
    *
    * @returns {import('../work-on-evolution/strategies/capacity/base-strategy.mjs').ComponentInput}
    */
+  // any: ComponentInput-shaped builder result with optional numeric fields and metadata bag
   buildComponentInput(): any {
     const input: any = {
       name: this.state.name,
@@ -552,9 +556,11 @@ export class ConversationSession {
    * Get a summary of what has been gathered so far.
    * @returns {Object}
    */
+  // any: summary returns a heterogeneous report object (gathered fields, missing fields,
+  //      phase, isComplete, exchangeCount, ...)
   getSummary(): any {
-    const gathered: any = {};
-    const missing: any = {};
+    const gathered: Record<string, unknown> = {};
+    const missing: Record<string, unknown> = {};
 
     // Base fields shared by both paths
     const baseFields = ['name', 'description', 'space'];
@@ -597,7 +603,7 @@ export class ConversationSession {
       missing: Object.keys(missing),
       history: this.state.history,
       readyForEstimation: this.isReadyForEstimation(),
-      exchangeCount: this.state.history.length,
+      exchangeCount: (this.state.history ?? []).length,
     };
   }
 
@@ -644,8 +650,8 @@ export class ConversationSession {
                       this.state.operate != null && this.state.usage != null;
       if (!hasPubs) {
         const inferred = inferFromMarketSignals(
-          this.state.marketDynamics,
-          this.state.adoptionPattern
+          this.state.marketDynamics ?? '',
+          this.state.adoptionPattern ?? ''
         );
         if (inferred.wonder != null) {
           if (this.state.wonder == null) this.state.wonder = inferred.wonder;
@@ -705,7 +711,7 @@ export class ConversationSession {
         // Solutions go to solution_context; capabilities go to characteristics.
         if (this.state.componentType === COMPONENT_TYPE.SOLUTION) {
           this.state.phase = 'solution_context';
-          this.state.history.push(
+          (this.state.history ??= []).push(
             `Classification: detected as solution (confidence=${this.state.componentTypeConfidence}, ` +
             `method=${this.state.componentTypeMethod}) — branching to solution path`
           );
@@ -761,7 +767,7 @@ export class ConversationSession {
   forceReady() {
     if (this.state.name) {
       this.state.phase = 'ready';
-      this.state.history.push('User requested early estimation with available data');
+      (this.state.history ??= []).push('User requested early estimation with available data');
     }
   }
 }
