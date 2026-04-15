@@ -56,7 +56,7 @@ export function getEvalMode() {
  *   or from the dual-verification orchestrator (routingDetection field)
  * @returns {{ useSolutionStrategies: boolean, useCapabilityStrategies: boolean, mode: string }}
  */
-export function determineRoutingTargets(detection) {
+export function determineRoutingTargets(detection: any): { useSolutionStrategies: boolean; useCapabilityStrategies: boolean; mode: string } {
   const mode = getEvalMode();
 
   if (mode === EVAL_MODES.PARALLEL) {
@@ -243,7 +243,7 @@ export async function dispatchWithRouting(component: any, options: any = {}): Pr
   }
 
   // Step 4: Merge evaluations (solution results get a 'solution:' prefix to avoid key collisions)
-  const evaluations = { ...capabilityEvaluations };
+  const evaluations: Record<string, unknown> = { ...capabilityEvaluations };
   for (const [method, result] of Object.entries(solutionEvaluations)) {
     // Only prefix if there would be a key collision
     const key = evaluations[method] ? `solution:${method}` : method;

@@ -74,7 +74,7 @@ const COMMON_CONTEXT_SIGNALS = [
  * @param {string} text
  * @returns {string}
  */
-function normalize(text) {
+function normalize(text: string): string {
   return (text || '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
@@ -84,8 +84,8 @@ function normalize(text) {
  * @param {string[]} indicators
  * @returns {{ count: number, matched: string[] }}
  */
-function matchIndicators(text, indicators) {
-  const matched = indicators.filter(ind => text.includes(ind));
+function matchIndicators(text: string, indicators: string[]): { count: number; matched: string[] } {
+  const matched = indicators.filter((ind: string) => text.includes(ind));
   return { count: matched.length, matched };
 }
 

@@ -127,9 +127,9 @@ export function classifyWardleyType(name: string, options: any = {}) {
 
   // Layer 4: Pattern-based heuristic on name + description
   const textToCheck = `${trimmed} ${options.description || ''}`.trim();
-  const scores = { activity: 0, practice: 0, data: 0, knowledge: 0 };
+  const scores: Record<string, number> = { activity: 0, practice: 0, data: 0, knowledge: 0 };
 
-  for (const [type, patterns] of Object.entries(WARDLEY_TYPE_PATTERNS)) {
+  for (const [type, patterns] of Object.entries(WARDLEY_TYPE_PATTERNS) as [string, RegExp[]][]) {
     for (const pattern of patterns) {
       if (pattern.test(textToCheck)) {
         scores[type] += 1;

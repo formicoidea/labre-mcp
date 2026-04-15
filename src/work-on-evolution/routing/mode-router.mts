@@ -49,7 +49,7 @@ const MODE_ALIASES = {
  * @param {Object} input - Request input
  * @returns {boolean} True if there are enough params for one-shot evaluation
  */
-function hasEvaluationParams(input) {
+function hasEvaluationParams(input: any): boolean {
   if (!input || typeof input !== 'object') return false;
 
   // S-curve params: certitude + ubiquity
@@ -85,7 +85,7 @@ export function detectMode(input: any) {
   // 1. Explicit mode parameter
   if (input.mode != null && typeof input.mode === 'string') {
     const normalized = input.mode.trim().toLowerCase();
-    const canonical = MODE_ALIASES[normalized];
+    const canonical = (MODE_ALIASES as Record<string, string>)[normalized];
     if (canonical) {
       return { mode: canonical, reason: `explicit mode parameter: "${input.mode}"` };
     }
@@ -297,7 +297,7 @@ async function routeGuided(input: any, modeReason: string): Promise<any> {
  * @param {Object} result - Result from estimateEvolutionConversational
  * @returns {string} Markdown-formatted response
  */
-function formatGuidedTurn(result) {
+function formatGuidedTurn(result: any): string {
   const lines = [];
 
   // Re-questioning for non-economic components
@@ -341,7 +341,7 @@ function formatGuidedTurn(result) {
     characteristics: 'Maturity Characteristics',
     market_signals: 'Market & Publication Signals',
     solution_context: 'Solution Context (12-Property Evaluation)',
-  };
+  } as Record<string, string>;
 
   lines.push(`### Guided Estimation — Phase ${currentIdx + 1}/${totalPhases}: ${phaseLabels[result.phase] || result.phase}`);
   lines.push('');

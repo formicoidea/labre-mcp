@@ -50,12 +50,12 @@ const RETRYABLE_PATTERNS = [
   'concurrency', 'empty response', 'unknown error',
 ];
 
-function isRetryableError(err) {
+function isRetryableError(err: unknown): boolean {
   const msg = String(toErrorMessage(err) || err).toLowerCase();
-  return RETRYABLE_PATTERNS.some(p => msg.includes(p));
+  return RETRYABLE_PATTERNS.some((p: string) => msg.includes(p));
 }
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function sleep(ms: number): Promise<void> { return new Promise(r => setTimeout(r, ms)); }
 
 // ─── Result Types ─────────────────────────────────────────────────────────────
 
@@ -267,7 +267,7 @@ function parseReferencesBlock(text: string) {
  * @param {string} raw - Raw evidence type from LLM
  * @returns {string} Normalized evidence type
  */
-function normalizeEvidenceType(raw) {
+function normalizeEvidenceType(raw: string | null | undefined): string {
   const normalized = (raw || '').toLowerCase().replace(/[\s_]+/g, '-').trim();
   const validTypes = [
     'product-page', 'wikipedia', 'vendor-association', 'pricing',
@@ -285,7 +285,7 @@ function normalizeEvidenceType(raw) {
  * @param {WebSearchReference[]} references - Any references parsed
  * @returns {WebSearchVerificationResult}
  */
-function inferFromKeywords(text, name, evidence, references) {
+function inferFromKeywords(text: string, name: string, evidence: any[], references: any[]): any {
   const lower = text.toLowerCase();
 
   // Count solution vs capability evidence keywords
@@ -345,15 +345,15 @@ function inferFromKeywords(text, name, evidence, references) {
  * @param {string} reason - Why the fallback was triggered
  * @returns {WebSearchVerificationResult}
  */
-function createFallbackResult(name, reason) {
+function createFallbackResult(name: string, reason: string): any {
   return {
     classification: 'capability',
     confidence: 0.40,
     method: 'web-search',
     reasoning: `Could not verify "${name}" via web search: ${reason} — defaulting to capability`,
     isSolution: false,
-    evidence: [],
-    references: [],
+    evidence: [] as any[],
+    references: [] as any[],
   };
 }
 
@@ -495,8 +495,8 @@ export async function verifyViaWebSearch(name: string, options: any = {}) {
       method: 'web-search',
       reasoning: `Web search verification failed for "${trimmed}": ${toErrorMessage(err)} — defaulting to capability`,
       isSolution: false,
-      evidence: [],
-      references: [],
+      evidence: [] as any[],
+      references: [] as any[],
       error: toErrorMessage(err),
     };
   }
@@ -647,7 +647,7 @@ used for container orchestration. There is pricing for managed versions like GKE
 
   // ── Test 6: verifyViaWebSearch with mock ───────────────────────────
   console.log('\n--- Test 6: verifyViaWebSearch with mock ---');
-  const mockWebSearch = async (prompt) => {
+  const mockWebSearch = async (prompt: string): Promise<string> => {
     if (prompt.includes('Kubernetes')) {
       return `classification=SOLUTION\nconfidence=0.95\nreasoning=Kubernetes is a specific platform by CNCF\nEVIDENCE_START\ntype=product-page|description=kubernetes.io|source=kubernetes.io|supports=solution\nEVIDENCE_END\nREFERENCES_START\ntitle=Kubernetes|url=https://kubernetes.io|snippet=Container orchestration platform\nREFERENCES_END`;
     }
@@ -684,7 +684,7 @@ used for container orchestration. There is pricing for managed versions like GKE
   // ── Test 9: combineWithPriorResult ─────────────────────────────────
   console.log('\n--- Test 9: Combine with prior result ---');
   const prior = { classification: 'solution', confidence: 0.70, method: 'naming', reasoning: 'has version number' };
-  const web = { classification: 'solution', confidence: 0.90, method: 'web-search', reasoning: 'has official website', isSolution: true, evidence: [], references: [] };
+  const web: any = { classification: 'solution', confidence: 0.90, method: 'web-search', reasoning: 'has official website', isSolution: true, evidence: [], references: [] };
 
   const combined = combineWithPriorResult(prior, web);
   console.assert(combined.confidence >= 0.88, `Agreement should boost confidence above average, got ${combined.confidence}`);

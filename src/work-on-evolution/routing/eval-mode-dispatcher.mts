@@ -163,8 +163,8 @@ async function runSolutionStrategies(component: any, createInstance: any) {
  * @param {string} namespace   - 'solution' or 'capability'
  * @returns {Object} Namespaced evaluations
  */
-function namespaceResults(evaluations, namespace) {
-  const namespaced = {};
+function namespaceResults(evaluations: Record<string, unknown>, namespace: string): Record<string, unknown> {
+  const namespaced: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(evaluations)) {
     namespaced[`${namespace}:${key}`] = value;
   }
@@ -315,7 +315,7 @@ export function previewDispatch(name: string, description: string = '') {
  * @param {function} StrategyCls - Strategy class constructor
  * @returns {Object} Strategy instance
  */
-function defaultInstanceFactory(StrategyCls) {
+function defaultInstanceFactory(StrategyCls: new () => unknown): unknown {
   return new StrategyCls();
 }
 
