@@ -16,6 +16,7 @@
 // outputs and producing a reconciled classification.
 
 import { logDebug } from '../../lib/mcp-notifications.mjs';
+import type { VerificationSignal, CombinedSignalResult } from '../../types/pipeline.mjs';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -106,11 +107,11 @@ export const SIGNAL_STATUS = {
  * @param {ClassificationSignal} signal - Signal to check
  * @returns {boolean} true if the signal provides a usable classification
  */
-export function isSignalUsable(signal: any) {
+export function isSignalUsable(signal: VerificationSignal | null | undefined): boolean {
   if (!signal) return false;
 
   // Status check: success or absent status field (backward compatibility)
-  const statusOk = !signal.status || signal.status === SIGNAL_STATUS.SUCCESS;
+  const statusOk = !signal.status || signal.status === SIGNAL_STATUS.SUCCESS as 'success';
 
   // Classification must be a valid type
   const classOk = signal.classification === COMPONENT_TYPE.SOLUTION ||
@@ -132,14 +133,14 @@ export function isSignalUsable(signal: any) {
  * @param {string} defaultMethod - Method label to use if not provided
  * @returns {ClassificationSignal} Normalized signal (never null)
  */
-function normalizeSignal(signal: any, defaultMethod: string = 'unknown'): any {
+function normalizeSignal(signal: VerificationSignal | null | undefined, defaultMethod: string = 'unknown'): VerificationSignal {
   if (!signal) {
     return {
       classification: null as string | null,
       confidence: 0,
       method: defaultMethod,
       reasoning: `No ${defaultMethod} signal provided`,
-      status: SIGNAL_STATUS.SKIPPED,
+      status: SIGNAL_STATUS.SKIPPED as 'skipped',
     };
   }
 
@@ -149,7 +150,7 @@ function normalizeSignal(signal: any, defaultMethod: string = 'unknown'): any {
       ? signal.confidence : 0,
     method: signal.method || defaultMethod,
     reasoning: signal.reasoning || '',
-    status: signal.status || (signal.classification ? SIGNAL_STATUS.SUCCESS : SIGNAL_STATUS.SKIPPED),
+    status: signal.status || (signal.classification ? SIGNAL_STATUS.SUCCESS as 'success' : SIGNAL_STATUS.SKIPPED as 'skipped'),
     ...(signal.durationMs !== undefined && { durationMs: signal.durationMs }),
     ...(signal.raw !== undefined && { raw: signal.raw }),
     ...(signal.error !== undefined && { error: signal.error }),
@@ -190,7 +191,8 @@ function normalizeSignal(signal: any, defaultMethod: string = 'unknown'): any {
  * @param {number} [options.minVerified=0.70]           - Min confidence for verified flag
  * @returns {CombinedClassificationResult} Combined classification with confidence
  */
-export function combineSignals(llmSignal: any, webSearchSignal: any, options: any = {}): any {
+// any: options bag carries many tunable knobs (weights, floors, bonuses, ...)
+export function combineSignals(llmSignal: VerificationSignal | null, webSearchSignal: VerificationSignal | null, options: any = {}): CombinedSignalResult {
   const params = {
     agreementBonus: options.agreementBonus ?? COMBINATION_PARAMS.AGREEMENT_BONUS,
     disagreementPenalty: options.disagreementPenalty ?? COMBINATION_PARAMS.DISAGREEMENT_PENALTY,
@@ -347,7 +349,8 @@ export function combineSignals(llmSignal: any, webSearchSignal: any, options: an
  * @param {Object} [options={}]                   - Same options as combineSignals
  * @returns {CombinedClassificationResult} Combined classification from all three signals
  */
-export function combineAllSignals(namingSignal: any, llmSignal: any, webSearchSignal: any, options: any = {}): any {
+// any: options bag carries many tunable knobs (weights, floors, bonuses, ...)
+export function combineAllSignals(namingSignal: VerificationSignal | null, llmSignal: VerificationSignal | null, webSearchSignal: VerificationSignal | null, options: any = {}): CombinedSignalResult {
   const params = {
     agreementBonus: options.agreementBonus ?? COMBINATION_PARAMS.AGREEMENT_BONUS,
     maxConfidence: options.maxConfidence ?? COMBINATION_PARAMS.MAX_CONFIDENCE,
@@ -432,12 +435,12 @@ export function combineAllSignals(namingSignal: any, llmSignal: any, webSearchSi
  * @param {ClassificationSignal} web
  * @returns {string}
  */
-function buildNoSignalReasoning(llm: any, web: any): string {
+function buildNoSignalReasoning(llm: VerificationSignal, web: VerificationSignal): string {
   const parts = [];
-  if (llm.status && llm.status !== SIGNAL_STATUS.SKIPPED) {
+  if (llm.status && llm.status !== SIGNAL_STATUS.SKIPPED as 'skipped') {
     parts.push(`LLM: ${llm.reasoning || llm.status}`);
   }
-  if (web.status && web.status !== SIGNAL_STATUS.SKIPPED) {
+  if (web.status && web.status !== SIGNAL_STATUS.SKIPPED as 'skipped') {
     parts.push(`Web search: ${web.reasoning || web.status}`);
   }
   if (parts.length === 0) {
@@ -452,7 +455,7 @@ function buildNoSignalReasoning(llm: any, web: any): string {
  * @param {ClassificationSignal} web
  * @returns {string}
  */
-function buildAgreementReasoning(llm: any, web: any): string {
+function buildAgreementReasoning(llm: VerificationSignal, web: VerificationSignal): string {
   const primary = web.confidence >= llm.confidence ? web : llm;
   const secondary = web.confidence >= llm.confidence ? llm : web;
   return `${primary.reasoning || primary.method} (${secondary.method} agrees: ${secondary.reasoning || secondary.classification})`;
@@ -465,7 +468,7 @@ function buildAgreementReasoning(llm: any, web: any): string {
  * @param {number} confGap
  * @returns {string}
  */
-function buildDisagreementReasoning(winner: any, loser: any, confGap: number): string {
+function buildDisagreementReasoning(winner: VerificationSignal, loser: VerificationSignal, confGap: number): string {
   const ambiguityNote = confGap < 0.10
     ? ' — signals are close in confidence, classification is ambiguous'
     : '';
@@ -481,7 +484,7 @@ function buildDisagreementReasoning(winner: any, loser: any, confGap: number): s
  * @param {Object} params
  * @returns {CombinedClassificationResult}
  */
-function buildCombinedResult(params: any): any {
+function buildCombinedResult(params: { classification: string | null; confidence: number; method: string; reasoning: string; [key: string]: unknown }): CombinedSignalResult {
   const { classification, confidence, method, reasoning, mergeCase, minVerified, llm, web } = params;
 
   return {
@@ -490,7 +493,7 @@ function buildCombinedResult(params: any): any {
     method,
     reasoning,
     mergeCase,
-    verified: confidence >= minVerified,
+    verified: confidence >= (minVerified as number),
     isSolution: classification === COMPONENT_TYPE.SOLUTION,
     signals: {
       llm: llm || null,

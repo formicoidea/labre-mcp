@@ -1,3 +1,6 @@
+import type { VerificationSignal } from '../../types/pipeline.mjs';
+import { toErrorMessage } from '../../lib/errors.mjs';
+
 /**
  * Verification signal builders and timeout racing utility.
  *
@@ -58,7 +61,7 @@ export function raceWithTimeout(promise: Promise<any>, timeoutMs: number, label:
  * @param {number} durationMs - Duration in milliseconds
  * @returns {VerificationSignal}
  */
-export function buildSuccessSignal(result: any, method: string, durationMs: number) {
+export function buildSuccessSignal(result: { classification?: string | null; confidence?: number; reasoning?: string; isSolution?: boolean; [key: string]: unknown }, method: string, durationMs: number): VerificationSignal {
   return {
     classification: result.classification || null,
     confidence: typeof result.confidence === 'number' ? result.confidence : 0,
@@ -78,7 +81,7 @@ export function buildSuccessSignal(result: any, method: string, durationMs: numb
  * @param {number} durationMs - Actual elapsed time
  * @returns {VerificationSignal}
  */
-export function buildTimeoutSignal(method: string, timeoutMs: number, durationMs: number) {
+export function buildTimeoutSignal(method: string, timeoutMs: number, durationMs: number): VerificationSignal {
   return {
     classification: null as string | null,
     confidence: 0,
@@ -98,15 +101,15 @@ export function buildTimeoutSignal(method: string, timeoutMs: number, durationMs
  * @param {number} durationMs - Duration before failure
  * @returns {VerificationSignal}
  */
-export function buildErrorSignal(method: string, err: any, durationMs: number) {
+export function buildErrorSignal(method: string, err: unknown, durationMs: number): VerificationSignal {
   return {
     classification: null as string | null,
     confidence: 0,
     method,
-    reasoning: `${method} verification failed: ${err.message}`,
+    reasoning: `${method} verification failed: ${toErrorMessage(err)}`,
     status: 'error',
     durationMs,
-    error: err.message,
+    error: toErrorMessage(err),
   };
 }
 
@@ -117,7 +120,7 @@ export function buildErrorSignal(method: string, err: any, durationMs: number) {
  * @param {string} reason - Why the signal was skipped
  * @returns {VerificationSignal}
  */
-export function buildSkippedSignal(method: string, reason: string) {
+export function buildSkippedSignal(method: string, reason: string): VerificationSignal {
   return {
     classification: null as string | null,
     confidence: 0,

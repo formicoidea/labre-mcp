@@ -52,7 +52,7 @@ const TOOL = 'estimateEvolution:pipeline';
  * @param {Function} options.evaluateCapabilityFn - Function to evaluate a capability (accepts {name, description, strategy})
  * @returns {Promise<CapabilityPivotResult>}
  */
-export async function evaluateCapabilityPivot(standardResult: any, component: any, options: any = {}): Promise<any> {
+export async function evaluateCapabilityPivot(standardResult: any, component: any, options: any = {}): Promise<any> {  // any: heterogeneous pipeline options/result bag
   const { evaluateCapabilityFn } = options;
 
   const isSolution = standardResult.routing?.usedSolutionStrategies === true;
@@ -113,7 +113,8 @@ export async function evaluateCapabilityPivot(standardResult: any, component: an
  * @param {Object<string, { evolution?: number, confidence?: number, error?: string }>} evaluations
  * @returns {{ evolution: number, confidence: number, method: string }}
  */
-function extractBestEvolution(evaluations: any) {
+// any: evaluations is a Record<string, EvolutionResult|{error}> map
+function extractBestEvolution(evaluations: any): any {
   let bestEvolution = 0.5;
   let bestConfidence = 0;
   let bestMethod = 'unknown';
@@ -236,7 +237,8 @@ function round2(n: number): number {
  * @param {string} [params.nature]         - Component nature (activity/practice/data/knowledge) — metadata only
  * @returns {string} Valid OWM syntax string
  */
-export function generateOwmSyntax(params: any) {
+// any: params bag for OWM syntax generation (component, anchor, label, evolution, ...)
+export function generateOwmSyntax(params: any): string {
   const {
     capabilityLabel = 'Capability',
     capabilityEvolution = 0.5,
@@ -455,7 +457,7 @@ export function parseSolutionDiscoveryResponse(text: string, capabilityName: str
  * @param {string}   [options.excludeName]    - Original component name to exclude from results
  * @returns {Promise<SolutionDiscoveryResult>}
  */
-export async function discoverPipelineSolutions(capabilityName: string, options: any = {}): Promise<any> {
+export async function discoverPipelineSolutions(capabilityName: string, options: any = {}): Promise<any> {  // any: heterogeneous pipeline options/result bag
   const { llmCall, description = '', excludeName = '' } = options;
 
   if (!capabilityName || typeof capabilityName !== 'string') {
@@ -512,7 +514,7 @@ export async function discoverPipelineSolutions(capabilityName: string, options:
  * @param {Function} options.llmCall - LLM call function
  * @returns {Promise<{ evolution: number|null, confidence: number, method: string, evaluations: Object }>}
  */
-export async function evaluateDiscoveredSolution(solution: any, options: any = {}): Promise<any> {
+export async function evaluateDiscoveredSolution(solution: any, options: any = {}): Promise<any> {  // any: heterogeneous pipeline options/result bag
   const { llmCall } = options;
 
   if (!solution || !solution.name) {
@@ -573,7 +575,7 @@ export async function evaluateDiscoveredSolution(solution: any, options: any = {
  * @param {Function} [options.llmCall]            - LLM call function for solution discovery
  * @returns {Promise<Object>} Pipeline result with capability pivot, OWM output, and discovered solutions
  */
-export async function runEnrichedPipeline(standardResult: any, component: any, options: any = {}): Promise<any> {
+export async function runEnrichedPipeline(standardResult: any, component: any, options: any = {}): Promise<any> {  // any: heterogeneous pipeline options/result bag
   logInfo(TOOL, `Starting enriched pipeline for "${component.name}"`);
 
   // Step 1: Capability pivot — always first

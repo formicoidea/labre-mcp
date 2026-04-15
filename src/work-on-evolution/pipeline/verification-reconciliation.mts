@@ -7,6 +7,8 @@
 
 import { COMPONENT_TYPE } from '../../lib/component-detection.mjs';
 import { determineRoutingTargets } from '../routing/solution-dispatch.mjs';
+import type { VerificationSignal, CombinedSignalResult } from '../../types/pipeline.mjs';
+import type { ComponentTypeDetection } from '../../types/routing.mjs';
 
 /**
  * Convert a ComponentTypeDetection (from naming conventions or LLM) into an
@@ -15,7 +17,8 @@ import { determineRoutingTargets } from '../routing/solution-dispatch.mjs';
  * @param {import('../../lib/component-detection.mjs').ComponentTypeDetection} detection
  * @returns {{ classification: string, confidence: number, method: string, reasoning: string }}
  */
-export function toIntermediateResult(detection: any) {
+// any: returns a heterogeneous intermediate shape (legacy fields plus routing)
+export function toIntermediateResult(detection: ComponentTypeDetection): any {
   return {
     classification: detection.type,
     confidence: detection.confidence,
@@ -41,6 +44,7 @@ export function toIntermediateResult(detection: any) {
  * @param {{ classification: string, confidence: number, method: string, reasoning: string }} tierB
  * @returns {{ classification: string, confidence: number, method: string, reasoning: string }}
  */
+// any: tierA/tierB shapes are heterogeneous detection-or-signal payloads
 export function reconcileTwoTiers(tierA: any, tierB: any): any {
   if (tierA.classification === tierB.classification) {
     // Agreement: boost confidence
@@ -85,7 +89,8 @@ export function reconcileTwoTiers(tierA: any, tierB: any): any {
  * @param {import('./dual-verification-orchestrator.mjs').VerificationSignal} webSearchSignal
  * @returns {{ classification: string, confidence: number, method: string, reasoning: string }}
  */
-export function reconcileSignalPair(llmSignal: any, webSearchSignal: any): any {
+// any: caller guarantees both signals are non-null after early-return guards above
+export function reconcileSignalPair(llmSignal: any, webSearchSignal: any): CombinedSignalResult {
   const llmOk = llmSignal.status === 'success' && llmSignal.classification != null;
   const webOk = webSearchSignal.status === 'success' && webSearchSignal.classification != null;
 
@@ -173,6 +178,7 @@ export function reconcileSignalPair(llmSignal: any, webSearchSignal: any): any {
  * @param {Object} [params.webSearchResult] - Tier 3 web search result
  * @returns {import('./dual-verification-orchestrator.mjs').VerifiedClassificationResult}
  */
+// any: result params bag varies (legacy fields, signal merges)
 export function buildResult(params: any): any {
   const {
     classification,

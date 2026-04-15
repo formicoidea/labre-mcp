@@ -106,6 +106,7 @@ export const DEFAULT_SIGNAL_TIMEOUT_MS = 15_000;
  * @param {number}   [context.webSearchTimeoutMs]
  * @returns {Promise<DualSignalPair>}
  */
+// any: context bag carries description, llmCall, webSearchCall, timeoutMs, useLlmFallback, useWebSearch, etc.
 export async function verifyConcurrent(componentName: string, context: any = {}): Promise<any> {
   const name = (componentName || '').trim();
   const concurrentStart = Date.now();
@@ -188,6 +189,7 @@ export async function verifyConcurrent(componentName: string, context: any = {})
   const webSearchPromise = canUseWebSearch
     ? (async () => {
         const t0 = Date.now();
+        // any: web search options (Claude Agent SDK loose shape)
         const webSearchOptions: any = {};
         if (typeof context.webSearchCall === 'function') {
           webSearchOptions.webSearchCall = context.webSearchCall;
@@ -277,6 +279,7 @@ export async function verifyConcurrent(componentName: string, context: any = {})
  * @param {Object} [context={}]  - Same context shape as verifyConcurrent
  * @returns {Promise<Object>}
  */
+// any: same loose context bag as verifyConcurrent — full result includes raw signals
 export async function verifyConcurrentFull(componentName: string, context: any = {}): Promise<any> {
   const name = (componentName || '').trim();
 

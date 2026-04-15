@@ -133,6 +133,7 @@ export const THRESHOLDS = {
  * @param {ClassificationContext} [context={}] - Partial classification context
  * @returns {Promise<VerifiedClassificationResult>} Verified classification result
  */
+// any: context bag (description, llmCall, webSearchCall, timeoutMs, etc.) — heterogeneous result shape
 export async function verifyClassification(componentName: string, context: any = {}): Promise<any> {
   const name = (componentName || '').trim();
 
@@ -239,6 +240,7 @@ export async function verifyClassification(componentName: string, context: any =
     tiersUsed.push('web-search');
 
     try {
+      // any: web search options (Claude Agent SDK loose shape)
       const webSearchOptions: any = {};
       if (typeof context.webSearchCall === 'function') {
         webSearchOptions.webSearchCall = context.webSearchCall;

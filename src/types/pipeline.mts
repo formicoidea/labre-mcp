@@ -36,6 +36,34 @@ export interface DiscoveredSolution {
   role: 'sota' | 'legacy';
 }
 
+// ─── Verification signals (LLM + web search dual-verification) ─────────────
+
+/** Signal status emitted by tier verifications. */
+export type SignalStatus = 'success' | 'timeout' | 'error' | 'skipped';
+
+/** Verification signal produced by a single tier (LLM or web search). */
+export interface VerificationSignal {
+  classification: string | null;
+  confidence: number;
+  method: string;
+  reasoning: string;
+  status?: SignalStatus;
+  durationMs?: number;
+  error?: string;
+  /** Loose extension fields tolerated downstream */
+  [key: string]: unknown;
+}
+
+/** Combined result returned by signal combiner / reconciliation. */
+export interface CombinedSignalResult {
+  classification: string | null;
+  confidence: number;
+  method: string;
+  reasoning: string;
+  /** Loose extension fields */
+  [key: string]: unknown;
+}
+
 /** Résultat de la phase de découverte SotA/legacy. */
 export interface SolutionDiscoveryResult {
   /** State-of-the-art / cutting-edge solution */
