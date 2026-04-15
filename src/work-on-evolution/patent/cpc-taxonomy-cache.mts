@@ -17,6 +17,7 @@
 // TTL defaults to 30 days (CPC taxonomy changes infrequently).
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import type { CpcEntry, BigQueryRow } from '../../types/patent.mjs';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
@@ -155,14 +156,14 @@ export function setCpcTitle(code: string, title: string): void {
 // ─── CpcTaxonomyCache class ────────────────────────────────────────────────
 
 export class CpcTaxonomyCache {
-  _client: any;
-  _queryOptions: any;
-  _cachePath: any;
-  _ttlMs: any;
-  _memory: any;
-  _diskLoaded: any;
+  _client: any;  // any: BigQuery client (lazy, no exposed types)
+  _queryOptions: Record<string, unknown>;
+  _cachePath: string;
+  _ttlMs: number;
+  _memory: Map<string, { children: CpcEntry[]; fetchedAt: number }>;
+  _diskLoaded: boolean;
 
-  constructor({ bigqueryClient, queryOptions, cachePath, ttlMs }: any = {}) {
+  constructor({ bigqueryClient, queryOptions, cachePath, ttlMs }: { bigqueryClient?: any; queryOptions?: Record<string, unknown>; cachePath?: string; ttlMs?: number } = {}) {
     this._client = bigqueryClient || null;
     this._queryOptions = queryOptions || {};
     this._cachePath = cachePath || DEFAULT_CACHE_PATH;
@@ -178,7 +179,7 @@ export class CpcTaxonomyCache {
    * @param {string} classCode - 3-char class code (e.g., "G06")
    * @returns {Promise<CpcEntry[]>}
    */
-  async getSubclasses(classCode: string): Promise<any[]> {
+  async getSubclasses(classCode: string): Promise<CpcEntry[]> {
     const key = classCode.toUpperCase();
     return this._getOrFetch(key, SQL_SUBCLASSES);
   }
@@ -188,7 +189,7 @@ export class CpcTaxonomyCache {
    * @param {string} subclassCode - 4-char subclass code (e.g., "G06F")
    * @returns {Promise<CpcEntry[]>}
    */
-  async getGroups(subclassCode: string): Promise<any[]> {
+  async getGroups(subclassCode: string): Promise<CpcEntry[]> {
     const key = subclassCode.toUpperCase();
     return this._getOrFetch(key, SQL_GROUPS);
   }
@@ -198,7 +199,7 @@ export class CpcTaxonomyCache {
    * @param {string} groupCode - Group prefix (e.g., "G06F9/")
    * @returns {Promise<CpcEntry[]>}
    */
-  async getSubgroups(groupCode: string): Promise<any[]> {
+  async getSubgroups(groupCode: string): Promise<CpcEntry[]> {
     const key = groupCode.toUpperCase();
     return this._getOrFetch(key, SQL_SUBGROUPS);
   }
@@ -208,12 +209,12 @@ export class CpcTaxonomyCache {
    * Registers titles in the global store on load.
    * @private
    */
-  async _getOrFetch(parentCode: string, sql: string): Promise<any[]> {
+  async _getOrFetch(parentCode: string, sql: string): Promise<CpcEntry[]> {
     // Check memory cache first
     const cached = this._memory.get(parentCode);
     if (cached && (Date.now() - cached.fetchedAt) < this._ttlMs) {
       // Re-register titles (may have been lost if title store was cleared)
-      for (const child of cached.children) setCpcTitle(child.code, child.title);
+      for (const child of cached.children) setCpcTitle(child.code, child.title ?? child.code);
       return cached.children;
     }
 
@@ -224,7 +225,7 @@ export class CpcTaxonomyCache {
 
       const diskCached = this._memory.get(parentCode);
       if (diskCached && (Date.now() - diskCached.fetchedAt) < this._ttlMs) {
-        for (const child of diskCached.children) setCpcTitle(child.code, child.title);
+        for (const child of diskCached.children) setCpcTitle(child.code, child.title ?? child.code);
         return diskCached.children;
       }
     }
@@ -233,7 +234,7 @@ export class CpcTaxonomyCache {
     const children = await this._fetchFromBigQuery(parentCode, sql);
 
     // Register titles
-    for (const child of children) setCpcTitle(child.code, child.title);
+    for (const child of children) setCpcTitle(child.code, child.title ?? child.code);
 
     // Store in memory + persist to disk
     const entry = { children, fetchedAt: Date.now() };
@@ -247,7 +248,7 @@ export class CpcTaxonomyCache {
    * Fetch CPC hierarchy data from BigQuery (with titles from cpc.definition).
    * @private
    */
-  async _fetchFromBigQuery(parentCode: string, sql: string): Promise<any[]> {
+  async _fetchFromBigQuery(parentCode: string, sql: string): Promise<CpcEntry[]> {
     if (!this._client) return [];
 
     try {
@@ -258,8 +259,8 @@ export class CpcTaxonomyCache {
       });
 
       return rows
-        .filter((r: any) => r.code)
-        .map((r: any) => ({
+        .filter((r: BigQueryRow) => r.code)
+        .map((r: BigQueryRow) => ({
           code: r.code,
           cnt: Number(r.cnt) || 0,
           title: r.title || r.code,
@@ -284,7 +285,7 @@ export class CpcTaxonomyCache {
             this._memory.set(key, entry);
             // Register titles from disk cache
             for (const child of entry.children) {
-              if (child.title) setCpcTitle(child.code, child.title);
+              if (child.title) setCpcTitle(child.code, child.title ?? child.code);
             }
           }
         }
@@ -327,7 +328,7 @@ export class CpcTaxonomyCache {
  * @param {Object} [options]
  * @returns {Promise<CpcTaxonomyCache>}
  */
-export async function createTaxonomyCache(options: any = {}) {
+export async function createTaxonomyCache(options: { cachePath?: string; ttlMs?: number } = {}) {
   try {
     const { resolveConfig, getClient, defaultQueryOptions } = await import('../../lib/patent/bigquery-client.mjs');
     const config = resolveConfig();

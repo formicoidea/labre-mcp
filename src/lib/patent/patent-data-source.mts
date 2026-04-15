@@ -130,15 +130,18 @@
  *
  * @returns {PatentData}
  */
-export function emptyPatentData(): any {
+import type { PatentData, IndicatorResults } from '../../types/patent.mjs';
+export type { PatentData, IndicatorResults };
+
+export function emptyPatentData(): PatentData {
   return {
     totalPatents: 0,
-    cpcDistribution: [] as any[],
-    yearlyClassifications: [] as any[],
+    cpcDistribution: [],
+    yearlyClassifications: [],
     citationData: { totalForwardCitations: 0, patentCount: 0 },
-    claimsTimeline: [] as any[],
+    claimsTimeline: [],
     assigneeData: { uniqueAssignees: 0, totalPatents: 0 },
-    geoData: { jurisdictionCount: 0, jurisdictions: [] as any[] },
+    geoData: { jurisdictionCount: 0, jurisdictions: [] },
     sectorData: { uniqueSections: 0, uniqueClasses: 0 },
     expirationData: { expiredCount: 0, totalPatents: 0 },
   };
@@ -184,7 +187,7 @@ export class PatentDataSource {
    * @returns {Promise<PatentData>} Patent data for the given CPC codes
    * @throws {Error} If not implemented by subclass
    */
-  async fetchByCpc(cpcCodes: string[]): Promise<any> {
+  async fetchByCpc(cpcCodes: string[]): Promise<PatentData> {
     throw new Error(
       `${this.constructor.name}.fetchByCpc() must be implemented by subclass`
     );
@@ -205,7 +208,7 @@ export class PatentDataSource {
    *   Custom ubiquity indicator config (for toggling/reweighting)
    * @returns {Promise<IndicatorResults>} Computed indicator results for both axes
    */
-  async fetchIndicators(cpcCodes: string[], options: Record<string, unknown> = {}) {
+  async fetchIndicators(cpcCodes: string[], options: Record<string, unknown> = {}): Promise<IndicatorResults> {
     const patentData = await this.fetchByCpc(cpcCodes);
 
     // Lazy-load to avoid circular dependencies and keep base class lightweight
@@ -236,55 +239,57 @@ export class PatentDataSource {
  * @param {*} data - Object to validate
  * @returns {{ valid: boolean, errors: string[] }}
  */
-export function validatePatentData(data: any): { valid: boolean; errors: string[] } {
+export function validatePatentData(data: unknown): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   if (data === null || typeof data !== 'object') {
     return { valid: false, errors: ['PatentData must be a non-null object'] };
   }
+  // After the guard above, narrow `data` to a record for field access during validation
+  const d = data as Record<string, any>;
 
   // totalPatents
-  if (typeof data.totalPatents !== 'number' || data.totalPatents < 0) {
+  if (typeof d.totalPatents !== 'number' || d.totalPatents < 0) {
     errors.push('totalPatents must be a non-negative number');
   }
 
   // cpcDistribution
-  if (!Array.isArray(data.cpcDistribution)) {
+  if (!Array.isArray(d.cpcDistribution)) {
     errors.push('cpcDistribution must be an array');
   }
 
   // yearlyClassifications
-  if (!Array.isArray(data.yearlyClassifications)) {
+  if (!Array.isArray(d.yearlyClassifications)) {
     errors.push('yearlyClassifications must be an array');
   }
 
   // citationData
-  if (!data.citationData || typeof data.citationData !== 'object') {
+  if (!d.citationData || typeof d.citationData !== 'object') {
     errors.push('citationData must be a non-null object');
   }
 
   // claimsTimeline
-  if (!Array.isArray(data.claimsTimeline)) {
+  if (!Array.isArray(d.claimsTimeline)) {
     errors.push('claimsTimeline must be an array');
   }
 
   // assigneeData
-  if (!data.assigneeData || typeof data.assigneeData !== 'object') {
+  if (!d.assigneeData || typeof d.assigneeData !== 'object') {
     errors.push('assigneeData must be a non-null object');
   }
 
   // geoData
-  if (!data.geoData || typeof data.geoData !== 'object') {
+  if (!d.geoData || typeof d.geoData !== 'object') {
     errors.push('geoData must be a non-null object');
   }
 
   // sectorData
-  if (!data.sectorData || typeof data.sectorData !== 'object') {
+  if (!d.sectorData || typeof d.sectorData !== 'object') {
     errors.push('sectorData must be a non-null object');
   }
 
   // expirationData
-  if (!data.expirationData || typeof data.expirationData !== 'object') {
+  if (!d.expirationData || typeof d.expirationData !== 'object') {
     errors.push('expirationData must be a non-null object');
   }
 

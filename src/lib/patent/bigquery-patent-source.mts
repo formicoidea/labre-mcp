@@ -16,6 +16,18 @@
 // Schema reference: https://console.cloud.google.com/bigquery?p=patents-public-data
 
 import { PatentDataSource, emptyPatentData } from './patent-data-source.mjs';
+import type {
+  PatentData,
+  BigQueryRow,
+  CpcDistributionEntry,
+  YearlyClassification,
+  CitationData,
+  ClaimsTimelineEntry,
+  AssigneeData,
+  GeoData,
+  SectorData,
+  ExpirationData,
+} from '../../types/patent.mjs';
 import {
   resolveConfig,
   getClient,
@@ -149,7 +161,7 @@ export function isRetryableError(error: unknown): boolean {
  * @throws {Error} The last error if all retries are exhausted, or non-retryable error immediately
  * @template T
  */
-export async function withRetry<T>(fn: () => Promise<T>, options: any = {}): Promise<T> {
+export async function withRetry<T>(fn: () => Promise<T>, options: { maxRetries?: number; baseDelayMs?: number; label?: string } = {}): Promise<T> {
   const {
     maxRetries = DEFAULT_MAX_RETRIES,
     baseDelayMs = DEFAULT_BASE_DELAY_MS,
@@ -202,7 +214,7 @@ export async function withRetry<T>(fn: () => Promise<T>, options: any = {}): Pro
  * @param {Object[]} rows - BigQuery result rows
  * @returns {Array<{cpc: string, count: number}>}
  */
-export function transformCpcDistribution(rows: any[]): any[] {
+export function transformCpcDistribution(rows: BigQueryRow[]): CpcDistributionEntry[] {
   if (!Array.isArray(rows)) return [];
   return rows
     .filter(r => r.cpc && typeof r.count === 'number')
@@ -214,7 +226,7 @@ export function transformCpcDistribution(rows: any[]): any[] {
  * @param {Object[]} rows - BigQuery result rows
  * @returns {Array<{year: number, cpcCodes: string[]}>}
  */
-export function transformYearlyClassifications(rows: any[]): any[] {
+export function transformYearlyClassifications(rows: BigQueryRow[]): YearlyClassification[] {
   if (!Array.isArray(rows)) return [];
   return rows
     .filter(r => typeof r.year === 'number')
@@ -229,7 +241,7 @@ export function transformYearlyClassifications(rows: any[]): any[] {
  * @param {Object[]} rows - BigQuery result rows (single row expected)
  * @returns {{totalForwardCitations: number, patentCount: number}}
  */
-export function transformCitationData(rows: any[]): any {
+export function transformCitationData(rows: BigQueryRow[]): CitationData {
   if (!Array.isArray(rows) || rows.length === 0) {
     return { totalForwardCitations: 0, patentCount: 0 };
   }
@@ -245,7 +257,7 @@ export function transformCitationData(rows: any[]): any {
  * @param {Object[]} rows - BigQuery result rows
  * @returns {Array<{year: number, avgIndependentClaims: number}>}
  */
-export function transformClaimsTimeline(rows: any[]): any[] {
+export function transformClaimsTimeline(rows: BigQueryRow[]): ClaimsTimelineEntry[] {
   if (!Array.isArray(rows)) return [];
   return rows
     .filter(r => typeof r.year === 'number' && typeof r.avg_independent_claims === 'number')
@@ -260,7 +272,7 @@ export function transformClaimsTimeline(rows: any[]): any[] {
  * @param {Object[]} rows - BigQuery result rows (single row expected)
  * @returns {{uniqueAssignees: number, totalPatents: number}}
  */
-export function transformAssigneeData(rows: any[]): any {
+export function transformAssigneeData(rows: BigQueryRow[]): AssigneeData {
   if (!Array.isArray(rows) || rows.length === 0) {
     return { uniqueAssignees: 0, totalPatents: 0 };
   }
@@ -276,7 +288,7 @@ export function transformAssigneeData(rows: any[]): any {
  * @param {Object[]} rows - BigQuery result rows (single row expected)
  * @returns {{jurisdictionCount: number, jurisdictions: string[]}}
  */
-export function transformGeoData(rows: any[]): any {
+export function transformGeoData(rows: BigQueryRow[]): GeoData {
   if (!Array.isArray(rows) || rows.length === 0) {
     return { jurisdictionCount: 0, jurisdictions: [] };
   }
@@ -292,7 +304,7 @@ export function transformGeoData(rows: any[]): any {
  * @param {Object[]} rows - BigQuery result rows (single row expected)
  * @returns {{uniqueSections: number, uniqueClasses: number}}
  */
-export function transformSectorData(rows: any[]): any {
+export function transformSectorData(rows: BigQueryRow[]): SectorData {
   if (!Array.isArray(rows) || rows.length === 0) {
     return { uniqueSections: 0, uniqueClasses: 0 };
   }
@@ -308,7 +320,7 @@ export function transformSectorData(rows: any[]): any {
  * @param {Object[]} rows - BigQuery result rows (single row expected)
  * @returns {{expiredCount: number, totalPatents: number}}
  */
-export function transformExpirationData(rows: any[]): any {
+export function transformExpirationData(rows: BigQueryRow[]): ExpirationData {
   if (!Array.isArray(rows) || rows.length === 0) {
     return { expiredCount: 0, totalPatents: 0 };
   }
@@ -325,7 +337,7 @@ export function transformExpirationData(rows: any[]): any {
  *
  * @type {Record<string, (rows: Object[]) => *>}
  */
-export const RESULT_TRANSFORMERS: Record<string, (rows: any) => any> = {
+export const RESULT_TRANSFORMERS: Record<string, (rows: BigQueryRow[]) => unknown> = {
   cpcDistribution:       transformCpcDistribution,
   yearlyClassifications: transformYearlyClassifications,
   citationData:          transformCitationData,
@@ -360,14 +372,14 @@ export const RESULT_TRANSFORMERS: Record<string, (rows: any) => any> = {
  *   const data = await source.fetchByCpc(['H04W']);
  */
 export class BigQueryPatentSource extends PatentDataSource {
-  _config: any;
-  _client: any;
-  _dataset: any;
-  _minYear: any;
-  _maxPatents: any;
-  _exclude: any;
-  _maxRetries: any;
-  _baseDelayMs: any;
+  _config: any;  // any: resolveConfig() returns env-derived shape
+  _client: any;  // any: BigQuery client instance (lazy-loaded, no exposed types)
+  _dataset: string;
+  _minYear: number;
+  _maxPatents: number;
+  _exclude: Set<string>;
+  _maxRetries: number;
+  _baseDelayMs: number;
 
   /**
    * @param {Object} [options]
@@ -380,6 +392,7 @@ export class BigQueryPatentSource extends PatentDataSource {
    * @param {number} [options.maxRetries]  - Max retry attempts for transient errors (default: 3)
    * @param {number} [options.baseDelayMs] - Base backoff delay in ms (default: 1000)
    */
+  // any: BigQuery options are loosely shaped (env-driven). resolveConfig() narrows them.
   constructor(options: any = {}) {
     super();
     this._config = resolveConfig(options);
@@ -410,7 +423,7 @@ export class BigQueryPatentSource extends PatentDataSource {
    * @returns {Promise<Object[]>} Array of result rows
    * @throws {Error} On query failure (auth, syntax, network, etc.)
    */
-  async _executeQuery(builtQuery: any): Promise<any[]> {
+  async _executeQuery(builtQuery: { sql: string; params: Record<string, unknown>; types: Record<string, unknown>; name?: string }): Promise<BigQueryRow[]> {
     const client = await this._getClient();
     const queryOptions = {
       ...defaultQueryOptions(this._config),
@@ -436,7 +449,7 @@ export class BigQueryPatentSource extends PatentDataSource {
    * @returns {Promise<Object[]>} Array of result rows
    * @throws {Error} Non-retryable error immediately, or last error after all retries exhausted
    */
-  async _executeQueryWithRetry(builtQuery: any): Promise<any[]> {
+  async _executeQueryWithRetry(builtQuery: { sql: string; params: Record<string, unknown>; types: Record<string, unknown>; name?: string }): Promise<BigQueryRow[]> {
     return withRetry(
       () => this._executeQuery(builtQuery),
       {
@@ -458,7 +471,7 @@ export class BigQueryPatentSource extends PatentDataSource {
    * @param {string[]} cpcCodes - Array of 4-char CPC sub-class codes (e.g. ['H04L', 'G06F'])
    * @returns {Promise<import('./patent-data-source.mjs').PatentData>} Patent data with optional _queryErrors metadata
    */
-  async fetchByCpc(cpcCodes: string[]): Promise<any> {
+  async fetchByCpc(cpcCodes: string[]): Promise<PatentData> {
     if (!Array.isArray(cpcCodes) || cpcCodes.length === 0) {
       return emptyPatentData();
     }
@@ -479,7 +492,7 @@ export class BigQueryPatentSource extends PatentDataSource {
 
     // Map results by query key, tracking errors for diagnostics
     const resultMap: Record<string, any> = {};
-    const queryErrors: any[] = [];
+    const queryErrors: Array<{ query: string; error: string; retryable: boolean }> = [];
 
     for (let i = 0; i < queryEntries.length; i++) {
       const [key] = queryEntries[i];
@@ -524,17 +537,19 @@ export class BigQueryPatentSource extends PatentDataSource {
     const totalPatentsRow = resultMap.totalPatents?.[0];
     const totalPatents = Number(totalPatentsRow?.total_patents || 0);
 
-    // Transform each indicator's raw rows into the PatentData shape
-    const patentData = {
+    // Transform each indicator's raw rows into the PatentData shape.
+    // Cast: RESULT_TRANSFORMERS is a generic dispatch table — each transformer
+    // returns its own typed shape, but the union is widened to `unknown` in the dict.
+    const patentData: PatentData = {
       totalPatents,
-      cpcDistribution:       RESULT_TRANSFORMERS.cpcDistribution(resultMap.cpcDistribution),
-      yearlyClassifications: RESULT_TRANSFORMERS.yearlyClassifications(resultMap.yearlyClassifications),
-      citationData:          RESULT_TRANSFORMERS.citationData(resultMap.citationData),
-      claimsTimeline:        RESULT_TRANSFORMERS.claimsTimeline(resultMap.claimsTimeline),
-      assigneeData:          RESULT_TRANSFORMERS.assigneeData(resultMap.assigneeData),
-      geoData:               RESULT_TRANSFORMERS.geoData(resultMap.geoData),
-      sectorData:            RESULT_TRANSFORMERS.sectorData(resultMap.sectorData),
-      expirationData:        RESULT_TRANSFORMERS.expirationData(resultMap.expirationData),
+      cpcDistribution:       transformCpcDistribution(resultMap.cpcDistribution),
+      yearlyClassifications: transformYearlyClassifications(resultMap.yearlyClassifications),
+      citationData:          transformCitationData(resultMap.citationData),
+      claimsTimeline:        transformClaimsTimeline(resultMap.claimsTimeline),
+      assigneeData:          transformAssigneeData(resultMap.assigneeData),
+      geoData:               transformGeoData(resultMap.geoData),
+      sectorData:            transformSectorData(resultMap.sectorData),
+      expirationData:        transformExpirationData(resultMap.expirationData),
     };
 
     // Attach error metadata for diagnostics (non-enumerable to avoid polluting serialization)

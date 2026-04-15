@@ -26,6 +26,7 @@ import type { ComponentInput, EvolutionResult } from '../../../types/evolution.m
 import { computeEvolution } from '../../s-curve/s-curve.mjs';
 import { getCpcTitle } from '../../patent/cpc-taxonomy-cache.mjs';
 import { toErrorMessage } from '../../../lib/errors.mjs';
+import type { IndicatorConfig, PatentData, IndicatorResults } from '../../../types/patent.mjs';
 
 // ─── Default indicator configuration ────────────────────────────────────────
 
@@ -62,7 +63,8 @@ const DEFAULT_UBIQUITY_INDICATORS = {
  * @param {Record<string, { weight: number, enabled: boolean }>} indicators
  * @returns {Record<string, number>} Map of indicator name → renormalized weight (enabled only)
  */
-function renormalizeWeights(indicators: any) {
+// any: indicators is a Record<key, {weight, enabled}> internal config shape (not IndicatorConfig[])
+function renormalizeWeights(indicators: any): any {
   const enabled = Object.entries(indicators)
     .filter(([, cfg]: [string, any]) => cfg.enabled);
 
@@ -187,9 +189,11 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    * @param {Record<string, { weight?: number, enabled?: boolean }>} [options.config.ubiquityIndicators]
    *   Override ubiquity indicator weights/toggles.
    */
+  // any: external dependencies injected via DI — diverse caller shapes
   _llmCall: any;
   _patentSource: any;
   _cpcMapper: any;
+  // any: legacy config shape is a Record<string, {weight, enabled}>, not an IndicatorConfig[]
   _certitudeIndicators: any;
   _ubiquityIndicators: any;
 
@@ -697,7 +701,8 @@ NAME | SHORT_DESCRIPTION | EVOLUTION
    * @param {string[]} cpcCodes - CPC codes used for the query
    * @returns {Promise<{ certitude: Record<string, number>, ubiquity: Record<string, number> }>}
    */
-  async _computeIndicators(patentData: any, cpcCodes: string[]) {
+  // any: return shape uses 'ubiquity' (legacy) instead of IndicatorResults.ubiquite
+  async _computeIndicators(patentData: PatentData, cpcCodes: string[]): Promise<any> {
     try {
       const indicators = await import('../../../lib/patent/patent-indicators.mjs');
 
@@ -758,6 +763,7 @@ NAME | SHORT_DESCRIPTION | EVOLUTION
  * @param {Record<string, { weight?: number, enabled?: boolean }>} [overrides]
  * @returns {Record<string, { weight: number, enabled: boolean }>}
  */
+// any: defaults/overrides are Record<key, {weight, enabled}> — not IndicatorConfig[] arrays
 function mergeIndicatorConfig(defaults: any, overrides: any): any {
   if (!overrides) return { ...defaults };
 

@@ -22,6 +22,7 @@
 //   source.closed      — whether close() was called
 
 import { PatentDataSource, emptyPatentData, validatePatentData } from './patent-data-source.mjs';
+import type { PatentData } from '../../types/patent.mjs';
 
 // ─── Pre-built fixture data ─────────────────────────────────────────────────
 
@@ -253,7 +254,7 @@ export class MockPatentSource extends PatentDataSource {
    * @param {string[]} cpcCodes - Array of 4-char CPC sub-class codes
    * @returns {Promise<import('./patent-data-source.mjs').PatentData>}
    */
-  async fetchByCpc(cpcCodes: string[]): Promise<unknown> {
+  async fetchByCpc(cpcCodes: string[]): Promise<PatentData> {
     // Record the call
     this.callCount++;
     this.lastArgs = cpcCodes;

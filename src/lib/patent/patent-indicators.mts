@@ -14,16 +14,32 @@
 //     7. diffusionSectorielle — cross-sector CPC group diversity          weight 0.25
 //     8. ratioExpires         — ratio of expired patents (commoditization) weight 0.20
 
+import type {
+  PatentData,
+  CpcDistributionEntry,
+  YearlyClassification,
+  CitationData,
+  ClaimsTimelineEntry,
+  AssigneeData,
+  GeoData,
+  SectorData,
+  ExpirationData,
+  IndicatorConfig,
+  IndicatorScores,
+  IndicatorResults,
+  WeightedAggregateResult,
+} from '../../types/patent.mjs';
+
 // ─── Default indicator configurations ───────────────────────────────────────────
 
-export const CERTITUDE_INDICATORS = [
+export const CERTITUDE_INDICATORS: IndicatorConfig[] = [
   { key: 'convergenceHHI',      weight: 0.30, enabled: true },
   { key: 'stabiliteTaxonomique', weight: 0.20, enabled: true },
   { key: 'densiteCitation',      weight: 0.25, enabled: true },
   { key: 'retrecissementClaims', weight: 0.25, enabled: true },
 ];
 
-export const UBIQUITE_INDICATORS = [
+export const UBIQUITE_INDICATORS: IndicatorConfig[] = [
   { key: 'diversiteAssignees',    weight: 0.30, enabled: true },
   { key: 'couvertureGeo',         weight: 0.25, enabled: true },
   { key: 'diffusionSectorielle',  weight: 0.25, enabled: true },
@@ -57,7 +73,7 @@ function round4(v: number): number {
  *   Example: [{ cpc: 'H04L', count: 120 }, { cpc: 'G06F', count: 80 }]
  * @returns {number} Score in [0, 1]. Higher = more concentrated = higher certitude.
  */
-export function convergenceHHI(cpcDistribution: any[]): number {
+export function convergenceHHI(cpcDistribution: CpcDistributionEntry[]): number {
   if (!Array.isArray(cpcDistribution) || cpcDistribution.length === 0) return 0;
 
   const total = cpcDistribution.reduce((sum, d) => sum + (d.count || 0), 0);
@@ -91,7 +107,7 @@ export function convergenceHHI(cpcDistribution: any[]): number {
  *   Example: [{ year: 2018, cpcCodes: ['H04L', 'G06F'] }, { year: 2019, cpcCodes: ['H04L', 'G06F', 'H04W'] }]
  * @returns {number} Score in [0, 1]. Higher = more stable = higher certitude.
  */
-export function stabiliteTaxonomique(yearlyClassifications: any[]): number {
+export function stabiliteTaxonomique(yearlyClassifications: YearlyClassification[]): number {
   if (!Array.isArray(yearlyClassifications) || yearlyClassifications.length < 2) return 0;
 
   // Sort by year to ensure correct order
@@ -132,7 +148,7 @@ export function stabiliteTaxonomique(yearlyClassifications: any[]): number {
  * @param {number} citationData.patentCount - Number of patents in the CPC class
  * @returns {number} Score in [0, 1]. Higher = more cited = higher certitude.
  */
-export function densiteCitation(citationData: any): number {
+export function densiteCitation(citationData: CitationData): number {
   if (!citationData || typeof citationData !== 'object') return 0;
 
   const { totalForwardCitations = 0, patentCount = 0 } = citationData;
@@ -159,7 +175,7 @@ export function densiteCitation(citationData: any): number {
  *   Example: [{ year: 2015, avgIndependentClaims: 8.5 }, { year: 2020, avgIndependentClaims: 4.2 }]
  * @returns {number} Score in [0, 1]. Higher = more narrowing = higher certitude.
  */
-export function retrecissementClaims(claimsTimeline: any[]): number {
+export function retrecissementClaims(claimsTimeline: ClaimsTimelineEntry[]): number {
   if (!Array.isArray(claimsTimeline) || claimsTimeline.length < 2) return 0;
 
   const sorted = [...claimsTimeline].sort((a, b) => a.year - b.year);
@@ -208,7 +224,7 @@ export function retrecissementClaims(claimsTimeline: any[]): number {
  * @param {number} assigneeData.totalPatents - Total patents in the class
  * @returns {number} Score in [0, 1]. Higher = more diverse = higher ubiquity.
  */
-export function diversiteAssignees(assigneeData: any): number {
+export function diversiteAssignees(assigneeData: AssigneeData): number {
   if (!assigneeData || typeof assigneeData !== 'object') return 0;
 
   const { uniqueAssignees = 0, totalPatents = 0 } = assigneeData;
@@ -231,7 +247,7 @@ export function diversiteAssignees(assigneeData: any): number {
  * @param {string[]} [geoData.jurisdictions] - Optional list of jurisdiction codes
  * @returns {number} Score in [0, 1]. Higher = broader coverage = higher ubiquity.
  */
-export function couvertureGeo(geoData: any): number {
+export function couvertureGeo(geoData: GeoData): number {
   if (!geoData || typeof geoData !== 'object') return 0;
 
   const count = geoData.jurisdictionCount || (geoData.jurisdictions || []).length;
@@ -255,7 +271,7 @@ export function couvertureGeo(geoData: any): number {
  * @param {number} sectorData.uniqueClasses - Number of unique CPC main classes
  * @returns {number} Score in [0, 1]. Higher = more cross-sector = higher ubiquity.
  */
-export function diffusionSectorielle(sectorData: any): number {
+export function diffusionSectorielle(sectorData: SectorData): number {
   if (!sectorData || typeof sectorData !== 'object') return 0;
 
   const sections = sectorData.uniqueSections || 0;
@@ -285,7 +301,7 @@ export function diffusionSectorielle(sectorData: any): number {
  * @param {number} expirationData.totalPatents - Total patents (expired + active)
  * @returns {number} Score in [0, 1]. Higher = more expired = higher ubiquity.
  */
-export function ratioExpires(expirationData: any): number {
+export function ratioExpires(expirationData: ExpirationData): number {
   if (!expirationData || typeof expirationData !== 'object') return 0;
 
   const { expiredCount = 0, totalPatents = 0 } = expirationData;
@@ -314,7 +330,7 @@ export function ratioExpires(expirationData: any): number {
  *   Indicator definitions with weights and enabled flags.
  * @returns {{ value: number, breakdown: Array<{key: string, score: number, weight: number, weightNormalized: number}>, enabledCount: number }}
  */
-export function weightedMean(scores: Record<string, number>, indicatorConfig: any[]): { value: number; breakdown: any[]; enabledCount: number } {
+export function weightedMean(scores: Record<string, number>, indicatorConfig: IndicatorConfig[]): WeightedAggregateResult {
   const enabled = indicatorConfig.filter(ind => ind.enabled !== false);
 
   if (enabled.length === 0) {
@@ -325,7 +341,7 @@ export function weightedMean(scores: Record<string, number>, indicatorConfig: an
   const totalWeight = enabled.reduce((sum, ind) => sum + ind.weight, 0);
 
   let weightedSum = 0;
-  const breakdown: any[] = [];
+  const breakdown: WeightedAggregateResult['breakdown'] = [];
 
   for (const ind of enabled) {
     const score = scores[ind.key] ?? 0;
@@ -360,7 +376,7 @@ export function weightedMean(scores: Record<string, number>, indicatorConfig: an
  *   Optional custom indicator config (for toggling/reweighting). Defaults to CERTITUDE_INDICATORS.
  * @returns {{ value: number, breakdown: Array, enabledCount: number }}
  */
-export function aggregateCertitude(scores: Record<string, number>, config: any[] = CERTITUDE_INDICATORS) {
+export function aggregateCertitude(scores: Record<string, number>, config: IndicatorConfig[] = CERTITUDE_INDICATORS): WeightedAggregateResult {
   return weightedMean(scores, config);
 }
 
@@ -378,7 +394,7 @@ export function aggregateCertitude(scores: Record<string, number>, config: any[]
  *   Optional custom indicator config (for toggling/reweighting). Defaults to UBIQUITE_INDICATORS.
  * @returns {{ value: number, breakdown: Array, enabledCount: number }}
  */
-export function aggregateUbiquite(scores: Record<string, number>, config: any[] = UBIQUITE_INDICATORS) {
+export function aggregateUbiquite(scores: Record<string, number>, config: IndicatorConfig[] = UBIQUITE_INDICATORS): WeightedAggregateResult {
   return weightedMean(scores, config);
 }
 
@@ -399,7 +415,7 @@ export function aggregateUbiquite(scores: Record<string, number>, config: any[] 
  * @param {Array} [options.ubiquiteConfig] - Custom ubiquité indicator config
  * @returns {{ certitude: {value, breakdown, enabledCount}, ubiquite: {value, breakdown, enabledCount}, scores: Object }}
  */
-export function computeAllIndicators(patentData: any, options: any = {}) {
+export function computeAllIndicators(patentData: PatentData, options: { certitudeConfig?: IndicatorConfig[]; ubiquiteConfig?: IndicatorConfig[] } = {}): IndicatorResults {
   const {
     certitudeConfig = CERTITUDE_INDICATORS,
     ubiquiteConfig = UBIQUITE_INDICATORS,
