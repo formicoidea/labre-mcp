@@ -27,18 +27,18 @@ import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
  * @param {string} content - Raw .wm file content
  * @returns {Object} Parsed map structure
  */
-export function parseWardleyMap(content) {
+export function parseWardleyMap(content: string): any {
   const lines = content.split('\n');
-  const result = {
-    title: null,
-    style: null,
-    anchors: [],
-    components: [],
-    links: [],
-    evolves: [],
-    notes: [],
-    pipelines: [],
-    other: [],
+  const result: any = {
+    title: null as string | null,
+    style: null as string | null,
+    anchors: [] as any[],
+    components: [] as any[],
+    links: [] as any[],
+    evolves: [] as any[],
+    notes: [] as any[],
+    pipelines: [] as any[],
+    other: [] as string[],
   };
 
   for (const line of lines) {
@@ -158,8 +158,8 @@ export async function evaluateMapComponents(parsedMap: any, options: any = {}): 
 
   // Evaluate anchors + components
   const allItems = [
-    ...parsedMap.anchors.map(a => ({ ...a, type: 'anchor' })),
-    ...parsedMap.components.map(c => ({ ...c, type: 'component' })),
+    ...parsedMap.anchors.map((a: any) => ({ ...a, type: 'anchor' })),
+    ...parsedMap.components.map((c: any) => ({ ...c, type: 'component' })),
   ];
 
   for (let i = 0; i < allItems.length; i++) {
@@ -304,7 +304,7 @@ export async function evaluateMapComponents(parsedMap: any, options: any = {}): 
  * @param {Array} evaluations - Output from evaluateMapComponents()
  * @returns {string} Updated .wm content
  */
-export function updateWmContent(originalContent, evaluations) {
+export function updateWmContent(originalContent: string, evaluations: any[]): string {
   let content = originalContent;
 
   for (const ev of evaluations) {
@@ -335,7 +335,7 @@ export function updateWmContent(originalContent, evaluations) {
   return content;
 }
 
-function escapeRegex(str) {
+function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
@@ -348,8 +348,8 @@ function escapeRegex(str) {
  * @param {Object} summary
  * @returns {string} Markdown report
  */
-export function formatEvaluationReport(evaluations, summary) {
-  const lines = [];
+export function formatEvaluationReport(evaluations: any[], summary: any): string {
+  const lines: string[] = [];
   lines.push('## Evaluation Report\n');
   lines.push(`| Component | Original | New | Delta | Status |`);
   lines.push(`|-----------|----------|-----|-------|--------|`);
