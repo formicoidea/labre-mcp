@@ -239,7 +239,7 @@ export function startServer() {
   });
 
   // Track pending async handlers so we flush before exit
-  const pending = [];
+  const pending: Promise<void>[] = [];
 
   rl.on('line', (line) => {
     const trimmed = line.trim();
@@ -249,7 +249,7 @@ export function startServer() {
     try {
       request = JSON.parse(trimmed);
     } catch {
-      const errorResponse = {
+      const errorResponse: JsonRpcResponse = {
         jsonrpc: '2.0',
         id: null,
         error: { code: -32700, message: 'Parse error' },

@@ -156,7 +156,7 @@ export const ESTIMATE_EVOLUTION_TOOL: McpToolDefinition = {
  * @param {*} input - Raw tool input
  * @returns {Object} Validated and normalized input
  */
-function validateInput(input) {
+function validateInput(input: any): any {
   if (input == null || typeof input !== 'object') {
     throw new Error('Input must be a non-null object');
   }
@@ -265,13 +265,13 @@ export async function handleEstimateEvolution(rawInput: Record<string, unknown>)
  *
  * @param {Object} server - MCP server instance with setRequestHandler or tool()
  */
-export function registerMcpTool(server) {
+export function registerMcpTool(server: any): void {
   /**
    * Format a successful result or an error into MCP content response.
    * @param {Function} handler - async function returning the result
    * @returns {Promise<Object>} MCP-formatted content response
    */
-  async function mcpContentResponse(handler) {
+  async function mcpContentResponse(handler: () => Promise<unknown>): Promise<any> {
     try {
       const result = await handler();
       return {
@@ -301,7 +301,7 @@ export function registerMcpTool(server) {
       ESTIMATE_EVOLUTION_TOOL.name,
       ESTIMATE_EVOLUTION_TOOL.description,
       ESTIMATE_EVOLUTION_TOOL.inputSchema.properties,
-      async (input) => mcpContentResponse(() => handleEstimateEvolution(input))
+      async (input: Record<string, unknown>) => mcpContentResponse(() => handleEstimateEvolution(input))
     );
     return;
   }
@@ -314,7 +314,7 @@ export function registerMcpTool(server) {
     }));
 
     // Register tool execution
-    server.setRequestHandler('tools/call', async (request) => {
+    server.setRequestHandler('tools/call', async (request: any) => {
       if (request.params.name !== ESTIMATE_EVOLUTION_TOOL.name) {
         return {
           content: [{ type: 'text', text: JSON.stringify({ error: `Unknown tool: ${request.params.name}` }) }],

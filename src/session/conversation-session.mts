@@ -217,7 +217,7 @@ export function inferFromMaturitySignals(text: string): any {
  * @param {string} adoptionPattern - Free-text adoption pattern description
  * @returns {{ wonder?: number, build?: number, operate?: number, usage?: number }}
  */
-export function inferFromMarketSignals(marketDynamics, adoptionPattern) {
+export function inferFromMarketSignals(marketDynamics: string, adoptionPattern: string): Record<string, number> {
   const text = `${marketDynamics || ''} ${adoptionPattern || ''}`.toLowerCase();
   if (!text.trim()) return {};
 
@@ -309,8 +309,8 @@ export class ConversationSession {
    * @param {Object} data - Key-value pairs to merge into the state
    * @returns {ConversationSession} this (for chaining)
    */
-  update(data) {
-    const gathered = [];
+  update(data: Record<string, unknown>): this {
+    const gathered: string[] = [];
 
     for (const [key, value] of Object.entries(data)) {
       if (value != null && value !== '' && key in this.state && key !== 'phase' && key !== 'history') {
@@ -352,7 +352,7 @@ export class ConversationSession {
     }
 
     // Look up in standard phases first, then solution-specific phases
-    const template = PHASE_QUESTIONS[this.state.phase] || SOLUTION_PHASE_QUESTIONS[this.state.phase];
+    const template = (PHASE_QUESTIONS as Record<string, any>)[this.state.phase] || (SOLUTION_PHASE_QUESTIONS as Record<string, any>)[this.state.phase];
     if (!template) return null;
 
     // Customize hints based on already-gathered data
@@ -614,7 +614,7 @@ export class ConversationSession {
    * @param {string} json
    * @returns {ConversationSession}
    */
-  static deserialize(json) {
+  static deserialize(json: string): ConversationSession {
     const state = JSON.parse(json);
     return new ConversationSession(state);
   }

@@ -64,7 +64,7 @@ confidence=X.XX (a number between 0 and 1 reflecting your overall confidence)`;
 
 // ─── Response Parsing ──────────────────────────────────────────────────────
 
-function parseAnchorResponse(text) {
+function parseAnchorResponse(text: string): { phase: number; justification: string; confidence: number } {
   const phaseMatch = text.match(/^phase=(\d)/mi);
   const justMatch = text.match(/^justification=(.*)/mi);
   const confidenceMatch = text.match(/^confidence=(.*)/mi);
@@ -111,7 +111,7 @@ export async function estimateAnchorEvolution(args: any, llmCall: any): Promise<
     confidence = parsed.confidence;
   }
 
-  const evolution = PHASE_MIDPOINTS[phase];
+  const evolution = (PHASE_MIDPOINTS as Record<number, number>)[phase];
   const stage = evolutionToStage(evolution);
 
   return {
@@ -122,8 +122,8 @@ export async function estimateAnchorEvolution(args: any, llmCall: any): Promise<
     context,
     perception: {
       phase,
-      userDescriptor: USER_PERCEPTION[phase],
-      industryDescriptor: INDUSTRY_PERCEPTION[phase],
+      userDescriptor: (USER_PERCEPTION as Record<number, string>)[phase],
+      industryDescriptor: (INDUSTRY_PERCEPTION as Record<number, string>)[phase],
       justification,
       source,
     },
@@ -133,8 +133,8 @@ export async function estimateAnchorEvolution(args: any, llmCall: any): Promise<
 
 // ─── Lazy LLM Singleton ────────────────────────────────────────────────────
 
-let _llmCall = null;
-function getLLMCall() {
+let _llmCall: ReturnType<typeof createLLMCall> | null = null;
+function getLLMCall(): ReturnType<typeof createLLMCall> {
   if (!_llmCall) {
     const model = process.env.WARDLEY_LLM_MODEL || 'claude-sonnet-4-6';
     logDebug('estimateAnchorEvolution', `LLM backend: Agent SDK, model="${model}"`);

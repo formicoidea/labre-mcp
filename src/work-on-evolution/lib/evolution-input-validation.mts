@@ -34,7 +34,7 @@ export const VALID_SPACES = ['economic', 'social_good', 'common_good'];
  * @param {*} input - Raw input
  * @returns {OneShotInput} Validated and normalized input
  */
-export function validateOneShotInput(input) {
+export function validateOneShotInput(input: any): any {
   if (input == null || typeof input !== 'object') {
     throw new Error('Input must be a non-null object');
   }
@@ -108,11 +108,11 @@ export function validateOneShotInput(input) {
  * @param {string|undefined} space - Pre-classified space or undefined
  * @returns {import('../routing/classification-gate.mjs').ClassificationResult}
  */
-export function resolveClassification(name, description, space) {
+export function resolveClassification(name: string, description: string, space: string | undefined): any {
   if (space) {
     // Use the provided space directly — skip the classification gate
     const requiresReQuestion = space !== 'economic';
-    const reasons = {
+    const reasons: Record<string, string> = {
       economic: `"${name}" pre-classified as economic — suitable for Wardley evolution evaluation.`,
       social_good: `"${name}" pre-classified as social_good — naturally available resource outside economic space.`,
       common_good: `"${name}" pre-classified as common_good — collectively managed resource beyond economic space.`,
