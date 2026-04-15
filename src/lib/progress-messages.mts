@@ -398,8 +398,8 @@ const MESSAGE_CATALOG = {
  * @param {Object} params - Key-value pairs to substitute
  * @returns {string} Interpolated string
  */
-function interpolate(template, params = {}) {
-  return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+function interpolate(template: string, params: Record<string, unknown> = {}): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (match: string, key: string) => {
     return params[key] !== undefined ? String(params[key]) : match;
   });
 }
@@ -420,11 +420,13 @@ function interpolate(template, params = {}) {
  *   msg('tool.start', { tool: 'estimateEvolution', component: 'ERP' })
  *   // → "Démarrage de estimateEvolution pour le composant « ERP »…"
  */
-export function createMessageResolver(lang = 'en') {
+export type MessageResolver = (messageId: string, params?: Record<string, unknown>) => string;
+
+export function createMessageResolver(lang: string = 'en'): MessageResolver {
   const effectiveLang = lang || 'en';
 
-  return function resolve(messageId, params = {}) {
-    const entry = MESSAGE_CATALOG[messageId];
+  return function resolve(messageId: string, params: Record<string, unknown> = {}): string {
+    const entry = (MESSAGE_CATALOG as Record<string, Record<string, string>>)[messageId];
     if (!entry) {
       // Unknown message ID — return the ID itself as fallback
       return interpolate(messageId, params);
@@ -449,7 +451,7 @@ export function createMessageResolver(lang = 'en') {
  * @param {Object} args - Tool arguments (name, context, description, etc.)
  * @returns {{ msg: function, lang: string }} Resolver + detected language
  */
-export function createMessageResolverFromArgs(args) {
+export function createMessageResolverFromArgs(args: Record<string, unknown> | null | undefined): { msg: MessageResolver; lang: string } {
   const lang = detectLanguageFromArgs(args);
   return {
     msg: createMessageResolver(lang),

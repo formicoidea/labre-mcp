@@ -37,7 +37,7 @@ export const CONFIDENCE_THRESHOLD = 0.90;
  * @param {string} name - Raw component name
  * @returns {string} Normalized name (lowercase, trimmed, collapsed whitespace)
  */
-export function normalizeName(name) {
+export function normalizeName(name: string): string {
   return (name || '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
@@ -46,7 +46,7 @@ export function normalizeName(name) {
  * @param {string} name - Normalized component name
  * @returns {boolean}
  */
-export function isCommonWord(name) {
+export function isCommonWord(name: string): boolean {
   return COMMON_ENGLISH_WORDS.has(name.toLowerCase());
 }
 
@@ -56,7 +56,7 @@ export function isCommonWord(name) {
  * @param {string} name - Component name
  * @returns {{ match: boolean, confidence: number, canonical?: string, vendor?: string, category?: string, reason: string }}
  */
-export function matchKnownSolution(name) {
+export function matchKnownSolution(name: string) {
   const normalized = normalizeName(name);
   const entry = KNOWN_SOLUTIONS.get(normalized);
 
@@ -94,7 +94,7 @@ export function matchKnownSolution(name) {
  * @param {string} name - Component name
  * @returns {{ match: boolean, confidence: number, canonical?: string, nature?: string, reason: string }}
  */
-export function matchKnownCapability(name) {
+export function matchKnownCapability(name: string) {
   const normalized = normalizeName(name);
   const entry = KNOWN_CAPABILITIES.get(normalized);
 
@@ -133,7 +133,7 @@ export function matchKnownCapability(name) {
  * @param {string} [description] - Optional description/context
  * @returns {{ type: string, confidence: number, signals: Array<{ pattern: string, weight: number, reason: string }> }}
  */
-export function applyHeuristics(name, description = '') {
+export function applyHeuristics(name: string, description: string = '') {
   const solutionSignals = [];
   const capabilitySignals = [];
   const combined = `${name} ${description}`.trim();
@@ -248,7 +248,7 @@ export function applyHeuristics(name, description = '') {
  * @param {string} [description] - Optional business/usage context
  * @returns {ComponentTypeDetection} Detection result with confidence and metadata
  */
-export function detectComponentType(name, description = '') {
+export function detectComponentType(name: string, description: string = '') {
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     return {
       type: COMPONENT_TYPE.CAPABILITY,

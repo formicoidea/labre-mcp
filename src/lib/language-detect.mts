@@ -122,7 +122,7 @@ const KOREAN_PATTERN = /[\uac00-\ud7af\u1100-\u11ff]/;
  * @param {string} text - Input text to analyze
  * @returns {string} ISO 639-1 language code (e.g. 'en', 'fr', 'es')
  */
-export function detectLanguage(text) {
+export function detectLanguage(text: string): string {
   if (!text || typeof text !== 'string' || text.trim().length === 0) {
     return 'en';
   }
@@ -205,7 +205,7 @@ export function detectLanguage(text) {
  * @param {Object} args - Tool arguments (from any WardleyAssistant tool)
  * @returns {string} Combined user text for language detection
  */
-export function extractUserText(args) {
+export function extractUserText(args: Record<string, unknown> | null | undefined): string {
   if (!args || typeof args !== 'object') return '';
 
   const textFields = [
@@ -229,7 +229,7 @@ export function extractUserText(args) {
  * @param {Object} args - Tool arguments
  * @returns {string} Detected language code
  */
-export function detectLanguageFromArgs(args) {
+export function detectLanguageFromArgs(args: Record<string, unknown> | null | undefined): string {
   const text = extractUserText(args);
   return detectLanguage(text);
 }

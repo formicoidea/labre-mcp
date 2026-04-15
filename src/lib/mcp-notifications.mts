@@ -45,7 +45,9 @@ let _verbose = resolveVerboseFromEnv();
  *
  * @param {boolean} enabled - true to enable debug messages, false to suppress
  */
-export function setVerbose(enabled) {
+export type LogLevel = 'debug' | 'info' | 'warning' | 'error';
+
+export function setVerbose(enabled: boolean): void {
   _verbose = Boolean(enabled);
 }
 
@@ -71,7 +73,7 @@ export function isVerbose() {
  * @param {string} logger - Logger name (typically the tool name)
  * @param {string} data - Human-readable log message
  */
-export function sendLog(level, logger, data) {
+export function sendLog(level: LogLevel, logger: string, data: string): void {
   // Channel notification — visible in Claude Code chat
   const channel = {
     jsonrpc: '2.0',
@@ -108,7 +110,7 @@ export function sendLog(level, logger, data) {
  * @param {string} logger - Logger name (tool name)
  * @param {string} message - Human-readable message
  */
-export function logInfo(logger, message) {
+export function logInfo(logger: string, message: string): void {
   sendLog('info', logger, message);
 }
 
@@ -122,7 +124,7 @@ export function logInfo(logger, message) {
  * @param {string} logger - Logger name (tool name)
  * @param {string} message - Human-readable message
  */
-export function logDebug(logger, message) {
+export function logDebug(logger: string, message: string): void {
   if (!_verbose) return;
   sendLog('debug', logger, message);
 }
@@ -134,7 +136,7 @@ export function logDebug(logger, message) {
  * @param {string} logger - Logger name (tool name)
  * @param {string} message - Human-readable error description
  */
-export function logError(logger, message) {
+export function logError(logger: string, message: string): void {
   sendLog('error', logger, message);
 }
 
@@ -144,6 +146,6 @@ export function logError(logger, message) {
  * @param {string} logger - Logger name (tool name)
  * @param {string} message - Human-readable warning
  */
-export function logWarning(logger, message) {
+export function logWarning(logger: string, message: string): void {
   sendLog('warning', logger, message);
 }
