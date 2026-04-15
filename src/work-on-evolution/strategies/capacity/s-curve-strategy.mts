@@ -5,6 +5,7 @@
 // Requires: certitude, ubiquity inputs on the component.
 
 import { BaseStrategy } from './base-strategy.mjs';
+import type { ComponentInput, EvolutionResult } from '../../../types/evolution.mjs';
 import { computeEvolution } from '../../s-curve/s-curve.mjs';
 
 export class SCurveStrategy extends BaseStrategy {
@@ -17,7 +18,7 @@ export class SCurveStrategy extends BaseStrategy {
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {import('./base-strategy.mjs').EvolutionResult}
    */
-  evaluate(component: any): any {
+  evaluate(component: ComponentInput): EvolutionResult {
     const { certitude, ubiquity } = component;
 
     if (certitude == null || ubiquity == null) {

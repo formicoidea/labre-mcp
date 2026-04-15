@@ -11,6 +11,7 @@
 // Requires llmCall injection (shared with LLMDirectStrategy internally).
 
 import { BaseStrategy } from './base-strategy.mjs';
+import type { ComponentInput, EvolutionResult } from '../../../types/evolution.mjs';
 import { identifyCapability } from '../../../work-on-value-chain/identify-capability.mjs';
 import { LLMDirectStrategy } from './llm-direct-strategy.mjs';
 
@@ -162,7 +163,7 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {Promise<import('./base-strategy.mjs').EvolutionResult>}
    */
-  async evaluate(component: any): Promise<any> {
+  async evaluate(component: ComponentInput): Promise<EvolutionResult> {
     if (!this._llmCall) {
       throw new Error('TimelineBenchmarkStrategy requires an llmCall function');
     }

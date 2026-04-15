@@ -47,8 +47,10 @@ export interface ComponentInput {
   usage?: number;
   /** Free-text component description */
   description?: string;
+  /** Alias for description (some callers pass `context` instead) */
+  context?: string;
   /** Optional date for context (when the component is to be observed) */
-  date?: string | Date;
+  date?: string | Date | number;
   /** Underlying capability identified upstream by the orchestrator */
   capability?: string;
   /** Capability nature */

@@ -21,6 +21,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { SolutionBaseStrategy } from './solution-base-strategy.mjs';
+import type { SolutionInput, SolutionEvolutionResult } from '../../../types/solution.mjs';
 import { toErrorMessage, errorCode } from '../../../lib/errors.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -422,7 +423,7 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
    * @param {import('./solution-base-strategy.mjs').SolutionInput} component
    * @returns {Promise<import('./solution-base-strategy.mjs').SolutionEvolutionResult>}
    */
-  async evaluate(component: any): Promise<any> {
+  async evaluate(component: SolutionInput): Promise<SolutionEvolutionResult> {
     const properties = await loadPropertiesReference();
     const solutionName = component.name || 'Unknown Solution';
 
@@ -434,16 +435,17 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
     const contextParts = [];
     if (component.context) contextParts.push(component.context);
     else if (component.description) contextParts.push(component.description);
-    if (component.solutionContext && !contextParts.some(p => p.includes(component.solutionContext))) {
-      contextParts.push(component.solutionContext);
+    const solCtx = component.solutionContext;
+    if (solCtx && !contextParts.some(p => p.includes(solCtx))) {
+      contextParts.push(solCtx);
     }
     // Pull in metadata fields if not already in context
     if (component.metadata) {
-      if (component.metadata.marketDynamics && !contextParts.some(p => p.includes(component.metadata.marketDynamics))) {
-        contextParts.push(`Market dynamics: ${component.metadata.marketDynamics}`);
+      if ((component.metadata?.marketDynamics as string) && !contextParts.some(p => p.includes((component.metadata?.marketDynamics as string)))) {
+        contextParts.push(`Market dynamics: ${(component.metadata?.marketDynamics as string)}`);
       }
-      if (component.metadata.adoptionPattern && !contextParts.some(p => p.includes(component.metadata.adoptionPattern))) {
-        contextParts.push(`Adoption pattern: ${component.metadata.adoptionPattern}`);
+      if ((component.metadata?.adoptionPattern as string) && !contextParts.some(p => p.includes((component.metadata?.adoptionPattern as string)))) {
+        contextParts.push(`Adoption pattern: ${(component.metadata?.adoptionPattern as string)}`);
       }
     }
     const context = contextParts.join('. ') || '';

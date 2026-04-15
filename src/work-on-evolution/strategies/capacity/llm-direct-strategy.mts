@@ -12,6 +12,7 @@
 //   4. Returns a direct evolution estimate with self-assessed confidence
 
 import { BaseStrategy } from './base-strategy.mjs';
+import type { ComponentInput, EvolutionResult } from '../../../types/evolution.mjs';
 
 const PROMPT_WITH_CAPABILITY = `You are an expert in economic science and technology history.
 
@@ -97,12 +98,12 @@ export class LLMDirectStrategy extends BaseStrategy {
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {Promise<import('./base-strategy.mjs').EvolutionResult>}
    */
-  async evaluate(component: any): Promise<any> {
+  async evaluate(component: ComponentInput): Promise<EvolutionResult> {
     const hasCapability = component.capability != null;
 
     const prompt = hasCapability
       ? PROMPT_WITH_CAPABILITY
-          .replace('{{capability}}', component.capability)
+          .replace('{{capability}}', component.capability ?? '')
           .replace('{{context}}', component.description || component.context || '')
           .replace('{{date}}', String(component.date ? new Date(component.date).getFullYear() : 'unknown'))
       : PROMPT_WITHOUT_CAPABILITY

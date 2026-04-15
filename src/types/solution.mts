@@ -19,6 +19,8 @@ export interface SolutionInput {
   description?: string;
   /** Alternative to description */
   context?: string;
+  /** Solution-specific business context (12-property evaluation) */
+  solutionContext?: string;
   /** Optional date for temporal context */
   date?: string | Date;
   /** Underlying capability if already identified */

@@ -13,6 +13,7 @@
 //   4. Optionally falls back to LLM-estimated proportions if none provided
 
 import { BaseStrategy } from './base-strategy.mjs';
+import type { ComponentInput, EvolutionResult } from '../../../types/evolution.mjs';
 import { pubEvolution, PUB_TYPE_CENTROIDS } from '../../s-curve/s-curve.mjs';
 
 // --- Advanced publication-based evolution model ---
@@ -154,7 +155,7 @@ export class PublicationAnalysisStrategy extends BaseStrategy {
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {Promise<import('./base-strategy.mjs').EvolutionResult>|import('./base-strategy.mjs').EvolutionResult}
    */
-  async evaluate(component: any): Promise<any> {
+  async evaluate(component: ComponentInput): Promise<EvolutionResult> {
     let wonder, build, operate, usage;
 
     // Use provided publication proportions if available

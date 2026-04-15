@@ -15,6 +15,7 @@
 //      (peaked = high confidence, uniform = low confidence)
 
 import { BaseStrategy } from './base-strategy.mjs';
+import type { ComponentInput, EvolutionResult } from '../../../types/evolution.mjs';
 
 // Phase midpoints aligned with s-curve.mjs PUB_TYPE_CENTROIDS / phase boundaries
 const PHASE_CENTROIDS = {
@@ -147,7 +148,7 @@ export class LogprobDistributionStrategy extends BaseStrategy {
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {Promise<import('./base-strategy.mjs').EvolutionResult>}
    */
-  async evaluate(component: any): Promise<any> {
+  async evaluate(component: ComponentInput): Promise<EvolutionResult> {
     const prompt = PROMPT_TEMPLATE
       .replace('{{component}}', component.name || '')
       .replace('{{context}}', component.description || component.context || '');

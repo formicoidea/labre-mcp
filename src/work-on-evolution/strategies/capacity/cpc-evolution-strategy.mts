@@ -22,6 +22,7 @@
 // so the registry picks it up alongside other *-strategy.mjs files.
 
 import { BaseStrategy } from './base-strategy.mjs';
+import type { ComponentInput, EvolutionResult } from '../../../types/evolution.mjs';
 import { computeEvolution } from '../../s-curve/s-curve.mjs';
 import { getCpcTitle } from '../../patent/cpc-taxonomy-cache.mjs';
 import { toErrorMessage } from '../../../lib/errors.mjs';
@@ -244,7 +245,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {Promise<import('./base-strategy.mjs').EvolutionResult & { certitude: number, ubiquity: number }>}
    */
-  async evaluate(component: any): Promise<any> {
+  async evaluate(component: ComponentInput): Promise<EvolutionResult> {
     try {
       return await this._evaluateInternal(component);
     } catch (err) {
