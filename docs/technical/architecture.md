@@ -11,11 +11,10 @@ flowchart TD
     MCP["src/mcp/mcp-server.mts\ninitialize | tools/list | tools/call | ping"]
     MCP --> EE["estimateEvolution"]
     MCP --> EM["evaluateMap"]
-    MCP --> GV["generateValueChain"]
     MCP --> IC["identifyCapability"]
     MCP --> AN["estimateAnchorEvolution"]
 
-    EE & EM & GV & IC & AN --> Zod["Zod validation\nsrc/schemas/*.schema.mts"]
+    EE & EM & IC & AN --> Zod["Zod validation\nsrc/schemas/*.schema.mts"]
     Zod --> CG["Classification Gate\n(social_good / common_good / economic)"]
     CG -->|"non-economic"| RQ["Re-questions"]
     CG -->|"economic"| MR["Mode Router\noneshot | guided"]
@@ -47,10 +46,9 @@ Aucune duplication entre le JSON Schema MCP, les interfaces TS et la validation 
 
 | Module | Role |
 |---|---|
-| `src/mcp/mcp-server.mts` | Serveur JSON-RPC 2.0 stdio, registre de 5 outils, dispatch |
+| `src/mcp/mcp-server.mts` | Serveur JSON-RPC 2.0 stdio, registre de 4 outils, dispatch |
 | `src/mcp/mcp-tool.mts` | Definition et handler de `estimateEvolution` |
 | `src/work-on-evolution/evaluate-map/evaluate-map.mts` | Definition et handler de `evaluateMap` |
-| `src/work-on-value-chain/generate-value-chain.mts` | Definition et handler de `generateValueChain` |
 | `src/work-on-value-chain/identify-capability.mts` | Definition et handler de `identifyCapability` |
 | `src/work-on-evolution/strategies/anchor/estimate-anchor-evolution.mts` | Definition et handler de `estimateAnchorEvolution` |
 
@@ -59,7 +57,6 @@ Aucune duplication entre le JSON Schema MCP, les interfaces TS et la validation 
 | Module | Role |
 |---|---|
 | `src/schemas/estimate-evolution.schema.mts` | Schema Zod de `estimateEvolution` + type `EstimateEvolutionInput` |
-| `src/schemas/generate-value-chain.schema.mts` | Schema Zod de `generateValueChain` |
 | `src/schemas/evaluate-map.schema.mts` | Schema Zod de `evaluateMap` |
 | `src/schemas/identify-capability.schema.mts` | Schema Zod de `identifyCapability` |
 | `src/schemas/estimate-anchor-evolution.schema.mts` | Schema Zod de `estimateAnchorEvolution` |
@@ -233,16 +230,4 @@ flowchart TD
     Eval --> Update["Mise a jour coordonnees\n[visibility, maturity]"]
     Update --> Write["Ecriture fichier .wm"]
     Write --> Report["Rapport markdown\ntableau original / nouveau / delta"]
-```
-
-## Flux de donnees — generateValueChain
-
-```mermaid
-flowchart TD
-    Input["Input: description, filename"] --> LLM["Appel LLM\nDecomposition en chaine de valeur JSON"]
-    LLM --> Loop["Pour chaque composant + anchor"]
-    Loop --> Eval["estimateEvolutionOneShot() → maturity"]
-    Eval --> Gen["generateWmContent()\nSyntaxe OWM avec coordonnees"]
-    Gen --> Write["Ecriture fichier .wm"]
-    Write --> Out["wmContent, filePath,\ncomponents, evaluations"]
 ```

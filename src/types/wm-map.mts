@@ -1,6 +1,6 @@
 // Wardley Map (.wm) parsing and evaluation types
 //
-// Used by evaluate-map.mts (parser + evaluator) and generate-value-chain.mts.
+// Used by evaluate-map.mts (parser + evaluator).
 
 export interface WardleyAnchor {
   name: string;
@@ -65,25 +65,6 @@ export interface MapItemEvaluation {
   reason?: string;
   /** Difference between newMaturity and originalMaturity (added during reporting) */
   delta?: number;
-}
-
-// Value chain shape used by generate-value-chain.mts (LLM-decomposed)
-export interface ValueChainComponent {
-  name: string;
-  context: string;
-  visibility: number;
-  dependsOn?: string[];
-}
-
-export interface ValueChainAnchor {
-  name: string;
-  context: string;
-}
-
-export interface DecomposedValueChain {
-  title: string;
-  anchor: ValueChainAnchor;
-  components: ValueChainComponent[];
 }
 
 /** Options for evaluateMapComponents / evaluateMapFile */

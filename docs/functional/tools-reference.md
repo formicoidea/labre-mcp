@@ -1,11 +1,10 @@
 # Reference des outils MCP
 
-WardleyAssistant expose **5 outils** via le protocole MCP. Chacun est appele via `tools/call` en JSON-RPC 2.0.
+WardleyAssistant expose **4 outils** via le protocole MCP. Chacun est appele via `tools/call` en JSON-RPC 2.0.
 
 | Outil | Role | Schema Zod |
 |---|---|---|
 | `estimateEvolution` | Estime l'evolution d'un composant | `src/schemas/estimate-evolution.schema.mts` |
-| `generateValueChain` | Genere une carte .wm depuis une description | `src/schemas/generate-value-chain.schema.mts` |
 | `evaluateMap` | Evalue et met a jour tous les composants d'un .wm | `src/schemas/evaluate-map.schema.mts` |
 | `identifyCapability` | Decode un nom de solution vers sa capability | `src/schemas/identify-capability.schema.mts` |
 | `estimateAnchorEvolution` | Estime l'evolution d'un anchor (user need) | `src/schemas/estimate-anchor-evolution.schema.mts` |
@@ -210,50 +209,6 @@ Evalue tous les composants d'un fichier `.wm` existant et met a jour leurs posit
   "report": "| Component | Original | New | Delta |\n...",
   "updatedContent": "title Tea Shop...",
   "filePath": "maps/myMaps/tea-shop-hot-beverages.wm"
-}
-```
-
----
-
-## generateValueChain
-
-Genere une carte Wardley (fichier `.wm`) a partir d'une description metier en langage naturel.
-
-### Schema d'entree
-
-| Parametre | Type | Requis | Description |
-|---|---|---|---|
-| `description` | string | **oui** | Description du contexte metier (ex: "Un salon de the servant des boissons chaudes") |
-| `filename` | string | non | Nom du fichier de sortie (auto-genere si omis) |
-| `outputDir` | string | non | Repertoire de sortie (`maps/myMaps` par defaut) |
-| `strategy` | string | non | Strategie pour l'evaluation des composants (`timeline-benchmark` par defaut) |
-
-### Processus
-
-1. **Decomposition LLM** : Le modele decompose la description en chaine de valeur JSON (anchor + composants + dependances)
-2. **Evaluation sequentielle** : Chaque composant est evalue via `estimateEvolutionOneShot`
-3. **Generation .wm** : Le contenu OWM est genere avec les coordonnees (visibility, maturity)
-4. **Ecriture** : Le fichier est ecrit dans le repertoire de sortie
-
-### Exemple
-
-```json
-{
-  "name": "generateValueChain",
-  "arguments": {
-    "description": "Un salon de the servant des boissons chaudes aux clients dans un centre-ville"
-  }
-}
-```
-
-### Structure de la reponse
-
-```json
-{
-  "wmContent": "title Salon de the\n\nanchor Boisson Chaude [0.94, 0.8]\n...",
-  "filePath": "maps/myMaps/salon-de-the.wm",
-  "components": ["Boisson Chaude", "The", "Eau", "Electricite"],
-  "evaluations": { ... }
 }
 ```
 

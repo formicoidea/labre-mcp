@@ -3,8 +3,7 @@
 // This regression test validates that:
 //   1. estimateEvolution return value shape is identical (mode, classification, reQuestions, evaluations, message)
 //   2. evaluateMap return value shape is identical (evaluations, summary, report, updatedContent, filePath)
-//   3. generateValueChain tool definition is unchanged
-//   4. MCP server response wrapping (content[0].text JSON) is unchanged
+//   3. MCP server response wrapping (content[0].text JSON) is unchanged
 //   5. Notifications are separate JSON-RPC messages (no id) and do NOT appear in tool results
 //   6. Error responses maintain the same {error} shape with isError flag
 //   7. parseWardleyMap output is unchanged
@@ -187,13 +186,13 @@ describe('AC 8: Existing tool output unchanged', () => {
     assert.equal(response.jsonrpc, '2.0');
     assert.equal(response.id, 2);
     const toolNames = response.result.tools.map(t => t.name).sort();
-    // Original 3 tools must still be present
-    const originalTools = ['estimateEvolution', 'evaluateMap', 'generateValueChain'];
+    // Core tools must be present
+    const originalTools = ['estimateEvolution', 'evaluateMap'];
     for (const tool of originalTools) {
-      assert.ok(toolNames.includes(tool), `Original tool "${tool}" must be registered, got: ${toolNames.join(', ')}`);
+      assert.ok(toolNames.includes(tool), `Core tool "${tool}" must be registered, got: ${toolNames.join(', ')}`);
     }
-    // New tools added by solution routing (estimateAnchorEvolution, identifyCapability) are allowed
-    assert.ok(toolNames.length >= 3, `Must have at least 3 tools, got ${toolNames.length}`);
+    // Additional tools (estimateAnchorEvolution, identifyCapability) are allowed
+    assert.ok(toolNames.length >= 2, `Must have at least 2 tools, got ${toolNames.length}`);
   });
 
   // ── MCP server handleRequest: tools/call wrapping format ──────────────
@@ -355,13 +354,13 @@ style wardley`;
 
   // ── Tool registry is complete ─────────────────────────────────────────
 
-  it('tool registry has at least 3 original tools with handlers', () => {
-    assert.ok(REGISTERED_TOOLS.length >= 3, `Must have at least 3 tools, got ${REGISTERED_TOOLS.length}`);
+  it('tool registry has at least 2 core tools with handlers', () => {
+    assert.ok(REGISTERED_TOOLS.length >= 2, `Must have at least 2 tools, got ${REGISTERED_TOOLS.length}`);
     const names = REGISTERED_TOOLS.map(t => t.name).sort();
-    // Original 3 tools must still be present
-    const originalTools = ['estimateEvolution', 'evaluateMap', 'generateValueChain'];
+    // Core tools must be present
+    const originalTools = ['estimateEvolution', 'evaluateMap'];
     for (const tool of originalTools) {
-      assert.ok(names.includes(tool), `Original tool "${tool}" must be registered, got: ${names.join(', ')}`);
+      assert.ok(names.includes(tool), `Core tool "${tool}" must be registered, got: ${names.join(', ')}`);
     }
 
     // Each tool has a handler

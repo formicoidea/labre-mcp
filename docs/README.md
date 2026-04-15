@@ -1,6 +1,6 @@
 # WardleyAssistant — Documentation
 
-WardleyAssistant est un serveur MCP (Model Context Protocol) qui estime la position d'evolution des composants sur une Wardley Map. Il expose **5 outils** via JSON-RPC 2.0 sur stdio et route automatiquement entre deux pipelines d'evaluation :
+WardleyAssistant est un serveur MCP (Model Context Protocol) qui estime la position d'evolution des composants sur une Wardley Map. Il expose **4 outils** via JSON-RPC 2.0 sur stdio et route automatiquement entre deux pipelines d'evaluation :
 
 - **Capability strategies** (7 strategies pluggables, y compris cpc-evolution via BigQuery) pour les capacites abstraites
 - **Solution strategies** (12 proprietes Wardley) pour les produits/solutions nommes
@@ -16,11 +16,10 @@ flowchart TD
     MCP["src/mcp/mcp-server.mts\nJSON-RPC 2.0 stdio"]
     MCP --> EE["estimateEvolution"]
     MCP --> EM["evaluateMap"]
-    MCP --> GV["generateValueChain"]
     MCP --> IC["identifyCapability"]
     MCP --> AN["estimateAnchorEvolution"]
 
-    EE & EM & GV & IC & AN --> Z["Zod validation\nsrc/schemas/*.schema.mts"]
+    EE & EM & IC & AN --> Z["Zod validation\nsrc/schemas/*.schema.mts"]
     Z --> CG["Classification Gate\nsocial_good / common_good / economic"]
     CG --> MR["Mode Router\noneshot / guided / auto"]
     MR --> SCR["Solution/Capability Router"]
@@ -38,7 +37,7 @@ flowchart TD
 |---|---|
 | [Demarrage rapide](getting-started.md) | Prerequisites, installation, premier appel |
 | [Architecture](architecture.md) | Pipeline, flux de donnees, modules |
-| [Reference des outils](tools-reference.md) | Les 5 outils MCP (schemas, parametres, exemples) |
+| [Reference des outils](tools-reference.md) | Les 4 outils MCP (schemas, parametres, exemples) |
 | [Validation (Zod)](validation.md) | Schemas Zod, source de verite unique, lecture des erreurs |
 | [Strategies](strategies.md) | Capability (7 strategies) et Solution (12 proprietes Wardley) |
 | [Gate de classification](classification-gate.md) | Filtrage social_good / common_good / economic |

@@ -144,13 +144,6 @@ La fonction `parseWardleyMap(content)` extrait via regex :
 - Notes, evolve, pipelines
 - Contenu brut pour le round-tripping
 
-### Generation (`generate-value-chain.mts`)
-
-La fonction `generateWmContent(chain, evaluations)` produit un fichier .wm valide :
-- Trie les composants par visibility (le plus visible en premier)
-- Genere les liens : anchor → top-level, puis dependances
-- Style par defaut : `wardley`
-
 ## Documentation OWM
 
 Pour la syntaxe complete et les fonctionnalites avancees (submap, annotations, market, etc.) :

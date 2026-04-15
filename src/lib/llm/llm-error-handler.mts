@@ -296,7 +296,7 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
     model: 'kimi-k2.5',
   });
   classifyAndLogLLMError(new Error('OpenCode API error 500: Internal Server Error'), {
-    logger: 'generateValueChain',
+    logger: 'identifyCapability',
     model: 'kimi-k2.5',
   });
 

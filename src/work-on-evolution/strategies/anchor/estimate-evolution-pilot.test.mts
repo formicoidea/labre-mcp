@@ -8,7 +8,7 @@
 //   5. Existing tool output remains unchanged
 //
 // This is the PILOT test — once validated, the same pattern generalizes
-// to evaluateMap and generateValueChain.
+// to evaluateMap.
 
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';

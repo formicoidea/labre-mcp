@@ -36,7 +36,7 @@ pnpm run dev
 
 Sortie attendue sur stderr :
 ```
-[wardley-assistant] MCP server started. Tools: estimateEvolution, generateValueChain, evaluateMap, identifyCapability, estimateAnchorEvolution
+[wardley-assistant] MCP server started. Tools: estimateEvolution, evaluateMap, identifyCapability, estimateAnchorEvolution
 ```
 
 Ctrl+C pour stopper.
@@ -93,7 +93,7 @@ Le fichier `.mcp.json` a la racine enregistre le serveur automatiquement :
 
 > **Note Windows** : le wrapper `cmd /c` est obligatoire pour que le client MCP puisse invoquer `npx`.
 
-Quand Claude Code demarre dans ce repertoire, le serveur MCP est disponible et les 5 outils apparaissent automatiquement (`estimateEvolution`, `generateValueChain`, `evaluateMap`, `identifyCapability`, `estimateAnchorEvolution`).
+Quand Claude Code demarre dans ce repertoire, le serveur MCP est disponible et les 4 outils apparaissent automatiquement (`estimateEvolution`, `evaluateMap`, `identifyCapability`, `estimateAnchorEvolution`).
 
 ### Activer les notifications dans le chat
 

@@ -23,7 +23,6 @@ process.env._WARDLEY_NESTED = '1';
 
 import { createInterface } from 'node:readline';
 import { ESTIMATE_EVOLUTION_TOOL, handleEstimateEvolution } from './mcp-tool.mjs';
-import { GENERATE_VALUE_CHAIN_TOOL, handleGenerateValueChain } from '../work-on-value-chain/generate-value-chain.mjs';
 import { EVALUATE_MAP_TOOL, handleEvaluateMap } from '../work-on-evolution/evaluate-map/evaluate-map.mjs';
 import { IDENTIFY_CAPABILITY_TOOL, handleIdentifyCapability } from '../work-on-value-chain/identify-capability.mjs';
 import { ESTIMATE_ANCHOR_EVOLUTION_TOOL, handleEstimateAnchorEvolution } from '../work-on-evolution/strategies/anchor/estimate-anchor-evolution.mjs';
@@ -44,7 +43,6 @@ import { toErrorMessage, errorCode } from '../lib/errors.mjs';
 /** All registered MCP tools. Add new tools here if needed. */
 const REGISTERED_TOOLS: McpToolDefinition[] = [
   ESTIMATE_EVOLUTION_TOOL,
-  GENERATE_VALUE_CHAIN_TOOL,
   EVALUATE_MAP_TOOL,
   IDENTIFY_CAPABILITY_TOOL,
   ESTIMATE_ANCHOR_EVOLUTION_TOOL,
@@ -53,7 +51,6 @@ const REGISTERED_TOOLS: McpToolDefinition[] = [
 /** Map of tool name → handler for fast dispatch */
 const TOOL_HANDLERS: Map<string, ToolHandler> = new Map<string, ToolHandler>([
   [ESTIMATE_EVOLUTION_TOOL.name, handleEstimateEvolution],
-  [GENERATE_VALUE_CHAIN_TOOL.name, handleGenerateValueChain],
   [EVALUATE_MAP_TOOL.name, handleEvaluateMap],
   [IDENTIFY_CAPABILITY_TOOL.name, handleIdentifyCapability],
   [ESTIMATE_ANCHOR_EVOLUTION_TOOL.name, handleEstimateAnchorEvolution],

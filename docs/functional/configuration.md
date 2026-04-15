@@ -102,6 +102,5 @@ Les skills sont definis dans `.claude/skills/` :
 |---|---|---|
 | `estimateEvolution` | `.claude/skills/wardley/map/estimateEvolution/SKILL.md` | Estimation d'evolution |
 | `evaluateMap` | `.claude/skills/wardley/map/evaluateMap/SKILL.md` | Evaluation de carte .wm |
-| `generateValueChain` | `.claude/skills/wardley/map/generateValueChain/SKILL.md` | Generation de chaine de valeur |
 | `eval` | `.claude/skills/eval/SKILL.md` | Lancement d'evaluations promptfoo |
 | `add-eval-case` | `.claude/skills/add-eval-case/SKILL.md` | Ajout de cas de test |

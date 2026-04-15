@@ -5,12 +5,11 @@
 
 ## 1. Vue d'ensemble
 
-`WardleyAssistant` est un serveur **MCP** (Model Context Protocol) qui expose 5 outils autour des cartes Wardley :
+`WardleyAssistant` est un serveur **MCP** (Model Context Protocol) qui expose 4 outils autour des cartes Wardley :
 
 | Outil MCP | Rôle | Entrée principale |
 |---|---|---|
 | `estimateEvolution` | Évalue l'évolution d'un composant (genesis → commodity) via 7 stratégies | `src/mcp/mcp-tool.mts` |
-| `generateValueChain` | Dérive une value chain d'une user need | `src/work-on-value-chain/generate-value-chain.mts` |
 | `evaluateMap` | Évalue qualitativement une carte OWM | `src/work-on-evolution/evaluate-map/evaluate-map.mts` |
 | `identifyCapability` | Identifie capabilities / solutions dans un texte | `src/work-on-value-chain/identify-capability.mts` |
 | `estimateAnchorEvolution` | Évolution du composant ancre (user need) | `src/work-on-evolution/strategies/anchor/estimate-anchor-evolution.mts` |
@@ -20,7 +19,7 @@
 - **Script npm (dev)** : `package.json` → `"dev": "tsx src/mcp/mcp-server.mts"` (charge les `.mts` via tsx)
 - **Script npm (prod)** : `package.json` → `"mcp:prod": "node dist/mcp/mcp-server.mjs"` (consomme le build `tsc`)
 - **`.mcp.json`** : `cmd /c npx tsx --env-file=.env src/mcp/mcp-server.mts` (wrapper `cmd /c` requis sous Windows)
-- **Serveur MCP réel** : `src/mcp/mcp-server.mts` — JSON-RPC 2.0 sur stdio, registre des 5 tools.
+- **Serveur MCP réel** : `src/mcp/mcp-server.mts` — JSON-RPC 2.0 sur stdio, registre des 4 tools.
 - **API programmatique** : `src/index.mts` — re-exporte la surface publique pour usage en bibliothèque.
 - **Build** : `tsc` compile `src/**/*.mts` vers `dist/**/*.mjs` + `dist/**/*.d.mts` (sourcemaps inclus). `main` pointe vers `dist/index.mjs`.
 
@@ -37,7 +36,6 @@ src/
 │
 ├── schemas/                     ── Schémas Zod (source de vérité unique)
 │   ├── estimate-evolution.schema.mts      Entrée de estimateEvolution
-│   ├── generate-value-chain.schema.mts    Entrée de generateValueChain
 │   ├── evaluate-map.schema.mts            Entrée de evaluateMap
 │   ├── identify-capability.schema.mts     Entrée de identifyCapability
 │   ├── estimate-anchor-evolution.schema.mts  Entrée de estimateAnchorEvolution
@@ -45,7 +43,7 @@ src/
 │   ├── patent.schema.mts                  PatentDataSchema + 8 sous-shapes (BigQuery/mock)
 │   ├── parsed-llm.schema.mts              Schémas des parsers LLM
 │   └── …
-│   Les 5 schémas d'entrée MCP génèrent le JSON Schema exposé au client via
+│   Les 4 schémas d'entrée MCP génèrent le JSON Schema exposé au client via
 │   `z.toJSONSchema(Schema, { io: 'input' })` et les types TS via `z.infer<…>`.
 │
 ├── types/                       ── Re-exports typés (pour imports plus courts)
@@ -85,8 +83,6 @@ src/
 │   └── solution-result-assembly.test.mts
 │
 ├── work-on-value-chain/         ── Tools centrés value chain / capabilities
-│   ├── generate-value-chain.mts
-│   ├── generate-value-chain-notifications.test.mts
 │   └── identify-capability.mts
 │
 └── work-on-evolution/           ── Cœur : pipeline d'évaluation d'évolution
@@ -180,11 +176,11 @@ src/
 ```
                     src/mcp/mcp-server.mts
                          │
-      ┌──────────────────┼────────────────────┬───────────────────┬───────────────────────┐
-      ▼                  ▼                    ▼                   ▼                       ▼
-  mcp-tool.mts   work-on-value-chain/   work-on-evolution/   work-on-value-chain/   work-on-evolution/
-  (estimate       generate-value-chain   evaluate-map/        identify-capability    strategies/anchor/
-   Evolution)                            evaluate-map                                 estimate-anchor-evolution
+      ┌──────────────────┼───────────────────┬───────────────────────┐
+      ▼                  ▼                   ▼                       ▼
+  mcp-tool.mts   work-on-evolution/   work-on-value-chain/   work-on-evolution/
+  (estimate       evaluate-map/        identify-capability    strategies/anchor/
+   Evolution)    evaluate-map                                 estimate-anchor-evolution
       │
       ▼
   work-on-evolution/routing/mode-router
@@ -222,7 +218,6 @@ Utiliser cette table pour réparer les imports. Les chemins sont **relatifs à `
 
 | Ancien (importé dans le code) | Nouveau (emplacement réel) |
 |---|---|
-| `./tools/generate-value-chain.mts` | `./work-on-value-chain/generate-value-chain.mts` |
 | `./tools/identify-capability.mts` | `./work-on-value-chain/identify-capability.mts` |
 | `./evaluate-map/evaluate-map.mts` | `./work-on-evolution/evaluate-map/evaluate-map.mts` |
 | `./evolution/estimate-anchor-evolution.mts` | `./work-on-evolution/strategies/anchor/estimate-anchor-evolution.mts` |
