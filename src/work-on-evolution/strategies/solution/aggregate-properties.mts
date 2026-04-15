@@ -315,7 +315,7 @@ export function aggregatePropertyScores(properties: any, options: any = {}): any
     validCount++;
     enabledEvaluated++;
 
-    phaseDistribution[roundedPhase]++;
+    (phaseDistribution as Record<number, number>)[roundedPhase]++;
     phaseSum += roundedPhase;
   }
 
@@ -384,7 +384,7 @@ export function aggregatePropertyScores(properties: any, options: any = {}): any
  * @param {number} evaluatedCount    - Number of properties with valid evaluations
  * @returns {number} Confidence score (0–1)
  */
-function computeAggregationConfidence(coverage, phaseDistribution, evaluatedCount) {
+function computeAggregationConfidence(coverage: number, phaseDistribution: any, evaluatedCount: number): number {
   // Base confidence from coverage
   // Full coverage → MAX_BASE_CONFIDENCE (0.85)
   // Partial → proportionally lower
@@ -440,7 +440,7 @@ export function computePhaseAgreement(distribution: any, total: number) {
  * @returns {AggregationResult}
  */
 export function aggregatePropertyScoreInstances(scores: any, options: any = {}): any {
-  const propEvals = scores.map(s => {
+  const propEvals = scores.map((s: any) => {
     if (typeof s.toPropertyEvaluation === 'function') {
       const eval_ = s.toPropertyEvaluation();
       eval_.id = s.id; // Preserve ID for key matching
@@ -461,7 +461,7 @@ export function aggregatePropertyScoreInstances(scores: any, options: any = {}):
  * @param {Array<{ property: string, phase: number, weight?: number }>} properties
  * @returns {{ evolution: number, confidence: number }}
  */
-export function simpleAggregate(properties) {
+export function simpleAggregate(properties: any[]): any {
   const result = aggregatePropertyScores(properties);
   return {
     evolution: result.evolution,

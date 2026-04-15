@@ -151,9 +151,9 @@ export class SolutionBaseStrategy extends BaseStrategy {
    * @param {number} phase - Phase number (1–4)
    * @returns {string} Label: 'Genesis' | 'Custom' | 'Product' | 'Commodity'
    */
-  static phaseLabel(phase) {
+  static phaseLabel(phase: number): string {
     const rounded = Math.round(phase);
-    return PHASE_LABELS[rounded] || 'Unknown';
+    return (PHASE_LABELS as Record<number, string>)[rounded] || 'Unknown';
   }
 
   /**
@@ -204,7 +204,7 @@ export class SolutionBaseStrategy extends BaseStrategy {
    * @param {string} [reason] - Optional reasoning
    * @returns {PropertyEvaluation}
    */
-  static buildPropertyEvaluation(property, phase, reason) {
+  static buildPropertyEvaluation(property: string, phase: number, reason?: string): any {
     const rounded = Math.round(Math.max(1, Math.min(4, phase)));
     return {
       property,
@@ -223,7 +223,7 @@ export class SolutionBaseStrategy extends BaseStrategy {
    * @param {SolutionEvolutionResult} result
    * @returns {SolutionEvolutionResult} the validated result (pass-through)
    */
-  static validateSolutionResult(result) {
+  static validateSolutionResult(result: any): any {
     // First: enforce the core EvolutionResult contract
     BaseStrategy.validateResult(result);
 

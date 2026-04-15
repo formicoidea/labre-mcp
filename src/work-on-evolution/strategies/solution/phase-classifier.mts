@@ -95,7 +95,7 @@ const GENERAL_PHASE_SIGNALS = {
  * @param {string} text
  * @returns {string}
  */
-function normalizeText(text) {
+function normalizeText(text: string): string {
   return (text || '')
     .toLowerCase()
     .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
@@ -109,10 +109,10 @@ function normalizeText(text) {
  * @param {string} text - Normalized text
  * @returns {string[]}
  */
-function extractTokens(text) {
+function extractTokens(text: string): string[] {
   return normalizeText(text)
     .split(/\s+/)
-    .filter(w => w.length > 2 && !STOP_WORDS.has(w));
+    .filter((w: string) => w.length > 2 && !STOP_WORDS.has(w));
 }
 
 /**
@@ -120,9 +120,9 @@ function extractTokens(text) {
  * @param {string} text - Normalized text
  * @returns {string[]}
  */
-function extractBigrams(text) {
-  const words = normalizeText(text).split(/\s+/).filter(w => w.length > 1);
-  const bigrams = [];
+function extractBigrams(text: string): string[] {
+  const words = normalizeText(text).split(/\s+/).filter((w: string) => w.length > 1);
+  const bigrams: string[] = [];
   for (let i = 0; i < words.length - 1; i++) {
     bigrams.push(`${words[i]} ${words[i + 1]}`);
   }
@@ -155,18 +155,18 @@ function extractBigrams(text) {
  * @param {object} property - Property definition with name and phases
  * @returns {PropertySignals}
  */
-function buildPropertySignals(property) {
+function buildPropertySignals(property: any): any {
   const phases = property.phases || {};
 
   // Step 1: Extract all unigram tokens per phase
-  const phaseTokens = {};
+  const phaseTokens: Record<number, Set<string>> = {};
   for (const phaseNum of [1, 2, 3, 4]) {
     const desc = phases[String(phaseNum)] || '';
     phaseTokens[phaseNum] = new Set(extractTokens(desc));
   }
 
   // Step 2: Count how many phases each token appears in (for discrimination)
-  const tokenPhaseCount = {};
+  const tokenPhaseCount: Record<string, number> = {};
   for (const phaseNum of [1, 2, 3, 4]) {
     for (const token of phaseTokens[phaseNum]) {
       tokenPhaseCount[token] = (tokenPhaseCount[token] || 0) + 1;
@@ -181,7 +181,7 @@ function buildPropertySignals(property) {
 
     // Signals from description tokens (unigrams)
     for (const token of phaseTokens[phaseNum]) {
-      const phaseCount = tokenPhaseCount[token] || 1;
+      const phaseCount = (tokenPhaseCount as Record<string, number>)[token] || 1;
       const discriminativeWeight = 1.0 / phaseCount;
       signals.push({
         term: token,
@@ -207,7 +207,7 @@ function buildPropertySignals(property) {
     }
 
     // Signals from general phase indicators
-    const generalTerms = GENERAL_PHASE_SIGNALS[phaseNum] || [];
+    const generalTerms = (GENERAL_PHASE_SIGNALS as Record<number, string[]>)[phaseNum] || [];
     for (const term of generalTerms) {
       signals.push({
         term: normalizeText(term),
@@ -295,7 +295,7 @@ export class PhaseClassifier {
    * @returns {string[]}
    */
   get propertyNames() {
-    return this._properties.map(p => p.name);
+    return this._properties.map((p: any) => p.name);
   }
 
   /**
@@ -313,7 +313,7 @@ export class PhaseClassifier {
    * @returns {PropertyClassification}
    * @throws {Error} If propertyName is not found in the reference
    */
-  classifyProperty(propertyName, inputText) {
+  classifyProperty(propertyName: string, inputText: string): any {
     const signals = this._findPropertySignals(propertyName);
     return this._scoreAndClassify(signals, inputText);
   }
@@ -324,8 +324,8 @@ export class PhaseClassifier {
    * @param {string} inputText - Text to evaluate against all properties
    * @returns {PropertyClassification[]} Array of 12 classifications (one per property)
    */
-  classifyAll(inputText) {
-    return this._signalBank.map(signals => this._scoreAndClassify(signals, inputText));
+  classifyAll(inputText: string): any[] {
+    return this._signalBank.map((signals: any) => this._scoreAndClassify(signals, inputText));
   }
 
   /**
@@ -335,11 +335,11 @@ export class PhaseClassifier {
    * @param {string[]} propertyNames - Names of properties to evaluate
    * @returns {PropertyClassification[]}
    */
-  classifySubset(inputText, propertyNames) {
-    const nameSet = new Set(propertyNames.map(n => n.toLowerCase()));
+  classifySubset(inputText: string, propertyNames: string[]): any[] {
+    const nameSet = new Set(propertyNames.map((n: string) => n.toLowerCase()));
     return this._signalBank
-      .filter(s => nameSet.has(s.propertyName.toLowerCase()))
-      .map(signals => this._scoreAndClassify(signals, inputText));
+      .filter((s: any) => nameSet.has(s.propertyName.toLowerCase()))
+      .map((signals: any) => this._scoreAndClassify(signals, inputText));
   }
 
   /**
@@ -351,7 +351,7 @@ export class PhaseClassifier {
    * @param {string} inputText     - The text that was classified
    * @returns {{ agreement: number, classifierPhase: number, assignedPhase: number, delta: number }}
    */
-  validateClassification(propertyName, assignedPhase, inputText) {
+  validateClassification(propertyName: string, assignedPhase: number, inputText: string): any {
     const classification = this.classifyProperty(propertyName, inputText);
     const delta = Math.abs(classification.phase - assignedPhase);
 
@@ -377,23 +377,23 @@ export class PhaseClassifier {
    * @returns {PropertySignals}
    * @private
    */
-  _findPropertySignals(propertyName) {
+  _findPropertySignals(propertyName: string): any {
     const lower = propertyName.toLowerCase().trim();
 
     // Exact match
     let match = this._signalBank.find(
-      s => s.propertyName.toLowerCase() === lower
+      (s: any) => s.propertyName.toLowerCase() === lower
     );
     if (match) return match;
 
     // Substring match
     match = this._signalBank.find(
-      s => s.propertyName.toLowerCase().includes(lower) ||
+      (s: any) => s.propertyName.toLowerCase().includes(lower) ||
            lower.includes(s.propertyName.toLowerCase())
     );
     if (match) return match;
 
-    const available = this._signalBank.map(s => s.propertyName).join(', ');
+    const available = this._signalBank.map((s: any) => s.propertyName).join(', ');
     throw new Error(
       `Unknown property "${propertyName}". Available: ${available}`
     );
@@ -407,7 +407,7 @@ export class PhaseClassifier {
    * @returns {PropertyClassification}
    * @private
    */
-  _scoreAndClassify(signals, inputText) {
+  _scoreAndClassify(signals: any, inputText: string): any {
     const normalizedInput = normalizeText(inputText);
     const inputTokens = new Set(extractTokens(inputText));
     const inputBigrams = new Set(extractBigrams(inputText));
@@ -440,7 +440,7 @@ export class PhaseClassifier {
         }
       }
 
-      scores[phaseNum] = Math.round(phaseScore * 1000) / 1000;
+      (scores as Record<number, number>)[phaseNum] = Math.round(phaseScore * 1000) / 1000;
     }
 
     // Select the phase with highest score
@@ -449,7 +449,7 @@ export class PhaseClassifier {
     return {
       property: signals.propertyName,
       phase,
-      label: PHASE_LABELS[phase],
+      label: (PHASE_LABELS as Record<number, string>)[phase],
       confidence,
       scores,
       reason,
@@ -504,7 +504,7 @@ export class PhaseClassifier {
     const confidence = Math.round(Math.min(0.95, Math.max(0.05, rawConfidence)) * 1000) / 1000;
 
     // Build reason text
-    const label = PHASE_LABELS[winningPhase];
+    const label = (PHASE_LABELS as Record<number, string>)[winningPhase];
     const reason = entries[0].score === entries[1].score
       ? `${propName}: tied between phases, selected ${label} (phase ${winningPhase})`
       : `${propName}: strongest signal for ${label} (phase ${winningPhase}), ` +
@@ -523,7 +523,7 @@ export class PhaseClassifier {
  * @param {string} inputText - Solution description or evidence text
  * @returns {Promise<PropertyClassification[]>}
  */
-export async function classifyAllProperties(inputText) {
+export async function classifyAllProperties(inputText: string): Promise<any[]> {
   const classifier = await PhaseClassifier.fromReference();
   return classifier.classifyAll(inputText);
 }
@@ -535,7 +535,7 @@ export async function classifyAllProperties(inputText) {
  * @param {string} inputText    - Text to evaluate
  * @returns {Promise<PropertyClassification>}
  */
-export async function classifySingleProperty(propertyName, inputText) {
+export async function classifySingleProperty(propertyName: string, inputText: string): Promise<any> {
   const classifier = await PhaseClassifier.fromReference();
   return classifier.classifyProperty(propertyName, inputText);
 }

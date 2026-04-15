@@ -29,7 +29,7 @@ const __dirname = dirname(__filename);
 // ─── Reference Data ────────────────────────────────────────────────────────
 
 /** @type {object[]|null} Cached property reference from evolution-properties.json */
-let _propertiesRef = null;
+let _propertiesRef: any[] | null = null;
 
 /**
  * Load the 12-property phase reference from evolution-properties.json.
@@ -194,7 +194,7 @@ const FALLBACK_PROPERTIES = [
  * @param {object[]} properties  - The 12-property reference
  * @returns {string} LLM prompt
  */
-function buildAutoPrompt(solutionName, context, properties) {
+function buildAutoPrompt(solutionName: string, context: string, properties: any[]): string {
   const propertyBlock = properties.map((prop, i) => {
     const phases = prop.phases || {};
     return [
@@ -237,7 +237,7 @@ Example: Market=3|Growing competitive market with multiple established vendors`;
  * @param {object} property      - Single property definition
  * @returns {string} LLM prompt
  */
-function buildSinglePropertyPrompt(solutionName, context, property) {
+function buildSinglePropertyPrompt(solutionName: string, context: string, property: any): string {
   const phases = property.phases || {};
   return `You are a Wardley Mapping evolution expert.
 
@@ -267,7 +267,7 @@ ${property.name}=PHASE|reason`;
  * @param {object[]} properties - Property reference for name matching
  * @returns {Array<{property: string, phase: number, reason: string}>}
  */
-export function parseAutoResponse(text, properties) {
+export function parseAutoResponse(text: string, properties: any[]): any {
   const results = [];
   const propertyNames = properties.map(p => p.name.toLowerCase());
 
@@ -307,7 +307,7 @@ export function parseAutoResponse(text, properties) {
  * @param {object} property - Property definition for name matching
  * @returns {{ property: string, phase: number, reason: string }|null}
  */
-export function parseSinglePropertyResponse(text, property) {
+export function parseSinglePropertyResponse(text: string, property: any): any {
   const linePattern = /^(.+?)\s*=\s*(\d)\s*\|\s*(.+)$/;
 
   for (const line of text.split('\n').reverse()) {
@@ -352,7 +352,7 @@ export function parseSinglePropertyResponse(text, property) {
  * @param {object[]} properties - Reference property list
  * @returns {string|null} Matched property name or null
  */
-function fuzzyMatchProperty(rawName, properties) {
+function fuzzyMatchProperty(rawName: string, properties: any[]): any {
   const lower = rawName.toLowerCase().trim();
 
   // Exact match (case-insensitive)
@@ -374,7 +374,7 @@ function fuzzyMatchProperty(rawName, properties) {
   let bestOverlap = 0;
   for (const prop of properties) {
     const refWords = prop.name.toLowerCase().split(/\s+/);
-    const overlap = refWords.filter(w => rawWords.has(w)).length;
+    const overlap = refWords.filter((w: string) => rawWords.has(w)).length;
     if (overlap > bestOverlap && overlap >= Math.ceil(refWords.length / 2)) {
       bestOverlap = overlap;
       bestMatch = prop.name;
@@ -422,7 +422,7 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
    * @param {import('./solution-base-strategy.mjs').SolutionInput} component
    * @returns {Promise<import('./solution-base-strategy.mjs').SolutionEvolutionResult>}
    */
-  async evaluate(component) {
+  async evaluate(component: any): Promise<any> {
     const properties = await loadPropertiesReference();
     const solutionName = component.name || 'Unknown Solution';
 
@@ -461,12 +461,12 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
     }
 
     // Build PropertyEvaluation entries
-    const propResults = propertyEvaluations.map(pe =>
+    const propResults = propertyEvaluations.map((pe: any) =>
       SolutionBaseStrategy.buildPropertyEvaluation(pe.property, pe.phase, pe.reason)
     );
 
     // Fill in any missing properties with a fallback (phase 2.5 ≈ midpoint)
-    const evaluatedNames = new Set(propResults.map(p => p.property));
+    const evaluatedNames = new Set(propResults.map((p: any) => p.property));
     for (const prop of properties) {
       if (!evaluatedNames.has(prop.name)) {
         propResults.push(
@@ -496,7 +496,7 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
       trace: [
         { step: 'load-reference', propertyCount: properties.length },
         { step: 'evaluate-properties', mode: this._mode, evaluated: propertyEvaluations.length, total: properties.length },
-        ...propertyEvaluations.map(pe => ({
+        ...propertyEvaluations.map((pe: any) => ({
           step: 'property-result',
           property: pe.property,
           phase: pe.phase,
@@ -517,7 +517,7 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
    * @returns {Promise<Array<{property: string, phase: number, reason: string}>>}
    * @private
    */
-  async _evaluateAuto(solutionName, context, properties) {
+  async _evaluateAuto(solutionName: string, context: string, properties: any[]): Promise<any> {
     const prompt = buildAutoPrompt(solutionName, context, properties);
     const response = await this._llmCall(prompt);
     return parseAutoResponse(response, properties);
@@ -532,7 +532,7 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
    * @returns {Promise<Array<{property: string, phase: number, reason: string}>>}
    * @private
    */
-  async _evaluateConversational(solutionName, context, properties) {
+  async _evaluateConversational(solutionName: string, context: string, properties: any[]): Promise<any> {
     const results = [];
 
     for (const prop of properties) {
@@ -558,7 +558,7 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
    * @param {string} propertyName   - Name of the property to evaluate
    * @returns {Promise<import('./solution-base-strategy.mjs').PropertyEvaluation|null>}
    */
-  async evaluateSingleProperty(solutionName, context, propertyName) {
+  async evaluateSingleProperty(solutionName: string, context: string, propertyName: string): Promise<any> {
     const properties = await loadPropertiesReference();
     const prop = properties.find(
       p => p.name.toLowerCase() === propertyName.toLowerCase()

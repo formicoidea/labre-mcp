@@ -37,8 +37,8 @@ import { PHASE_LABELS } from './solution-base-strategy.mjs';
  * @param {Array<{ phase: number }>} properties
  * @returns {{ 1: number, 2: number, 3: number, 4: number }}
  */
-function computePhaseDistribution(properties) {
-  const dist = { 1: 0, 2: 0, 3: 0, 4: 0 };
+function computePhaseDistribution(properties: any[]): Record<number, number> {
+  const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
   for (const prop of properties) {
     const p = Math.round(prop.phase);
     if (p >= 1 && p <= 4) dist[p]++;
@@ -64,7 +64,7 @@ function dominantPhase(distribution: any) {
   return {
     phase: maxPhase,
     count: maxCount,
-    label: PHASE_LABELS[maxPhase] || 'Unknown',
+    label: (PHASE_LABELS as Record<number, string>)[maxPhase] || 'Unknown',
   };
 }
 
@@ -74,9 +74,9 @@ function dominantPhase(distribution: any) {
  * @param {Array<{ phase: number }>} properties
  * @returns {number} Mean phase (1–4), rounded to 2 decimals
  */
-function computeMeanPhase(properties) {
+function computeMeanPhase(properties: any[]): number {
   if (properties.length === 0) return 0;
-  const sum = properties.reduce((s, p) => s + (p.phase || 0), 0);
+  const sum = properties.reduce((s: number, p: any) => s + (p.phase || 0), 0);
   return Math.round((sum / properties.length) * 100) / 100;
 }
 
@@ -146,7 +146,7 @@ export function assembleSolutionResult(rawResult: any, options: any = {}): any {
   // Build confidence metadata if not already present
   if (!enriched.confidenceMetadata) {
     const evaluatedProperties = rawResult.properties.filter(
-      p => !p.reason?.startsWith('Not evaluated')
+      (p: any) => !p.reason?.startsWith('Not evaluated')
     );
     const evaluatedCount = evaluatedProperties.length || rawResult.properties.length;
     const coverage = evaluatedCount / PROPERTY_COUNT;
@@ -161,11 +161,11 @@ export function assembleSolutionResult(rawResult: any, options: any = {}): any {
   }
 
   // Ensure each property has a label
-  enriched.properties = rawResult.properties.map(prop => {
+  enriched.properties = rawResult.properties.map((prop: any) => {
     if (prop.label) return prop;
     return {
       ...prop,
-      label: PHASE_LABELS[Math.round(prop.phase)] || `Phase ${prop.phase}`,
+      label: (PHASE_LABELS as Record<number, string>)[Math.round(prop.phase)] || `Phase ${prop.phase}`,
     };
   });
 
@@ -183,8 +183,8 @@ export function assembleSolutionResult(rawResult: any, options: any = {}): any {
  * @param {AssemblyOptions} [options={}]
  * @returns {Object<string, Object>} Map of method → enriched result
  */
-export function assembleSolutionEvaluations(evaluations, options = {}) {
-  const assembled = {};
+export function assembleSolutionEvaluations(evaluations: Record<string, any>, options: any = {}): Record<string, any> {
+  const assembled: Record<string, any> = {};
   for (const [method, result] of Object.entries(evaluations)) {
     assembled[method] = assembleSolutionResult(result, options);
   }
@@ -214,7 +214,7 @@ export function buildStructuredResult(rawResult: any, options: any = {}): any {
   const { mode = 'auto' } = options;
 
   // Convert properties to PropertyScore instances
-  const scores = (rawResult.properties || []).map(prop => {
+  const scores = (rawResult.properties || []).map((prop: any) => {
     const id = PROPERTY_NAME_TO_ID.get(prop.property?.toLowerCase())
       || prop.id
       || prop.property?.toLowerCase().replace(/[\s/]+/g, '_')
@@ -259,7 +259,7 @@ export function buildStructuredResult(rawResult: any, options: any = {}): any {
  * @param {number} evolution - Evolution value (0–1)
  * @returns {string} Stage label: 'Genesis' | 'Custom' | 'Product' | 'Commodity'
  */
-function resolveStage(evolution) {
+function resolveStage(evolution: number): string {
   if (typeof evolution !== 'number' || Number.isNaN(evolution)) return 'Unknown';
   if (evolution < 0.18) return 'Genesis';
   if (evolution < 0.40) return 'Custom';

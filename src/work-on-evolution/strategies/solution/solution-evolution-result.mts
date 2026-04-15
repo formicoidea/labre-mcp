@@ -156,7 +156,7 @@ export class PropertyScore {
     this.phase = Math.round(phase);
 
     /** @type {string} Phase label (Genesis/Custom/Product/Commodity) */
-    this.label = label || PHASE_LABELS[this.phase] || 'Unknown';
+    this.label = label || (PHASE_LABELS as Record<number, string>)[this.phase] || 'Unknown';
 
     /** @type {number} Weight for aggregation (default: 1/12) */
     this.weight = typeof weight === 'number' ? weight : DEFAULT_WEIGHT;
@@ -182,7 +182,7 @@ export class PropertyScore {
    * @returns {number} Evolution midpoint (0–1) for the assigned phase
    */
   get evolution() {
-    return PHASE_TO_EVOLUTION[this.phase] ?? 0;
+    return (PHASE_TO_EVOLUTION as Record<number, number>)[this.phase] ?? 0;
   }
 
   /**
@@ -195,7 +195,7 @@ export class PropertyScore {
    * @param {Object} [extra]  - Optional extra fields (confidence, phaseDescription, weight)
    * @returns {PropertyScore}
    */
-  static create(id, property, phase, reason, extra = {}) {
+  static create(id: string, property: string, phase: number, reason?: string, extra: any = {}): any {
     return new PropertyScore({
       id,
       property,
@@ -468,7 +468,7 @@ export class SolutionEvolutionResult {
    */
   get meanPhase() {
     if (this.properties.length === 0) return null;
-    const sum = this.properties.reduce((s, p) => s + (p.phase || 0), 0);
+    const sum = this.properties.reduce((s: number, p: any) => s + (p.phase || 0), 0);
     return Math.round((sum / this.properties.length) * 100) / 100;
   }
 
@@ -479,8 +479,8 @@ export class SolutionEvolutionResult {
   get phaseDistribution() {
     const dist = { 1: 0, 2: 0, 3: 0, 4: 0 };
     for (const prop of this.properties) {
-      const p = prop.phase;
-      if (p >= 1 && p <= 4) dist[p]++;
+      const p = (prop as any).phase;
+      if (p >= 1 && p <= 4) (dist as Record<number, number>)[p]++;
     }
     return dist;
   }
@@ -529,7 +529,7 @@ export class SolutionEvolutionResult {
 
     // Compute phase agreement: how concentrated are phases?
     // Uses normalized entropy: 0 = all same phase, 1 = uniform distribution
-    const dist = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
     for (const s of scores) {
       if (s.phase >= 1 && s.phase <= 4) dist[s.phase]++;
     }
@@ -574,7 +574,7 @@ export class SolutionEvolutionResult {
    * @returns {SolutionEvolutionResult}
    */
   static fromEvolutionResult(plainResult: any) {
-    const properties = (plainResult.properties || []).map(p => {
+    const properties = (plainResult.properties || []).map((p: any) => {
       if (p instanceof PropertyScore) return p;
       return PropertyScore.fromPropertyEvaluation(p);
     });
@@ -635,7 +635,7 @@ export class SolutionEvolutionResult {
       confidence: this.confidence,
       method: this.method,
       trace: this.trace,
-      properties: this.properties.map(p =>
+      properties: this.properties.map((p: any) =>
         p instanceof PropertyScore ? p.toPropertyEvaluation() : p
       ),
     };
@@ -656,7 +656,7 @@ export class SolutionEvolutionResult {
       meanPhase: this.meanPhase,
       phaseDistribution: this.phaseDistribution,
       trace: this.trace,
-      properties: this.properties.map(p =>
+      properties: this.properties.map((p: any) =>
         (p instanceof PropertyScore || typeof p.toJSON === 'function')
           ? p.toJSON()
           : p
@@ -677,8 +677,8 @@ export class SolutionEvolutionResult {
    */
   toString() {
     const propsText = this.properties.length > 0
-      ? this.properties.map(p =>
-          `  ${p.property || p.id}: Phase ${p.phase} (${p.label || PHASE_LABELS[p.phase]})`
+      ? this.properties.map((p: any) =>
+          `  ${p.property || p.id}: Phase ${p.phase} (${p.label || (PHASE_LABELS as Record<number, string>)[p.phase]})`
         ).join('\n')
       : '  (no property evaluations)';
 
