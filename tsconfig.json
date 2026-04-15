@@ -16,10 +16,7 @@
     "allowJs": true,
     "checkJs": false,
 
-    "strict": false,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "useUnknownInCatchVariables": true,
+    "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
 
