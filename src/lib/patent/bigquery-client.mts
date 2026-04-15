@@ -265,7 +265,7 @@ export async function getClient(config: Record<string, unknown> = {}) {
     projectId: config.projectId,
     location: config.location,
     scopes: config.scopes,
-  } as any;
+  } as any;  // any: BigQuery query options shape varies by SDK version
 
   // Add service account key file if provided (otherwise relies on ADC)
   if (config.keyFilename) {

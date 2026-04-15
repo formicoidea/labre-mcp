@@ -31,15 +31,15 @@ import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
 export function parseWardleyMap(content: string): ParsedWardleyMap {
   const lines = content.split('\n');
   const result: ParsedWardleyMap = {
-    title: null as string | null,
-    style: null as string | null,
-    anchors: [] as any[],
-    components: [] as any[],
-    links: [] as any[],
-    evolves: [] as any[],
-    notes: [] as any[],
-    pipelines: [] as any[],
-    other: [] as string[],
+    title: null,
+    style: null,
+    anchors: [],
+    components: [],
+    links: [],
+    evolves: [],
+    notes: [],
+    pipelines: [],
+    other: [],
   };
 
   for (const line of lines) {

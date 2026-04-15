@@ -404,7 +404,7 @@ export function createWebSearchCall(config: any = {}) {
       try {
         let resultText = '';
         for await (const message of query({ prompt, options } as Parameters<typeof query>[0])) {
-          const msg = message as any;
+          const msg = message as any;  // any: Claude Agent SDK streaming message (untyped union)
           if (msg.type === 'result') {
             if (msg.subtype === 'success') {
               resultText = msg.result || '';
@@ -498,8 +498,8 @@ export async function verifyViaWebSearch(name: string, options: { description?: 
       method: 'web-search',
       reasoning: `Web search verification failed for "${trimmed}": ${toErrorMessage(err)} — defaulting to capability`,
       isSolution: false,
-      evidence: [] as any[],
-      references: [] as any[],
+      evidence: [],
+      references: [],
       error: toErrorMessage(err),
     };
   }

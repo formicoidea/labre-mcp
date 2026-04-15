@@ -202,7 +202,8 @@ export async function generateValueChain(description: string, options: { filenam
       if (result.evaluations) {
         // Pick the requested strategy's result, or first successful one
         const stratResult = result.evaluations[strategy]
-          || (Object.values(result.evaluations) as any[]).find(e => !e.error);
+          || // any: evaluations values are heterogeneous strategy results
+        (Object.values(result.evaluations) as any[]).find(e => !e.error);
         if (stratResult && !stratResult.error) {
           evaluations[item.name] = Math.max(0, Math.min(1, stratResult.evolution));
           logDebug(TOOL, msg('step.evaluation.bestpick', {

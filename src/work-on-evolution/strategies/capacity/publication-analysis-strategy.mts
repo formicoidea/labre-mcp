@@ -113,6 +113,7 @@ function parsePubResponse(text: string): any {
   for (const [k, v] of Object.entries(vals)) {
     if (!Number.isFinite(v) || v < 0) {
       throw new Error(
+        // any: raw is the parsed LLM response, fields dynamic
         `PublicationAnalysisStrategy: invalid ${k} value "${(raw as any)[k]}" parsed from LLM response`
       );
     }

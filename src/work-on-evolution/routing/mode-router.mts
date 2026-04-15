@@ -193,7 +193,7 @@ async function routeOneShot(input: any, modeReason: string): Promise<RoutedRespo
   // When pipeline mode is active, the result has a different shape with
   // pipeline-specific fields (owmOutput, capabilityPivot, sotaSolution, etc.).
   // Standard fields live under result.standardResult in that case.
-  const r = result as any;
+  const r = result as any;  // any: result is a RoutedResponse | PipelineResponse union
   const std: any = r.pipeline ? (r.standardResult || {}) : r;
 
   const response: any = {
@@ -288,7 +288,7 @@ async function routeGuided(input: any, modeReason: string): Promise<any> {  // a
     nextQuestion: result.nextQuestion || null,
     phase: result.phase,
     // Pass through routing metadata (solution/capability detection + confidence)
-    routing: (result as any).routing || null,
+    routing: (result as any).routing || null,  // any: routing is an optional extension field
   };
 }
 

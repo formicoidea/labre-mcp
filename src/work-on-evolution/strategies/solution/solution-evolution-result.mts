@@ -503,7 +503,7 @@ export class SolutionEvolutionResult {
   get phaseDistribution() {
     const dist = { 1: 0, 2: 0, 3: 0, 4: 0 };
     for (const prop of this.properties) {
-      const p = (prop as any).phase;
+      const p = (prop as any).phase;  // any: prop is either PropertyScore (phase: number) or PropertyEvaluation
       if (p >= 1 && p <= 4) (dist as Record<number, number>)[p]++;
     }
     return dist;

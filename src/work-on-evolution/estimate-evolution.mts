@@ -191,7 +191,8 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
       // any: ComponentInput enriched with derived fields from LLM signals
       const enrichedComponent: any = { ...component };
       if (enrichedComponent.certitude == null || enrichedComponent.ubiquity == null) {
-        const llmResults = (Object.values(evaluations) as any[]).filter(
+        const llmResults = // any: evaluations values are EvolutionResult | {error} | extended LLM results
+(Object.values(evaluations) as any[]).filter(
           e => !e.error && e.certitude != null && e.ubiquity != null
         );
         if (llmResults.length > 0) {
@@ -256,8 +257,10 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
   }
 
   // Step 6: Format result
-  const successCount = (Object.values(evaluations) as any[]).filter(e => !e.error).length;
-  const errorCount = (Object.values(evaluations) as any[]).filter(e => e.error).length;
+  const successCount = // any: evaluations values are EvolutionResult | {error} | extended LLM results
+(Object.values(evaluations) as any[]).filter(e => !e.error).length;
+  const errorCount = // any: evaluations values are EvolutionResult | {error} | extended LLM results
+(Object.values(evaluations) as any[]).filter(e => e.error).length;
   const duration = Date.now() - t0;
 
   logDebug(TOOL, `Results for "${name}": ${successCount} succeeded, ${errorCount} failed out of ${Object.keys(evaluations).length} strategies`);
@@ -644,8 +647,10 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
       }
     }
 
-    const successCount = (Object.values(evaluations) as any[]).filter(e => !e.error).length;
-    const errorCount = (Object.values(evaluations) as any[]).filter(e => e.error).length;
+    const successCount = // any: evaluations values are EvolutionResult | {error} | extended LLM results
+(Object.values(evaluations) as any[]).filter(e => !e.error).length;
+    const errorCount = // any: evaluations values are EvolutionResult | {error} | extended LLM results
+(Object.values(evaluations) as any[]).filter(e => e.error).length;
     const summary = session.getSummary();
 
     logDebug(TOOL, `Conversational results for "${session.state.name}": ${successCount} succeeded, ${errorCount} failed, ${summary.exchangeCount} exchange(s)`);

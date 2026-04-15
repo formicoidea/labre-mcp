@@ -95,7 +95,8 @@ async function runCapabilityStrategies(component: any, createInstance: (cls: any
   // Phase B: Enrich component with certitude/ubiquity from LLM results
   const enrichedComponent: any = { ...component };
   if (enrichedComponent.certitude == null || enrichedComponent.ubiquity == null) {
-    const llmResults = (Object.values(evaluations) as any[]).filter(
+    const llmResults = // any: evaluations values are heterogeneous strategy results
+(Object.values(evaluations) as any[]).filter(
       e => !e.error && e.certitude != null && e.ubiquity != null
     );
     if (llmResults.length > 0) {

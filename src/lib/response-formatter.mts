@@ -345,6 +345,7 @@ export function formatResponse(result: any, options: any = {}): string {
   // ── Economic: evaluation results ──
   if (result.evaluations) {
     const entries = Object.entries(result.evaluations);
+    // any: ev is EvolutionResult | {error: string}
     const successful = entries.filter(([, ev]) => !(ev as any).error);
     const errors = entries.filter(([, ev]) => (ev as any).error);
 
@@ -355,7 +356,7 @@ export function formatResponse(result: any, options: any = {}): string {
       lines.push('All strategies encountered errors:');
       lines.push('');
       for (const [method, ev] of errors) {
-        lines.push(`- **${method}**: ${(ev as any).error}`);
+        lines.push(`- **${method}**: ${(ev as any).error}`);  // any: ev has optional error field
       }
       lines.push('');
       lines.push('*Try providing more parameters (certitude, ubiquity, publication proportions) or use a specific strategy.*');
