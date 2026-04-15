@@ -72,6 +72,7 @@ const STRATEGY_ALIASES = {
  * @param {string} input - Raw conversational text
  * @returns {Object} Parsed parameters ready for estimateEvolutionOneShot()
  */
+// any: input is freeform user text or { text } wrapper; result has dynamic field set
 export function parseConversationalInput(input: any): any {
   if (input == null || typeof input !== 'string') {
     throw new Error('Conversational input must be a non-empty string');
@@ -97,6 +98,7 @@ export function parseConversationalInput(input: any): any {
  * @param {string} text
  * @returns {Object|null}
  */
+// any: structured-parser output has a dynamic key/value set
 function tryStructuredParse(text: string): any {
   const result: any = {};
 
@@ -179,6 +181,7 @@ function tryStructuredParse(text: string): any {
  * @param {string} text
  * @returns {Object}
  */
+// any: NL parser output has a dynamic key/value set
 function parseNaturalLanguage(text: string): any {
   const result: any = {};
 
@@ -265,6 +268,7 @@ function cleanDescription(desc: string): string {
  * @param {string} originalText - Full original input
  * @returns {Object}
  */
+// any: result is a partially-parsed object enriched in place with detected fields
 function enrichWithDetectedParams(result: any, originalText: string): any {
   const lower = originalText.toLowerCase();
 
@@ -317,6 +321,7 @@ function enrichWithDetectedParams(result: any, originalText: string): any {
  * @param {string} conversationalInput - Raw user text that triggered the skill
  * @returns {Promise<Object>} Result from estimateEvolutionOneShot with conversational metadata
  */
+// any: handler input is the raw conversational bag; result is RoutedResponse
 export async function handleSkillInvocation(conversationalInput: any): Promise<any> {
   // Step 1: Parse the conversational input into structured params
   const parsed = parseConversationalInput(conversationalInput);
@@ -347,6 +352,7 @@ export async function handleSkillInvocation(conversationalInput: any): Promise<a
  * @param {boolean} [options.compact] - Use compact table format instead of detailed
  * @returns {string} Markdown-formatted conversational output
  */
+// any: result/options accept heterogeneous fields driven by the RoutedResponse output
 export function formatConversationalResult(result: any, options: any = {}): any {
   return formatResponse(result, {
     component: result.parsedInput,
@@ -382,6 +388,7 @@ export { routeEstimateEvolution, detectMode, MODES };
  * @param {boolean} [options.forceEstimate] - Force estimation with partial data
  * @returns {Promise<Object>} Routed result with formatted output, mode info, and strategies
  */
+// any: input is raw bag; options carry mode-routing tunables
 export async function handleSkillWithModeRouting(input: any, options: any = {}): Promise<any> {
   // Parse conversational text into structured params
   let parsed;
@@ -437,6 +444,7 @@ export async function handleSkillWithModeRouting(input: any, options: any = {}):
  * @param {string}  [input.strategy]      - Strategy override (default: 'all')
  * @returns {Promise<Object>} Conversational response with phase, question, sessionState, and formatted output
  */
+// any: conversational entrypoint — same loose input shape
 export async function handleConversationalInvocation(input: any = {}): Promise<any> {
   const { userMessage, sessionState, forceEstimate = false, strategy } = input;
 
@@ -481,6 +489,7 @@ export async function handleConversationalInvocation(input: any = {}): Promise<a
  * @param {Object} result - Result from estimateEvolutionConversational()
  * @returns {string} Markdown-formatted response for this turn
  */
+// any: result is the conversational session output (loose shape, formatter-only)
 export function formatConversationalTurn(result: any): string {
   const lines = [];
 

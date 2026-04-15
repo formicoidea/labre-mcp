@@ -12,6 +12,7 @@
 //   const result = await evaluateMapFile('maps/myMaps/tea-shop.wm');
 
 import type { McpToolDefinition } from '../../types/mcp.mjs';
+import type { ParsedWardleyMap, MapItemEvaluation } from '../../types/wm-map.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { classifyComponent } from '../routing/classification-gate.mjs';
 import { estimateEvolutionOneShot } from '../estimate-evolution.mjs';
@@ -27,9 +28,9 @@ import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
  * @param {string} content - Raw .wm file content
  * @returns {Object} Parsed map structure
  */
-export function parseWardleyMap(content: string): any {
+export function parseWardleyMap(content: string): ParsedWardleyMap {
   const lines = content.split('\n');
-  const result: any = {
+  const result: ParsedWardleyMap = {
     title: null as string | null,
     style: null as string | null,
     anchors: [] as any[],
@@ -151,10 +152,11 @@ export function parseWardleyMap(content: string): any {
  * @param {string} [options.context] - Additional context for evaluation
  * @returns {Promise<{evaluations: Array, summary: Object}>}
  */
-export async function evaluateMapComponents(parsedMap: any, options: any = {}): Promise<any> {
+// any: options bag carries strategy, context, msg resolver and various tunables
+export async function evaluateMapComponents(parsedMap: ParsedWardleyMap, options: any = {}): Promise<{ evaluations: MapItemEvaluation[]; summary: any }> {
   const { strategy = 'all', context = parsedMap.title || '', msg } = options;
   const TOOL = 'evaluateMap';
-  const evaluations: any[] = [];
+  const evaluations: MapItemEvaluation[] = [];
 
   // Evaluate anchors + components
   const allItems = [
@@ -304,7 +306,7 @@ export async function evaluateMapComponents(parsedMap: any, options: any = {}): 
  * @param {Array} evaluations - Output from evaluateMapComponents()
  * @returns {string} Updated .wm content
  */
-export function updateWmContent(originalContent: string, evaluations: any[]): string {
+export function updateWmContent(originalContent: string, evaluations: MapItemEvaluation[]): string {
   let content = originalContent;
 
   for (const ev of evaluations) {
@@ -348,7 +350,8 @@ function escapeRegex(str: string): string {
  * @param {Object} summary
  * @returns {string} Markdown report
  */
-export function formatEvaluationReport(evaluations: any[], summary: any): string {
+// any: summary carries a heterogeneous bag of stats (avgDelta, byClassification, ...)
+export function formatEvaluationReport(evaluations: MapItemEvaluation[], summary: any): string {
   const lines: string[] = [];
   lines.push('## Evaluation Report\n');
   lines.push(`| Component | Original | New | Delta | Status |`);
@@ -358,8 +361,9 @@ export function formatEvaluationReport(evaluations: any[], summary: any): string
     if (ev.skipped) {
       lines.push(`| ${ev.name} | ${ev.originalMaturity} | - | - | ${ev.classification} (skipped) |`);
     } else {
-      const arrow = ev.delta > 0.05 ? ' >>>' : ev.delta < -0.05 ? ' <<<' : '';
-      lines.push(`| ${ev.name} | ${ev.originalMaturity} | ${ev.newMaturity} | ${ev.delta > 0 ? '+' : ''}${ev.delta} | ${arrow} |`);
+      const delta = ev.delta ?? 0;
+      const arrow = delta > 0.05 ? ' >>>' : delta < -0.05 ? ' <<<' : '';
+      lines.push(`| ${ev.name} | ${ev.originalMaturity} | ${ev.newMaturity} | ${delta > 0 ? '+' : ''}${delta} | ${arrow} |`);
     }
   }
 
@@ -380,6 +384,7 @@ export function formatEvaluationReport(evaluations: any[], summary: any): string
  * @param {boolean} [options.updateFile=true]
  * @returns {Promise<{evaluations, summary, report, updatedContent, filePath}>}
  */
+// any: file-level orchestrator with diverse options (strategy, updateFile, ...)
 export async function evaluateMapFile(filePath: string, options: any = {}): Promise<any> {
   const { strategy = 'all', updateFile = true } = options;
   const TOOL = 'evaluateMap';

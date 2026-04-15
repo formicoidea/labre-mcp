@@ -59,6 +59,7 @@ import { toErrorMessage, errorCode } from '../lib/errors.mjs';
  * @param {OneShotInput} rawInput - All parameters for the estimation
  * @returns {Promise<OneShotResult>} Complete estimation result
  */
+// any: rawInput is the raw MCP arguments bag (validated downstream); result is RoutedResponse
 export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
   // Step 1: Validate input
   const validated = validateOneShotInput(rawInput);
@@ -97,6 +98,7 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
   }
 
   // Step 4: Build component input for strategies
+  // any: ComponentInput superset including pipeline-specific fields
   const component: any = {
     name,
     context: description,
@@ -186,6 +188,7 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
       }
 
       // Phase B: If certitude/ubiquity not on the component, derive from LLM strategies
+      // any: ComponentInput enriched with derived fields from LLM signals
       const enrichedComponent: any = { ...component };
       if (enrichedComponent.certitude == null || enrichedComponent.ubiquity == null) {
         const llmResults = (Object.values(evaluations) as any[]).filter(
@@ -286,6 +289,7 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
   }
   message += '.';
 
+  // any: RoutedResponse-like shape with optional pipeline extension fields
   const standardResult: any = {
     mode: 'oneshot',
     classification,
@@ -317,7 +321,7 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
 
     // Provide a capability evaluation function that re-uses estimateEvolutionOneShot
     // but forces capability path (no pipeline recursion)
-    const evaluateCapabilityFn = (capInput: any) =>
+    const evaluateCapabilityFn = (capInput: any) =>  // any: capability-only input variant
       estimateEvolutionOneShot({ ...capInput, pipeline: false });
 
     const pipelineResult = await runEnrichedPipeline(standardResult, component, {
@@ -371,6 +375,7 @@ function getLogprobCall(): ReturnType<typeof createOpenCodeLogprobCall> {
  * @param {typeof BaseStrategy} StrategyCls
  * @returns {BaseStrategy}
  */
+// any: StrategyCls is a constructor (BaseStrategy subclass); instance shape varies
 function createStrategyInstance(StrategyCls: any): any {
   const method = StrategyCls.method;
 
@@ -433,6 +438,7 @@ function createStrategyInstance(StrategyCls: any): any {
  * @param {string} [input.strategy] - Strategy to use (default: 'all')
  * @returns {Promise<ConversationalResult>}
  */
+// any: conversational input is the raw MCP arguments bag; result is a guided-turn shape
 export async function estimateEvolutionConversational(input: any = {}): Promise<any> {
   const { sessionState, data = {}, forceEstimate = false, strategy } = input;
   const TOOL = 'estimateEvolution';

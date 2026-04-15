@@ -66,6 +66,7 @@ Examples:
  * @param {{ name: string, type?: string, context?: string }} component - Input component
  * @returns {{ type: string, nature: string, capability: string, confidence: number, justification: string, context: string, name: string }}
  */
+// any: component is the loose MCP input; returns parser-shaped { capability, nature, confidence, reasoning }
 export function parseCapabilityResponse(text: string, component: any): any {
   const typeMatch = text.match(/^type=(\S+)/mi);
   const natureMatch = text.match(/^nature=(\S+)/mi);
@@ -104,6 +105,7 @@ export function parseCapabilityResponse(text: string, component: any): any {
  * @param {function(string): Promise<string>} llmCall
  * @returns {Promise<{ type: string, nature: string, capability: string, confidence: number, justification: string }>}
  */
+// any: component is the loose MCP input; llmCall is a closure with diverse signatures
 export async function identifyCapability(component: any, llmCall?: any): Promise<any> {
   // When type is known and non-eligible, skip immediately
   if (component.type && !ELIGIBLE_TYPES.has(component.type)) {

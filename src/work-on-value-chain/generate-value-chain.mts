@@ -10,6 +10,7 @@
 //   const result = await generateValueChain('A tea shop serving customers');
 
 import type { McpToolDefinition } from '../types/mcp.mjs';
+import type { DecomposedValueChain, ValueChainComponent } from '../types/wm-map.mjs';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { createLLMCall } from '../lib/llm/llm-call.mjs';
@@ -68,7 +69,7 @@ IMPORTANT:
  * @param {Object<string, number>} evolutions - Component name → evolution score
  * @returns {string} Valid .wm file content
  */
-function generateWmContent(chain: any, evolutions: Record<string, number>): string {
+function generateWmContent(chain: DecomposedValueChain, evolutions: Record<string, number>): string {
   const lines = [];
 
   // Title
@@ -89,7 +90,7 @@ function generateWmContent(chain: any, evolutions: Record<string, number>): stri
   lines.push('');
 
   // Links — anchor to top-level components
-  const topLevel = chain.components.filter((c: any) => c.visibility >= 0.70);
+  const topLevel = chain.components.filter((c: ValueChainComponent) => c.visibility >= 0.70);
   for (const comp of topLevel) {
     lines.push(`${chain.anchor.name}->${comp.name}`);
   }
@@ -131,7 +132,8 @@ function slugify(text: string): string {
  * @param {string} [options.strategy='timeline-benchmark'] - Evolution evaluation strategy
  * @returns {Promise<{wmContent: string, filePath: string, components: Array, evaluations: Object}>}
  */
-export async function generateValueChain(description: string, options: any = {}): Promise<any> {
+// any: result includes wmContent, filePath, components, evaluations, lang — heterogeneous
+export async function generateValueChain(description: string, options: { filename?: string; outputDir?: string; strategy?: string } = {}): Promise<any> {
   const {
     filename,
     outputDir = 'maps/myMaps',
@@ -177,7 +179,7 @@ export async function generateValueChain(description: string, options: any = {})
   const evaluations: Record<string, number> = {};
   const allItems = [
     { name: chain.anchor.name, context: chain.anchor.context },
-    ...chain.components.map((c: any) => ({ name: c.name, context: c.context })),
+    ...chain.components.map((c: ValueChainComponent) => ({ name: c.name, context: c.context })),
   ];
 
   for (let i = 0; i < allItems.length; i++) {
