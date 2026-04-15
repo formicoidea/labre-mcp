@@ -30,7 +30,7 @@ export const PUB_TYPE_CENTROIDS = {
 
 // Publication type distribution → evolution scalar [0, 1]
 // Each input is a proportion (0-1); they are normalized to sum=1 internally.
-export function pubEvolution(wonder, build, operate, usage) {
+export function pubEvolution(wonder: number, build: number, operate: number, usage: number): number | null {
   const C = PUB_TYPE_CENTROIDS;
   const sum = wonder + build + operate + usage;
   if (sum === 0) return null;
@@ -39,41 +39,41 @@ export function pubEvolution(wonder, build, operate, usage) {
 }
 
 // Raw sigmoid (0→1)
-export function sigmoid(c, k, x0) {
+export function sigmoid(c: number, k: number, x0: number): number {
   return 1 / (1 + Math.exp(-k * (c - x0)));
 }
 
 // Generalized sigmoid with range and skew
-function gsigmoid(c, k, x0, yMin, yMax, nu) {
+function gsigmoid(c: number, k: number, x0: number, yMin: number, yMax: number, nu: number): number {
   return yMin + (yMax - yMin) * Math.pow(sigmoid(c, k, x0), nu);
 }
 
 // Band boundaries — two independent generalized sigmoids
-export function bandUpper(c, params = DEFAULT_PARAMS) {
+export function bandUpper(c: number, params: any = DEFAULT_PARAMS): number {
   return gsigmoid(c, params.kUpper, params.x0Upper, params.yMinUpper, params.yMaxUpper, params.nuUpper);
 }
 
-export function bandLower(c, params = DEFAULT_PARAMS) {
+export function bandLower(c: number, params: any = DEFAULT_PARAMS): number {
   return gsigmoid(c, params.kLower, params.x0Lower, params.yMinLower, params.yMaxLower, params.nuLower);
 }
 
 // Center of the band — used for geometric projection
-export function centerCurve(c, params = DEFAULT_PARAMS) {
+export function centerCurve(c: number, params: any = DEFAULT_PARAMS): number {
   return (bandUpper(c, params) + bandLower(c, params)) / 2;
 }
 
 // Is the point inside the evolution band?
-export function isInBand(c, u, params = DEFAULT_PARAMS) {
+export function isInBand(c: number, u: number, params: any = DEFAULT_PARAMS): boolean {
   return u >= bandLower(c, params) && u <= bandUpper(c, params);
 }
 
 // Classify zone: competitive (inside band) / extra-competitive-market (outside band)
-export function classifyZone(c, u, params = DEFAULT_PARAMS) {
+export function classifyZone(c: number, u: number, params: any = DEFAULT_PARAMS): string {
   return isInBand(c, u, params) ? 'competitive' : 'extra-competitive-market';
 }
 
 // Signed distance from band boundary: positive = inside, negative = outside
-export function bandDistance(c, u, params = DEFAULT_PARAMS) {
+export function bandDistance(c: number, u: number, params: any = DEFAULT_PARAMS): number {
   const upper = bandUpper(c, params);
   const lower = bandLower(c, params);
   if (u > upper) return -(u - upper);
@@ -82,7 +82,7 @@ export function bandDistance(c, u, params = DEFAULT_PARAMS) {
 }
 
 // Geometric projection onto the center curve → { evolution: t* ∈ [0, 1], distToCenter }
-export function projectOnCurve(c, u, params = DEFAULT_PARAMS) {
+export function projectOnCurve(c: number, u: number, params: any = DEFAULT_PARAMS): { evolution: number; distToCenter: number } {
   let bestT = 0;
   let bestDist = Infinity;
   for (let t = 0; t <= 1; t += 0.001) {
@@ -100,7 +100,7 @@ export function projectOnCurve(c, u, params = DEFAULT_PARAMS) {
 }
 
 // Main function: (certitude, ubiquity) → { zone, evolution, phase, bandDistance }
-export function computeEvolution(certitude, ubiquity, params = DEFAULT_PARAMS) {
+export function computeEvolution(certitude: number, ubiquity: number, params: any = DEFAULT_PARAMS): any {
   const zone = classifyZone(certitude, ubiquity, params);
   const bd = bandDistance(certitude, ubiquity, params);
 
