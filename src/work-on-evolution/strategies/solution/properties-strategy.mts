@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { SolutionBaseStrategy } from './solution-base-strategy.mjs';
 import type { SolutionInput, SolutionEvolutionResult } from '../../../types/solution.mjs';
+import type { ParsedAutoResponse, ParsedPropertyEvaluation } from '../../../schemas/parsed-llm.schema.mjs';
 import { toErrorMessage, errorCode } from '../../../lib/errors.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -269,9 +270,8 @@ ${property.name}=PHASE|reason`;
  * @param {object[]} properties - Property reference for name matching
  * @returns {Array<{property: string, phase: number, reason: string}>}
  */
-// any: returns parser-shaped { propertyName, phase, reason } objects (loose contract)
-export function parseAutoResponse(text: string, properties: PropertyDef[]): any {
-  const results = [];
+export function parseAutoResponse(text: string, properties: PropertyDef[]): ParsedAutoResponse {
+  const results: ParsedAutoResponse = [];
   const propertyNames = properties.map(p => p.name.toLowerCase());
 
   // Match lines like: PropertyName=3|Some reason here
@@ -310,7 +310,7 @@ export function parseAutoResponse(text: string, properties: PropertyDef[]): any 
  * @param {object} property - Property definition for name matching
  * @returns {{ property: string, phase: number, reason: string }|null}
  */
-export function parseSinglePropertyResponse(text: string, property: PropertyDef): any {
+export function parseSinglePropertyResponse(text: string, property: PropertyDef): ParsedPropertyEvaluation | null {
   const linePattern = /^(.+?)\s*=\s*(\d)\s*\|\s*(.+)$/;
 
   for (const line of text.split('\n').reverse()) {

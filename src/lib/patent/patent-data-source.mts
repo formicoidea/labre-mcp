@@ -131,6 +131,7 @@
  * @returns {PatentData}
  */
 import type { PatentData, IndicatorResults } from '../../types/patent.mjs';
+import { PatentDataSchema } from '../../schemas/patent.schema.mjs';
 export type { PatentData, IndicatorResults };
 
 export function emptyPatentData(): PatentData {
@@ -240,58 +241,8 @@ export class PatentDataSource {
  * @returns {{ valid: boolean, errors: string[] }}
  */
 export function validatePatentData(data: unknown): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-
-  if (data === null || typeof data !== 'object') {
-    return { valid: false, errors: ['PatentData must be a non-null object'] };
-  }
-  // After the guard above, narrow `data` to a record for field access during validation
-  const d = data as Record<string, any>;
-
-  // totalPatents
-  if (typeof d.totalPatents !== 'number' || d.totalPatents < 0) {
-    errors.push('totalPatents must be a non-negative number');
-  }
-
-  // cpcDistribution
-  if (!Array.isArray(d.cpcDistribution)) {
-    errors.push('cpcDistribution must be an array');
-  }
-
-  // yearlyClassifications
-  if (!Array.isArray(d.yearlyClassifications)) {
-    errors.push('yearlyClassifications must be an array');
-  }
-
-  // citationData
-  if (!d.citationData || typeof d.citationData !== 'object') {
-    errors.push('citationData must be a non-null object');
-  }
-
-  // claimsTimeline
-  if (!Array.isArray(d.claimsTimeline)) {
-    errors.push('claimsTimeline must be an array');
-  }
-
-  // assigneeData
-  if (!d.assigneeData || typeof d.assigneeData !== 'object') {
-    errors.push('assigneeData must be a non-null object');
-  }
-
-  // geoData
-  if (!d.geoData || typeof d.geoData !== 'object') {
-    errors.push('geoData must be a non-null object');
-  }
-
-  // sectorData
-  if (!d.sectorData || typeof d.sectorData !== 'object') {
-    errors.push('sectorData must be a non-null object');
-  }
-
-  // expirationData
-  if (!d.expirationData || typeof d.expirationData !== 'object') {
-    errors.push('expirationData must be a non-null object');
-  }
-
-  return { valid: errors.length === 0, errors };
+  const result = PatentDataSchema.safeParse(data);
+  if (result.success) return { valid: true, errors: [] };
+  const errors = result.error.issues.map(i => `${i.path.join('.') || '(root)'}: ${i.message}`);
+  return { valid: false, errors };
 }

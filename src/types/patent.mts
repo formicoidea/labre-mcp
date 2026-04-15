@@ -1,63 +1,20 @@
 // Patent domain types — used by lib/patent/* and work-on-evolution/patent/*
 //
-// Reflects the exact runtime shape produced by emptyPatentData() and
-// expected by the 8 indicator functions in patent-indicators.mts.
+// Source of truth lives in src/schemas/patent.schema.mts (Zod). This file
+// re-exports the inferred types for convenience and keeps indicator/BigQuery
+// config interfaces that have no runtime validation.
 
-// ─── PatentData (raw input to indicators) ──────────────────────────────────
-
-export interface CpcDistributionEntry {
-  cpc: string;
-  count: number;
-}
-
-export interface YearlyClassification {
-  year: number;
-  cpcCodes: string[];
-}
-
-export interface CitationData {
-  totalForwardCitations: number;
-  patentCount: number;
-}
-
-export interface ClaimsTimelineEntry {
-  year: number;
-  avgIndependentClaims: number;
-}
-
-export interface AssigneeData {
-  uniqueAssignees: number;
-  totalPatents: number;
-}
-
-export interface GeoData {
-  jurisdictionCount: number;
-  jurisdictions: string[];
-}
-
-export interface SectorData {
-  uniqueSections: number;
-  uniqueClasses: number;
-}
-
-export interface ExpirationData {
-  expiredCount: number;
-  totalPatents: number;
-}
-
-export interface PatentData {
-  totalPatents: number;
-  cpcDistribution: CpcDistributionEntry[];
-  yearlyClassifications: YearlyClassification[];
-  citationData: CitationData;
-  claimsTimeline: ClaimsTimelineEntry[];
-  assigneeData: AssigneeData;
-  geoData: GeoData;
-  sectorData: SectorData;
-  expirationData: ExpirationData;
-  /** Optional metadata on partial query failures */
-  _queryErrors?: Record<string, string>;
-}
+export type {
+  CpcDistributionEntry,
+  YearlyClassification,
+  CitationData,
+  ClaimsTimelineEntry,
+  AssigneeData,
+  GeoData,
+  SectorData,
+  ExpirationData,
+  PatentData,
+} from '../schemas/patent.schema.mjs';
 
 // ─── Indicator config + results ─────────────────────────────────────────────
 

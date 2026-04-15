@@ -10,6 +10,7 @@
 import { z } from 'zod';
 import type { McpToolDefinition, JsonSchema } from '../types/mcp.mjs';
 import { IdentifyCapabilityInputSchema, type IdentifyCapabilityInput } from '../schemas/identify-capability.schema.mjs';
+import type { ParsedCapabilityResponse } from '../schemas/parsed-llm.schema.mjs';
 import { createLLMCall } from '../lib/llm/llm-call.mjs';
 import { logDebug } from '../lib/mcp-notifications.mjs';
 
@@ -68,8 +69,8 @@ Examples:
  * @param {{ name: string, type?: string, context?: string }} component - Input component
  * @returns {{ type: string, nature: string, capability: string, confidence: number, justification: string, context: string, name: string }}
  */
-// any: component is the loose MCP input; returns parser-shaped { capability, nature, confidence, reasoning }
-export function parseCapabilityResponse(text: string, component: any): any {
+// any: component is the loose MCP input (name/type/description/context)
+export function parseCapabilityResponse(text: string, component: any): ParsedCapabilityResponse {
   const typeMatch = text.match(/^type=(\S+)/mi);
   const natureMatch = text.match(/^nature=(\S+)/mi);
   const capMatch = text.match(/^capability=(.*)/mi);

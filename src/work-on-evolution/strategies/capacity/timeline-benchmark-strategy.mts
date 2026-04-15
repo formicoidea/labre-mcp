@@ -12,6 +12,7 @@
 
 import { BaseStrategy } from './base-strategy.mjs';
 import type { ComponentInput, EvolutionResult } from '../../../types/evolution.mjs';
+import type { ParsedHistoryIteration } from '../../../schemas/parsed-llm.schema.mjs';
 
 interface TimelineMilestone {
   name: string;
@@ -54,8 +55,7 @@ milestone_date=<year as integer>`;
  * @param {string} text
  * @returns {{ name: string, date: number }}
  */
-// any: parser result has a dynamic subset of { name, date, justification, confidence }
-export function parseHistoryIterationResponse(text: string): any {
+export function parseHistoryIterationResponse(text: string): ParsedHistoryIteration {
   const nameMatch = text.match(/milestone_name[:\s=]*(.*)/i);
   const dateMatch = text.match(/milestone_date[:\s=]*(\d+)/i);
 
