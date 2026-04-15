@@ -134,13 +134,13 @@ function tryStructuredParse(text: string): any {
         break;
       case 'space': {
         const normalized = value.toLowerCase().trim();
-        const canonical = SPACE_ALIASES[normalized];
+        const canonical = (SPACE_ALIASES as Record<string, string>)[normalized];
         if (canonical) result.space = canonical;
         break;
       }
       case 'strategy': {
         const normalized = value.toLowerCase().trim();
-        const canonical = STRATEGY_ALIASES[normalized];
+        const canonical = (STRATEGY_ALIASES as Record<string, string>)[normalized];
         if (canonical) result.strategy = canonical;
         break;
       }
@@ -252,7 +252,7 @@ function parseNaturalLanguage(text: string): any {
  * @param {string} desc
  * @returns {string}
  */
-function cleanDescription(desc) {
+function cleanDescription(desc: string): string {
   return desc
     .replace(/^(?:that is|which is|is|as|being)\s+/i, '')
     .replace(/^[,;:]\s*/, '')
@@ -265,7 +265,7 @@ function cleanDescription(desc) {
  * @param {string} originalText - Full original input
  * @returns {Object}
  */
-function enrichWithDetectedParams(result, originalText) {
+function enrichWithDetectedParams(result: any, originalText: string): any {
   const lower = originalText.toLowerCase();
 
   // Detect space if not already set
@@ -645,8 +645,8 @@ export function formatConversationalTurn(result: any): string {
  * @param {string} phase
  * @returns {string}
  */
-function formatPhaseName(phase) {
-  const labels = {
+function formatPhaseName(phase: string): string {
+  const labels: Record<string, string> = {
     identity: 'Component Identity',
     classification: 'Economic Classification',
     characteristics: 'Maturity Characteristics',

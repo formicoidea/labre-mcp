@@ -59,7 +59,7 @@ import { toErrorMessage, errorCode } from '../lib/errors.mjs';
  * @param {OneShotInput} rawInput - All parameters for the estimation
  * @returns {Promise<OneShotResult>} Complete estimation result
  */
-export async function estimateEvolutionOneShot(rawInput) {
+export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
   // Step 1: Validate input
   const validated = validateOneShotInput(rawInput);
   const { name, description, space, strategy, pipeline, ...componentData } = validated;
@@ -158,7 +158,7 @@ export async function estimateEvolutionOneShot(rawInput) {
     `capability=${routingTargets.useCapabilityStrategies}`);
 
   // Step 5: Evaluate with selected strategy(ies) — dispatched via routing
-  const evaluations = {};
+  const evaluations: Record<string, any> = {};
 
   // Step 5a: Run capability strategies (existing pipeline) if routed
   if (routingTargets.useCapabilityStrategies) {
@@ -286,7 +286,7 @@ export async function estimateEvolutionOneShot(rawInput) {
   }
   message += '.';
 
-  const standardResult = {
+  const standardResult: any = {
     mode: 'oneshot',
     classification,
     reQuestions: null,
@@ -317,7 +317,7 @@ export async function estimateEvolutionOneShot(rawInput) {
 
     // Provide a capability evaluation function that re-uses estimateEvolutionOneShot
     // but forces capability path (no pipeline recursion)
-    const evaluateCapabilityFn = (capInput) =>
+    const evaluateCapabilityFn = (capInput: any) =>
       estimateEvolutionOneShot({ ...capInput, pipeline: false });
 
     const pipelineResult = await runEnrichedPipeline(standardResult, component, {
@@ -335,8 +335,8 @@ export async function estimateEvolutionOneShot(rawInput) {
 
 // ─── Lazy LLM Singletons ────────────────────────────────────────────────────
 
-let _llmCall = null;
-function getLLMCall() {
+let _llmCall: ReturnType<typeof createLLMCall> | null = null;
+function getLLMCall(): ReturnType<typeof createLLMCall> {
   if (!_llmCall) {
     const model = process.env.WARDLEY_LLM_MODEL || 'claude-sonnet-4-6';
     logDebug('estimateEvolution', `LLM backend: Agent SDK, model="${model}"`);
@@ -349,8 +349,8 @@ function getLLMCall() {
   return _llmCall;
 }
 
-let _logprobCall = null;
-function getLogprobCall() {
+let _logprobCall: ReturnType<typeof createOpenCodeLogprobCall> | null = null;
+function getLogprobCall(): ReturnType<typeof createOpenCodeLogprobCall> {
   if (!_logprobCall) {
     const model = process.env.WARDLEY_LOGPROB_MODEL || 'kimi-k2.5';
     logDebug('estimateEvolution', `Logprob backend: OpenCode API, model="${model}"`);
@@ -371,7 +371,7 @@ function getLogprobCall() {
  * @param {typeof BaseStrategy} StrategyCls
  * @returns {BaseStrategy}
  */
-function createStrategyInstance(StrategyCls) {
+function createStrategyInstance(StrategyCls: any): any {
   const method = StrategyCls.method;
 
   // s-curve: purely analytical
@@ -498,7 +498,7 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
     const classification = session.getClassification();
     const component = session.buildComponentInput();
     const selectedStrategy = session.state.strategy || 'all';
-    const evaluations = {};
+    const evaluations: Record<string, any> = {};
 
     logDebug(TOOL, `Conversational estimation ready for "${session.state.name}", strategy="${selectedStrategy}"`);
 
