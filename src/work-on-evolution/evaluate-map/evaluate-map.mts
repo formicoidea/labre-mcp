@@ -12,7 +12,7 @@
 //   const result = await evaluateMapFile('maps/myMaps/tea-shop.wm');
 
 import type { McpToolDefinition } from '../../types/mcp.mjs';
-import type { ParsedWardleyMap, MapItemEvaluation } from '../../types/wm-map.mjs';
+import type { ParsedWardleyMap, MapItemEvaluation, EvaluateMapOptions } from '../../types/wm-map.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { classifyComponent } from '../routing/classification-gate.mjs';
 import { estimateEvolutionOneShot } from '../estimate-evolution.mjs';
@@ -152,8 +152,7 @@ export function parseWardleyMap(content: string): ParsedWardleyMap {
  * @param {string} [options.context] - Additional context for evaluation
  * @returns {Promise<{evaluations: Array, summary: Object}>}
  */
-// any: options bag carries strategy, context, msg resolver and various tunables
-export async function evaluateMapComponents(parsedMap: ParsedWardleyMap, options: any = {}): Promise<{ evaluations: MapItemEvaluation[]; summary: any }> {
+export async function evaluateMapComponents(parsedMap: ParsedWardleyMap, options: EvaluateMapOptions = {}): Promise<{ evaluations: MapItemEvaluation[]; summary: any }> {
   const { strategy = 'all', context = parsedMap.title || '', msg } = options;
   const TOOL = 'evaluateMap';
   const evaluations: MapItemEvaluation[] = [];
@@ -384,8 +383,8 @@ export function formatEvaluationReport(evaluations: MapItemEvaluation[], summary
  * @param {boolean} [options.updateFile=true]
  * @returns {Promise<{evaluations, summary, report, updatedContent, filePath}>}
  */
-// any: file-level orchestrator with diverse options (strategy, updateFile, ...)
-export async function evaluateMapFile(filePath: string, options: any = {}): Promise<any> {
+// any: result is a heterogeneous bag (filePath, updated, evaluations, summary, ...)
+export async function evaluateMapFile(filePath: string, options: EvaluateMapOptions = {}): Promise<any> {
   const { strategy = 'all', updateFile = true } = options;
   const TOOL = 'evaluateMap';
 

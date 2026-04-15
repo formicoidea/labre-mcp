@@ -85,3 +85,12 @@ export interface DecomposedValueChain {
   anchor: ValueChainAnchor;
   components: ValueChainComponent[];
 }
+
+/** Options for evaluateMapComponents / evaluateMapFile */
+export interface EvaluateMapOptions {
+  strategy?: string;
+  context?: string;
+  updateFile?: boolean;
+  msg?: (id: string, params?: Record<string, unknown>) => string;
+  [key: string]: unknown;
+}

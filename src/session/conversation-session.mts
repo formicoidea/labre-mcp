@@ -32,7 +32,7 @@
 //   if (session.isReadyForEstimation()) { ... }
 
 import { classifyComponent, buildReQuestions } from '../work-on-evolution/routing/classification-gate.mjs';
-import type { SessionState, SessionExchange } from '../types/session.mjs';
+import type { SessionState, SessionExchange, SessionSummary } from '../types/session.mjs';
 import {
   detectComponentType,
   COMPONENT_TYPE,
@@ -556,9 +556,7 @@ export class ConversationSession {
    * Get a summary of what has been gathered so far.
    * @returns {Object}
    */
-  // any: summary returns a heterogeneous report object (gathered fields, missing fields,
-  //      phase, isComplete, exchangeCount, ...)
-  getSummary(): any {
+  getSummary(): SessionSummary {
     const gathered: Record<string, unknown> = {};
     const missing: Record<string, unknown> = {};
 

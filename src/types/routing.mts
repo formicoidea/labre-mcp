@@ -112,3 +112,23 @@ export interface ComponentTypeDetection {
 }
 
 export type WebSearchVerificationResult = ComponentTypeDetection;
+
+// ─── Guided / re-questioning response variants ─────────────────────────────
+
+/** Guided conversational turn — partial evaluation with a next question. */
+export interface GuidedTurnResponse {
+  mode: 'conversational' | 'guided';
+  phase: string | null;
+  nextQuestion: NextQuestion | null;
+  gathered?: Record<string, unknown>;
+  sessionState?: string | null;
+  message?: string;
+  formatted?: string;
+  classification?: ClassificationResult | null;
+  evaluations?: EvaluationsMap | null;
+  reQuestions?: string[] | null;
+  [key: string]: unknown;
+}
+
+/** Union of all shapes that the MCP handlers may return from estimateEvolution. */
+export type EstimateEvolutionResponse = RoutedResponse | GuidedTurnResponse;

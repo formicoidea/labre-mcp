@@ -14,6 +14,43 @@
 //   0.70–1.00  Commodity (+utility) (standardised, invisible)
 //   (evolution is always in [0, 1] via geometric projection)
 
+// ─── Strategy result union (formatter boundary) ─────────────────────────────
+
+/**
+ * Shape accepted by the per-strategy formatters. Callers may pass any of:
+ *  - a capability EvolutionResult ({ evolution, confidence, method, trace? })
+ *  - a SolutionEvolutionResult (adds properties, phaseDistribution, …)
+ *  - an error envelope ({ error: string })
+ *  - any strategy-specific extension bag
+ * The formatter narrows fields at the use site (checks for .error, .properties, …).
+ */
+export interface StrategyResultLike {
+  error?: string;
+  evolution?: number;
+  confidence?: number;
+  method?: string;
+  properties?: Array<{ property: string; phase: number; label?: string; reason?: string }>;
+  phaseDistribution?: Record<number, number>;
+  dominantPhase?: { phase: number; count: number; label: string };
+  meanPhase?: number;
+  stage?: string;
+  trace?: unknown[];
+  confidenceMetadata?: { coverage?: number; evaluatedCount?: number; totalCount?: number; [key: string]: unknown };
+  [key: string]: unknown;
+}
+
+/** Component input shape accepted by formatters — loose superset of ComponentInput/SolutionInput. */
+export interface FormatterComponent {
+  name?: string;
+  description?: string;
+  context?: string;
+  capability?: string;
+  nature?: string;
+  certitude?: number;
+  ubiquity?: number;
+  [key: string]: unknown;
+}
+
 // ─── Evolution Stage Mapping ────────────────────────────────────────────────
 
 export interface EvolutionStage {
@@ -115,8 +152,8 @@ export function formatConfidence(confidence: number): { label: string; bar: stri
  * @returns {string} Reasoning sentence
  */
 // any: result/component shapes vary across strategies (capability vs solution vs anchor)
-export function strategyReasoning(method: string, result: any, component: any = {}) {
-  const stage = evolutionToStage(result.evolution);
+export function strategyReasoning(method: string, result: StrategyResultLike, component: FormatterComponent = {}): string {
+  const stage = evolutionToStage(result.evolution ?? 0);
 
   const reasoningMap = {
     's-curve': () => {
@@ -191,7 +228,7 @@ export function strategyReasoning(method: string, result: any, component: any = 
  * @returns {string} Reasoning sentence
  */
 // any: result is a SolutionEvolutionResult-like bag with optional dist/dominant fields
-function buildSolutionPropertiesReasoning(result: any, stage: EvolutionStage): string {
+function buildSolutionPropertiesReasoning(result: StrategyResultLike, stage: EvolutionStage): string {
   const propCount = result.properties?.length || 12;
   const parts = [
     `12-property Wardley evolution evaluation across ${propCount} characteristics ` +
@@ -236,13 +273,13 @@ function buildSolutionPropertiesReasoning(result: any, stage: EvolutionStage): s
  * @returns {string} Markdown block
  */
 // any: evalResult is heterogeneous (EvolutionResult|SolutionEvolutionResult|{error}); component is loose
-export function formatStrategyResult(method: string, evalResult: any, component: any = {}): string {
+export function formatStrategyResult(method: string, evalResult: StrategyResultLike, component: FormatterComponent = {}): string {
   if (evalResult.error) {
     return `**${method}**: ⚠️ ${evalResult.error}`;
   }
 
-  const stage = evolutionToStage(evalResult.evolution);
-  const conf = formatConfidence(evalResult.confidence);
+  const stage = evolutionToStage(evalResult.evolution ?? 0);
+  const conf = formatConfidence(evalResult.confidence ?? 0);
   const reasoning = strategyReasoning(method, evalResult, component);
 
   const lines = [
@@ -273,8 +310,9 @@ export function formatStrategyResult(method: string, evalResult: any, component:
       if (evalResult.stage) {
         summaryParts.push(`Overall stage: ${evalResult.stage}`);
       }
-      if (evalResult.confidenceMetadata?.coverage != null) {
-        const coveragePct = Math.round(evalResult.confidenceMetadata.coverage * 100);
+      const coverage = evalResult.confidenceMetadata?.coverage;
+      if (coverage != null) {
+        const coveragePct = Math.round(coverage * 100);
         summaryParts.push(`Coverage: ${coveragePct}%`);
       }
       if (summaryParts.length > 0) {
@@ -344,10 +382,9 @@ export function formatResponse(result: any, options: any = {}): string {
 
   // ── Economic: evaluation results ──
   if (result.evaluations) {
-    const entries = Object.entries(result.evaluations);
-    // any: ev is EvolutionResult | {error: string}
-    const successful = entries.filter(([, ev]) => !(ev as any).error);
-    const errors = entries.filter(([, ev]) => (ev as any).error);
+    const entries = Object.entries(result.evaluations) as Array<[string, StrategyResultLike]>;
+    const successful = entries.filter(([, ev]) => !ev.error);
+    const errors = entries.filter(([, ev]) => ev.error);
 
     if (successful.length === 0 && errors.length > 0) {
       // All strategies errored
@@ -356,7 +393,7 @@ export function formatResponse(result: any, options: any = {}): string {
       lines.push('All strategies encountered errors:');
       lines.push('');
       for (const [method, ev] of errors) {
-        lines.push(`- **${method}**: ${(ev as any).error}`);  // any: ev has optional error field
+        lines.push(`- **${method}**: ${ev.error}`);
       }
       lines.push('');
       lines.push('*Try providing more parameters (certitude, ubiquity, publication proportions) or use a specific strategy.*');
@@ -532,7 +569,7 @@ function formatRoutingBlock(routing: any): string {
  * @returns {string}
  */
 // any: successful/errors arrays mix strategy result entries; component is loose
-function formatDetailedResults(successful: any[], errors: any[], component: any): string {
+function formatDetailedResults(successful: Array<[string, StrategyResultLike]>, errors: Array<[string, StrategyResultLike]>, component: FormatterComponent): string {
   const lines = [];
 
   // Consensus summary (if multiple strategies)
@@ -570,15 +607,15 @@ function formatDetailedResults(successful: any[], errors: any[], component: any)
  * @returns {string}
  */
 // any: same shapes as formatDetailedResults — compact variant
-function formatCompactResults(successful: any[], errors: any[], component: any): string {
+function formatCompactResults(successful: Array<[string, StrategyResultLike]>, errors: Array<[string, StrategyResultLike]>, component: FormatterComponent): string {
   const lines = [];
 
   lines.push('| Strategy | Evolution | Stage | Confidence |');
   lines.push('|----------|-----------|-------|------------|');
 
   for (const [method, ev] of successful) {
-    const stage = evolutionToStage(ev.evolution);
-    const conf = formatConfidence(ev.confidence);
+    const stage = evolutionToStage(ev.evolution ?? 0);
+    const conf = formatConfidence(ev.confidence ?? 0);
     lines.push(`| ${method} | ${stage.position} | ${stage.shortName} | ${conf.percentage} |`);
   }
 
@@ -588,7 +625,7 @@ function formatCompactResults(successful: any[], errors: any[], component: any):
 
   // One-line consensus
   if (successful.length > 1) {
-    const evolutions = successful.map(([, ev]) => ev.evolution);
+    const evolutions = successful.map(([, ev]) => ev.evolution ?? 0);
     const avg = evolutions.reduce((a, b) => a + b, 0) / evolutions.length;
     const avgStage = evolutionToStage(avg);
     lines.push('');
@@ -605,9 +642,10 @@ function formatCompactResults(successful: any[], errors: any[], component: any):
  * @returns {string}
  */
 // any: successful is a list of strategy result entries
-function formatConsensus(successful: any[]): string {
-  const evolutions = successful.map(([, ev]) => ev.evolution);
-  const confidences = successful.map(([, ev]) => ev.confidence);
+function formatConsensus(successful: Array<[string, StrategyResultLike]>): string {
+  // Guarded: successful only contains entries that already have evolution/confidence
+  const evolutions = successful.map(([, ev]) => ev.evolution ?? 0);
+  const confidences = successful.map(([, ev]) => ev.confidence ?? 0);
 
   const avg = evolutions.reduce((a, b) => a + b, 0) / evolutions.length;
   const min = Math.min(...evolutions);

@@ -15,7 +15,7 @@
 
 import { estimateEvolutionOneShot, estimateEvolutionConversational } from '../estimate-evolution.mjs';
 import { formatResponse } from '../../lib/response-formatter.mjs';
-import type { RoutedResponse } from '../../types/routing.mjs';
+import type { RoutedResponse, EstimateEvolutionResponse, GuidedTurnResponse } from '../../types/routing.mjs';
 
 // ─── Mode Constants ────────────────────────────────────────────────────────
 
@@ -146,8 +146,8 @@ export function detectMode(input: any): { mode: string; reason: string } {
  * @param {Object} input - Request input with optional mode parameter
  * @returns {Promise<RoutedResponse>} Unified response with mode, results, and formatting
  */
-// any: input is MCP raw arguments; output is RoutedResponse | guided-turn shape
-export async function routeEstimateEvolution(input: any = {}): Promise<any> {
+// any: input is raw MCP arguments bag
+export async function routeEstimateEvolution(input: any = {}): Promise<EstimateEvolutionResponse> {
   const { mode, reason } = detectMode(input);
 
   if (mode === MODES.ONESHOT) {
@@ -236,7 +236,7 @@ async function routeOneShot(input: any, modeReason: string): Promise<RoutedRespo
  * @param {string} modeReason - Why guided was selected
  * @returns {Promise<RoutedResponse>}
  */
-async function routeGuided(input: any, modeReason: string): Promise<any> {  // any: guided-turn shape
+async function routeGuided(input: any, modeReason: string): Promise<GuidedTurnResponse> {
   // Build conversational input
   const conversationalInput: any = {
     sessionState: input.sessionState || null,
@@ -277,7 +277,7 @@ async function routeGuided(input: any, modeReason: string): Promise<any> {  // a
   }
 
   return {
-    mode: MODES.GUIDED,
+    mode: MODES.GUIDED as 'guided',
     modeReason,
     classification: result.classification,
     reQuestions: result.reQuestions,
@@ -469,8 +469,8 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
   });
   console.log(`  Mode: ${r1.mode}`);
   console.log(`  Reason: ${r1.modeReason}`);
-  console.log(`  Evolution: ${r1.evaluations?.['s-curve']?.evolution}`);
-  console.log(`  Has formatted: ${r1.formatted?.length > 0}`);
+  console.log(`  Evolution: ${(r1.evaluations?.['s-curve'] as any)?.evolution}`);
+  console.log(`  Has formatted: ${(r1.formatted?.length ?? 0) > 0}`);
   console.log(`  SessionState: ${r1.sessionState}`);
   console.assert(r1.mode === 'oneshot', 'Should be oneshot');
   console.assert(r1.sessionState === null, 'One-shot has no session');
@@ -509,13 +509,13 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
   });
   console.log(`  Mode: ${r4.mode}`);
   console.log(`  Space: ${r4.classification?.space}`);
-  console.log(`  Has reQuestions: ${r4.reQuestions?.length > 0}`);
+  console.log(`  Has reQuestions: ${(r4.reQuestions?.length ?? 0) > 0}`);
   console.log(`  Evaluations: ${r4.evaluations}`);
-  console.assert(r4.reQuestions?.length > 0, 'Should have re-questions');
+  console.assert((r4.reQuestions?.length ?? 0) > 0, 'Should have re-questions');
 
   // Test 15: Shared formatting consistency
   console.log('\n--- Test 15: Formatted output ---');
-  console.log(r1.formatted.substring(0, 200) + '...');
+  console.log((r1.formatted ?? '').substring(0, 200) + '...');
 
   console.log('\n=== mode-router self-test completed ===');
 }

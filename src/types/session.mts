@@ -34,3 +34,15 @@ export interface SessionExchange {
   content: string;
   timestamp?: number;
 }
+
+/** Session summary report returned by ConversationSession.getSummary() */
+export interface SessionSummary {
+  phase: string;
+  componentType: string | null;
+  gathered: Record<string, unknown>;
+  missing: string[];
+  history?: string[];
+  readyForEstimation: boolean;
+  exchangeCount: number;
+  [key: string]: unknown;
+}
