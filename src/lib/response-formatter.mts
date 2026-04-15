@@ -16,6 +16,14 @@
 
 // ─── Evolution Stage Mapping ────────────────────────────────────────────────
 
+export interface EvolutionStage {
+  name: string;
+  shortName: string;
+  descriptor: string;
+  rangeMin: number;
+  rangeMax: number;
+}
+
 /**
  * @typedef {Object} EvolutionStage
  * @property {string} name       - Stage label (e.g. "Product (+rental)")
@@ -25,7 +33,7 @@
  * @property {number} rangeMax   - Upper bound (exclusive, except last)
  */
 
-const EVOLUTION_STAGES = [
+const EVOLUTION_STAGES: EvolutionStage[] = [
   {
     name: 'Genesis',
     shortName: 'Genesis',
@@ -62,7 +70,7 @@ const EVOLUTION_STAGES = [
  * @param {number} evolution - Evolution value
  * @returns {EvolutionStage & { position: string }}
  */
-export function evolutionToStage(evolution) {
+export function evolutionToStage(evolution: number): EvolutionStage & { position: string } {
   for (const stage of EVOLUTION_STAGES) {
     if (evolution >= stage.rangeMin && evolution < stage.rangeMax) {
       return { ...stage, position: evolution.toFixed(3) };
@@ -81,7 +89,7 @@ export function evolutionToStage(evolution) {
  * @param {number} confidence - Confidence 0–1
  * @returns {{ label: string, bar: string, percentage: string }}
  */
-export function formatConfidence(confidence) {
+export function formatConfidence(confidence: number): { label: string; bar: string; percentage: string } {
   const pct = Math.round(confidence * 100);
   const filledBlocks = Math.round(confidence * 10);
   const bar = '█'.repeat(filledBlocks) + '░'.repeat(10 - filledBlocks);
@@ -153,13 +161,13 @@ export function strategyReasoning(method: string, result: any, component: any = 
     'solution-properties': () => buildSolutionPropertiesReasoning(result, stage),
   };
 
-  const generator = reasoningMap[method];
+  const generator = (reasoningMap as Record<string, () => string>)[method];
   if (generator) return generator();
 
   // Handle solution: prefixed methods (parallel mode key collision resolution)
   if (method.startsWith('solution:')) {
     const baseMethod = method.replace(/^solution:/, '');
-    const baseGenerator = reasoningMap[baseMethod];
+    const baseGenerator = (reasoningMap as Record<string, () => string>)[baseMethod];
     if (baseGenerator) return baseGenerator();
   }
 
@@ -181,7 +189,7 @@ export function strategyReasoning(method: string, result: any, component: any = 
  * @param {Object} stage  - Wardley stage from evolutionToStage()
  * @returns {string} Reasoning sentence
  */
-function buildSolutionPropertiesReasoning(result, stage) {
+function buildSolutionPropertiesReasoning(result: any, stage: EvolutionStage): string {
   const propCount = result.properties?.length || 12;
   const parts = [
     `12-property Wardley evolution evaluation across ${propCount} characteristics ` +
@@ -225,7 +233,7 @@ function buildSolutionPropertiesReasoning(result, stage) {
  * @param {Object} [component] - Original component input
  * @returns {string} Markdown block
  */
-export function formatStrategyResult(method, evalResult, component = {}) {
+export function formatStrategyResult(method: string, evalResult: any, component: any = {}): string {
   if (evalResult.error) {
     return `**${method}**: ⚠️ ${evalResult.error}`;
   }
@@ -245,9 +253,9 @@ export function formatStrategyResult(method, evalResult, component = {}) {
   if (evalResult.properties && Array.isArray(evalResult.properties) && evalResult.properties.length > 0) {
     lines.push('');
     lines.push('  Property breakdown:');
-    const phaseLabels = { 1: 'Genesis', 2: 'Custom', 3: 'Product', 4: 'Commodity' };
+    const phaseLabels: Record<number, string> = { 1: 'Genesis', 2: 'Custom', 3: 'Product', 4: 'Commodity' };
     for (const prop of evalResult.properties) {
-      const label = prop.label || phaseLabels[prop.phase] || `Phase ${prop.phase}`;
+      const label = prop.label || phaseLabels[prop.phase as number] || `Phase ${prop.phase}`;
       const reasonSuffix = prop.reason ? ` — ${prop.reason}` : '';
       lines.push(`    - ${prop.property}: **${label}** (phase ${prop.phase})${reasonSuffix}`);
     }
@@ -379,8 +387,8 @@ export function formatResponse(result: any, options: any = {}) {
  * @param {string} space
  * @returns {string}
  */
-function formatSpaceName(space) {
-  const names = {
+function formatSpaceName(space: string): string {
+  const names: Record<string, string> = {
     economic: 'Economic Space (market-driven)',
     social_good: 'Social Good (naturally available)',
     common_good: 'Common Good (collectively managed)',
@@ -396,7 +404,7 @@ function formatSpaceName(space) {
  * @param {Object} classification
  * @returns {string}
  */
-function formatReQuestioningBlock(reQuestions, name, classification) {
+function formatReQuestioningBlock(reQuestions: string[], name: string, classification: any): string {
   const spaceLabel = classification?.space === 'social_good' ? 'social good' : 'common good';
   const lines = [
     `### ⚠️ Component Outside Economic Space`,
@@ -434,15 +442,15 @@ function formatReQuestioningBlock(reQuestions, name, classification) {
  * @param {{ type: string, confidence: number, reason: string }} wardleyType
  * @returns {string} Markdown line
  */
-function formatWardleyTypeBlock(wardleyType) {
-  const typeLabels = {
+function formatWardleyTypeBlock(wardleyType: any): string {
+  const typeLabels: Record<string, string> = {
     activity: 'Activity (what you do)',
     practice: 'Practice (how you do it)',
     data: 'Data (information/records)',
     knowledge: 'Knowledge (expertise/understanding)',
   };
 
-  const label = typeLabels[wardleyType.type] || wardleyType.type;
+  const label = typeLabels[wardleyType.type as string] || wardleyType.type;
   const conf = formatConfidence(wardleyType.confidence);
 
   return `**Wardley Component Type:** ${label} — ${conf.percentage} confidence (${wardleyType.reason})`;
@@ -465,14 +473,14 @@ function formatWardleyTypeBlock(wardleyType) {
  * @param {string[]} [routing.tiersUsed] - Verification tiers invoked (e.g. ['naming', 'llm'])
  * @returns {string} Markdown block
  */
-function formatRoutingBlock(routing) {
+function formatRoutingBlock(routing: any): string {
   const typeLabel = routing.type === 'solution'
     ? 'Named Solution (product/platform)'
     : 'Abstract Capability (activity/practice)';
 
   const conf = formatConfidence(routing.confidence);
 
-  const methodLabels = {
+  const methodLabels: Record<string, string> = {
     'known-solution': 'dictionary match (known solution)',
     'known-capability': 'dictionary match (known capability)',
     'heuristic': 'naming convention heuristics',
@@ -481,7 +489,7 @@ function formatRoutingBlock(routing) {
     'naming+web-search': 'naming + web search evidence',
     'naming+llm+web-search': 'naming + LLM + web search (full pipeline)',
   };
-  const methodLabel = methodLabels[routing.method] || routing.method;
+  const methodLabel = methodLabels[routing.method as string] || routing.method;
 
   const lines = [
     `**Component Type:** ${typeLabel}`,
@@ -516,7 +524,7 @@ function formatRoutingBlock(routing) {
  * @param {Object} component
  * @returns {string}
  */
-function formatDetailedResults(successful, errors, component) {
+function formatDetailedResults(successful: any[], errors: any[], component: any): string {
   const lines = [];
 
   // Consensus summary (if multiple strategies)
@@ -553,7 +561,7 @@ function formatDetailedResults(successful, errors, component) {
  * @param {Object} component
  * @returns {string}
  */
-function formatCompactResults(successful, errors, component) {
+function formatCompactResults(successful: any[], errors: any[], component: any): string {
   const lines = [];
 
   lines.push('| Strategy | Evolution | Stage | Confidence |');
@@ -587,7 +595,7 @@ function formatCompactResults(successful, errors, component) {
  * @param {Array} successful - [[method, result], ...]
  * @returns {string}
  */
-function formatConsensus(successful) {
+function formatConsensus(successful: any[]): string {
   const evolutions = successful.map(([, ev]) => ev.evolution);
   const confidences = successful.map(([, ev]) => ev.confidence);
 
@@ -634,7 +642,7 @@ function formatConsensus(successful) {
  * @param {Object} result - Conversational result with phase, nextQuestion, summary
  * @returns {string}
  */
-function formatConversationalGuidance(result) {
+function formatConversationalGuidance(result: any): string {
   const lines = [];
 
   if (result.nextQuestion) {
@@ -695,7 +703,7 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
 
   // Test 4: Full economic response
   console.log('--- Test 4: Full economic response ---');
-  const economicResult = {
+  const economicResult: any = {
     classification: { space: 'economic', reason: '"ERP" classified as economic.', requiresReQuestion: false },
     reQuestions: null,
     evaluations: {
@@ -712,7 +720,7 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
 
   // Test 5: Re-questioning response
   console.log('--- Test 5: Re-questioning response ---');
-  const socialResult = {
+  const socialResult: any = {
     classification: { space: 'social_good', reason: '"Air" is a naturally available resource.', requiresReQuestion: true },
     reQuestions: [
       'Did you mean a commercialized version of this resource (e.g., bottled oxygen, air filtration systems)?',
@@ -732,7 +740,7 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
 
   // Test 7: Single strategy
   console.log('--- Test 7: Single strategy ---');
-  const singleResult = {
+  const singleResult: any = {
     classification: { space: 'economic', reason: 'economic component', requiresReQuestion: false },
     reQuestions: null,
     evaluations: {
@@ -745,7 +753,7 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
 
   // Test 8: All errors
   console.log('--- Test 8: All errors ---');
-  const errorResult = {
+  const errorResult: any = {
     classification: { space: 'economic', reason: 'economic component', requiresReQuestion: false },
     reQuestions: null,
     evaluations: {
