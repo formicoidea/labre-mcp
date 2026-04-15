@@ -66,7 +66,7 @@ Examples:
  * @param {{ name: string, type?: string, context?: string }} component - Input component
  * @returns {{ type: string, nature: string, capability: string, confidence: number, justification: string, context: string, name: string }}
  */
-export function parseCapabilityResponse(text, component) {
+export function parseCapabilityResponse(text: string, component: any): any {
   const typeMatch = text.match(/^type=(\S+)/mi);
   const natureMatch = text.match(/^nature=(\S+)/mi);
   const capMatch = text.match(/^capability=(.*)/mi);
@@ -104,7 +104,7 @@ export function parseCapabilityResponse(text, component) {
  * @param {function(string): Promise<string>} llmCall
  * @returns {Promise<{ type: string, nature: string, capability: string, confidence: number, justification: string }>}
  */
-export async function identifyCapability(component, llmCall) {
+export async function identifyCapability(component: any, llmCall?: any): Promise<any> {
   // When type is known and non-eligible, skip immediately
   if (component.type && !ELIGIBLE_TYPES.has(component.type)) {
     return {
@@ -141,8 +141,8 @@ export async function identifyCapability(component, llmCall) {
 
 // ─── Lazy LLM Singleton ────────────────────────────────────────────────────
 
-let _llmCall = null;
-function getLLMCall() {
+let _llmCall: ReturnType<typeof createLLMCall> | null = null;
+function getLLMCall(): ReturnType<typeof createLLMCall> {
   if (!_llmCall) {
     const model = process.env.WARDLEY_LLM_MODEL || 'claude-sonnet-4-6';
     logDebug('identifyCapability', `LLM backend: Agent SDK, model="${model}"`);

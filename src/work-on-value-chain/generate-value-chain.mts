@@ -68,7 +68,7 @@ IMPORTANT:
  * @param {Object<string, number>} evolutions - Component name → evolution score
  * @returns {string} Valid .wm file content
  */
-function generateWmContent(chain, evolutions) {
+function generateWmContent(chain: any, evolutions: Record<string, number>): string {
   const lines = [];
 
   // Title
@@ -89,7 +89,7 @@ function generateWmContent(chain, evolutions) {
   lines.push('');
 
   // Links — anchor to top-level components
-  const topLevel = chain.components.filter(c => c.visibility >= 0.70);
+  const topLevel = chain.components.filter((c: any) => c.visibility >= 0.70);
   for (const comp of topLevel) {
     lines.push(`${chain.anchor.name}->${comp.name}`);
   }
@@ -111,7 +111,7 @@ function generateWmContent(chain, evolutions) {
 
 // ─── Filename Generation ────────────────────────────────────────────────────
 
-function slugify(text) {
+function slugify(text: string): string {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -174,10 +174,10 @@ export async function generateValueChain(description: string, options: any = {})
   logDebug(TOOL, `Decomposition complete: "${chain.title}" — ${chain.components.length} components + 1 anchor`);
 
   // Step 2: Evaluate evolution for each component + anchor
-  const evaluations = {};
+  const evaluations: Record<string, number> = {};
   const allItems = [
     { name: chain.anchor.name, context: chain.anchor.context },
-    ...chain.components.map(c => ({ name: c.name, context: c.context })),
+    ...chain.components.map((c: any) => ({ name: c.name, context: c.context })),
   ];
 
   for (let i = 0; i < allItems.length; i++) {
