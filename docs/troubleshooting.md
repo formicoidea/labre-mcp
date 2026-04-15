@@ -10,7 +10,7 @@
 
 ```bash
 unset _WARDLEY_NESTED
-node --env-file=.env src/mcp-server.mjs
+pnpm run dev
 ```
 
 ### "OPENCODE_API_KEY is not set"
@@ -48,13 +48,36 @@ Note : cette cle n'est necessaire que pour les strategies utilisant le backend O
 
 **Methodes supportees** : `initialize`, `tools/list`, `tools/call`, `ping`, `notifications/initialized`
 
+### ZodError: Invalid input
+
+**Cause** : Les arguments passes a un outil ne respectent pas le schema Zod. Le handler appelle `Schema.parse(args)` qui leve une `ZodError` structuree.
+
+**Message typique** :
+
+```json
+{
+  "error": {
+    "code": -32602,
+    "message": "Invalid input",
+    "data": {
+      "issues": [
+        { "path": ["certitude"], "message": "Number must be less than or equal to 1" },
+        { "path": ["name"], "message": "Required" }
+      ]
+    }
+  }
+}
+```
+
+**Solution** : Lire `issues[].path` (chemin dans l'objet d'entree) et `issues[].message` (regle violee). Le schema de reference est dans `src/schemas/*.schema.mts`. Voir [validation.md](validation.md).
+
 ## Debug
 
 ### Activer le mode verbose
 
 ```bash
 # Via variable d'environnement
-WARDLEY_VERBOSE=1 node --env-file=.env src/mcp-server.mjs
+WARDLEY_VERBOSE=1 npx tsx --env-file=.env src/mcp/mcp-server.mts
 
 # Ou dans le fichier .env
 WARDLEY_VERBOSE=1
@@ -66,52 +89,41 @@ Envoyer des messages JSON-RPC sur stdin :
 
 ```bash
 # Ping
-echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | node --env-file=.env src/mcp-server.mjs
+echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | npx tsx --env-file=.env src/mcp/mcp-server.mts
 
 # Lister les outils
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | node --env-file=.env src/mcp-server.mjs
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | npx tsx --env-file=.env src/mcp/mcp-server.mts
 
 # Appel complet (initialize + call)
 printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"test","version":"1.0"}}}
 {"jsonrpc":"2.0","method":"notifications/initialized"}
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"estimateEvolution","arguments":{"name":"ERP","strategy":"s-curve","certitude":0.9,"ubiquity":0.85}}}
-' | node --env-file=.env src/mcp-server.mjs
+' | npx tsx --env-file=.env src/mcp/mcp-server.mts
 ```
 
 ### Filtrer les notifications
 
 ```bash
 # Voir uniquement les notifications de progression
-... | node --env-file=.env src/mcp-server.mjs | grep "notifications/message"
+... | npx tsx --env-file=.env src/mcp/mcp-server.mts | grep "notifications/message"
 
 # Voir uniquement les channel notifications
-... | node --env-file=.env src/mcp-server.mjs | grep "claude/channel"
+... | npx tsx --env-file=.env src/mcp/mcp-server.mts | grep "claude/channel"
 ```
 
 ### Lancer les tests
 
 ```bash
 # Tous les tests
-node --test src/*.test.mjs src/strategies/*.test.mjs
+pnpm test
 
-# Un fichier specifique
-node --test src/classification-gate.test.mjs
-
-# Tests avec module mocks (Node 22+)
-node --test --experimental-test-module-mocks src/evaluate-map-notifications.test.mjs
+# Un fichier specifique (via tsx)
+npx tsx --test src/work-on-evolution/routing/classification-gate.test.mts
 ```
-
-**Note** : Certains tests necessitent `--experimental-test-module-mocks` sous Node.js v22 pour le mocking de modules.
 
 ### Visualiser le modele S-curve
 
-Ouvrir `src/evolution/s-curve-visualizer.html` dans un navigateur pour visualiser interactivement le modele dual sigmoide et ajuster les parametres.
-
-### Calibrer les parametres S-curve
-
-```bash
-node src/calibrate-s-curve.mjs
-```
+Ouvrir `src/work-on-evolution/s-curve/s-curve-visualizer.html` dans un navigateur pour visualiser interactivement le modele dual sigmoide et ajuster les parametres.
 
 Permet d'ajuster les parametres kUpper, kLower, x0, yMin, yMax, nu du modele.
 
@@ -138,7 +150,7 @@ La detection est automatique : si vous fournissez assez de parametres, c'est du 
 
 ### Comment ajouter une strategie ?
 
-Creer un fichier `src/strategies/ma-strategy.mjs` qui etend `BaseStrategy`. Le registre le decouvre automatiquement. Voir [Extensibilite](extending.md).
+Creer un fichier `src/work-on-evolution/strategies/capacity/ma-strategy.mts` qui etend `BaseStrategy`. Le registre le decouvre automatiquement. Voir [Extensibilite](extending.md).
 
 ### Que signifie "extra-competitif" ?
 

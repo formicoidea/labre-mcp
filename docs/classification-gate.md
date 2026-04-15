@@ -58,7 +58,7 @@ Le systeme utilise un score combine :
 ## API
 
 ```javascript
-import { classifyComponent, buildReQuestions } from './classification-gate.mjs';
+import { classifyComponent, buildReQuestions } from './classification-gate.mts';
 
 const result = classifyComponent('Air', 'Oxygene atmospherique pour la respiration');
 // → { space: 'social_good', reason: '...', requiresReQuestion: true }

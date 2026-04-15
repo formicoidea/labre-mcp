@@ -1,24 +1,25 @@
 # Extensibilite
 
-## Ajouter une nouvelle strategie
+## Ajouter une nouvelle strategie capability
 
 C'est la forme d'extension la plus simple — aucune modification de code existant n'est necessaire.
 
 ### Etape 1 : Creer le fichier
 
-Creer `src/strategies/ma-strategy.mjs` :
+Creer `src/work-on-evolution/strategies/capacity/ma-strategy.mts` :
 
-```javascript
+```typescript
 import { BaseStrategy } from './base-strategy.mjs';
+import type { ComponentInput, EvolutionResult } from '../../../types/evolution.mjs';
 
 export class MaStrategy extends BaseStrategy {
   // Identifiant unique de la strategie
-  static get method() {
+  static get method(): string {
     return 'ma-strategy';
   }
 
   // Evaluation du composant
-  async evaluate(component) {
+  async evaluate(component: ComponentInput): Promise<EvolutionResult> {
     const { name, certitude, ubiquity, description } = component;
 
     // Votre logique d'evaluation ici
@@ -36,7 +37,7 @@ export class MaStrategy extends BaseStrategy {
 
 ### Etape 2 : C'est tout
 
-Le registre (`strategies/registry.mjs`) decouvre automatiquement tout fichier `*-strategy.mjs` dans le dossier `src/strategies/`. Pas besoin de modifier le registre, le serveur ou les handlers.
+Le registre (`src/work-on-evolution/strategies/capacity/registry.mts`) decouvre automatiquement tout fichier `*-strategy.mts` dans le dossier. Pas besoin de modifier le registre, le serveur ou les handlers.
 
 ### Contrat a respecter
 
@@ -75,26 +76,27 @@ async evaluate(component) {
 
 ## Ajouter une solution strategy
 
-Meme principe que les capability strategies, mais dans le dossier `src/solution-strategies/`.
+Meme principe que les capability strategies, mais dans le dossier `src/work-on-evolution/strategies/solution/`.
 
 ### Etape 1 : Creer le fichier
 
-Creer `src/solution-strategies/ma-strategy.mjs` :
+Creer `src/work-on-evolution/strategies/solution/ma-strategy.mts` :
 
-```javascript
+```typescript
 import { SolutionBaseStrategy } from './solution-base-strategy.mjs';
+import type { SolutionInput, SolutionEvolutionResult } from '../../../types/solution.mjs';
 
 export class MaStrategy extends SolutionBaseStrategy {
-  static get method() {
+  static get method(): string {
     return 'ma-solution-strategy';
   }
 
-  async evaluate(component) {
+  async evaluate(component: SolutionInput): Promise<SolutionEvolutionResult> {
     const { name, description } = component;
 
     // Votre logique d'evaluation ici
     // Doit retourner un SolutionEvolutionResult
-    return this.validateSolutionResult({
+    return SolutionBaseStrategy.validateSolutionResult({
       evolution: 0.55,
       confidence: 0.80,
       method: MaStrategy.method,
@@ -106,7 +108,7 @@ export class MaStrategy extends SolutionBaseStrategy {
 
 ### Etape 2 : C'est tout
 
-Le registre (`solution-strategies/registry.mjs`) decouvre automatiquement tout fichier `*-strategy.mjs` dans `src/solution-strategies/`. Meme mecanisme que les capability strategies.
+Le registre (`src/work-on-evolution/strategies/solution/registry.mts`) decouvre automatiquement tout fichier `*-strategy.mts` dans le dossier.
 
 ### Contrat a respecter
 
@@ -134,71 +136,100 @@ Etend `EvolutionResult` avec des champs supplementaires :
 
 ## Ajouter un nouvel outil MCP
 
-### Etape 1 : Creer le module
+Le flow moderne utilise **Zod comme source de verite unique** — le schema Zod genere a la fois le JSON Schema expose au client MCP, le type TypeScript, et la validation runtime. Plus de duplication entre `inputSchema` literal et fonction `validateInput()` manuelle.
 
-Creer `src/mon-outil.mjs` :
+### Etape 1 : Creer le schema Zod
 
-```javascript
-// Definition du schema MCP
-export const MON_OUTIL_TOOL = {
+Creer `src/schemas/mon-outil.schema.mts` :
+
+```typescript
+import { z } from 'zod';
+
+export const MonOutilInputSchema = z.object({
+  param1: z.string().min(1).describe('Mon parametre obligatoire'),
+  option: z.number().min(0).max(1).optional().describe('Option numerique [0-1]'),
+  mode: z.enum(['fast', 'thorough']).default('fast'),
+}).strict();
+
+export type MonOutilInput = z.infer<typeof MonOutilInputSchema>;
+```
+
+Les `.describe()` alimentent le champ `description` du JSON Schema genere. `.strict()` refuse les proprietes inconnues.
+
+### Etape 2 : Creer le module tool
+
+Creer `src/mon-outil.mts` :
+
+```typescript
+import { z } from 'zod';
+import type { McpToolDefinition, JsonSchema } from './types/mcp.mjs';
+import { MonOutilInputSchema, type MonOutilInput } from './schemas/mon-outil.schema.mjs';
+import { logInfo, logError } from './lib/mcp-notifications.mjs';
+import { toErrorMessage } from './lib/errors.mjs';
+
+// Tool definition — le JSON Schema est genere a partir du Zod schema
+export const MON_OUTIL_TOOL: McpToolDefinition = {
   name: 'monOutil',
-  description: 'Description de mon outil',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      param1: { type: 'string', description: 'Mon parametre' },
-    },
-    required: ['param1'],
-  },
+  description: 'Description de mon outil, visible dans l\'autocompletion MCP.',
+  inputSchema: z.toJSONSchema(MonOutilInputSchema, { io: 'input' }) as JsonSchema,
 };
 
-// Handler
-export async function handleMonOutil(args) {
-  const { param1 } = args;
-  // Logique metier
-  return { result: `Traite: ${param1}` };
-}
-```
+// Handler : Zod valide les args, lance une ZodError structuree si invalide
+export async function handleMonOutil(args: Record<string, unknown>): Promise<unknown> {
+  const input: MonOutilInput = MonOutilInputSchema.parse(args);
+  const TOOL = 'monOutil';
 
-### Etape 2 : Enregistrer dans le serveur
-
-Modifier `src/mcp-server.mjs` :
-
-```javascript
-import { MON_OUTIL_TOOL, handleMonOutil } from './mon-outil.mjs';
-
-const REGISTERED_TOOLS = [
-  ESTIMATE_EVOLUTION_TOOL,
-  GENERATE_VALUE_CHAIN_TOOL,
-  EVALUATE_MAP_TOOL,
-  MON_OUTIL_TOOL,  // Ajouter ici
-];
-
-const TOOL_HANDLERS = new Map([
-  [ESTIMATE_EVOLUTION_TOOL.name, handleEstimateEvolution],
-  [GENERATE_VALUE_CHAIN_TOOL.name, handleGenerateValueChain],
-  [EVALUATE_MAP_TOOL.name, handleEvaluateMap],
-  [MON_OUTIL_TOOL.name, handleMonOutil],  // Ajouter ici
-]);
-```
-
-### Etape 3 : Ajouter les notifications (optionnel)
-
-```javascript
-import { logInfo, logDebug, logError } from './mcp-notifications.mjs';
-
-export async function handleMonOutil(args) {
-  logInfo('monOutil', `Starting monOutil for "${args.param1}"...`);
+  logInfo(TOOL, `Starting monOutil for "${input.param1}" (mode=${input.mode})...`);
   try {
-    // ...
-    logInfo('monOutil', `monOutil completed for "${args.param1}"`);
+    // Logique metier — input est strictement type via z.infer
+    const result = { result: `Traite: ${input.param1}` };
+    logInfo(TOOL, `monOutil completed for "${input.param1}"`);
     return result;
   } catch (err) {
-    logError('monOutil', `monOutil failed: ${err.message}`);
+    logError(TOOL, `monOutil failed: ${toErrorMessage(err)}`);
     throw err;
   }
 }
 ```
+
+### Etape 3 : Enregistrer dans le serveur
+
+Modifier `src/mcp/mcp-server.mts` :
+
+```typescript
+import { MON_OUTIL_TOOL, handleMonOutil } from '../mon-outil.mjs';
+
+const REGISTERED_TOOLS: McpToolDefinition[] = [
+  ESTIMATE_EVOLUTION_TOOL,
+  GENERATE_VALUE_CHAIN_TOOL,
+  EVALUATE_MAP_TOOL,
+  IDENTIFY_CAPABILITY_TOOL,
+  ESTIMATE_ANCHOR_EVOLUTION_TOOL,
+  MON_OUTIL_TOOL,  // Ajouter ici
+];
+
+const TOOL_HANDLERS: Map<string, ToolHandler> = new Map([
+  // ... existants ...
+  [MON_OUTIL_TOOL.name, handleMonOutil],  // Ajouter ici
+]);
+```
+
+### Etape 4 : Exporter via l'API publique (optionnel)
+
+Si le tool doit etre accessible via l'API programmatique, ajouter dans `src/index.mts` :
+
+```typescript
+export { MON_OUTIL_TOOL, handleMonOutil } from './mon-outil.mjs';
+```
+
+### Pourquoi Zod plutot qu'un JSON Schema literal
+
+- **Une seule source de verite** : le schema Zod definit le JSON Schema client + le type TS + la validation runtime
+- **Validation runtime reelle** : `Schema.parse(args)` retourne une `ZodError` structuree (`issues[].path`, `issues[].message`) si l'input est invalide, au lieu d'un crash cryptique plus loin
+- **Types inferes** : plus besoin de maintenir une interface TS en parallele
+- **Refactoring simplifie** : ajouter un champ = une ligne dans le schema, TS, JSON Schema et validation sont mis a jour automatiquement
+
+Voir [validation.md](validation.md) pour le detail du systeme Zod.
 
 ---
 
@@ -206,7 +237,7 @@ export async function handleMonOutil(args) {
 
 ### Etape 1 : Creer la fonction d'appel
 
-Ajouter dans `src/llm-call.mjs` :
+Ajouter dans `src/lib/llm/llm-call.mts` :
 
 ```javascript
 export function createMonBackendCall(config = {}) {
@@ -251,7 +282,7 @@ export function createMonBackendLogprobCall(config = {}) {
 
 ### Etape 1 : Ajouter au catalogue
 
-Modifier `src/progress-messages.mjs` — ajouter la langue a chaque message :
+Modifier `src/lib/progress-messages.mts` — ajouter la langue a chaque message :
 
 ```javascript
 {
@@ -264,7 +295,7 @@ Modifier `src/progress-messages.mjs` — ajouter la langue a chaque message :
 
 ### Etape 2 : Ajouter au detecteur
 
-Modifier `src/language-detect.mjs` — ajouter une empreinte :
+Modifier `src/lib/language-detect.mts` — ajouter une empreinte :
 
 ```javascript
 const FINGERPRINTS = {

@@ -35,6 +35,22 @@ src/
 │   ├── mcp-tool.mts             Tool "estimateEvolution" (schéma + handler)
 │   └── mcp-tool-transparent.test.mts
 │
+├── schemas/                     ── Schémas Zod (source de vérité unique)
+│   ├── estimate-evolution.schema.mts      Entrée de estimateEvolution
+│   ├── generate-value-chain.schema.mts    Entrée de generateValueChain
+│   ├── evaluate-map.schema.mts            Entrée de evaluateMap
+│   ├── identify-capability.schema.mts     Entrée de identifyCapability
+│   ├── estimate-anchor-evolution.schema.mts  Entrée de estimateAnchorEvolution
+│   ├── domain.schema.mts                  ComponentInput, SolutionInput, EvolutionResult, …
+│   ├── patent.schema.mts                  PatentDataSchema + 8 sous-shapes (BigQuery/mock)
+│   ├── parsed-llm.schema.mts              Schémas des parsers LLM
+│   └── …
+│   Les 5 schémas d'entrée MCP génèrent le JSON Schema exposé au client via
+│   `z.toJSONSchema(Schema, { io: 'input' })` et les types TS via `z.infer<…>`.
+│
+├── types/                       ── Re-exports typés (pour imports plus courts)
+│
+
 ├── lib/                         ── Code réutilisable inter-domaines (cross work-on-*)
 │   ├── component-detection.mts  Heuristiques de détection de composants
 │   ├── known-dictionaries.mts   Dictionnaires de référence (termes connus)

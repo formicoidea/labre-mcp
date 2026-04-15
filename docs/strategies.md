@@ -2,7 +2,7 @@
 
 WardleyAssistant utilise deux pipelines d'evaluation complementaires, selectionnes automatiquement selon le type de composant :
 
-- **Capability Strategies** (6 strategies) — pour les capacites abstraites (CRM, container orchestration, data storage)
+- **Capability Strategies** (7 strategies) — pour les capacites abstraites (CRM, container orchestration, data storage)
 - **Solution Strategies** (12 proprietes Wardley) — pour les solutions/produits nommes (Kubernetes, Salesforce, SAP ERP)
 
 Le [routage](architecture.md#detection-solution-vs-capability--pipeline-3-tiers) est transparent : l'utilisateur fournit un nom de composant et le systeme detecte automatiquement le type.
@@ -11,20 +11,23 @@ Le [routage](architecture.md#detection-solution-vs-capability--pipeline-3-tiers)
 
 # Capability Strategies
 
-Les capability strategies evaluent les capacites abstraites via 6 strategies pluggables. Chaque strategie produit un resultat independant : `{ evolution, confidence, method }`.
+Les capability strategies evaluent les capacites abstraites via 7 strategies pluggables (s-curve, publication-analysis, timeline-benchmark, llm-direct, logprob-distribution, cpc-evolution, sector-agent). Chaque strategie produit un resultat independant : `{ evolution, confidence, method }`.
 
 ## Auto-decouverte
 
-Les strategies sont decouvertes automatiquement au demarrage via `strategies/registry.mjs`. Tout fichier `*-strategy.mjs` dans le dossier `src/strategies/` est charge et enregistre. Aucune modification du registre n'est necessaire pour ajouter une strategie.
+Les strategies sont decouvertes automatiquement au demarrage via `src/work-on-evolution/strategies/capacity/registry.mts`. Tout fichier `*-strategy.mts` dans ce dossier est charge et enregistre. Aucune modification du registre n'est necessaire pour ajouter une strategie.
 
 ## Interface commune
 
-Chaque strategie etend `BaseStrategy` (`strategies/base-strategy.mjs`) :
+Chaque strategie etend `BaseStrategy` (`src/work-on-evolution/strategies/capacity/base-strategy.mts`) :
 
-```javascript
+```typescript
+import { BaseStrategy } from './base-strategy.mjs';
+import type { ComponentInput, EvolutionResult } from '../../../types/evolution.mjs';
+
 class MaStrategy extends BaseStrategy {
-  static get method() { return 'ma-strategy'; }
-  async evaluate(component) {
+  static get method(): string { return 'ma-strategy'; }
+  async evaluate(component: ComponentInput): Promise<EvolutionResult> {
     return { evolution: 0.75, confidence: 0.85, method: 'ma-strategy' };
   }
 }
@@ -80,7 +83,7 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 **Cas d'usage** : Quand les valeurs de certitude et ubiquite sont connues avec precision.
 
-**Fichiers** : `strategies/s-curve-strategy.mjs`, `s-curve.mjs`
+**Fichiers** : `strategies/s-curve-strategy.mts`, `s-curve.mts`
 
 ---
 
@@ -105,7 +108,7 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 **Fallback** : Si les proportions ne sont pas fournies, appel LLM pour les estimer.
 
-**Fichier** : `strategies/publication-analysis-strategy.mjs`
+**Fichier** : `strategies/publication-analysis-strategy.mts`
 
 ---
 
@@ -116,14 +119,14 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 **Entrees requises** : `name`, `description` ou `context`
 
 **Processus** :
-1. Identification de la capacite sous-jacente via `identify-capability.mjs` (ex: "CRM" → "gestion de la relation client")
+1. Identification de la capacite sous-jacente via `identify-capability.mts` (ex: "CRM" → "gestion de la relation client")
 2. Construction recursive de la timeline (max 15 iterations) via LLM
 3. Chaque jalon evalue par `LLMDirectStrategy` avec contexte temporel
 4. Position finale basee sur l'ancrage historique
 
 **Cas d'usage** : Composants avec une histoire connue (technologies, pratiques industrielles).
 
-**Fichier** : `strategies/timeline-benchmark-strategy.mjs`
+**Fichier** : `strategies/timeline-benchmark-strategy.mts`
 
 ---
 
@@ -139,7 +142,7 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 **Cas d'usage** : Quand aucune donnee numerique n'est disponible.
 
-**Fichier** : `strategies/llm-direct-strategy.mjs`
+**Fichier** : `strategies/llm-direct-strategy.mts`
 
 ---
 
@@ -161,7 +164,7 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 **Cas d'usage** : Quand on souhaite une mesure d'incertitude basee sur les probabilites du modele.
 
-**Fichier** : `strategies/logprob-distribution-strategy.mjs`
+**Fichier** : `strategies/logprob-distribution-strategy.mts`
 
 ---
 
@@ -179,7 +182,7 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 **Cas d'usage** : Composants fortement lies a un secteur specifique.
 
-**Fichier** : `strategies/sector-agent-strategy.mjs`
+**Fichier** : `strategies/sector-agent-strategy.mts`
 
 ---
 
@@ -291,17 +294,17 @@ Le resultat solution etend `EvolutionResult` avec des champs supplementaires :
 
 ### Auto-decouverte
 
-Les solution strategies suivent le meme pattern que les capability strategies : tout fichier `*-strategy.mjs` dans `src/solution-strategies/` est decouvert automatiquement par `solution-strategies/registry.mjs`.
+Les solution strategies suivent le meme pattern que les capability strategies : tout fichier `*-strategy.mts` dans `src/solution-strategies/` est decouvert automatiquement par `solution-strategies/registry.mts`.
 
 ## Fichiers
 
 | Module | Role |
 |---|---|
-| `solution-strategies/registry.mjs` | Auto-decouverte et chargement |
-| `solution-strategies/solution-base-strategy.mjs` | Classe abstraite (etend `BaseStrategy`) |
-| `solution-strategies/properties-strategy.mjs` | Evaluation des 12 proprietes |
+| `solution-strategies/registry.mts` | Auto-decouverte et chargement |
+| `solution-strategies/solution-base-strategy.mts` | Classe abstraite (etend `BaseStrategy`) |
+| `solution-strategies/properties-strategy.mts` | Evaluation des 12 proprietes |
 | `solution-strategies/evolution-properties.json` | Reference des 12 proprietes × 4 phases |
-| `solution-strategies/phase-classifier.mjs` | Mapping propriete → phase |
-| `solution-strategies/aggregate-properties.mjs` | Agregation ponderee en evolution |
-| `solution-strategies/assemble-result.mjs` | Enrichissement des resultats |
-| `solution-strategies/solution-evolution-result.mjs` | Modele de resultat avec validation |
+| `solution-strategies/phase-classifier.mts` | Mapping propriete → phase |
+| `solution-strategies/aggregate-properties.mts` | Agregation ponderee en evolution |
+| `solution-strategies/assemble-result.mts` | Enrichissement des resultats |
+| `solution-strategies/solution-evolution-result.mts` | Modele de resultat avec validation |

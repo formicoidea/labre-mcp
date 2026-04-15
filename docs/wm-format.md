@@ -136,7 +136,7 @@ Visualisez cette carte sur [onlinewardleymaps.com](https://onlinewardleymaps.com
 
 ## Parsing et generation
 
-### Parsing (`evaluate-map.mjs`)
+### Parsing (`evaluate-map.mts`)
 
 La fonction `parseWardleyMap(content)` extrait via regex :
 - Title, anchors, components (avec coordonnees)
@@ -144,7 +144,7 @@ La fonction `parseWardleyMap(content)` extrait via regex :
 - Notes, evolve, pipelines
 - Contenu brut pour le round-tripping
 
-### Generation (`generate-value-chain.mjs`)
+### Generation (`generate-value-chain.mts`)
 
 La fonction `generateWmContent(chain, evaluations)` produit un fichier .wm valide :
 - Trie les composants par visibility (le plus visible en premier)

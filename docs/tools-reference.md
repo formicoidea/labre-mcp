@@ -1,6 +1,16 @@
 # Reference des outils MCP
 
-WardleyAssistant expose 3 outils via le protocole MCP. Chacun est appele via `tools/call` en JSON-RPC 2.0.
+WardleyAssistant expose **5 outils** via le protocole MCP. Chacun est appele via `tools/call` en JSON-RPC 2.0.
+
+| Outil | Role | Schema Zod |
+|---|---|---|
+| `estimateEvolution` | Estime l'evolution d'un composant | `src/schemas/estimate-evolution.schema.mts` |
+| `generateValueChain` | Genere une carte .wm depuis une description | `src/schemas/generate-value-chain.schema.mts` |
+| `evaluateMap` | Evalue et met a jour tous les composants d'un .wm | `src/schemas/evaluate-map.schema.mts` |
+| `identifyCapability` | Decode un nom de solution vers sa capability | `src/schemas/identify-capability.schema.mts` |
+| `estimateAnchorEvolution` | Estime l'evolution d'un anchor (user need) | `src/schemas/estimate-anchor-evolution.schema.mts` |
+
+Les schemas d'entree exposes au client MCP sont **generes a partir des schemas Zod** (`z.toJSONSchema(schema, { io: 'input' })`). Toute modification d'un schema passe par le fichier `src/schemas/*.schema.mts` correspondant — voir [validation.md](validation.md).
 
 ---
 
@@ -25,7 +35,8 @@ Estime la position d'evolution d'un composant sur l'axe de Wardley (0 = Genesis,
 | `strategy` | string | non | Strategie a utiliser. `"all"` par defaut. Ou un nom specifique (ex: `"s-curve"`). |
 | `mode` | enum | non | `oneshot`, `guided`, `conversational`, `auto`, `default`. Auto-detection par defaut. |
 | `sessionState` | string | non | Etat serialise d'une session multi-tour (mode guide). |
-| `forceEstimate` | boolean | non | Force l'estimation avec les donnees disponibles (mode guide). |
+| `forceEstimate` | boolean | non | Force l'estimation avec les donnees disponibles (mode guide). `false` par defaut. |
+| `pipeline` | boolean | non | Active le mode pipeline enrichi (capability pivot + SotA + legacy). `false` par defaut. |
 
 ### Modes d'execution
 
@@ -243,5 +254,87 @@ Genere une carte Wardley (fichier `.wm`) a partir d'une description metier en la
   "filePath": "maps/myMaps/salon-de-the.wm",
   "components": ["Boisson Chaude", "The", "Eau", "Electricite"],
   "evaluations": { ... }
+}
+```
+
+---
+
+## identifyCapability
+
+Decode un nom technique (CRM, Kubernetes, Data Warehouse…) en la **capability sous-jacente** qu'il sert, classifiee par nature (activity / practice / knowledge / data). Ne s'applique qu'aux composants de type `component` ou `pipeline` — les types `anchor`, `market`, `ecosystem` sont renvoyes tels quels.
+
+### Schema d'entree
+
+| Parametre | Type | Requis | Description |
+|---|---|---|---|
+| `name` | string | **oui** | Nom ou label du composant (ex: "CRM", "Kubernetes", "Data Warehouse") |
+| `type` | enum | non | Type OWM : `anchor`, `component`, `pipeline`, `market`, `ecosystem`. Prioritaire sur l'estimation LLM. |
+| `description` | string | non | Description libre du composant |
+| `context` | string | non | Contexte d'usage dans la chaine de valeur |
+
+### Exemple
+
+```json
+{
+  "name": "identifyCapability",
+  "arguments": {
+    "name": "Salesforce CRM",
+    "description": "Plateforme SaaS de gestion relation client"
+  }
+}
+```
+
+### Structure de la reponse
+
+```json
+{
+  "type": "component",
+  "nature": "activite",
+  "capability": "Gestion de la relation client",
+  "confidence": 0.92,
+  "justification": "Salesforce CRM est une solution ciblant l'activite de CRM.",
+  "context": "Plateforme SaaS de gestion relation client",
+  "name": "Salesforce CRM"
+}
+```
+
+---
+
+## estimateAnchorEvolution
+
+Estime l'evolution d'un **anchor** (user need, haut de la value chain) sur l'axe Wardley via la lentille consumption culture (perception utilisateur + perception industrielle). Retourne une phase discrete 1-4 (Genesis → Commodity).
+
+### Schema d'entree
+
+| Parametre | Type | Requis | Description |
+|---|---|---|---|
+| `name` | string | **oui** | Nom du user need (ex: "Hot Beverage", "Urban Mobility", "Project Management") |
+| `context` | string | **oui** | Contexte metier (requis — l'evaluation d'un anchor est hautement dependante du contexte) |
+| `phase` | integer [1-4] | non | Phase pre-evaluee. Si omise, le LLM l'estime. `1`=Genesis, `2`=Custom, `3`=Product, `4`=Commodity. |
+
+### Exemple
+
+```json
+{
+  "name": "estimateAnchorEvolution",
+  "arguments": {
+    "name": "Hot Beverage",
+    "context": "Salon de the dans un centre commercial europeen, clientele urbaine"
+  }
+}
+```
+
+### Structure de la reponse
+
+```json
+{
+  "name": "Hot Beverage",
+  "context": "...",
+  "phase": 4,
+  "label": "Commodity",
+  "evolution": 0.85,
+  "justification": "La boisson chaude est un produit de base standardise...",
+  "source": "llm",
+  "confidence": 0.92
 }
 ```

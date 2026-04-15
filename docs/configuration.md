@@ -30,8 +30,8 @@ Le fichier `.mcp.json` a la racine enregistre le serveur MCP aupres de Claude Co
 {
   "mcpServers": {
     "wardley-assistant": {
-      "command": "node",
-      "args": ["--env-file=.env", "src/mcp-server.mjs"],
+      "command": "cmd",
+      "args": ["/c", "npx", "tsx", "--env-file=.env", "src/mcp/mcp-server.mts"],
       "cwd": "C:\\...\\WardleyAssistant",
       "timeout": 600
     }
@@ -41,8 +41,8 @@ Le fichier `.mcp.json` a la racine enregistre le serveur MCP aupres de Claude Co
 
 | Champ | Description |
 |---|---|
-| `command` | Executable Node.js |
-| `args` | Charge le `.env` puis lance le serveur |
+| `command` | `cmd` sous Windows (wrapper obligatoire pour `npx`). Sous Linux/macOS : `npx` directement. |
+| `args` | Lance tsx avec le `.env` puis execute le serveur (`.mts` compile a la volee) |
 | `cwd` | Repertoire de travail (chemin absolu) |
 | `timeout` | Timeout en secondes (600 = 10 minutes). Necessaire pour les evaluations longues. |
 
@@ -52,7 +52,7 @@ Pour activer les notifications de progression dans le chat :
 
 ### 1. Capability serveur (deja configure)
 
-Le serveur declare la capability channel dans `mcp-server.mjs` :
+Le serveur declare la capability channel dans `src/mcp/mcp-server.mts` :
 
 ```javascript
 const SERVER_CAPABILITIES = {
@@ -90,7 +90,7 @@ Le mode verbose controle l'emission des messages `debug` :
 Activation programmatique :
 
 ```javascript
-import { setVerbose } from './mcp-notifications.mjs';
+import { setVerbose } from './mcp-notifications.mts';
 setVerbose(true);
 ```
 
