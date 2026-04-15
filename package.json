@@ -2,12 +2,13 @@
   "name": "WardleyAssistant",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.mjs",
+  "types": "dist/index.d.mts",
   "scripts": {
-    "mcp": "tsx src/mcp/mcp-server.mjs",
+    "mcp": "tsx src/mcp/mcp-server.mts",
     "mcp:prod": "node dist/mcp/mcp-server.mjs",
     "build": "tsc",
-    "dev": "tsx src/mcp/mcp-server.mjs",
+    "dev": "tsx src/mcp/mcp-server.mts",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test \"src/**/*.test.mjs\""
   },

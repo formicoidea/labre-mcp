@@ -391,7 +391,8 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
     ubiquity: 0.85,
   });
   console.log(`  Strategies evaluated: ${Object.keys(allResult.evaluations).join(', ')}`);
-  for (const [method, ev] of Object.entries(allResult.evaluations)) {
+  for (const [method, evRaw] of Object.entries(allResult.evaluations)) {
+    const ev = evRaw as { error?: string; evolution?: number; confidence?: number };
     if (ev.error) {
       console.log(`  ${method}: error - ${ev.error}`);
     } else {

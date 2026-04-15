@@ -1,7 +1,8 @@
 // WardleyAssistant — main entry point
 //
 // Re-exports the public API surface for programmatic consumers.
-// For MCP server usage, run: node src/mcp-server.mjs
+// For MCP server usage, run: npx tsx src/mcp/mcp-server.mts (dev)
+// or: node dist/mcp/mcp-server.mjs (prod, after pnpm run build)
 
 // ─── MCP Server ─────────────────────────────────────────────────────────────
 export { startServer, REGISTERED_TOOLS, TOOL_HANDLERS, handleRequest } from './mcp/mcp-server.mjs';

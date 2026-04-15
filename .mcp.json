@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "wardley-assistant": {
-      "command": "node",
-      "args": ["--env-file=.env", "src/mcp-server.mjs"],
+      "command": "npx",
+      "args": ["tsx", "--env-file=.env", "src/mcp/mcp-server.mts"],
       "cwd": "C:\\Users\\Dell\\Documents\\5-DEV\\DevWardleyMaps\\WardleyAssistant",
       "timeout": 600
     }
