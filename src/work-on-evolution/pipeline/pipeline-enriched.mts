@@ -189,7 +189,7 @@ const DEFAULT_VISIBILITY = 0.51;
  * @param {string} name
  * @returns {string} Quoted name if necessary
  */
-function wmQuote(name) {
+function wmQuote(name: string | null | undefined): string {
   if (!name) return '"Component"';
   const clean = name.replace(/"/g, "'");
   return clean.includes(' ') ? `"${clean}"` : clean;
@@ -200,7 +200,7 @@ function wmQuote(name) {
  * @param {number} n
  * @returns {number}
  */
-function round2(n) {
+function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 

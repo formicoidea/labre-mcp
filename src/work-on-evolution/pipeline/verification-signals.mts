@@ -80,7 +80,7 @@ export function buildSuccessSignal(result: any, method: string, durationMs: numb
  */
 export function buildTimeoutSignal(method: string, timeoutMs: number, durationMs: number) {
   return {
-    classification: null,
+    classification: null as string | null,
     confidence: 0,
     method,
     reasoning: `${method} verification timed out after ${timeoutMs}ms`,
@@ -100,7 +100,7 @@ export function buildTimeoutSignal(method: string, timeoutMs: number, durationMs
  */
 export function buildErrorSignal(method: string, err: any, durationMs: number) {
   return {
-    classification: null,
+    classification: null as string | null,
     confidence: 0,
     method,
     reasoning: `${method} verification failed: ${err.message}`,
@@ -119,7 +119,7 @@ export function buildErrorSignal(method: string, err: any, durationMs: number) {
  */
 export function buildSkippedSignal(method: string, reason: string) {
   return {
-    classification: null,
+    classification: null as string | null,
     confidence: 0,
     method,
     reasoning: reason,

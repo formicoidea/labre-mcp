@@ -132,10 +132,10 @@ export function isSignalUsable(signal: any) {
  * @param {string} defaultMethod - Method label to use if not provided
  * @returns {ClassificationSignal} Normalized signal (never null)
  */
-function normalizeSignal(signal, defaultMethod = 'unknown') {
+function normalizeSignal(signal: any, defaultMethod: string = 'unknown'): any {
   if (!signal) {
     return {
-      classification: null,
+      classification: null as string | null,
       confidence: 0,
       method: defaultMethod,
       reasoning: `No ${defaultMethod} signal provided`,
@@ -432,7 +432,7 @@ export function combineAllSignals(namingSignal: any, llmSignal: any, webSearchSi
  * @param {ClassificationSignal} web
  * @returns {string}
  */
-function buildNoSignalReasoning(llm, web) {
+function buildNoSignalReasoning(llm: any, web: any): string {
   const parts = [];
   if (llm.status && llm.status !== SIGNAL_STATUS.SKIPPED) {
     parts.push(`LLM: ${llm.reasoning || llm.status}`);
@@ -452,7 +452,7 @@ function buildNoSignalReasoning(llm, web) {
  * @param {ClassificationSignal} web
  * @returns {string}
  */
-function buildAgreementReasoning(llm, web) {
+function buildAgreementReasoning(llm: any, web: any): string {
   const primary = web.confidence >= llm.confidence ? web : llm;
   const secondary = web.confidence >= llm.confidence ? llm : web;
   return `${primary.reasoning || primary.method} (${secondary.method} agrees: ${secondary.reasoning || secondary.classification})`;
@@ -465,7 +465,7 @@ function buildAgreementReasoning(llm, web) {
  * @param {number} confGap
  * @returns {string}
  */
-function buildDisagreementReasoning(winner, loser, confGap) {
+function buildDisagreementReasoning(winner: any, loser: any, confGap: number): string {
   const ambiguityNote = confGap < 0.10
     ? ' — signals are close in confidence, classification is ambiguous'
     : '';
@@ -481,7 +481,7 @@ function buildDisagreementReasoning(winner, loser, confGap) {
  * @param {Object} params
  * @returns {CombinedClassificationResult}
  */
-function buildCombinedResult(params) {
+function buildCombinedResult(params: any): any {
   const { classification, confidence, method, reasoning, mergeCase, minVerified, llm, web } = params;
 
   return {
@@ -506,7 +506,7 @@ function buildCombinedResult(params) {
  * @param {number} value
  * @returns {number}
  */
-function roundConfidence(value) {
+function roundConfidence(value: number): number {
   return Math.round(value * 100) / 100;
 }
 

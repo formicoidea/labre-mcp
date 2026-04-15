@@ -73,7 +73,7 @@ const TOOL = 'pipelineCapabilityInference';
  * @param {string} nature     - Component nature (activity/practice/knowledge/data)
  * @returns {string} Clean label for OWM display
  */
-export function capabilityToLabel(capability, nature) {
+export function capabilityToLabel(capability: string, nature?: string): string {
   if (!capability) return 'Capability';
 
   const trimmed = capability.trim();
@@ -112,7 +112,7 @@ export function capabilityToLabel(capability, nature) {
             search: 'Search', index: 'Indexing',
             render: 'Rendering',
           };
-          const nounForm = nominalizations[verb] || (verb.charAt(0).toUpperCase() + verb.slice(1) + 'ing');
+          const nounForm = (nominalizations as Record<string, string>)[verb] || (verb.charAt(0).toUpperCase() + verb.slice(1) + 'ing');
           // Title-case the object and append nominalization
           const objectTitled = titleCase(object);
           return `${objectTitled} ${nounForm}`;
@@ -159,9 +159,9 @@ export function capabilityToLabel(capability, nature) {
  * @param {string} str
  * @returns {string}
  */
-function titleCase(str) {
+function titleCase(str: string): string {
   // Preserve existing capitalization for abbreviations (IT, CRM, API, etc.)
-  return str.replace(/\b\w+/g, word => {
+  return str.replace(/\b\w+/g, (word: string) => {
     // If already all-caps and length >= 2, keep it (likely an abbreviation)
     if (word.length >= 2 && word === word.toUpperCase()) return word;
     return word.charAt(0).toUpperCase() + word.slice(1);
