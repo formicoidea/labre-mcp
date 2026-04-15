@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const EstimateAnchorEvolutionInputSchema = z.object({
   name: z.string().min(1).describe(
-    'Anchor name — the user need (e.g. "Hot Beverage", "Urban Mobility", "Project Management")'
+    'Anchor name — the user name (e.g. "Client", "User", "Stakeholder")'
   ),
   context: z.string().min(1).describe(
     'Business/market context (required — anchor evaluation is highly context-dependent)'
