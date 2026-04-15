@@ -57,7 +57,7 @@ confidence=X.XX`;
  * @param {string} text - Raw LLM response
  * @returns {{ evolution: number, confidence: number }}
  */
-function parseLLMResponse(text) {
+function parseLLMResponse(text: string): any {
   const evoMatch = text.match(/evolution[:\s=]*([\d.]+)/i);
   const confMatch = text.match(/confidence[:\s=]*([\d.]+)/i);
 
@@ -97,7 +97,7 @@ export class LLMDirectStrategy extends BaseStrategy {
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {Promise<import('./base-strategy.mjs').EvolutionResult>}
    */
-  async evaluate(component) {
+  async evaluate(component: any): Promise<any> {
     const hasCapability = component.capability != null;
 
     const prompt = hasCapability

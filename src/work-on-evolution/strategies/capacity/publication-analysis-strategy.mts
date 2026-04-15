@@ -37,7 +37,7 @@ const PUB_SIGMOID_X0 = 0.30;  // center — laterRatio ≥ 0.42 maps to evo ≥ 
  * @param {number} usage   - Usage proportion
  * @returns {number|null} Evolution in [0, 1] or null if all zeros
  */
-export function advancedPubEvolution(wonder, build, operate, usage) {
+export function advancedPubEvolution(wonder: number, build: number, operate: number, usage: number): any {
   const sum = wonder + build + operate + usage;
   if (sum === 0) return null;
 
@@ -87,12 +87,12 @@ usage=U.UU`;
  * @param {string} text
  * @returns {{ wonder: number, build: number, operate: number, usage: number }}
  */
-function parsePubResponse(text) {
+function parsePubResponse(text: string): any {
   // Anchor on the "MANDATORY FORMAT" contract from the prompt: one `key=value`
   // per line. This avoids matching the keywords when they appear in multilingual
   // prose above the final block (which caused NaN on e.g. "wonder." sentence ends).
   const NUM = '(\\d+(?:\\.\\d+)?|\\.\\d+)';
-  const lineFor = (key) => new RegExp(`^\\s*${key}\\s*[:=]\\s*${NUM}\\s*$`, 'im');
+  const lineFor = (key: string) => new RegExp(`^\\s*${key}\\s*[:=]\\s*${NUM}\\s*$`, 'im');
   const wMatch = text.match(lineFor('wonder'));
   const bMatch = text.match(lineFor('build'));
   const oMatch = text.match(lineFor('operate'));
@@ -112,7 +112,7 @@ function parsePubResponse(text) {
   for (const [k, v] of Object.entries(vals)) {
     if (!Number.isFinite(v) || v < 0) {
       throw new Error(
-        `PublicationAnalysisStrategy: invalid ${k} value "${raw[k]}" parsed from LLM response`
+        `PublicationAnalysisStrategy: invalid ${k} value "${(raw as any)[k]}" parsed from LLM response`
       );
     }
   }
@@ -131,7 +131,7 @@ function parsePubResponse(text) {
  * @param {number} u - usage proportion (normalized)
  * @returns {number} Concentration in [0, 1]
  */
-function concentration(w, b, o, u) {
+function concentration(w: number, b: number, o: number, u: number): number {
   const hhi = w * w + b * b + o * o + u * u;
   // HHI ranges from 0.25 (uniform) to 1.0 (single dominant)
   // Normalize to [0, 1]
@@ -154,7 +154,7 @@ export class PublicationAnalysisStrategy extends BaseStrategy {
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {Promise<import('./base-strategy.mjs').EvolutionResult>|import('./base-strategy.mjs').EvolutionResult}
    */
-  async evaluate(component) {
+  async evaluate(component: any): Promise<any> {
     let wonder, build, operate, usage;
 
     // Use provided publication proportions if available

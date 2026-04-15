@@ -17,7 +17,7 @@ export class SCurveStrategy extends BaseStrategy {
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {import('./base-strategy.mjs').EvolutionResult}
    */
-  evaluate(component) {
+  evaluate(component: any): any {
     const { certitude, ubiquity } = component;
 
     if (certitude == null || ubiquity == null) {

@@ -49,7 +49,7 @@ Reply with EXACTLY ONE WORD — the phase name:`;
  *   Typically the top logprobs for the first generated token.
  * @returns {Object<string, number>} Phase name → probability (sums to ~1)
  */
-function extractPhaseProbabilities(logprobs) {
+function extractPhaseProbabilities(logprobs: any): Record<string, number> {
   // Map each phase to its best matching logprob
   const phaseLogprobs: Record<string, number> = {};
 
@@ -147,7 +147,7 @@ export class LogprobDistributionStrategy extends BaseStrategy {
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {Promise<import('./base-strategy.mjs').EvolutionResult>}
    */
-  async evaluate(component) {
+  async evaluate(component: any): Promise<any> {
     const prompt = PROMPT_TEMPLATE
       .replace('{{component}}', component.name || '')
       .replace('{{context}}', component.description || component.context || '');
@@ -167,7 +167,7 @@ export class LogprobDistributionStrategy extends BaseStrategy {
     // Compute evolution as probability-weighted centroid
     let evolution = 0;
     for (const phase of PHASE_NAMES) {
-      evolution += (phaseProbabilities[phase] || 0) * PHASE_CENTROIDS[phase];
+      evolution += ((phaseProbabilities as Record<string, number>)[phase] || 0) * (PHASE_CENTROIDS as Record<string, number>)[phase];
     }
     evolution = Math.round(evolution * 1000) / 1000;
 
@@ -191,9 +191,9 @@ export class LogprobDistributionStrategy extends BaseStrategy {
  * @param {string} text - Raw LLM response text
  * @returns {Object<string, number>}
  */
-function parseFallbackPhase(text) {
+function parseFallbackPhase(text: string): Record<string, number> {
   const lower = (text || '').toLowerCase().trim();
-  const probs = {};
+  const probs: Record<string, number> = {};
 
   // Try to match a phase name in the response
   let matched = null;

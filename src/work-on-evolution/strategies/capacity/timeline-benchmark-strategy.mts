@@ -46,7 +46,7 @@ milestone_date=<year as integer>`;
  * @param {string} text
  * @returns {{ name: string, date: number }}
  */
-export function parseHistoryIterationResponse(text) {
+export function parseHistoryIterationResponse(text: string): any {
   const nameMatch = text.match(/milestone_name[:\s=]*(.*)/i);
   const dateMatch = text.match(/milestone_date[:\s=]*(\d+)/i);
 
@@ -65,12 +65,12 @@ export function parseHistoryIterationResponse(text) {
  * @param {Array<{ name: string, date: number, evolution: number, confidence: number }>} history
  * @returns {string}
  */
-export function formatHistorySection(history) {
+export function formatHistorySection(history: any[]): string {
   if (history.length === 0) {
     return 'History so far: (none — identify the GENESIS-ERA origin: the EARLIEST known form of this capability, when it was first conceived or rudimentarily practiced. This should be in the Genesis stage of evolution: novel, poorly understood, rare.)';
   }
   const lines = history.map(
-    h => `- ${h.name} (${h.date}): evolution=${h.evolution}`,
+    (h: any) => `- ${h.name} (${h.date}): evolution=${h.evolution}`,
   );
   const last = history[history.length - 1];
   return `History so far (chronological):\n${lines.join('\n')}\n\nContinue from after ${last.name} (${last.date}).`;
@@ -83,7 +83,7 @@ export function formatHistorySection(history) {
  * @param {number} maxIterations
  * @returns {string}
  */
-export function formatPacingGuidance(history, iteration, maxIterations) {
+export function formatPacingGuidance(history: any[], iteration: number, maxIterations: number): string {
   const remaining = maxIterations - iteration - 1;
   const lastDate = history.length > 0 ? history[history.length - 1].date : null;
   const yearsToGo = lastDate != null ? CURRENT_YEAR - lastDate : null;
@@ -106,7 +106,7 @@ export function formatPacingGuidance(history, iteration, maxIterations) {
  * @param {Array<{ name: string, date: number, evolution: number, confidence: number }>} history
  * @returns {number} confidence in [0.2, 0.95]
  */
-export function computeTimelineConfidence(history) {
+export function computeTimelineConfidence(history: any[]): number {
   if (history.length === 0) return 0.2;
 
   // Factor 1: iteration richness (more milestones = more grounded)
@@ -124,7 +124,7 @@ export function computeTimelineConfidence(history) {
     : 1;
 
   // Factor 3: average confidence from LLM-direct evaluations
-  const avgLlmConfidence = history.reduce((s, h) => s + h.confidence, 0) / history.length;
+  const avgLlmConfidence = history.reduce((s: number, h: any) => s + h.confidence, 0) / history.length;
 
   // Factor 4: temporal coverage — did the timeline reach the present?
   const firstDate = history[0].date;
@@ -162,7 +162,7 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {Promise<import('./base-strategy.mjs').EvolutionResult>}
    */
-  async evaluate(component) {
+  async evaluate(component: any): Promise<any> {
     if (!this._llmCall) {
       throw new Error('TimelineBenchmarkStrategy requires an llmCall function');
     }

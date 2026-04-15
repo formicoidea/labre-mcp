@@ -24,6 +24,7 @@
 import { BaseStrategy } from './base-strategy.mjs';
 import { computeEvolution } from '../../s-curve/s-curve.mjs';
 import { getCpcTitle } from '../../patent/cpc-taxonomy-cache.mjs';
+import { toErrorMessage } from '../../../lib/errors.mjs';
 
 // ─── Default indicator configuration ────────────────────────────────────────
 
@@ -86,7 +87,7 @@ function renormalizeWeights(indicators: any) {
  * @param {number} patentCount - Number of patents found
  * @returns {number} Data quality score in [0.2, 0.9]
  */
-function computeDataQuality(patentCount) {
+function computeDataQuality(patentCount: number): number {
   if (patentCount < 10) {
     // Very few patents: low confidence, linear ramp from 0.2 to 0.4
     return 0.2 + (patentCount / 10) * 0.2;
@@ -106,7 +107,7 @@ function computeDataQuality(patentCount) {
  * @param {Object} scurveResult - Result from computeEvolution()
  * @returns {number} Model confidence score in [0.3, 0.95]
  */
-function computeModelConfidence(scurveResult) {
+function computeModelConfidence(scurveResult: any): number {
   if (scurveResult.zone === 'competitive') {
     // Inside band: high model confidence, scaled by distance to center
     return Math.min(0.95, 0.8 + (1 - Math.min(scurveResult.distToCenter, 0.3) / 0.3) * 0.15);
@@ -123,7 +124,7 @@ function computeModelConfidence(scurveResult) {
  * @param {number} modelConfidence - S-curve model fit confidence
  * @returns {number} Bounded confidence score
  */
-function computeConfidence(dataQuality, modelConfidence) {
+function computeConfidence(dataQuality: number, modelConfidence: number): number {
   const raw = dataQuality * 0.5 + modelConfidence * 0.5;
   return Math.round(Math.max(0.1, Math.min(0.95, raw)) * 1000) / 1000;
 }
@@ -243,7 +244,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {Promise<import('./base-strategy.mjs').EvolutionResult & { certitude: number, ubiquity: number }>}
    */
-  async evaluate(component) {
+  async evaluate(component: any): Promise<any> {
     try {
       return await this._evaluateInternal(component);
     } catch (err) {
@@ -263,7 +264,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    * @returns {Promise<import('./base-strategy.mjs').EvolutionResult & { certitude: number, ubiquity: number }>}
    * @private
    */
-  async _evaluateInternal(component) {
+  async _evaluateInternal(component: any): Promise<any> {
     // Step 1: Resolve CPC codes for the component
     const cpcCodes = await this._resolveCpcCodes(component);
 
@@ -291,7 +292,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
     const confidence = computeConfidence(dataQuality, modelConfidence);
 
     // Step 8: Generate .wm pipeline insight
-    const cpcTitles = cpcCodes.map(code => ({ code, title: getCpcTitle(code) }));
+    const cpcTitles = cpcCodes.map((code: string) => ({ code, title: getCpcTitle(code) }));
     const insight = await this._generatePipelineInsight(
       component, scurveResult.evolution, cpcTitles
     );
@@ -332,7 +333,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    * @returns {import('./base-strategy.mjs').EvolutionResult & { certitude: number, ubiquity: number }}
    * @private
    */
-  _buildFallbackResult(err) {
+  _buildFallbackResult(err: unknown): any {
     // Neutral midpoint — still delegate to S-curve for evolution score
     const NEUTRAL = 0.5;
     let evolution = NEUTRAL;
@@ -352,7 +353,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
       certitude: NEUTRAL,
       ubiquity: NEUTRAL,
       trace: [
-        { step: 'fallback', reason: err?.message || 'unknown error' },
+        { step: 'fallback', reason: toErrorMessage(err) || 'unknown error' },
         { step: 'aggregated', certitude: NEUTRAL, ubiquity: NEUTRAL },
         { step: 'confidence', dataQuality: 0.2, modelConfidence: 0, combined: 0.1 },
       ],
@@ -370,7 +371,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    * @param {boolean} enabled - Whether to enable or disable the indicator
    * @throws {Error} If the indicator key is not found on the given axis
    */
-  setIndicatorEnabled(axis, key, enabled) {
+  setIndicatorEnabled(axis: string, key: string, enabled: boolean): void {
     const indicators = axis === 'certitude'
       ? this._certitudeIndicators
       : this._ubiquityIndicators;
@@ -475,7 +476,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    * @returns {Promise<string>} .wm format snippet
    * @private
    */
-  async _generatePipelineInsight(component, evolution, cpcTitles) {
+  async _generatePipelineInsight(component: any, evolution: number, cpcTitles: any): Promise<any> {
     const DEFAULT_VISIBILITY = 0.51;
     const STATE_OF_ART_MIN = 0.85;
 
@@ -535,7 +536,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    * Derive a clean capability name from CPC titles or component data.
    * @private
    */
-  _deriveCapabilityName(component, cpcTitles) {
+  _deriveCapabilityName(component: any, cpcTitles: any): string {
     // Prefer component.capability if set by identify-capability pipeline
     if (component.capability) {
       const cap = component.capability.trim();
@@ -563,7 +564,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    * Ask the LLM for a concrete state-of-the-art example in the CPC domain.
    * @private
    */
-  async _getStateOfArtExample(component, evolution, cpcTitles) {
+  async _getStateOfArtExample(component: any, evolution: number, cpcTitles: any): Promise<any> {
     if (!this._llmCall) return null;
 
     const phase =
@@ -572,7 +573,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
       evolution <= 0.70 ? 'Product' : 'Commodity';
 
     const cpcContext = cpcTitles
-      .map(t => `${t.code}: ${t.title}`)
+      .map((t: any) => `${t.code}: ${t.title}`)
       .join('\n');
 
     const prompt = `Given the CPC patent domain:
@@ -615,7 +616,7 @@ NAME | SHORT_DESCRIPTION | EVOLUTION
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {Promise<string[]>} Array of CPC codes (variable length)
    */
-  async _resolveCpcCodes(component) {
+  async _resolveCpcCodes(component: any): Promise<any> {
     if (this._cpcMapper) {
       try {
         const result = await this._cpcMapper.mapToCpc(component);
@@ -663,7 +664,7 @@ NAME | SHORT_DESCRIPTION | EVOLUTION
    * @param {string[]} cpcCodes
    * @returns {Promise<Object>} Patent data object
    */
-  async _fetchPatentData(cpcCodes) {
+  async _fetchPatentData(cpcCodes: string[]): Promise<any> {
     if (cpcCodes.length === 0) {
       return { totalPatents: 0, patents: [] };
     }
