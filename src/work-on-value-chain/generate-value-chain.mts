@@ -129,7 +129,7 @@ function slugify(text) {
  * @param {string} [options.strategy='timeline-benchmark'] - Evolution evaluation strategy
  * @returns {Promise<{wmContent: string, filePath: string, components: Array, evaluations: Object}>}
  */
-export async function generateValueChain(description, options = {}) {
+export async function generateValueChain(description: string, options: any = {}): Promise<any> {
   const {
     filename,
     outputDir = 'maps/myMaps',
@@ -198,7 +198,7 @@ export async function generateValueChain(description, options = {}) {
       if (result.evaluations) {
         // Pick the requested strategy's result, or first successful one
         const stratResult = result.evaluations[strategy]
-          || Object.values(result.evaluations).find(e => !e.error);
+          || (Object.values(result.evaluations) as any[]).find(e => !e.error);
         if (stratResult && !stratResult.error) {
           evaluations[item.name] = Math.max(0, Math.min(1, stratResult.evolution));
           logDebug(TOOL, msg('step.evaluation.bestpick', {
@@ -287,7 +287,7 @@ export const GENERATE_VALUE_CHAIN_TOOL = {
  * @param {Object} args - Tool arguments
  * @returns {Promise<Object>} Result with wmContent, filePath, evaluations
  */
-export async function handleGenerateValueChain(args) {
+export async function handleGenerateValueChain(args: any): Promise<any> {
   return generateValueChain(args.description, {
     filename: args.filename,
     outputDir: args.outputDir,

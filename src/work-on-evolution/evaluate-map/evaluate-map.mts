@@ -149,10 +149,10 @@ export function parseWardleyMap(content) {
  * @param {string} [options.context] - Additional context for evaluation
  * @returns {Promise<{evaluations: Array, summary: Object}>}
  */
-export async function evaluateMapComponents(parsedMap, options = {}) {
+export async function evaluateMapComponents(parsedMap: any, options: any = {}): Promise<any> {
   const { strategy = 'all', context = parsedMap.title || '', msg } = options;
   const TOOL = 'evaluateMap';
-  const evaluations = [];
+  const evaluations: any[] = [];
 
   // Evaluate anchors + components
   const allItems = [
@@ -212,18 +212,18 @@ export async function evaluateMapComponents(parsedMap, options = {}) {
         strategy,
       });
 
-      const stratResults = {};
+      const stratResults: Record<string, any> = {};
       let bestEvolution = item.maturity;
 
       if (result.evaluations) {
-        for (const [method, ev] of Object.entries(result.evaluations)) {
+        for (const [method, ev] of Object.entries(result.evaluations) as [string, any][]) {
           if (!ev.error) {
             stratResults[method] = { evolution: ev.evolution, confidence: ev.confidence };
           }
         }
 
         // Pick the strategy with highest confidence
-        const best = Object.entries(stratResults)
+        const best = (Object.entries(stratResults) as [string, any][])
           .filter(([, v]) => v.evolution >= 0 && v.evolution <= 1)
           .sort((a, b) => b[1].confidence - a[1].confidence)[0];
 
@@ -378,7 +378,7 @@ export function formatEvaluationReport(evaluations, summary) {
  * @param {boolean} [options.updateFile=true]
  * @returns {Promise<{evaluations, summary, report, updatedContent, filePath}>}
  */
-export async function evaluateMapFile(filePath, options = {}) {
+export async function evaluateMapFile(filePath: string, options: any = {}): Promise<any> {
   const { strategy = 'all', updateFile = true } = options;
   const TOOL = 'evaluateMap';
 

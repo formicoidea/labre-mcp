@@ -71,7 +71,7 @@ const STRATEGY_ALIASES = {
  * @param {string} input - Raw conversational text
  * @returns {Object} Parsed parameters ready for estimateEvolutionOneShot()
  */
-export function parseConversationalInput(input) {
+export function parseConversationalInput(input: any): any {
   if (input == null || typeof input !== 'string') {
     throw new Error('Conversational input must be a non-empty string');
   }
@@ -96,8 +96,8 @@ export function parseConversationalInput(input) {
  * @param {string} text
  * @returns {Object|null}
  */
-function tryStructuredParse(text) {
-  const result = {};
+function tryStructuredParse(text: string): any {
+  const result: any = {};
 
   // Normalize comma-separated key-value pairs into newline-separated format
   // so that "Component: Docker, Strategy: all, Context: foo" works alongside
@@ -178,8 +178,8 @@ function tryStructuredParse(text) {
  * @param {string} text
  * @returns {Object}
  */
-function parseNaturalLanguage(text) {
-  const result = {};
+function parseNaturalLanguage(text: string): any {
+  const result: any = {};
 
   // Strip common preamble phrases
   let cleaned = text
@@ -316,7 +316,7 @@ function enrichWithDetectedParams(result, originalText) {
  * @param {string} conversationalInput - Raw user text that triggered the skill
  * @returns {Promise<Object>} Result from estimateEvolutionOneShot with conversational metadata
  */
-export async function handleSkillInvocation(conversationalInput) {
+export async function handleSkillInvocation(conversationalInput: any): Promise<any> {
   // Step 1: Parse the conversational input into structured params
   const parsed = parseConversationalInput(conversationalInput);
 
@@ -346,7 +346,7 @@ export async function handleSkillInvocation(conversationalInput) {
  * @param {boolean} [options.compact] - Use compact table format instead of detailed
  * @returns {string} Markdown-formatted conversational output
  */
-export function formatConversationalResult(result, options = {}) {
+export function formatConversationalResult(result: any, options: any = {}): any {
   return formatResponse(result, {
     component: result.parsedInput,
     compact: options.compact || false,
@@ -381,7 +381,7 @@ export { routeEstimateEvolution, detectMode, MODES };
  * @param {boolean} [options.forceEstimate] - Force estimation with partial data
  * @returns {Promise<Object>} Routed result with formatted output, mode info, and strategies
  */
-export async function handleSkillWithModeRouting(input, options = {}) {
+export async function handleSkillWithModeRouting(input: any, options: any = {}): Promise<any> {
   // Parse conversational text into structured params
   let parsed;
   if (typeof input === 'string') {
@@ -436,7 +436,7 @@ export async function handleSkillWithModeRouting(input, options = {}) {
  * @param {string}  [input.strategy]      - Strategy override (default: 'all')
  * @returns {Promise<Object>} Conversational response with phase, question, sessionState, and formatted output
  */
-export async function handleConversationalInvocation(input = {}) {
+export async function handleConversationalInvocation(input: any = {}): Promise<any> {
   const { userMessage, sessionState, forceEstimate = false, strategy } = input;
 
   // Parse user message into structured data if provided
@@ -480,7 +480,7 @@ export async function handleConversationalInvocation(input = {}) {
  * @param {Object} result - Result from estimateEvolutionConversational()
  * @returns {string} Markdown-formatted response for this turn
  */
-export function formatConversationalTurn(result) {
+export function formatConversationalTurn(result: any): string {
   const lines = [];
 
   // ── Case 1: Non-economic component (re-questioning) ─────────────────
@@ -529,7 +529,7 @@ export function formatConversationalTurn(result) {
     lines.push('| Strategy | Evolution | Confidence | Method |');
     lines.push('|----------|-----------|------------|--------|');
 
-    for (const [method, ev] of Object.entries(result.evaluations)) {
+    for (const [method, ev] of Object.entries(result.evaluations) as [string, any][]) {
       if (ev.error) {
         lines.push(`| ${method} | — | — | Error: ${ev.error} |`);
       } else {
@@ -541,7 +541,7 @@ export function formatConversationalTurn(result) {
     lines.push('');
 
     // Consensus range
-    const successful = Object.entries(result.evaluations)
+    const successful = (Object.entries(result.evaluations) as [string, any][])
       .filter(([, ev]) => !ev.error)
       .map(([, ev]) => ev.evolution);
 

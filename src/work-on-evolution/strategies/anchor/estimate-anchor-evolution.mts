@@ -87,7 +87,7 @@ function parseAnchorResponse(text) {
 
 // ─── Core Evaluation ───────────────────────────────────────────────────────
 
-export async function estimateAnchorEvolution(args, llmCall) {
+export async function estimateAnchorEvolution(args: any, llmCall: any): Promise<any> {
   const { name, context } = args;
 
   let phase, justification, source, confidence;
@@ -182,7 +182,7 @@ export const ESTIMATE_ANCHOR_EVOLUTION_TOOL = {
   },
 };
 
-export async function handleEstimateAnchorEvolution(args) {
+export async function handleEstimateAnchorEvolution(args: any): Promise<any> {
   if (!args?.name || typeof args.name !== 'string' || args.name.trim().length === 0) {
     throw new Error('Required parameter "name" must be a non-empty string');
   }
@@ -190,7 +190,7 @@ export async function handleEstimateAnchorEvolution(args) {
     throw new Error('Required parameter "context" must be a non-empty string');
   }
 
-  const validated = {
+  const validated: any = {
     name: args.name.trim(),
     context: args.context.trim(),
   };

@@ -96,7 +96,7 @@ export async function estimateEvolutionOneShot(rawInput) {
   }
 
   // Step 4: Build component input for strategies
-  const component = {
+  const component: any = {
     name,
     context: description,
     description,
@@ -185,18 +185,18 @@ export async function estimateEvolutionOneShot(rawInput) {
       }
 
       // Phase B: If certitude/ubiquity not on the component, derive from LLM strategies
-      const enrichedComponent = { ...component };
+      const enrichedComponent: any = { ...component };
       if (enrichedComponent.certitude == null || enrichedComponent.ubiquity == null) {
-        const llmResults = Object.values(evaluations).filter(
+        const llmResults = (Object.values(evaluations) as any[]).filter(
           e => !e.error && e.certitude != null && e.ubiquity != null
         );
         if (llmResults.length > 0) {
           // Average certitude/ubiquity from all LLM strategies that provided them
           enrichedComponent.certitude = Math.round(
-            llmResults.reduce((s, r) => s + r.certitude, 0) / llmResults.length * 1000
+            llmResults.reduce((s: number, r: any) => s + r.certitude, 0) / llmResults.length * 1000
           ) / 1000;
           enrichedComponent.ubiquity = Math.round(
-            llmResults.reduce((s, r) => s + r.ubiquity, 0) / llmResults.length * 1000
+            llmResults.reduce((s: number, r: any) => s + r.ubiquity, 0) / llmResults.length * 1000
           ) / 1000;
           logDebug(TOOL, `Enriched "${name}" from ${llmResults.length} LLM result(s): certitude=${enrichedComponent.certitude}, ubiquity=${enrichedComponent.ubiquity}`);
         }
@@ -252,8 +252,8 @@ export async function estimateEvolutionOneShot(rawInput) {
   }
 
   // Step 6: Format result
-  const successCount = Object.values(evaluations).filter(e => !e.error).length;
-  const errorCount = Object.values(evaluations).filter(e => e.error).length;
+  const successCount = (Object.values(evaluations) as any[]).filter(e => !e.error).length;
+  const errorCount = (Object.values(evaluations) as any[]).filter(e => e.error).length;
   const duration = Date.now() - t0;
 
   logDebug(TOOL, `Results for "${name}": ${successCount} succeeded, ${errorCount} failed out of ${Object.keys(evaluations).length} strategies`);
@@ -432,7 +432,7 @@ function createStrategyInstance(StrategyCls) {
  * @param {string} [input.strategy] - Strategy to use (default: 'all')
  * @returns {Promise<ConversationalResult>}
  */
-export async function estimateEvolutionConversational(input = {}) {
+export async function estimateEvolutionConversational(input: any = {}): Promise<any> {
   const { sessionState, data = {}, forceEstimate = false, strategy } = input;
   const TOOL = 'estimateEvolution';
 
@@ -632,8 +632,8 @@ export async function estimateEvolutionConversational(input = {}) {
       }
     }
 
-    const successCount = Object.values(evaluations).filter(e => !e.error).length;
-    const errorCount = Object.values(evaluations).filter(e => e.error).length;
+    const successCount = (Object.values(evaluations) as any[]).filter(e => !e.error).length;
+    const errorCount = (Object.values(evaluations) as any[]).filter(e => e.error).length;
     const summary = session.getSummary();
 
     logDebug(TOOL, `Conversational results for "${session.state.name}": ${successCount} succeeded, ${errorCount} failed, ${summary.exchangeCount} exchange(s)`);
@@ -793,7 +793,7 @@ if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\
   });
   console.log(`Mode: ${allResult.mode}`);
   console.log(`Strategies evaluated:`);
-  for (const [method, ev] of Object.entries(allResult.evaluations)) {
+  for (const [method, ev] of Object.entries(allResult.evaluations) as [string, any][]) {
     if (ev.error) {
       console.log(`  ${method}: error - ${ev.error}`);
     } else {

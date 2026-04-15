@@ -164,10 +164,10 @@ const SOLUTION_PHASE_QUESTIONS = {
  * @param {string} text - Free-text description of maturity signals
  * @returns {{ certitude?: number, ubiquity?: number }}
  */
-export function inferFromMaturitySignals(text) {
+export function inferFromMaturitySignals(text: string): any {
   if (!text) return {};
   const t = text.toLowerCase();
-  const inferred = {};
+  const inferred: any = {};
 
   // Certitude signals
   const highCertitude = [
@@ -267,12 +267,10 @@ export function inferFromMarketSignals(marketDynamics, adoptionPattern) {
  * enough context has been accumulated to produce an estimation.
  */
 export class ConversationSession {
+  state: any;
+  exchanges: any;
 
-  /**
-   * Create a new conversation session.
-   * @param {Partial<SessionState>} [initial] - Optional initial state
-   */
-  constructor(initial = {}) {
+  constructor(initial: any = {}) {
     /** @type {SessionState} */
     this.state = {
       name: null,
@@ -491,8 +489,8 @@ export class ConversationSession {
    *
    * @returns {import('../work-on-evolution/strategies/capacity/base-strategy.mjs').ComponentInput}
    */
-  buildComponentInput() {
-    const input = {
+  buildComponentInput(): any {
+    const input: any = {
       name: this.state.name,
       description: this.state.description || '',
       context: this.state.description || '',
@@ -554,9 +552,9 @@ export class ConversationSession {
    * Get a summary of what has been gathered so far.
    * @returns {Object}
    */
-  getSummary() {
-    const gathered = {};
-    const missing = {};
+  getSummary(): any {
+    const gathered: any = {};
+    const missing: any = {};
 
     // Base fields shared by both paths
     const baseFields = ['name', 'description', 'space'];
