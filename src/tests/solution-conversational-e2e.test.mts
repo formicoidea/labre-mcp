@@ -330,10 +330,8 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
       // Verify the enriched component input
       const component = session2.buildComponentInput();
       assert.equal(component.isSolution, true);
-      assert.ok(component.context.includes('Container orchestration'));
-      assert.ok(component.context.includes('Dominant container orchestration'));
-      assert.ok(component.context.includes('Market dynamics'));
-      assert.ok(component.solutionContext.includes('CNCF'));
+      assert.ok(component.description?.includes('Container orchestration'));
+      assert.ok(component.solutionMetadata?.marketPosition?.includes('CNCF'));
     });
 
     it('capability path is unchanged: CRM → characteristics → market_signals', async () => {

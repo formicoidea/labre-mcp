@@ -219,8 +219,10 @@ export async function dispatchWithRouting(component: any, options: any = {}): Pr
     description = '',
   } = options;
 
-  // Step 1: Detect component type
-  const detection = detectComponentType(component.name, description || component.description || '');
+  // Step 1: Detect component type. `description` is a label-like signal
+  // suitable for classification; `context` (business environment) is not used
+  // here to avoid contaminating the detection heuristics with unrelated prose.
+  const detection = detectComponentType(component.name, description || component.description || component.name || '');
 
   // Step 2: Determine routing targets
   const targets = determineRoutingTargets(detection);

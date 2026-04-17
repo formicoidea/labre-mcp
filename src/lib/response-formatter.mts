@@ -48,6 +48,7 @@ export interface FormatterComponent {
   nature?: string;
   certitude?: number;
   ubiquity?: number;
+  phaseDistribution?: { bins: Array<{ position: number; probability: number }> };
   [key: string]: unknown;
 }
 
@@ -167,14 +168,14 @@ export function strategyReasoning(method: string, result: StrategyResultLike, co
     },
 
     'publication-analysis': () => {
-      const parts = [];
-      if (component.wonder != null) parts.push(`wonder=${component.wonder}`);
-      if (component.build != null) parts.push(`build=${component.build}`);
-      if (component.operate != null) parts.push(`operate=${component.operate}`);
-      if (component.usage != null) parts.push(`usage=${component.usage}`);
-      const distribution = parts.length > 0 ? parts.join(', ') : 'provided distribution';
+      const bins = component.phaseDistribution?.bins;
+      const distribution = bins && bins.length > 0
+        ? bins
+            .map((b, i) => `phase${i + 1}=${b.probability.toFixed(2)}`)
+            .join(', ')
+        : 'provided distribution';
       return (
-        `Publication type analysis (${distribution}) indicates the dominant discourse ` +
+        `Publication-phase analysis (${distribution}) indicates the dominant discourse ` +
         `is consistent with the **${stage.name}** stage — ${stage.descriptor}.`
       );
     },

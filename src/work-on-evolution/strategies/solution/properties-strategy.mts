@@ -430,27 +430,18 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
     const properties = await loadPropertiesReference();
     const solutionName = component.name || 'Unknown Solution';
 
-    // Compose context from all available sources.
-    // In conversational mode, the session enriches component.context with
-    // solutionContext, marketDynamics, and adoptionPattern. We also explicitly
-    // check component.solutionContext to handle cases where context was not
-    // pre-composed (e.g. direct strategy invocation).
-    const contextParts = [];
+    // Compose context from distinct semantic slots. `context` and `description`
+    // are NOT aliases — context is the user-provided business environment and
+    // description is an enrichable label; both contribute when present.
+    // Additional solution-specific signals are pulled from `solutionMetadata`
+    // so strategies see a single canonical shape regardless of caller.
+    const contextParts: string[] = [];
     if (component.context) contextParts.push(component.context);
-    else if (component.description) contextParts.push(component.description);
-    const solCtx = component.solutionContext;
-    if (solCtx && !contextParts.some(p => p.includes(solCtx))) {
-      contextParts.push(solCtx);
-    }
-    // Pull in metadata fields if not already in context
-    if (component.metadata) {
-      if ((component.metadata?.marketDynamics as string) && !contextParts.some(p => p.includes((component.metadata?.marketDynamics as string)))) {
-        contextParts.push(`Market dynamics: ${(component.metadata?.marketDynamics as string)}`);
-      }
-      if ((component.metadata?.adoptionPattern as string) && !contextParts.some(p => p.includes((component.metadata?.adoptionPattern as string)))) {
-        contextParts.push(`Adoption pattern: ${(component.metadata?.adoptionPattern as string)}`);
-      }
-    }
+    if (component.description) contextParts.push(component.description);
+    const marketPosition = component.solutionMetadata?.marketPosition;
+    if (marketPosition) contextParts.push(marketPosition);
+    const adoptionPattern = component.solutionMetadata?.adoptionPattern;
+    if (adoptionPattern) contextParts.push(`Adoption pattern: ${adoptionPattern}`);
     const context = contextParts.join('. ') || '';
 
     let propertyEvaluations;

@@ -400,12 +400,12 @@ export async function handleSkillWithModeRouting(input: any, options: any = {}):
     throw new Error('Input must be a non-empty string or object');
   }
 
-  // Merge options into the router input
+  // Merge options into the router input. `description` and `context` carry
+  // distinct semantics — pass each through without collapsing.
   const routerInput = {
     ...parsed,
-    // Map parsed fields to router-compatible names
-    description: parsed.description || parsed.context || '',
-    // Apply option overrides
+    ...(parsed.description != null && { description: parsed.description }),
+    ...(parsed.context != null && { context: parsed.context }),
     ...(options.mode && { mode: options.mode }),
     ...(options.sessionState && { sessionState: options.sessionState }),
     ...(options.forceEstimate != null && { forceEstimate: options.forceEstimate }),

@@ -63,10 +63,20 @@ assert(
   'certitude+ubiquity → oneshot'
 );
 
-// Sufficient publication params → oneshot
+// Sufficient phase distribution → oneshot
 assert(
-  detectMode({ name: 'X', wonder: 0.1, build: 0.2, operate: 0.3, usage: 0.4 }).mode === MODES.ONESHOT,
-  'wonder+build+operate+usage → oneshot'
+  detectMode({
+    name: 'X',
+    phaseDistribution: {
+      bins: [
+        { position: 0.09, probability: 0.1 },
+        { position: 0.29, probability: 0.2 },
+        { position: 0.48, probability: 0.3 },
+        { position: 0.85, probability: 0.4 },
+      ],
+    },
+  }).mode === MODES.ONESHOT,
+  'phaseDistribution → oneshot',
 );
 
 // Partial params → guided
@@ -75,8 +85,8 @@ assert(
   'only certitude (no ubiquity) → guided'
 );
 assert(
-  detectMode({ name: 'X', wonder: 0.1, build: 0.2 }).mode === MODES.GUIDED,
-  'partial pub params → guided'
+  detectMode({ name: 'X', phaseDistribution: { bins: [] } }).mode === MODES.GUIDED,
+  'empty phaseDistribution bins → guided',
 );
 
 // Minimal input → guided

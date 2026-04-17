@@ -71,7 +71,8 @@ export async function evaluateCapabilityPivot(standardResult: any, component: an
 
     const capResult = await evaluateCapabilityFn({
       name: capabilityName,
-      description: component.context || component.description || '',
+      description: component.description,
+      context: component.context,
       strategy: 'all',
       space: 'economic',
     });
@@ -588,7 +589,8 @@ export async function runEnrichedPipeline(standardResult: any, component: any, o
     capabilityPivot.capabilityName,
     {
       llmCall: options.llmCall,
-      description: component.context || component.description || '',
+      description: component.description,
+      context: component.context,
       excludeName: component.name,
     },
   );

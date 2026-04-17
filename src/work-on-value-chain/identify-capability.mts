@@ -32,6 +32,7 @@ You must look BEHIND the label to find the underlying capability.
 The essence of capability transcends time, innovation after innovation.
 
 Component: {{component}}
+Description: {{description}}
 Context: {{context}}
 
 For component and pipeline types, identify the nature and reformulate the label using these naming conventions:
@@ -126,7 +127,8 @@ export async function identifyCapability(component: any, llmCall?: any): Promise
 
   const prompt = CAPABILITY_IDENTIFICATION_PROMPT
     .replace('{{component}}', component.name || '')
-    .replace('{{context}}', component.description || component.context || '');
+    .replace('{{description}}', component.description ?? '')
+    .replace('{{context}}', component.context ?? '');
 
   const response = await llmCall(prompt);
   const result = parseCapabilityResponse(response, component);

@@ -3,13 +3,19 @@
 // validation of incoming tool/call arguments.
 
 import { z } from 'zod';
+import { PhaseDistributionSchema } from './inputs.schema.mjs';
 
 export const EstimateEvolutionInputSchema = z.object({
   name: z.string().min(1).describe(
     'Component name (e.g. "ERP", "LLM", "Electricity", "Air")'
   ),
   context: z.string().optional().describe(
-    'Business or usage context for the component (e.g. "Enterprise software for sales teams", "Western power supply today")'
+    'Business environment in which the component exists — user-provided. ' +
+    'Distinct from `description`: never a fallback for it.'
+  ),
+  description: z.string().optional().describe(
+    'Component label / semantic hint enrichable by upstream tooling. ' +
+    'Distinct from `context`: never a fallback for it.'
   ),
   certitude: z.number().min(0).max(1).optional().describe(
     'How well-understood and defined the component is (0 = novel/uncertain, 1 = fully understood). Required by s-curve strategy.'
@@ -17,20 +23,11 @@ export const EstimateEvolutionInputSchema = z.object({
   ubiquity: z.number().min(0).max(1).optional().describe(
     'How widespread the component is (0 = rare, 1 = ubiquitous). Required by s-curve strategy.'
   ),
-  wonder: z.number().min(0).max(1).optional().describe(
-    'Proportion of publications describing novelty/wonder (0–1). Used by pub-distribution strategy.'
-  ),
-  build: z.number().min(0).max(1).optional().describe(
-    'Proportion of publications focused on building/learning/experimenting (0–1). Used by pub-distribution strategy.'
-  ),
-  operate: z.number().min(0).max(1).optional().describe(
-    'Proportion of publications about maintenance/operations/features (0–1). Used by pub-distribution strategy.'
-  ),
-  usage: z.number().min(0).max(1).optional().describe(
-    'Proportion of publications about commodity usage (0–1). Used by pub-distribution strategy.'
-  ),
-  description: z.string().optional().describe(
-    'Free-text description of the component for strategies that use semantic analysis.'
+  phaseDistribution: PhaseDistributionSchema.optional().describe(
+    'Probability distribution over the Wardley evolution axis. ' +
+    'Format: { bins: [{ position: 0..1, probability: 0..1 }] } summing to ~1. ' +
+    'Consumed by the publication-analysis strategy when provided — replaces the ' +
+    'legacy flat wonder/build/operate/usage fields.'
   ),
   space: z.enum(['economic', 'social_good', 'common_good']).optional().describe(
     'Pre-classification of the component\'s economic space. ' +

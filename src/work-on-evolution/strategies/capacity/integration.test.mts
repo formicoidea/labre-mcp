@@ -73,10 +73,10 @@ function mockLLMLogprobCall(prompt) {
   });
 }
 
-/** Mock LLM call that returns publication proportions */
+/** Mock LLM call that returns phase probabilities */
 function mockPubLLMCall(prompt) {
   return Promise.resolve(
-    'wonder=0.10\nbuild=0.20\noperate=0.40\nusage=0.30'
+    'phase1=0.10\nphase2=0.20\nphase3=0.40\nphase4=0.30'
   );
 }
 
@@ -86,10 +86,14 @@ const COMPONENT_FULL = {
   name: 'Cloud Computing',
   certitude: 0.85,
   ubiquity: 0.80,
-  wonder: 0.05,
-  build: 0.10,
-  operate: 0.35,
-  usage: 0.50,
+  phaseDistribution: {
+    bins: [
+      { position: 0.09, probability: 0.05 },
+      { position: 0.29, probability: 0.10 },
+      { position: 0.48, probability: 0.35 },
+      { position: 0.85, probability: 0.50 },
+    ],
+  },
   description: 'IaaS/PaaS cloud infrastructure services',
 };
 

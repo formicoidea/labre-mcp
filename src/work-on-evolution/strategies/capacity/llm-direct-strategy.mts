@@ -17,6 +17,7 @@ import type { ComponentInput, EvolutionResult } from '../../../types/evolution.m
 const PROMPT_WITH_CAPABILITY = `You are an expert in economic science and technology history.
 
 Capability: {{capability}}
+Description: {{description}}
 Context: {{context}}
 Context date: {{date}}
 
@@ -36,6 +37,7 @@ confidence=X.XX`;
 const PROMPT_WITHOUT_CAPABILITY = `You are an expert in economic science and technology history.
 
 Component: {{component}}
+Description: {{description}}
 Context: {{context}}
 Context date: {{date}}
 
@@ -101,14 +103,22 @@ export class LLMDirectStrategy extends BaseStrategy {
   async evaluate(component: ComponentInput): Promise<EvolutionResult> {
     const hasCapability = component.capability != null;
 
+    if (!component.context) {
+      console.warn(
+        `[${LLMDirectStrategy.method}] no context provided for "${component.name}" — evaluation accuracy may be degraded`,
+      );
+    }
+
     const prompt = hasCapability
       ? PROMPT_WITH_CAPABILITY
           .replace('{{capability}}', component.capability ?? '')
-          .replace('{{context}}', component.description || component.context || '')
+          .replace('{{description}}', component.description ?? '')
+          .replace('{{context}}', component.context ?? '')
           .replace('{{date}}', String(component.date ? new Date(component.date).getFullYear() : 'unknown'))
       : PROMPT_WITHOUT_CAPABILITY
           .replace('{{component}}', component.name || '')
-          .replace('{{context}}', component.description || component.context || '')
+          .replace('{{description}}', component.description ?? '')
+          .replace('{{context}}', component.context ?? '')
           .replace('{{date}}', String(component.date ? new Date(component.date).getFullYear() : 'unknown'));
 
     const response = await this._llmCall(prompt);

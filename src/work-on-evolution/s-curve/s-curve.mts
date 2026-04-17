@@ -19,25 +19,6 @@ export const DEFAULT_PARAMS = {
   kLower: 7,    x0Lower: 0.54, yMinLower: 0, yMaxLower: 0.98, nuLower: 1.7,
 };
 
-// Publication type centroids — aligned with phase boundaries above
-// Used as anchors for weighted centroid (distribution → scalar)
-export const PUB_TYPE_CENTROIDS = {
-  wonder:  0.09,   // Genesis midpoint   [0, 0.18]
-  build:   0.29,   // Custom midpoint    [0.18, 0.40]
-  operate: 0.48,   // Product midpoint   [0.40, 0.70]
-  usage:   0.85,   // Commodity midpoint [0.70, 1.0]
-};
-
-// Publication type distribution → evolution scalar [0, 1]
-// Each input is a proportion (0-1); they are normalized to sum=1 internally.
-export function pubEvolution(wonder: number, build: number, operate: number, usage: number): number | null {
-  const C = PUB_TYPE_CENTROIDS;
-  const sum = wonder + build + operate + usage;
-  if (sum === 0) return null;
-  const w = wonder / sum, b = build / sum, o = operate / sum, u = usage / sum;
-  return Math.round((w * C.wonder + b * C.build + o * C.operate + u * C.usage) * 1000) / 1000;
-}
-
 // Raw sigmoid (0→1)
 export function sigmoid(c: number, k: number, x0: number): number {
   return 1 / (1 + Math.exp(-k * (c - x0)));

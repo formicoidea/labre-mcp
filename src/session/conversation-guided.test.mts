@@ -64,10 +64,19 @@ console.log('--- Test 1: Full multi-turn conversation (ERP) ---');
   assert(turn3.summary.gathered.ubiquity === 0.85, 'Turn 3: ubiquity is gathered');
   assert(turn3.summary.exchangeCount >= 2, `Turn 3: exchange count is ${turn3.summary.exchangeCount} (>=2)`);
 
-  // Turn 4: Provide publication proportions → should complete with evaluation
+  // Turn 4: Provide a phase distribution → should complete with evaluation
   const turn4 = await estimateEvolutionConversational({
     sessionState: turn3.sessionState,
-    data: { wonder: 0.02, build: 0.08, operate: 0.25, usage: 0.65 },
+    data: {
+      phaseDistribution: {
+        bins: [
+          { position: 0.09, probability: 0.02 },
+          { position: 0.29, probability: 0.08 },
+          { position: 0.48, probability: 0.25 },
+          { position: 0.85, probability: 0.65 },
+        ],
+      },
+    },
   });
   assert(turn4.phase === 'complete', 'Turn 4: phase is complete');
   assert(turn4.evaluations !== null, 'Turn 4: has evaluations');
@@ -166,7 +175,16 @@ console.log('--- Test 5: Session serialization round-trip ---');
   assert(restored.state.history.length === session.state.history.length, 'Restored history length matches');
 
   // Continue from restored session
-  restored.update({ wonder: 0.05, build: 0.15, operate: 0.30, usage: 0.50 });
+  restored.update({
+    phaseDistribution: {
+      bins: [
+        { position: 0.09, probability: 0.05 },
+        { position: 0.29, probability: 0.15 },
+        { position: 0.48, probability: 0.30 },
+        { position: 0.85, probability: 0.50 },
+      ],
+    },
+  });
   assert(restored.isReadyForEstimation(), 'Restored session progresses to ready');
 }
 console.log();
@@ -189,7 +207,9 @@ console.log('--- Test 6: Free-text inference ---');
     'Many competitors, feature differentiation, dominant players',
     'Mass adoption in enterprise, mainstream'
   );
-  assert(marketInferred.operate != null || marketInferred.usage != null, 'Inferred publication proportions from market signals');
+  assert(marketInferred !== null, 'Inferred phase distribution from market signals');
+  const phase3or4 = marketInferred.bins[2].probability + marketInferred.bins[3].probability;
+  assert(phase3or4 > 0, 'Market signals map to phase3 or phase4 mass');
 }
 console.log();
 
@@ -258,8 +278,17 @@ console.log('--- Test 8: Phase progression order ---');
   session.update({ certitude: 0.85 });
   assert(session.phase === 'market_signals', 'After certitude: market_signals phase');
 
-  session.update({ wonder: 0.05, build: 0.10, operate: 0.35, usage: 0.50 });
-  assert(session.phase === 'ready', 'After pub proportions: ready phase');
+  session.update({
+    phaseDistribution: {
+      bins: [
+        { position: 0.09, probability: 0.05 },
+        { position: 0.29, probability: 0.10 },
+        { position: 0.48, probability: 0.35 },
+        { position: 0.85, probability: 0.50 },
+      ],
+    },
+  });
+  assert(session.phase === 'ready', 'After phase distribution: ready phase');
   assert(session.isReadyForEstimation(), 'Is ready for estimation');
 }
 console.log();

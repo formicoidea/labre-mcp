@@ -1,68 +1,66 @@
 // Logprob distribution strategy: uses LLM token-level log-probabilities
-// to build a probability distribution over Wardley evolution phases, then
-// computes a weighted evolution estimate from those probabilities.
+// to build a probability distribution over the 4 Wardley evolution phases,
+// then reduces it to a scalar evolution + entropy-based confidence.
 //
-// This is a model-based strategy — it requires an LLM logprob call function
-// to be injected at construction time.
+// Requires an LLM logprob call function to be injected at construction time.
 //
 // The strategy:
-//   1. Sends a prompt asking the LLM to classify the component into an
-//      evolution phase (Genesis, Custom, Product, Commodity)
-//   2. Extracts logprobs for the phase tokens from the response
-//   3. Converts logprobs to probabilities via softmax
-//   4. Computes evolution as a probability-weighted centroid of phase midpoints
-//   5. Confidence is derived from the entropy of the distribution
-//      (peaked = high confidence, uniform = low confidence)
+//   1. Asks the LLM to classify the component into exactly one phase
+//      (phase1..phase4)
+//   2. Extracts logprobs for the four phase tokens from the response
+//   3. Converts logprobs to probabilities via softmax → PhaseDistribution
+//   4. Computes evolution via centroidEvolution()
+//   5. Confidence via entropyConfidence() (peaked = high, uniform = low)
 
 import { BaseStrategy } from './base-strategy.mjs';
 import type { ComponentInput, EvolutionResult } from '../../../types/evolution.mjs';
+import { PHASE_CENTROIDS, phase4Distribution } from '../../../schemas/inputs.schema.mjs';
+import {
+  centroidEvolution,
+  entropyConfidence,
+} from '../../../lib/phase-distribution.mjs';
 
-// Phase midpoints aligned with s-curve.mjs PUB_TYPE_CENTROIDS / phase boundaries
-const PHASE_CENTROIDS = {
-  genesis:   0.09,   // [0, 0.18]
-  custom:    0.29,   // [0.18, 0.40]
-  product:   0.48,   // [0.40, 0.70]
-  commodity: 0.85,   // [0.70, 1.0]
-};
-
-const PHASE_NAMES = Object.keys(PHASE_CENTROIDS);
+const PHASE_NAMES = ['phase1', 'phase2', 'phase3', 'phase4'] as const;
+type PhaseName = (typeof PHASE_NAMES)[number];
 
 const PROMPT_TEMPLATE = `You are an expert in Wardley Mapping and technology evolution.
 
 Classify the following component into exactly ONE evolution phase.
 
 The four phases are:
-- Genesis: novel, poorly understood, high uncertainty, experimental
-- Custom: emerging understanding, being built to solve specific needs
-- Product: well-understood, feature-rich, multiple competing implementations
-- Commodity: standardized, utility, cost-driven, ubiquitous
+- Phase1: novel, poorly understood, high uncertainty, experimental
+- Phase2: emerging understanding, being built to solve specific needs
+- Phase3: well-understood, feature-rich, multiple competing implementations
+- Phase4: standardized, utility, cost-driven, ubiquitous
 
 Component: {{component}}
+Description: {{description}}
 Context: {{context}}
 
-Reply with EXACTLY ONE WORD — the phase name:`;
+Reply with EXACTLY ONE TOKEN — one of: Phase1, Phase2, Phase3, Phase4`;
+
+interface LogprobEntry {
+  token: string;
+  logprob: number;
+}
 
 /**
- * Extract phase probabilities from logprobs data.
- *
- * @param {Array<{token: string, logprob: number}>} logprobs
- *   Array of token logprob objects from the LLM response.
- *   Typically the top logprobs for the first generated token.
- * @returns {Object<string, number>} Phase name → probability (sums to ~1)
+ * Extract per-phase probabilities from a top-logprobs response.
+ * Matches tokens that contain or are contained by a phase name (lowercased).
+ * Falls back to uniform when no token matches any phase.
  */
-function extractPhaseProbabilities(logprobs: any): Record<string, number> {
-  // Map each phase to its best matching logprob
-  const phaseLogprobs: Record<string, number> = {};
-
-  for (const phase of PHASE_NAMES) {
-    phaseLogprobs[phase] = -Infinity; // default: impossible
-  }
+function extractPhaseProbabilities(logprobs: LogprobEntry[] | null | undefined): Record<PhaseName, number> {
+  const phaseLogprobs: Record<PhaseName, number> = {
+    phase1: -Infinity,
+    phase2: -Infinity,
+    phase3: -Infinity,
+    phase4: -Infinity,
+  };
 
   if (logprobs && logprobs.length > 0) {
     for (const entry of logprobs) {
       const token = entry.token.trim().toLowerCase();
       for (const phase of PHASE_NAMES) {
-        // Match if the token starts with or equals the phase name
         if (phase.startsWith(token) || token.startsWith(phase)) {
           phaseLogprobs[phase] = Math.max(phaseLogprobs[phase], entry.logprob);
         }
@@ -70,28 +68,18 @@ function extractPhaseProbabilities(logprobs: any): Record<string, number> {
     }
   }
 
-  // Convert logprobs to probabilities via softmax
-  // If no logprobs matched at all, fall back to uniform distribution
   const hasAnyMatch = Object.values(phaseLogprobs).some(lp => lp > -Infinity);
-
   if (!hasAnyMatch) {
-    // Uniform fallback
     const uniform = 1 / PHASE_NAMES.length;
-    const result: Record<string, number> = {};
-    for (const phase of PHASE_NAMES) {
-      result[phase] = uniform;
-    }
-    return result;
+    return { phase1: uniform, phase2: uniform, phase3: uniform, phase4: uniform };
   }
 
-  // Softmax: exp(logprob) / sum(exp(logprobs))
-  // logprobs are already in log-space, so exp gives probabilities
-  const maxLp = Math.max(...Object.values(phaseLogprobs).filter(v => v > -Infinity));
-  const expValues: Record<string, number> = {};
+  const maxLp = Math.max(
+    ...Object.values(phaseLogprobs).filter(v => v > -Infinity),
+  );
+  const expValues: Record<PhaseName, number> = { phase1: 0, phase2: 0, phase3: 0, phase4: 0 };
   let sumExp = 0;
-
   for (const phase of PHASE_NAMES) {
-    // Shift by max for numerical stability, treat -Infinity as 0
     if (phaseLogprobs[phase] === -Infinity) {
       expValues[phase] = 0;
     } else {
@@ -100,38 +88,38 @@ function extractPhaseProbabilities(logprobs: any): Record<string, number> {
     sumExp += expValues[phase];
   }
 
-  const probabilities: Record<string, number> = {};
+  const out: Record<PhaseName, number> = { phase1: 0, phase2: 0, phase3: 0, phase4: 0 };
   for (const phase of PHASE_NAMES) {
-    probabilities[phase] = sumExp > 0 ? expValues[phase] / sumExp : 1 / PHASE_NAMES.length;
+    out[phase] = sumExp > 0 ? expValues[phase] / sumExp : 1 / PHASE_NAMES.length;
   }
-
-  return probabilities;
+  return out;
 }
 
 /**
- * Compute Shannon entropy of a probability distribution (normalized to [0, 1]).
- * @param {Object<string, number>} probs
- * @returns {number} Normalized entropy in [0, 1] (0 = certain, 1 = uniform)
+ * Text-only fallback when logprobs are not available: parse the phase name
+ * from the response and produce a peaked distribution.
  */
-function normalizedEntropy(probs: Record<string, number>) {
-  const values = Object.values(probs).filter(p => p > 0);
-  if (values.length <= 1) return 0;
-  const maxEntropy = Math.log(values.length);
-  const entropy = -values.reduce((s, p) => s + p * Math.log(p), 0);
-  return maxEntropy > 0 ? entropy / maxEntropy : 0;
+function parseFallbackPhase(text: string): Record<PhaseName, number> {
+  const lower = (text || '').toLowerCase().trim();
+  let matched: PhaseName | null = null;
+  for (const phase of PHASE_NAMES) {
+    if (lower.includes(phase)) {
+      matched = phase;
+      break;
+    }
+  }
+  const out: Record<PhaseName, number> = { phase1: 0, phase2: 0, phase3: 0, phase4: 0 };
+  for (const phase of PHASE_NAMES) {
+    if (phase === matched) out[phase] = 0.85;
+    else out[phase] = matched ? 0.05 : 0.25;
+  }
+  return out;
 }
 
 export class LogprobDistributionStrategy extends BaseStrategy {
+  _llmLogprobCall: (prompt: string) => Promise<{ text: string; logprobs: LogprobEntry[] }>;
 
-  /**
-   * @param {Object} options
-   * @param {function(string): Promise<{text: string, logprobs: Array<{token: string, logprob: number}>}>} options.llmLogprobCall
-   *   Async function that takes a prompt and returns both the text response
-   *   and an array of top token logprobs for the first generated token(s).
-   *   The logprobs array should contain objects with `token` and `logprob` fields.
-   */
-  _llmLogprobCall: any;
-
+  // any: constructor options bag — test/integration harness shape varies
   constructor({ llmLogprobCall }: any = {}) {
     super();
     if (typeof llmLogprobCall !== 'function') {
@@ -144,78 +132,41 @@ export class LogprobDistributionStrategy extends BaseStrategy {
     return 'logprob-distribution';
   }
 
-  /**
-   * @param {import('./base-strategy.mjs').ComponentInput} component
-   * @returns {Promise<import('./base-strategy.mjs').EvolutionResult>}
-   */
   async evaluate(component: ComponentInput): Promise<EvolutionResult> {
     const prompt = PROMPT_TEMPLATE
       .replace('{{component}}', component.name || '')
-      .replace('{{context}}', component.description || component.context || '');
+      .replace('{{description}}', component.description ?? '')
+      .replace('{{context}}', component.context ?? '');
+
+    if (!component.context) {
+      console.warn(
+        `[${LogprobDistributionStrategy.method}] no context provided for "${component.name}" — evaluation accuracy may be degraded`,
+      );
+    }
 
     const { text, logprobs } = await this._llmLogprobCall(prompt);
 
-    // Extract phase probabilities from logprobs
-    let phaseProbabilities;
+    const probs = (logprobs && logprobs.length > 0)
+      ? extractPhaseProbabilities(logprobs)
+      : parseFallbackPhase(text);
 
-    if (logprobs && logprobs.length > 0) {
-      phaseProbabilities = extractPhaseProbabilities(logprobs);
-    } else {
-      // Fallback: if no logprobs available, parse the text response as a single phase
-      phaseProbabilities = parseFallbackPhase(text);
-    }
-
-    // Compute evolution as probability-weighted centroid
-    let evolution = 0;
-    for (const phase of PHASE_NAMES) {
-      evolution += ((phaseProbabilities as Record<string, number>)[phase] || 0) * (PHASE_CENTROIDS as Record<string, number>)[phase];
-    }
-    evolution = Math.round(evolution * 1000) / 1000;
-
-    // Confidence from entropy: low entropy = high confidence
-    const entropy = normalizedEntropy(phaseProbabilities);
-    const confidence = Math.round(Math.max(0.1, 1 - entropy * 0.8) * 1000) / 1000;
+    const distribution = phase4Distribution(
+      probs.phase1,
+      probs.phase2,
+      probs.phase3,
+      probs.phase4,
+    );
 
     const result = {
-      evolution,
-      confidence,
+      evolution: centroidEvolution(distribution),
+      confidence: entropyConfidence(distribution),
       method: LogprobDistributionStrategy.method,
+      trace: [{ distribution }],
     };
 
     return BaseStrategy.validateResult(result);
   }
 }
 
-/**
- * Fallback when logprobs are not available: parse the text response
- * and create a one-hot probability distribution for the detected phase.
- * @param {string} text - Raw LLM response text
- * @returns {Object<string, number>}
- */
-function parseFallbackPhase(text: string): Record<string, number> {
-  const lower = (text || '').toLowerCase().trim();
-  const probs: Record<string, number> = {};
-
-  // Try to match a phase name in the response
-  let matched = null;
-  for (const phase of PHASE_NAMES) {
-    if (lower.includes(phase)) {
-      matched = phase;
-      break;
-    }
-  }
-
-  for (const phase of PHASE_NAMES) {
-    // Give 85% to matched phase, spread 15% across others for slight uncertainty
-    if (phase === matched) {
-      probs[phase] = 0.85;
-    } else {
-      probs[phase] = matched ? 0.05 : 0.25; // uniform if nothing matched
-    }
-  }
-
-  return probs;
-}
-
 // Export internals for testing
-export { extractPhaseProbabilities, normalizedEntropy, parseFallbackPhase, PHASE_CENTROIDS };
+export { extractPhaseProbabilities, parseFallbackPhase, PHASE_CENTROIDS };

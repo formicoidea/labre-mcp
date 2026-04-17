@@ -117,7 +117,16 @@ test('Capability path: full flow identity-classification-characteristics-market_
   if (s.phase !== 'characteristics') throw new Error('Step 1 failed: ' + s.phase);
   s.update({ certitude: 0.7, ubiquity: 0.6 });
   if (s.phase !== 'market_signals') throw new Error('Step 2 failed: ' + s.phase);
-  s.update({ wonder: 0.1, build: 0.2, operate: 0.3, usage: 0.4 });
+  s.update({
+    phaseDistribution: {
+      bins: [
+        { position: 0.09, probability: 0.1 },
+        { position: 0.29, probability: 0.2 },
+        { position: 0.48, probability: 0.3 },
+        { position: 0.85, probability: 0.4 },
+      ],
+    },
+  });
   if (s.phase !== 'ready') throw new Error('Step 3 failed: ' + s.phase);
 });
 
@@ -173,7 +182,9 @@ test('buildComponentInput() includes solution fields for solutions', () => {
   const input = s.buildComponentInput();
   if (input.isSolution !== true) throw new Error('Missing isSolution');
   if (input.componentType !== 'solution') throw new Error('Missing componentType');
-  if (input.solutionContext !== 'Event streaming platform') throw new Error('Missing solutionContext');
+  if (input.solutionMetadata?.marketPosition !== 'Event streaming platform') {
+    throw new Error('Missing solutionMetadata.marketPosition');
+  }
 });
 
 test('buildComponentInput() does NOT include isSolution for capabilities', () => {

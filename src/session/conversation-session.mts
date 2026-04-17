@@ -33,6 +33,8 @@
 
 import { classifyComponent, buildReQuestions } from '../work-on-evolution/routing/classification-gate.mjs';
 import type { SessionState, SessionExchange, SessionSummary } from '../types/session.mjs';
+import type { PhaseDistribution } from '../schemas/inputs.schema.mjs';
+import { phase4Distribution } from '../schemas/inputs.schema.mjs';
 import {
   detectComponentType,
   COMPONENT_TYPE,
@@ -213,52 +215,53 @@ export function inferFromMaturitySignals(text: string): Record<string, number> {
 }
 
 /**
- * Infer publication proportions from market dynamics text.
- *
- * @param {string} marketDynamics - Free-text market dynamics description
- * @param {string} adoptionPattern - Free-text adoption pattern description
- * @returns {{ wonder?: number, build?: number, operate?: number, usage?: number }}
+ * Infer a PhaseDistribution from free-text market dynamics / adoption pattern.
+ * Counts per-phase keyword hits, normalizes to sum=1, and returns the
+ * canonical 4-phase discrete distribution. Returns null when no signal matches.
  */
-export function inferFromMarketSignals(marketDynamics: string, adoptionPattern: string): Record<string, number> {
+export function inferFromMarketSignals(
+  marketDynamics: string,
+  adoptionPattern: string,
+): PhaseDistribution | null {
   const text = `${marketDynamics || ''} ${adoptionPattern || ''}`.toLowerCase();
-  if (!text.trim()) return {};
+  if (!text.trim()) return null;
 
   // Market signal patterns
-  const commoditySignals = [
+  const phase4Signals = [
     'utility', 'commodity', 'many competitors', 'pricing converging',
     'price war', 'standardized', 'interchangeable', 'api-first',
     'pay per use', 'pay-per-use', 'metered', 'ubiquitous',
   ];
-  const productSignals = [
+  const phase3Signals = [
     'few competitors', 'dominant players', 'feature differentiation',
     'product comparison', 'market leader', 'market share',
     'enterprise sales', 'vendor lock-in',
   ];
-  const customSignals = [
+  const phase2Signals = [
     'custom development', 'bespoke', 'consulting', 'integration work',
     'system integrator', 'professional services', 'custom built',
   ];
-  const genesisSignals = [
+  const phase1Signals = [
     'no competitors', 'first mover', 'research phase', 'experimental',
     'proof of concept', 'venture capital', 'startup', 'seed funding',
   ];
 
-  const scores = {
-    genesis: genesisSignals.filter(s => text.includes(s)).length,
-    custom: customSignals.filter(s => text.includes(s)).length,
-    product: productSignals.filter(s => text.includes(s)).length,
-    commodity: commoditySignals.filter(s => text.includes(s)).length,
+  const hits = {
+    phase1: phase1Signals.filter(s => text.includes(s)).length,
+    phase2: phase2Signals.filter(s => text.includes(s)).length,
+    phase3: phase3Signals.filter(s => text.includes(s)).length,
+    phase4: phase4Signals.filter(s => text.includes(s)).length,
   };
 
-  const total = scores.genesis + scores.custom + scores.product + scores.commodity;
-  if (total === 0) return {};
+  const total = hits.phase1 + hits.phase2 + hits.phase3 + hits.phase4;
+  if (total === 0) return null;
 
-  return {
-    wonder: Math.round((scores.genesis / total) * 100) / 100,
-    build: Math.round((scores.custom / total) * 100) / 100,
-    operate: Math.round((scores.product / total) * 100) / 100,
-    usage: Math.round((scores.commodity / total) * 100) / 100,
-  };
+  return phase4Distribution(
+    Math.round((hits.phase1 / total) * 100) / 100,
+    Math.round((hits.phase2 / total) * 100) / 100,
+    Math.round((hits.phase3 / total) * 100) / 100,
+    Math.round((hits.phase4 / total) * 100) / 100,
+  );
 }
 
 // ─── ConversationSession class ──────────────────────────────────────────────
@@ -277,13 +280,11 @@ export class ConversationSession {
     this.state = {
       name: null,
       description: null,
+      context: null,
       space: null,
       certitude: null,
       ubiquity: null,
-      wonder: null,
-      build: null,
-      operate: null,
-      usage: null,
+      phaseDistribution: null,
       sector: null,
       maturitySignals: null,
       marketDynamics: null,
@@ -370,14 +371,11 @@ export class ConversationSession {
     }
 
     if (this.state.phase === 'market_signals') {
-      const hasPubs = this.state.wonder != null && this.state.build != null &&
-                      this.state.operate != null && this.state.usage != null;
-      if (hasPubs) {
-        customized.hints.unshift(
-          `✓ Publication proportions already provided: ` +
-          `wonder=${this.state.wonder}, build=${this.state.build}, ` +
-          `operate=${this.state.operate}, usage=${this.state.usage}`
-        );
+      if (this.state.phaseDistribution != null) {
+        const summary = this.state.phaseDistribution.bins
+          .map((b, i) => `phase${i + 1}=${b.probability.toFixed(2)}`)
+          .join(', ');
+        customized.hints.unshift(`✓ Phase distribution already provided: ${summary}`);
       }
     }
 
@@ -492,60 +490,47 @@ export class ConversationSession {
    *
    * @returns {import('../work-on-evolution/strategies/capacity/base-strategy.mjs').ComponentInput}
    */
-  // any: ComponentInput-shaped builder result with optional numeric fields and metadata bag
+  // any: ComponentInput-shaped builder result with optional fields and metadata bag
   buildComponentInput(): any {
     const input: any = {
       name: this.state.name,
-      description: this.state.description || '',
-      context: this.state.description || '',
     };
 
-    // Add numeric fields if present
-    const numericFields = ['certitude', 'ubiquity', 'wonder', 'build', 'operate', 'usage'];
-    for (const field of numericFields) {
-      if (this.state[field] != null) {
-        input[field] = this.state[field];
-      }
-    }
+    // `context` and `description` have distinct semantics — never fall back from one to the other.
+    if (this.state.description) input.description = this.state.description;
+    if (this.state.context) input.context = this.state.context;
 
-    // Add metadata for LLM-based strategies
+    // Numeric axes
+    if (this.state.certitude != null) input.certitude = this.state.certitude;
+    if (this.state.ubiquity != null) input.ubiquity = this.state.ubiquity;
+    if (this.state.phaseDistribution != null) input.phaseDistribution = this.state.phaseDistribution;
+
+    // Loose metadata for LLM-based strategies
     input.metadata = {};
     if (this.state.sector) input.metadata.sector = this.state.sector;
     if (this.state.maturitySignals) input.metadata.maturitySignals = this.state.maturitySignals;
     if (this.state.marketDynamics) input.metadata.marketDynamics = this.state.marketDynamics;
     if (this.state.adoptionPattern) input.metadata.adoptionPattern = this.state.adoptionPattern;
 
-    // Add solution routing metadata (detected during classification phase)
+    // Solution routing metadata (detected during classification phase)
     if (this.state.componentType) {
       input.componentType = this.state.componentType;
       input.componentTypeConfidence = this.state.componentTypeConfidence;
       input.componentTypeMethod = this.state.componentTypeMethod;
-      // Tag as solution for solution strategies
       if (this.state.componentType === COMPONENT_TYPE.SOLUTION) {
         input.isSolution = true;
       }
     }
 
-    // Add solution-specific context for 12-property evaluation
-    if (this.state.solutionContext) {
-      input.solutionContext = this.state.solutionContext;
-      input.metadata.solutionContext = this.state.solutionContext;
-    }
-
-    // ── Enrich context for solution components ──
-    // When the component is a solution, compose a rich context string from all
-    // conversational data gathered during the solution_context phase. This ensures
-    // solution strategy LLM prompts receive the full conversational context
-    // (not just the bare description) for accurate 12-property evaluation.
+    // Solution-specific canonical bag — absorbs the prior `solutionContext` top-level
+    // leak and pairs it with adoption pattern for strategies that need both.
     if (this.state.componentType === COMPONENT_TYPE.SOLUTION) {
-      const contextParts = [];
-      if (this.state.description) contextParts.push(this.state.description);
-      if (this.state.solutionContext) contextParts.push(this.state.solutionContext);
-      if (this.state.marketDynamics) contextParts.push(`Market dynamics: ${this.state.marketDynamics}`);
-      if (this.state.adoptionPattern) contextParts.push(`Adoption pattern: ${this.state.adoptionPattern}`);
-      if (this.state.sector) contextParts.push(`Sector: ${this.state.sector}`);
-      if (contextParts.length > 0) {
-        input.context = contextParts.join('. ');
+      const marketPosition = this.state.solutionContext ?? this.state.marketDynamics ?? null;
+      const solutionMetadata: Record<string, string> = {};
+      if (marketPosition) solutionMetadata.marketPosition = marketPosition;
+      if (this.state.adoptionPattern) solutionMetadata.adoptionPattern = this.state.adoptionPattern;
+      if (Object.keys(solutionMetadata).length > 0) {
+        input.solutionMetadata = solutionMetadata;
       }
     }
 
@@ -565,8 +550,7 @@ export class ConversationSession {
 
     // Path-specific fields
     const capabilityFields = [
-      'certitude', 'ubiquity',
-      'wonder', 'build', 'operate', 'usage',
+      'certitude', 'ubiquity', 'phaseDistribution',
       'sector', 'maturitySignals', 'marketDynamics', 'adoptionPattern',
     ];
     const solutionFields = [
@@ -642,22 +626,13 @@ export class ConversationSession {
       }
     }
 
-    // Infer publication proportions from market dynamics
-    if (this.state.marketDynamics || this.state.adoptionPattern) {
-      const hasPubs = this.state.wonder != null && this.state.build != null &&
-                      this.state.operate != null && this.state.usage != null;
-      if (!hasPubs) {
-        const inferred = inferFromMarketSignals(
-          this.state.marketDynamics ?? '',
-          this.state.adoptionPattern ?? ''
-        );
-        if (inferred.wonder != null) {
-          if (this.state.wonder == null) this.state.wonder = inferred.wonder;
-          if (this.state.build == null) this.state.build = inferred.build;
-          if (this.state.operate == null) this.state.operate = inferred.operate;
-          if (this.state.usage == null) this.state.usage = inferred.usage;
-        }
-      }
+    // Infer a PhaseDistribution from free-text market dynamics / adoption pattern
+    if ((this.state.marketDynamics || this.state.adoptionPattern) && this.state.phaseDistribution == null) {
+      const inferred = inferFromMarketSignals(
+        this.state.marketDynamics ?? '',
+        this.state.adoptionPattern ?? '',
+      );
+      if (inferred) this.state.phaseDistribution = inferred;
     }
 
     // Auto-classify if not yet classified
@@ -733,12 +708,11 @@ export class ConversationSession {
     // Phase: market_signals → can proceed when we have some market data
     //   OR user explicitly wants to proceed
     if (this.state.phase === 'market_signals') {
-      const hasPubs = this.state.wonder != null && this.state.build != null &&
-                      this.state.operate != null && this.state.usage != null;
+      const hasDistribution = this.state.phaseDistribution != null;
       const hasMarketText = this.state.marketDynamics || this.state.adoptionPattern;
 
-      // Ready if we have either publication proportions or market text signals
-      if (hasPubs || hasMarketText) {
+      // Ready if we have either a phase distribution or market text signals
+      if (hasDistribution || hasMarketText) {
         this.state.phase = 'ready';
       }
     }

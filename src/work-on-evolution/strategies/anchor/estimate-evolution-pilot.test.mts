@@ -216,10 +216,14 @@ describe('estimateEvolution pilot — progress notifications', () => {
       description: 'Enterprise resource planning',
       certitude: 0.9,
       ubiquity: 0.85,
-      wonder: 0.02,
-      build: 0.08,
-      operate: 0.25,
-      usage: 0.65,
+      phaseDistribution: {
+        bins: [
+          { position: 0.09, probability: 0.02 },
+          { position: 0.29, probability: 0.08 },
+          { position: 0.48, probability: 0.25 },
+          { position: 0.85, probability: 0.65 },
+        ],
+      },
     });
 
     const debugMsgs = byLevel(cap.messages, 'debug');

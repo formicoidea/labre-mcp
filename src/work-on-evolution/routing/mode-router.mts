@@ -57,13 +57,14 @@ function hasEvaluationParams(input: any): boolean {
   // S-curve params: certitude + ubiquity
   const hasSCurveParams = input.certitude != null && input.ubiquity != null;
 
-  // Publication distribution: wonder + build + operate + usage
-  const hasPubParams =
-    input.wonder != null && input.build != null &&
-    input.operate != null && input.usage != null;
+  // Distribution-based params: phaseDistribution with at least one bin
+  const hasPhaseDistribution =
+    input.phaseDistribution
+    && Array.isArray(input.phaseDistribution.bins)
+    && input.phaseDistribution.bins.length > 0;
 
   // At least one complete param set for a strategy
-  return hasSCurveParams || hasPubParams;
+  return hasSCurveParams || hasPhaseDistribution;
 }
 
 /**
@@ -170,15 +171,13 @@ async function routeOneShot(input: any, modeReason: string): Promise<RoutedRespo
   // Map input to one-shot API format
   const oneShotInput = {
     name: input.name,
-    description: input.description || input.context || '',
+    description: input.description,
+    context: input.context,
     space: input.space,
     strategy: input.strategy || 'all',
     ...(input.certitude != null && { certitude: input.certitude }),
     ...(input.ubiquity != null && { ubiquity: input.ubiquity }),
-    ...(input.wonder != null && { wonder: input.wonder }),
-    ...(input.build != null && { build: input.build }),
-    ...(input.operate != null && { operate: input.operate }),
-    ...(input.usage != null && { usage: input.usage }),
+    ...(input.phaseDistribution != null && { phaseDistribution: input.phaseDistribution }),
     ...(input.pipeline != null && { pipeline: Boolean(input.pipeline) }),
   };
 
@@ -247,16 +246,12 @@ async function routeGuided(input: any, modeReason: string): Promise<GuidedTurnRe
 
   // Map all available data into the conversational data payload
   if (input.name) conversationalInput.data.name = input.name;
-  if (input.description || input.context) {
-    conversationalInput.data.description = input.description || input.context;
-  }
+  if (input.description) conversationalInput.data.description = input.description;
+  if (input.context) conversationalInput.data.context = input.context;
   if (input.space) conversationalInput.data.space = input.space;
   if (input.certitude != null) conversationalInput.data.certitude = input.certitude;
   if (input.ubiquity != null) conversationalInput.data.ubiquity = input.ubiquity;
-  if (input.wonder != null) conversationalInput.data.wonder = input.wonder;
-  if (input.build != null) conversationalInput.data.build = input.build;
-  if (input.operate != null) conversationalInput.data.operate = input.operate;
-  if (input.usage != null) conversationalInput.data.usage = input.usage;
+  if (input.phaseDistribution != null) conversationalInput.data.phaseDistribution = input.phaseDistribution;
   if (input.sector) conversationalInput.data.sector = input.sector;
   if (input.maturitySignals) conversationalInput.data.maturitySignals = input.maturitySignals;
   if (input.marketDynamics) conversationalInput.data.marketDynamics = input.marketDynamics;

@@ -17,7 +17,8 @@ Tous les schémas vivent dans `src/schemas/*.schema.mts`.
 | Famille | Fichiers | Rôle |
 |---|---|---|
 | **Tool inputs** (4) | `estimate-evolution.schema.mts`, `evaluate-map.schema.mts`, `identify-capability.schema.mts`, `estimate-anchor-evolution.schema.mts` | Entrée des 4 outils MCP — schéma publié au client + parsé à l'appel |
-| **Domain** | `domain.schema.mts` | `ComponentInput`, `SolutionInput`, `EvolutionResult`, `PropertyEvaluation`, … — objets métier partagés |
+| **Inputs** | `inputs.schema.mts` | `ComponentInput`, `SolutionInput`, `PhaseDistribution` + primitives (`CapabilityNature`, `WardleyPhase`, `PhaseLabel`) — objets métier partagés |
+| **Results** | `results.schema.mts` | `EvolutionResult`, `PropertyEvaluation`, `SolutionEvolutionResult` — sorties des stratégies |
 | **Patent** | `patent.schema.mts` | `PatentDataSchema` + 8 sous-shapes. Frontière BigQuery / mock — valide les données entrantes d'une source externe |
 | **Parsed LLM** | `parsed-llm.schema.mts` | Schémas de sortie des parsers LLM — garantit la forme de ce qu'on reçoit d'un modèle |
 

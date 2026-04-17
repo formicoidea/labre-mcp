@@ -3,16 +3,16 @@
 // Used by src/session/conversation-session.mts to manage multi-turn
 // evolution estimation flows.
 
+import type { PhaseDistribution } from '../schemas/inputs.schema.mjs';
+
 export interface SessionState {
   name: string | null;
   description: string | null;
+  context: string | null;
   space: string | null;
   certitude: number | null;
   ubiquity: number | null;
-  wonder: number | null;
-  build: number | null;
-  operate: number | null;
-  usage: number | null;
+  phaseDistribution: PhaseDistribution | null;
   sector: string | null;
   maturitySignals: string | null;
   marketDynamics: string | null;

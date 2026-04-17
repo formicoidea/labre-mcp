@@ -207,10 +207,12 @@ export async function dispatchEvaluation(component: any, detection: ComponentTyp
     strategy = 'all',
   } = options;
 
-  // Step 1: Detect component type if not provided
+  // Step 1: Detect component type if not provided.
+  // `description` is the label we classify on (not `context`, which is the
+  // business environment and can be noisy for detection).
   const effectiveDetection = detection || detectComponentType(
     component.name,
-    component.description || component.context || ''
+    component.description ?? '',
   );
 
   // Step 2: Determine routing targets

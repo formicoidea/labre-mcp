@@ -32,6 +32,7 @@ You are building a chronological timeline of how a capability has been fulfilled
 
 Underlying capability: {{capability}}
 Original component: {{component}}
+Description: {{description}}
 Context: {{context}}
 Current year: ${CURRENT_YEAR}
 
@@ -193,7 +194,8 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
       const iterationPrompt = HISTORY_ITERATION_PROMPT
         .replace('{{capability}}', capability.capability)
         .replace('{{component}}', component.name || '')
-        .replace('{{context}}', component.description || component.context || '')
+        .replace('{{description}}', component.description ?? '')
+        .replace('{{context}}', component.context ?? '')
         .replace('{{history_section}}', historySection)
         .replace('{{pacing_guidance}}', pacingGuidance);
 
@@ -214,7 +216,8 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
           name: milestone.name,
           capability: capability.capability,
           nature: capability.nature,
-          context: component.description || component.context || '',
+          description: component.description,
+          context: component.context,
           date: milestone.date,
         });
       } catch (err) {
@@ -242,7 +245,8 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
           name: component.name || capability.capability,
           capability: capability.capability,
           nature: capability.nature,
-          context: component.description || component.context || '',
+          description: component.description,
+          context: component.context,
           date: CURRENT_YEAR,
         });
         history.push({

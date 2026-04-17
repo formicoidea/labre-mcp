@@ -39,7 +39,8 @@ src/
 │   ├── evaluate-map.schema.mts            Entrée de evaluateMap
 │   ├── identify-capability.schema.mts     Entrée de identifyCapability
 │   ├── estimate-anchor-evolution.schema.mts  Entrée de estimateAnchorEvolution
-│   ├── domain.schema.mts                  ComponentInput, SolutionInput, EvolutionResult, …
+│   ├── inputs.schema.mts                  Primitives + ComponentInput, SolutionInput, PhaseDistribution
+│   ├── results.schema.mts                 EvolutionResult, PropertyEvaluation, SolutionEvolutionResult
 │   ├── patent.schema.mts                  PatentDataSchema + 8 sous-shapes (BigQuery/mock)
 │   ├── parsed-llm.schema.mts              Schémas des parsers LLM
 │   └── …
@@ -56,6 +57,8 @@ src/
 │   ├── language-detect.test.mts
 │   ├── mcp-notifications.mts    Émetteur de notifications <channel>
 │   ├── mcp-notifications.test.mts
+│   ├── phase-distribution.mts   centroidEvolution / entropyConfidence / concentrationConfidence
+│   ├── phase-distribution.test.mts
 │   ├── progress-messages.mts    Messages de progression standards
 │   ├── response-formatter.mts   Formatage sortie tool (FR/EN, markdown)
 │   ├── llm/

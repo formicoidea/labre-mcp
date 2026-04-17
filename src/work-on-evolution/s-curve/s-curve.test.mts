@@ -13,10 +13,10 @@ import {
   bandDistance,
   projectOnCurve,
   computeEvolution,
-  pubEvolution,
   DEFAULT_PARAMS,
-  PUB_TYPE_CENTROIDS,
 } from './s-curve.mjs';
+import { PHASE_CENTROIDS, phase4Distribution } from '../../schemas/inputs.schema.mjs';
+import { centroidEvolution } from '../../lib/phase-distribution.mjs';
 
 describe('s-curve — sigmoid primitives', () => {
   it('sigmoid(x0, k, x0) = 0.5', () => {
@@ -91,22 +91,26 @@ describe('s-curve — computeEvolution', () => {
   });
 });
 
-describe('s-curve — pubEvolution', () => {
-  it('returns null when all inputs are zero', () => {
-    assert.equal(pubEvolution(0, 0, 0, 0), null);
+describe('phase-distribution — centroidEvolution over phase4 buckets', () => {
+  it('returns 0 when all probabilities are zero', () => {
+    const d = phase4Distribution(0, 0, 0, 0);
+    assert.equal(centroidEvolution(d), 0);
   });
 
-  it('pure wonder yields the wonder centroid', () => {
-    assert.equal(pubEvolution(1, 0, 0, 0), PUB_TYPE_CENTROIDS.wonder);
+  it('pure phase1 yields the phase1 centroid', () => {
+    const d = phase4Distribution(1, 0, 0, 0);
+    assert.equal(centroidEvolution(d), PHASE_CENTROIDS.phase1);
   });
 
-  it('pure usage yields the usage centroid', () => {
-    assert.equal(pubEvolution(0, 0, 0, 1), PUB_TYPE_CENTROIDS.usage);
+  it('pure phase4 yields the phase4 centroid', () => {
+    const d = phase4Distribution(0, 0, 0, 1);
+    assert.equal(centroidEvolution(d), PHASE_CENTROIDS.phase4);
   });
 
-  it('normalizes a mixed distribution to a scalar in [0, 1]', () => {
-    const v = pubEvolution(0.02, 0.08, 0.25, 0.65);
-    assert.ok(v !== null && v > PUB_TYPE_CENTROIDS.operate && v < PUB_TYPE_CENTROIDS.usage);
+  it('normalizes a mixed distribution to a scalar between phase3 and phase4 centroids', () => {
+    const d = phase4Distribution(0.02, 0.08, 0.25, 0.65);
+    const v = centroidEvolution(d);
+    assert.ok(v > PHASE_CENTROIDS.phase3 && v < PHASE_CENTROIDS.phase4);
   });
 });
 
