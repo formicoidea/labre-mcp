@@ -10,10 +10,10 @@ import { z } from 'zod';
 
 /** Wardley capability nature. */
 export const CapabilityNatureSchema = z.enum([
-  'activite',
-  'pratique',
-  'connaissance',
-  'donnee',
+  'activity',
+  'practice',
+  'knowledge',
+  'data',
   'none',
 ]);
 export type CapabilityNature = z.infer<typeof CapabilityNatureSchema>;

@@ -94,7 +94,7 @@ const COMPONENT_FULL = {
   name: 'TCP/IP Networking',
   capability: 'network protocol stack',
   description: 'Standard internet communication protocols',
-  nature: 'activite',
+  nature: 'activity',
 };
 
 const COMPONENT_MINIMAL = {

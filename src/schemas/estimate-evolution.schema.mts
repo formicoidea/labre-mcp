@@ -9,13 +9,13 @@ export const EstimateEvolutionInputSchema = z.object({
   name: z.string().min(1).describe(
     'Component name (e.g. "ERP", "LLM", "Electricity", "Air")'
   ),
-  context: z.string().optional().describe(
-    'Business environment in which the component exists — user-provided. ' +
-    'Distinct from `description`: never a fallback for it.'
-  ),
   description: z.string().optional().describe(
     'Component label / semantic hint enrichable by upstream tooling. ' +
     'Distinct from `context`: never a fallback for it.'
+  ),
+  context: z.string().optional().describe(
+    'Business environment in which the component exists — user-provided. ' +
+    'Distinct from `description`: never a fallback for it.'
   ),
   certitude: z.number().min(0).max(1).optional().describe(
     'How well-understood and defined the component is (0 = novel/uncertain, 1 = fully understood). Required by s-curve strategy.'
@@ -54,9 +54,9 @@ export const EstimateEvolutionInputSchema = z.object({
   ),
   pipeline: z.boolean().default(false).describe(
     'When true, enables enriched pipeline mode that orchestrates 3 evaluations: ' +
-    '(1) capability pivot — the abstract capability is evaluated first as central anchor, ' +
-    '(2) state-of-the-art solution — a modern/SotA implementation of that capability, ' +
-    '(3) legacy solution — an older/legacy implementation. ' +
+    '(1) capability pivot — the abstract capability is evaluated first, ' +
+    '(2) state-of-the-art solution — a modern/SotA implementation of that capability (should be align with anchor), ' +
+    '(3) legacy solution — your solution or an older/legacy implementation. ' +
     'Produces a complete OWM (onlinewardleymaps.com) output with pipeline syntax ' +
     'containing component, pipeline, and label declarations. ' +
     'When omitted or false, the default single-evaluation behavior is preserved.'

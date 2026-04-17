@@ -244,7 +244,7 @@ Decode un nom technique (CRM, Kubernetes, Data Warehouse…) en la **capability 
 ```json
 {
   "type": "component",
-  "nature": "activite",
+  "nature": "activity",
   "capability": "Gestion de la relation client",
   "confidence": 0.92,
   "justification": "Salesforce CRM est une solution ciblant l'activite de CRM.",

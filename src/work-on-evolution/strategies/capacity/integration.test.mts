@@ -27,7 +27,7 @@ function mockTimelineLLMCall(prompt) {
   if (prompt.includes('underlying capability')) {
     // Phase 1: capability identification
     return Promise.resolve(
-      'type=capability\nnature=activite\ncapability=Fournir de l\'infrastructure informatique à la demande\nconfidence=0.85'
+      'type=capability\nnature=activity\ncapability=Fournir de l\'infrastructure informatique à la demande\nconfidence=0.85'
     );
   }
   if (prompt.includes('NEXT chronological milestone')) {
@@ -46,7 +46,7 @@ function mockTimelineLLMCall(prompt) {
 function mockTimelineLLMCallStalling(prompt) {
   if (prompt.includes('underlying capability')) {
     return Promise.resolve(
-      'type=capability\nnature=activite\ncapability=Test capability\nconfidence=0.85'
+      'type=capability\nnature=activity\ncapability=Test capability\nconfidence=0.85'
     );
   }
   if (prompt.includes('NEXT chronological milestone')) {

@@ -33,11 +33,11 @@ export type { SolutionInput, SolutionEvolutionResult, PropertyEvaluation };
 /**
  * @typedef {Object} SolutionInput
  * @property {string}  name          - Solution / product name (e.g. "Kubernetes")
- * @property {string}  [description] - Free-text context or business description
- * @property {string}  [context]     - Alternative to description
+ * @property {string}  [description] - Enrichable label / semantic hint for the solution
+ * @property {string}  [context]     - Business environment where the solution is used (distinct from description — never a fallback for it)
  * @property {string|Date} [date]    - Optional date for temporal context
  * @property {string}  [capability]  - Underlying capability if already identified
- * @property {string}  [nature]      - Capability nature (activite|pratique|connaissance|donnee|none)
+ * @property {string}  [nature]      - Capability nature (activity|practice|knowledge|data|none)
  * @property {boolean} [isSolution]  - Routing flag: true when the router determined this is a solution
  * @property {number}  [routerConfidence] - Confidence of the solution/capability classification
  * @property {Object}  [metadata]    - Additional strategy-specific data
