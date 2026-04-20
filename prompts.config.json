@@ -1,0 +1,119 @@
+{
+  "identify-capability": {
+    "default": {
+      "kind": "template",
+      "templateFile": "prompts/identify-capability.md",
+      "variables": ["component", "description", "context"],
+      "parser": { "kind": "custom", "id": "identifyCapability" }
+    }
+  },
+  "anchor-evolution": {
+    "default": {
+      "kind": "template",
+      "templateFile": "prompts/anchor-evolution.md",
+      "variables": ["anchor", "context"],
+      "parser": { "kind": "custom", "id": "anchorEvolution" }
+    }
+  },
+  "publication-analysis": {
+    "default": {
+      "kind": "template",
+      "templateFile": "prompts/publication-analysis.md",
+      "variables": ["component", "description", "context"],
+      "parser": { "kind": "custom", "id": "publicationPhases" }
+    }
+  },
+  "logprob-distribution": {
+    "default": {
+      "kind": "template",
+      "templateFile": "prompts/logprob-distribution.md",
+      "variables": ["component", "description", "context"],
+      "parser": { "kind": "custom", "id": "logprobFallback" }
+    }
+  },
+  "timeline-benchmark": {
+    "default": {
+      "kind": "template",
+      "templateFile": "prompts/timeline-benchmark.md",
+      "variables": ["capability", "component", "description", "context", "current_year", "history_section", "pacing_guidance"],
+      "parser": { "kind": "custom", "id": "timelineIteration" }
+    }
+  },
+  "llm-direct": {
+    "with-capability": {
+      "kind": "template",
+      "templateFile": "prompts/llm-direct.with-capability.md",
+      "variables": ["capability", "description", "context", "date"],
+      "parser": { "kind": "custom", "id": "llmDirect" }
+    },
+    "without-capability": {
+      "kind": "template",
+      "templateFile": "prompts/llm-direct.without-capability.md",
+      "variables": ["component", "description", "context", "date"],
+      "parser": { "kind": "custom", "id": "llmDirect" }
+    }
+  },
+  "cpc-evolution": {
+    "sot-extraction": {
+      "kind": "function",
+      "builderId": "cpcSotExtraction",
+      "parser": { "kind": "custom", "id": "cpcSotExtraction" }
+    }
+  },
+  "cpc-mapper": {
+    "pick-class": {
+      "kind": "template",
+      "templateFile": "prompts/cpc-mapper.pick-class.md",
+      "variables": ["capability"],
+      "parser": { "kind": "custom", "id": "cpcPickClass" }
+    },
+    "pick-from-list": {
+      "kind": "template",
+      "templateFile": "prompts/cpc-mapper.pick-from-list.md",
+      "variables": ["capability", "parent_context", "codes_list"],
+      "parser": { "kind": "custom", "id": "cpcPickFromList" }
+    },
+    "fallback": {
+      "kind": "template",
+      "templateFile": "prompts/cpc-mapper.fallback.md",
+      "variables": ["capability"],
+      "parser": { "kind": "custom", "id": "cpcFallback" }
+    }
+  },
+  "pipeline-enrichment": {
+    "solution-discovery": {
+      "kind": "template",
+      "templateFile": "prompts/pipeline-enrichment.solution-discovery.md",
+      "variables": ["capability", "contextLine", "excludeLine"],
+      "parser": { "kind": "custom", "id": "solutionDiscovery" }
+    }
+  },
+  "web-search-verification": {
+    "default": {
+      "kind": "template",
+      "templateFile": "prompts/web-search-verification.md",
+      "variables": ["name", "contextLine"],
+      "parser": { "kind": "custom", "id": "webSearchVerification" }
+    }
+  },
+  "solution-classification": {
+    "default": {
+      "kind": "template",
+      "templateFile": "prompts/solution-classification.md",
+      "variables": ["name", "contextLine"],
+      "parser": { "kind": "custom", "id": "solutionClassification" }
+    }
+  },
+  "properties-strategy": {
+    "auto": {
+      "kind": "function",
+      "builderId": "propertiesAuto",
+      "parser": { "kind": "custom", "id": "propertiesAuto" }
+    },
+    "single": {
+      "kind": "function",
+      "builderId": "propertiesSingle",
+      "parser": { "kind": "custom", "id": "propertiesSingle" }
+    }
+  }
+}

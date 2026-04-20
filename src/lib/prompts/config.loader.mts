@@ -1,0 +1,147 @@
+// Loader for prompts.config.json.
+//
+// Resolution order:
+//   1. process.env.WARDLEY_PROMPTS_CONFIG (absolute or project-relative path)
+//   2. <project root>/prompts.config.json
+//
+// For every `template`-kind entry, reads the referenced templateFile from disk,
+// normalizes CRLF → LF (indispensable on Windows so the prompt matches what the
+// JS constant used to emit), validates that declared `variables[]` exactly
+// matches the {{var}} placeholders found in the template, and stores the
+// normalized text alongside the entry metadata.
+//
+// Cross-validation with llm.config.json is intentionally *soft*: prompts for
+// strategies that have no LLM config entry are accepted (some prompts are
+// shared infrastructure consumed via injected llmCall by a parent strategy).
+
+import { readFileSync } from 'node:fs';
+import { resolve, isAbsolute, dirname } from 'node:path';
+import { PromptsConfigSchema, type PromptsConfig, type PromptEntry } from './prompts.schema.mjs';
+
+export interface ResolvedTemplate {
+  text: string;
+  variables: readonly string[];
+}
+
+export interface LoadedPrompts {
+  /** Validated raw config (references to templateFile, not their content). */
+  config: PromptsConfig;
+  /** strategyId → promptName → resolved template text (CRLF-normalized).
+   *  Missing for `function`-kind entries. */
+  templates: Record<string, Record<string, ResolvedTemplate>>;
+}
+
+let cached: LoadedPrompts | undefined;
+let cachedPath: string | undefined;
+
+function resolveConfigPath(): string {
+  const override = process.env.WARDLEY_PROMPTS_CONFIG;
+  if (override) {
+    return isAbsolute(override) ? override : resolve(process.cwd(), override);
+  }
+  return resolve(process.cwd(), 'prompts.config.json');
+}
+
+function extractTemplateVars(text: string): string[] {
+  const found = new Set<string>();
+  const re = /\{\{(\w+)\}\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    found.add(m[1]);
+  }
+  return [...found].sort();
+}
+
+function validateVariables(
+  strategy: string,
+  name: string,
+  templateVars: string[],
+  declaredVars: readonly string[],
+): void {
+  const declared = [...declaredVars].sort();
+  const template = [...templateVars].sort();
+  const missing = template.filter(v => !declared.includes(v));
+  const extra = declared.filter(v => !template.includes(v));
+  if (missing.length > 0 || extra.length > 0) {
+    const parts = [];
+    if (missing.length) parts.push(`template uses ${JSON.stringify(missing)} not declared in variables[]`);
+    if (extra.length) parts.push(`variables[] declares ${JSON.stringify(extra)} not used in template`);
+    throw new Error(
+      `Prompt "${strategy}/${name}": ${parts.join('; ')}`,
+    );
+  }
+}
+
+export function loadPromptsConfig(): LoadedPrompts {
+  if (cached) return cached;
+  const path = resolveConfigPath();
+
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch (err) {
+    throw new Error(`Cannot read prompts config at ${path}: ${(err as Error).message}`);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`Invalid JSON in prompts config at ${path}: ${(err as Error).message}`);
+  }
+
+  const result = PromptsConfigSchema.safeParse(parsed);
+  if (!result.success) {
+    const details = result.error.issues
+      .map(i => `  - ${i.path.join('.') || '<root>'}: ${i.message}`)
+      .join('\n');
+    throw new Error(`Prompts config at ${path} failed validation:\n${details}`);
+  }
+
+  const config = result.data;
+  const configDir = dirname(path);
+  const templates: Record<string, Record<string, ResolvedTemplate>> = {};
+
+  for (const [strategy, prompts] of Object.entries(config)) {
+    templates[strategy] = {};
+    for (const [name, entry] of Object.entries(prompts)) {
+      if ((entry as PromptEntry).kind !== 'template') continue;
+      const tEntry = entry as Extract<PromptEntry, { kind: 'template' }>;
+      const templatePath = isAbsolute(tEntry.templateFile)
+        ? tEntry.templateFile
+        : resolve(configDir, tEntry.templateFile);
+
+      let rawTemplate: string;
+      try {
+        rawTemplate = readFileSync(templatePath, 'utf8');
+      } catch (err) {
+        throw new Error(
+          `Prompt "${strategy}/${name}": cannot read template ${templatePath}: ${(err as Error).message}`,
+        );
+      }
+
+      // Normalize CRLF → LF. Windows text files often carry \r\n; the JS string
+      // constants used \n exclusively, so preserving behaviour requires this.
+      const text = rawTemplate.replace(/\r\n/g, '\n');
+
+      const templateVars = extractTemplateVars(text);
+      validateVariables(strategy, name, templateVars, tEntry.variables);
+
+      templates[strategy][name] = { text, variables: tEntry.variables };
+    }
+  }
+
+  cached = { config, templates };
+  cachedPath = path;
+  return cached;
+}
+
+export function getLoadedPromptsConfigPath(): string | undefined {
+  return cachedPath;
+}
+
+/** Test-only: clear the memoized config so the next call re-reads from disk. */
+export function resetPromptsConfigCache(): void {
+  cached = undefined;
+  cachedPath = undefined;
+}
