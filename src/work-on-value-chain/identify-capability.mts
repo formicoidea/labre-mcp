@@ -11,7 +11,7 @@ import { z } from 'zod';
 import type { McpToolDefinition, JsonSchema } from '../types/mcp.mjs';
 import { IdentifyCapabilityInputSchema, type IdentifyCapabilityInput } from '../schemas/identify-capability.schema.mjs';
 import type { ParsedCapabilityResponse } from '../schemas/parsed-llm.schema.mjs';
-import { createLLMCall } from '../lib/llm/llm-call.mjs';
+import { getStrategyLLM } from '../lib/llm/registry.mjs';
 import { logDebug } from '../lib/mcp-notifications.mjs';
 
 const ELIGIBLE_TYPES = new Set(['component', 'pipeline']);
@@ -146,22 +146,6 @@ export async function identifyCapability(component: any, llmCall?: any): Promise
   return result;
 }
 
-// ─── Lazy LLM Singleton ────────────────────────────────────────────────────
-
-let _llmCall: ReturnType<typeof createLLMCall> | null = null;
-function getLLMCall(): ReturnType<typeof createLLMCall> {
-  if (!_llmCall) {
-    const model = process.env.WARDLEY_LLM_MODEL || 'claude-sonnet-4-6';
-    logDebug('identifyCapability', `LLM backend: Agent SDK, model="${model}"`);
-    _llmCall = createLLMCall({
-      model,
-      effort: 'high',
-      maxBudgetUsd: 0.10,
-    });
-  }
-  return _llmCall;
-}
-
 // ─── MCP Tool Definition ───────────────────────────────────────────────────
 
 export const IDENTIFY_CAPABILITY_TOOL: McpToolDefinition = {
@@ -193,5 +177,5 @@ export async function handleIdentifyCapability(args: Record<string, unknown>): P
     ...(context && { context: context.trim() }),
   };
 
-  return identifyCapability(component, getLLMCall());
+  return identifyCapability(component, getStrategyLLM('identify-capability'));
 }

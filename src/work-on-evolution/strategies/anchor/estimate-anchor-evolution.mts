@@ -11,7 +11,7 @@
 import { z } from 'zod';
 import type { McpToolDefinition, JsonSchema } from '../../../types/mcp.mjs';
 import { EstimateAnchorEvolutionInputSchema, type EstimateAnchorEvolutionInput } from '../../../schemas/estimate-anchor-evolution.schema.mjs';
-import { createLLMCall } from '../../../lib/llm/llm-call.mjs';
+import { getStrategyLLM } from '../../../lib/llm/registry.mjs';
 import { logDebug } from '../../../lib/mcp-notifications.mjs';
 import { evolutionToStage } from '../../../lib/response-formatter.mjs';
 
@@ -134,22 +134,6 @@ export async function estimateAnchorEvolution(args: any, llmCall: any): Promise<
   };
 }
 
-// ─── Lazy LLM Singleton ────────────────────────────────────────────────────
-
-let _llmCall: ReturnType<typeof createLLMCall> | null = null;
-function getLLMCall(): ReturnType<typeof createLLMCall> {
-  if (!_llmCall) {
-    const model = process.env.WARDLEY_LLM_MODEL || 'claude-sonnet-4-6';
-    logDebug('estimateAnchorEvolution', `LLM backend: Agent SDK, model="${model}"`);
-    _llmCall = createLLMCall({
-      model,
-      effort: 'high',
-      maxBudgetUsd: 0.10,
-    });
-  }
-  return _llmCall;
-}
-
 // ─── MCP Tool Definition ───────────────────────────────────────────────────
 
 export const ESTIMATE_ANCHOR_EVOLUTION_TOOL: McpToolDefinition = {
@@ -165,5 +149,5 @@ export const ESTIMATE_ANCHOR_EVOLUTION_TOOL: McpToolDefinition = {
 
 export async function handleEstimateAnchorEvolution(args: Record<string, unknown>): Promise<unknown> {
   const input: EstimateAnchorEvolutionInput = EstimateAnchorEvolutionInputSchema.parse(args);
-  return estimateAnchorEvolution(input, getLLMCall());
+  return estimateAnchorEvolution(input, getStrategyLLM('anchor-evolution'));
 }

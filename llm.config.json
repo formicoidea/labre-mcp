@@ -1,0 +1,24 @@
+{
+  "defaultProvider": "claude-sdk",
+  "providers": {
+    "claude-sdk": { "kind": "agent-sdk" },
+    "opencode": {
+      "kind": "http-api",
+      "baseUrl": "https://opencode.ai/zen/v1",
+      "apiKeyEnv": "OPENCODE_API_KEY"
+    }
+  },
+  "strategies": {
+    "publication-analysis": { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
+    "timeline-benchmark":   { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
+    "llm-direct":           { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
+    "cpc-evolution":        { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
+    "cpc-mapper":           { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "low",  "maxBudgetUsd": 0.05 },
+    "logprob-distribution": { "provider": "opencode",   "model": "kimi-k2.5", "temperature": 0, "topLogprobs": 5 },
+    "properties-strategy":  { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
+    "anchor-evolution":     { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
+    "identify-capability":  { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
+    "dual-verification":    { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
+    "pipeline-enrichment":  { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 }
+  }
+}

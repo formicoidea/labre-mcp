@@ -4,12 +4,47 @@
 
 | Variable | Valeur | Description |
 |---|---|---|
-| `OPENCODE_API_KEY` | `sk-...` | Cle API OpenCode pour le backend kimi-k2.5 (obligatoire pour logprob-distribution) |
+| `OPENCODE_API_KEY` | `sk-...` | Cle API OpenCode, requise pour toute strategie routee vers un provider `http-api` (par defaut : logprob-distribution) |
+| `WARDLEY_LLM_CONFIG` | chemin absolu ou relatif | Override du fichier de configuration LLM. Par defaut : `<racine>/llm.config.json`. |
 | `WARDLEY_VERBOSE` | `1`, `true`, `yes` | Active les messages debug dans les notifications. Desactive par defaut. |
-| `WARDLEY_LLM_MODEL` | `claude-sonnet-4-6`, `kimi-k2.5`, etc. | Override du modele LLM (par defaut : `claude-sonnet-4-6` pour Agent SDK, `kimi-k2.5` pour OpenCode) |
-| `WARDLEY_LOGPROB_MODEL` | `kimi-k2.5` | Modele pour la strategie logprob-distribution |
 | `WARDLEY_EVAL_MODE` | `exclusive`, `parallel` | Mode de routage solution/capability. `exclusive` (defaut) : un seul pipeline. `parallel` : les deux pipelines, resultats fusionnes. |
 | `_WARDLEY_NESTED` | `1` | **Automatique** — Positionne par le serveur au demarrage. Guard anti-recursion. Ne pas modifier. |
+
+> Les choix de modele et de provider par strategie vivent desormais dans `llm.config.json` a la racine (voir section suivante). `WARDLEY_LLM_MODEL` et `WARDLEY_LOGPROB_MODEL` ont ete supprimes.
+
+## Configuration LLM — llm.config.json
+
+Chaque capacite/strategie du MCP declare independamment son provider (HTTP API ou runtime agentique) et ses parametres d'appel. Le fichier par defaut est `llm.config.json` a la racine ; pour un override local sans toucher au depot, pointer `WARDLEY_LLM_CONFIG` vers `llm.config.local.json` (gitignore).
+
+Structure :
+
+```json
+{
+  "defaultProvider": "claude-sdk",
+  "providers": {
+    "claude-sdk": { "kind": "agent-sdk" },
+    "opencode":   { "kind": "http-api", "baseUrl": "https://opencode.ai/zen/v1", "apiKeyEnv": "OPENCODE_API_KEY" }
+  },
+  "strategies": {
+    "publication-analysis": { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
+    "logprob-distribution": { "provider": "opencode",   "model": "kimi-k2.5", "temperature": 0, "topLogprobs": 5 }
+    // ... une entree par strategie
+  }
+}
+```
+
+Regles :
+
+- Les **secrets** ne vivent jamais dans le JSON. Le provider reference l'env var par son nom (`apiKeyEnv`).
+- Une strategie absente du JSON tombe automatiquement sur le `defaultProvider`.
+- La config est validee **au chargement** : si une strategie necessite une capability (`text`, `structured`, `logprobs`) que le provider assigne ne supporte pas, le demarrage echoue avec un message explicite.
+
+Matrice des capabilities par type de provider :
+
+| Provider kind | text | structured | logprobs |
+|---|:---:|:---:|:---:|
+| `agent-sdk` | ✓ | ✓ | ✗ |
+| `http-api`  | ✓ | ✗ | ✓ |
 
 ## Fichier .env
 

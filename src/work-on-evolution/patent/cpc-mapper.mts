@@ -17,7 +17,7 @@
 //   cpc-evolution-strategy.mjs calls mapCapabilityToCPC(capability, options)
 //   which returns 1-5 CPC codes at the most specific level discovered.
 
-import { createLLMCall } from '../../lib/llm/llm-call.mjs';
+import { getStrategyLLM } from '../../lib/llm/registry.mjs';
 import type { CpcEntry, CpcMappingResult } from '../../types/patent.mjs';
 import type { LLMCall } from '../../types/llm.mjs';
 
@@ -292,7 +292,7 @@ export async function mapCapabilityToCPC(capability: string, options: { llmCall?
   // Resolve LLM call function
   const llmCall = typeof options.llmCall === 'function'
     ? options.llmCall
-    : createLLMCall({ effort: 'low', maxBudgetUsd: 0.05 });
+    : getStrategyLLM('cpc-mapper');
 
   // Path 1: Progressive discovery with taxonomy cache
   if (options.taxonomyCache) {

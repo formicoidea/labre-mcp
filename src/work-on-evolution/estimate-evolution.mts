@@ -13,7 +13,7 @@ import { buildReQuestions } from './routing/classification-gate.mjs';
 import { loadStrategies, getStrategy, listStrategies } from './strategies/capacity/registry.mjs';
 import { BaseStrategy } from './strategies/capacity/base-strategy.mjs';
 import { ConversationSession } from '../session/conversation-session.mjs';
-import { createLLMCall, createOpenCodeCall, createOpenCodeLogprobCall } from '../lib/llm/llm-call.mjs';
+import { getStrategyLLM, getStrategyLogprobLLM } from '../lib/llm/registry.mjs';
 import { identifyCapability } from '../work-on-value-chain/identify-capability.mjs';
 import { logDebug, logInfo, logError } from '../lib/mcp-notifications.mjs';
 import { createMessageResolverFromArgs } from '../lib/progress-messages.mjs';
@@ -110,7 +110,7 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
 
   // Step 4b: Identify underlying capability for LLM strategies
   try {
-    const capResult = await identifyCapability(component, getLLMCall());
+    const capResult = await identifyCapability(component, getStrategyLLM('identify-capability'));
     component.capability = capResult.capability;
     component.nature = capResult.nature;
     logDebug(TOOL, `Identified capability for "${name}": ${capResult.capability} (${capResult.nature})`);
@@ -137,7 +137,7 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
     try {
       const partialContext = {
         description,
-        llmCall: getLLMCall(),
+        llmCall: getStrategyLLM('dual-verification'),
         ...(component.capability && { capability: component.capability }),
         ...(component.nature && { nature: component.nature }),
       };
@@ -249,7 +249,7 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
     logDebug(TOOL, `Dispatching "${name}" to solution strategies`);
     try {
       const solutionEvals = await dispatchSolutionStrategies(component, {
-        llmCall: getLLMCall(),
+        llmCall: getStrategyLLM('properties-strategy'),
         strategy: strategy === 'all' ? 'all' : strategy,
         mode: 'auto',
       });
@@ -337,7 +337,7 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
 
     const pipelineResult = await runEnrichedPipeline(standardResult, component, {
       evaluateCapabilityFn,
-      llmCall: getLLMCall(),
+      llmCall: getStrategyLLM('pipeline-enrichment'),
     });
 
     logDebug(TOOL, `Pipeline complete for "${name}": capability evolution=${pipelineResult.capabilityPivot?.evolution}`);
@@ -346,32 +346,6 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
   }
 
   return standardResult;
-}
-
-// ─── Lazy LLM Singletons ────────────────────────────────────────────────────
-
-let _llmCall: ReturnType<typeof createLLMCall> | null = null;
-function getLLMCall(): ReturnType<typeof createLLMCall> {
-  if (!_llmCall) {
-    const model = process.env.WARDLEY_LLM_MODEL || 'claude-sonnet-4-6';
-    logDebug('estimateEvolution', `LLM backend: Agent SDK, model="${model}"`);
-    _llmCall = createLLMCall({
-      model,
-      effort: 'high',
-      maxBudgetUsd: 0.10,
-    });
-  }
-  return _llmCall;
-}
-
-let _logprobCall: ReturnType<typeof createOpenCodeLogprobCall> | null = null;
-function getLogprobCall(): ReturnType<typeof createOpenCodeLogprobCall> {
-  if (!_logprobCall) {
-    const model = process.env.WARDLEY_LOGPROB_MODEL || 'kimi-k2.5';
-    logDebug('estimateEvolution', `Logprob backend: OpenCode API, model="${model}"`);
-    _logprobCall = createOpenCodeLogprobCall({ model });
-  }
-  return _logprobCall;
 }
 
 /**
@@ -397,22 +371,22 @@ function createStrategyInstance(StrategyCls: any): any {
 
   // Enriched analytical strategies: inject LLM for deeper analysis
   if (method === 'publication-analysis' || method === 'timeline-benchmark') {
-    return new StrategyCls({ llmCall: getLLMCall() });
+    return new StrategyCls({ llmCall: getStrategyLLM(method) });
   }
 
   // LLM-required strategies: inject Agent SDK llmCall
   if (method === 'llm-direct') {
-    return new StrategyCls({ llmCall: getLLMCall() });
+    return new StrategyCls({ llmCall: getStrategyLLM('llm-direct') });
   }
 
   // CPC evolution strategy: inject LLM for CPC mapper (patent source uses env vars)
   if (method === 'cpc-evolution') {
-    return new StrategyCls({ llmCall: getLLMCall() });
+    return new StrategyCls({ llmCall: getStrategyLLM('cpc-evolution') });
   }
 
   // Logprob strategy: inject OpenCode/kimi logprob call
   if (method === 'logprob-distribution') {
-    return new StrategyCls({ llmLogprobCall: getLogprobCall() });
+    return new StrategyCls({ llmLogprobCall: getStrategyLogprobLLM('logprob-distribution') });
   }
 
   // Unknown strategy type — try default constructor
@@ -578,7 +552,7 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
       try {
         const convPartialContext = {
           description: session.state.description || '',
-          llmCall: getLLMCall(),
+          llmCall: getStrategyLLM('dual-verification'),
           ...(component.capability ? { capability: component.capability } : {}),
           ...(component.nature ? { nature: component.nature } : {}),
         };
@@ -641,7 +615,7 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
       logDebug(TOOL, `Dispatching "${session.state.name}" to solution strategies (conversational)`);
       try {
         const solutionEvals = await dispatchSolutionStrategies(component, {
-          llmCall: getLLMCall(),
+          llmCall: getStrategyLLM('properties-strategy'),
           strategy: selectedStrategy === 'all' ? 'all' : selectedStrategy,
           mode: 'conversational',
         });

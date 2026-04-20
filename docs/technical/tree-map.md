@@ -62,7 +62,15 @@ src/
 │   ├── progress-messages.mts    Messages de progression standards
 │   ├── response-formatter.mts   Formatage sortie tool (FR/EN, markdown)
 │   ├── llm/
-│   │   ├── llm-call.mts         createLLMCall / createStructuredLLMCall (OpenCode API)
+│   │   ├── llm-call.mts         Factories bas niveau : createLLMCall / createStructuredLLMCall / createOpenCode*Call
+│   │   ├── config.schema.mts    Zod schema du fichier llm.config.json
+│   │   ├── config.loader.mts    Lecture + validation + cache du JSON
+│   │   ├── strategy-ids.mts     Liste canonique des strategies + capability requise
+│   │   ├── registry.mts         getStrategyLLM / getStrategyStructuredLLM / getStrategyLogprobLLM
+│   │   ├── providers/
+│   │   │   ├── provider.types.mts     Interface LLMProvider + UnsupportedCapabilityError
+│   │   │   ├── agent-sdk-provider.mts Wrapper Agent SDK (text + structured)
+│   │   │   └── http-api-provider.mts  Wrapper OpenCode-style HTTP (text + logprobs)
 │   │   ├── llm-error-handler.mts  Classification erreurs LLM (rate-limit, timeout, …)
 │   │   └── llm-error-handler.test.mts
 │   └── patent/                  Primitives brevets génériques (BigQuery + indicateurs)
