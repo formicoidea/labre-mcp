@@ -61,25 +61,31 @@ export function getPrompt(strategy: string, name: string = 'default'): ResolvedP
   }
 
   const p = entry.parser;
+  // Parser resolution is lazy: call-sites that only need build() should not
+  // require parser registration. Errors surface on first parse() call instead.
   let parse: (response: string, ctx?: any) => any;
   if (p.kind === 'custom') {
-    const fn = getParser(p.id);
-    if (!fn) {
-      throw new Error(
-        `Prompt "${strategy}/${name}": parser "${p.id}" is not registered. ` +
-        `Call registerParser("${p.id}", fn) before getPrompt().`,
-      );
-    }
-    parse = (response: string, ctx?: any) => fn(response, ctx);
+    parse = (response: string, ctx?: any) => {
+      const fn = getParser(p.id);
+      if (!fn) {
+        throw new Error(
+          `Prompt "${strategy}/${name}": parser "${p.id}" is not registered. ` +
+          `Call registerParser("${p.id}", fn) before .parse().`,
+        );
+      }
+      return fn(response, ctx);
+    };
   } else if (p.kind === 'delimited') {
     parse = (response: string) => parseDelimitedBlock(response, p.startMarker, p.endMarker);
   } else {
     // keyValue — reserved for future generic prompts. Current codebase uses
     // custom parsers everywhere (each has domain-specific post-processing).
-    throw new Error(
-      `Prompt "${strategy}/${name}": parser kind "keyValue" requires a schema registry, ` +
-      `not yet wired. Use kind=custom with a registered parser instead.`,
-    );
+    parse = () => {
+      throw new Error(
+        `Prompt "${strategy}/${name}": parser kind "keyValue" requires a schema registry, ` +
+        `not yet wired. Use kind=custom with a registered parser instead.`,
+      );
+    };
   }
 
   const resolved: ResolvedPrompt = { build, parse };

@@ -14,8 +14,8 @@
 import { logDebug, logInfo } from '../../lib/mcp-notifications.mjs';
 import { dispatchSolutionStrategies } from '../routing/solution-dispatch.mjs';
 import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
-import { interpolate } from '../../lib/prompts/interpolate.mjs';
 import { parseKeyValueBlock } from '../../lib/prompts/parsers.mjs';
+import { getPrompt } from '../../lib/prompts/registry.mjs';
 
 const TOOL = 'estimateEvolution:pipeline';
 
@@ -357,32 +357,7 @@ export function generateOwmSyntax(params: any): string {
  * descriptions. They should represent opposite ends of the evolution spectrum for
  * the same underlying capability.
  */
-const SOLUTION_DISCOVERY_PROMPT = `You are an expert in Wardley Mapping and technology evolution.
-
-Given a GENERIC CAPABILITY, identify TWO named solutions that represent it at different evolution stages:
-
-1. **STATE-OF-THE-ART (SotA)**: The most modern, cutting-edge, or innovative named solution currently addressing this capability. It should be a specific product, framework, platform, methodology, or standard — NOT a generic description. SotA solutions are typically in the Product or early Commodity phase of evolution.
-
-2. **LEGACY**: An older, well-established named solution for the same capability. It was once state-of-the-art but has been superseded by newer alternatives. Legacy solutions are typically in the Custom or early Product phase — still used but showing their age.
-
-IMPORTANT RULES:
-- Both answers MUST be SPECIFIC NAMED solutions (proper nouns): products, frameworks, platforms, methodologies, standards, or specifications.
-- Do NOT return generic descriptions (e.g. "modern CI/CD tool" is NOT valid; "GitHub Actions" IS valid).
-- The SotA solution should be MORE evolved (higher on the Wardley evolution axis) than the legacy solution.
-- If the original input component is itself a named solution, do NOT repeat it — choose different representative solutions.
-- Choose solutions that are widely recognized and representative of their evolution stage.
-
-Capability: "{{capability}}"
-{{contextLine}}
-{{excludeLine}}
-
-MANDATORY OUTPUT FORMAT (exactly 6 lines, no additional text):
-sota_name=<specific solution name>
-sota_description=<one sentence describing what it is and why it's SotA>
-legacy_name=<specific solution name>
-legacy_description=<one sentence describing what it is and why it's legacy>
-confidence=<0.XX>
-reasoning=<one sentence explaining your choices>`;
+// Prompt text lives in prompts/pipeline-enrichment.solution-discovery.md.
 
 /**
  * Parse the LLM response for solution discovery into a structured result.
@@ -484,7 +459,7 @@ export async function discoverPipelineSolutions(capabilityName: string, options:
     ? `Original component (do NOT repeat): "${excludeName}"`
     : '';
 
-  const prompt = interpolate(SOLUTION_DISCOVERY_PROMPT, { capability: trimmed, contextLine, excludeLine });
+  const prompt = getPrompt('pipeline-enrichment', 'solution-discovery').build({ capability: trimmed, contextLine, excludeLine });
 
   logDebug(TOOL, `Discovering solutions for capability "${trimmed}"${excludeName ? ` (excluding "${excludeName}")` : ''}...`);
 

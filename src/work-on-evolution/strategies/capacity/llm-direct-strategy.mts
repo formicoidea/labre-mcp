@@ -13,49 +13,10 @@
 
 import { BaseStrategy } from './base-strategy.mjs';
 import type { ComponentInput, EvolutionResult } from '../../../types/evolution.mjs';
-import { interpolate } from '../../../lib/prompts/interpolate.mjs';
 import { parseKeyValueBlock } from '../../../lib/prompts/parsers.mjs';
+import { getPrompt } from '../../../lib/prompts/registry.mjs';
 
-const PROMPT_WITH_CAPABILITY = `You are an expert in economic science and technology history.
-
-Capability: {{capability}}
-Description: {{description}}
-Context: {{context}}
-Context date: {{date}}
-
-First, reason briefly about the state of this capability at the given date:
-- How was it practiced, known, or used at that time?
-- Where would you place it on the Wardley evolution axis?
-  Genesis [0, 0.18] | Custom [0.18, 0.40] | Product [0.40, 0.70] | Commodity [0.70, 1.0]
-
-Important rules:
-- Evaluate the capability itself, not a specific technical implementation.
-- A capability may be old yet still be early in evolution.
-
-MANDATORY FORMAT (last two lines, no text after them):
-evolution=Z.ZZ
-confidence=X.XX`;
-
-const PROMPT_WITHOUT_CAPABILITY = `You are an expert in economic science and technology history.
-
-Component: {{component}}
-Description: {{description}}
-Context: {{context}}
-Context date: {{date}}
-
-First, identify the underlying capability (activity, practice, knowledge, or data) that this component represents. Then reason briefly about its state at the given date:
-- What capability does this component fulfill?
-- How was that capability practiced, known, or used at that time?
-- Where would you place it on the Wardley evolution axis?
-  Genesis [0, 0.18] | Custom [0.18, 0.40] | Product [0.40, 0.70] | Commodity [0.70, 1.0]
-
-Important rules:
-- Evaluate the underlying capability, not the specific technical label.
-- A capability may be old yet still be early in evolution.
-
-MANDATORY FORMAT (last two lines, no text after them):
-evolution=Z.ZZ
-confidence=X.XX`;
+// Prompt text lives in prompts/llm-direct.{with,without}-capability.md.
 
 /**
  * Parse the LLM response into evolution and confidence values.
@@ -112,13 +73,13 @@ export class LLMDirectStrategy extends BaseStrategy {
 
     const dateStr = String(component.date ? new Date(component.date).getFullYear() : 'unknown');
     const prompt = hasCapability
-      ? interpolate(PROMPT_WITH_CAPABILITY, {
+      ? getPrompt('llm-direct', 'with-capability').build({
           capability: component.capability ?? '',
           description: component.description ?? '',
           context: component.context ?? '',
           date: dateStr,
         })
-      : interpolate(PROMPT_WITHOUT_CAPABILITY, {
+      : getPrompt('llm-direct', 'without-capability').build({
           component: component.name || '',
           description: component.description ?? '',
           context: component.context ?? '',

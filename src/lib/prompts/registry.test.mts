@@ -134,20 +134,23 @@ describe('getPrompt — error paths', () => {
     assert.throws(() => getPrompt('s'), /builder "ghost" is not registered/);
   });
 
-  it('throws when a custom parser is unregistered', () => {
+  it('throws on .parse() when a custom parser is unregistered (lazy)', () => {
     setup(
       { s: { default: { kind: 'template', templateFile: 't.md', variables: [], parser: { kind: 'custom', id: 'ghost' } } } },
       { 't.md': 'x' },
     );
-    assert.throws(() => getPrompt('s'), /parser "ghost" is not registered/);
+    const p = getPrompt('s');  // build() does not require parser registration
+    assert.equal(p.build({}), 'x');
+    assert.throws(() => p.parse('response'), /parser "ghost" is not registered/);
   });
 
-  it('rejects keyValue parser kind until schema registry is wired', () => {
+  it('rejects keyValue parser kind on .parse() until schema registry is wired', () => {
     setup(
       { s: { default: { kind: 'template', templateFile: 't.md', variables: [], parser: { kind: 'keyValue', schemaId: 'X' } } } },
       { 't.md': 'x' },
     );
-    assert.throws(() => getPrompt('s'), /not yet wired/);
+    const p = getPrompt('s');
+    assert.throws(() => p.parse('response'), /not yet wired/);
   });
 });
 

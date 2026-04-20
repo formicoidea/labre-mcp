@@ -22,36 +22,15 @@ interface TimelineMilestone {
 }
 import { identifyCapability } from '../../../work-on-value-chain/identify-capability.mjs';
 import { LLMDirectStrategy } from './llm-direct-strategy.mjs';
-import { interpolate } from '../../../lib/prompts/interpolate.mjs';
 import { parseKeyValueBlock } from '../../../lib/prompts/parsers.mjs';
+import { getPrompt } from '../../../lib/prompts/registry.mjs';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const MAX_HISTORY_ITERATIONS = 15;
 
-const HISTORY_ITERATION_PROMPT = `You are an expert in technology history, the history of techniques, and Wardley Mapping.
-
-You are building a chronological timeline of how a capability has been fulfilled throughout history, starting from its Genesis (earliest known manifestation) up to the present year (${CURRENT_YEAR}).
-
-Underlying capability: {{capability}}
-Original component: {{component}}
-Description: {{description}}
-Context: {{context}}
-Current year: ${CURRENT_YEAR}
-
-{{history_section}}
-
-{{pacing_guidance}}
-
-Your task: identify the NEXT chronological milestone — the next significant solution, method, or manifestation of this capability that appeared AFTER the ones listed above.
-
-Rules:
-- Each milestone must be LATER than the previous one
-- Focus on major inflection points, not minor incremental updates
-- Space milestones to cover the remaining timeline proportionally
-
-MANDATORY FORMAT: exactly two lines at the end, no additional text after them:
-milestone_name=<name of the solution or manifestation>
-milestone_date=<year as integer>`;
+// Prompt text lives in prompts/timeline-benchmark.md. Resolved via getPrompt().
+// The {{current_year}} placeholder replaces the former ${CURRENT_YEAR} template
+// literal (same resolved value — CURRENT_YEAR is passed in via build()).
 
 /**
  * Parse a single history iteration response from the LLM.
@@ -196,11 +175,12 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
       const historySection = formatHistorySection(history);
       const pacingGuidance = formatPacingGuidance(history, i, MAX_HISTORY_ITERATIONS);
 
-      const iterationPrompt = interpolate(HISTORY_ITERATION_PROMPT, {
+      const iterationPrompt = getPrompt('timeline-benchmark').build({
         capability: capability.capability,
         component: component.name || '',
         description: component.description ?? '',
         context: component.context ?? '',
+        current_year: String(CURRENT_YEAR),
         history_section: historySection,
         pacing_guidance: pacingGuidance,
       });

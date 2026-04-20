@@ -53,13 +53,6 @@
       "parser": { "kind": "custom", "id": "llmDirect" }
     }
   },
-  "cpc-evolution": {
-    "sot-extraction": {
-      "kind": "function",
-      "builderId": "cpcSotExtraction",
-      "parser": { "kind": "custom", "id": "cpcSotExtraction" }
-    }
-  },
   "cpc-mapper": {
     "pick-class": {
       "kind": "template",
@@ -102,18 +95,6 @@
       "templateFile": "prompts/solution-classification.md",
       "variables": ["name", "contextLine"],
       "parser": { "kind": "custom", "id": "solutionClassification" }
-    }
-  },
-  "properties-strategy": {
-    "auto": {
-      "kind": "function",
-      "builderId": "propertiesAuto",
-      "parser": { "kind": "custom", "id": "propertiesAuto" }
-    },
-    "single": {
-      "kind": "function",
-      "builderId": "propertiesSingle",
-      "parser": { "kind": "custom", "id": "propertiesSingle" }
     }
   }
 }

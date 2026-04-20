@@ -13,57 +13,12 @@ import { IdentifyCapabilityInputSchema, type IdentifyCapabilityInput } from '../
 import type { ParsedCapabilityResponse } from '../schemas/parsed-llm.schema.mjs';
 import { getStrategyLLM } from '../lib/llm/registry.mjs';
 import { logDebug } from '../lib/mcp-notifications.mjs';
-import { interpolate } from '../lib/prompts/interpolate.mjs';
 import { parseKeyValueBlock } from '../lib/prompts/parsers.mjs';
+import { getPrompt } from '../lib/prompts/registry.mjs';
 
 const ELIGIBLE_TYPES = new Set(['component', 'pipeline']);
 
-const CAPABILITY_IDENTIFICATION_PROMPT = `You are an expert in Wardley Mapping and business capability modeling.
-
-Given a component label and its context, identify the TRUE underlying capability or need.
-
-Component types in Wardley Mapping:
-- anchor: the stakeholder who reaps the benefits of the value chain
-- component: an activity, practice, knowledge, or data component that fulfills a need
-- pipeline: a set of components at different evolution stages serving the same capability
-- market: a node symbolizing a competitive crossroad where multiple providers exist
-- ecosystem: an interconnected system of components
-
-IMPORTANT: Many component labels are technical solution names, not capabilities.
-You must look BEHIND the label to find the underlying capability.
-The essence of capability transcends time, innovation after innovation.
-
-Component: {{component}}
-Description: {{description}}
-Context: {{context}}
-
-For component and pipeline types, identify the nature and reformulate the label using these naming conventions:
-- Activity: a phrase that begins with an infinitive verb
-    ex: “Manage customer relationships,” “Orchestrate containers,” “Brew beer”
-- Practice: a phrase that begins with “how to...”
-    ex: “how to manage a project”, “how to drive a car”
-- Knowledge: a phrase that begins with “technical expertise...” or “interpersonal skills...”
-    e.g., “welding know-how,” “managerial interpersonal skills”
-- Data: the title describes the data itself
-    e.g., “ambient temperature,” “conversion rate,” “GPS coordinates”
-
-For anchor, market, or ecosystem types, set nature=none and keep the original label as capability.
-
-MANDATORY FORMAT: exactly five lines at the end, no additional text after them:
-type=<anchor|component|pipeline|market|ecosystem>
-nature=<activity|practice|knowledge|data|none>
-capability=<the underlying capability described following its nature's naming convention>
-confidence=X.XX (a number between 0 and 1 reflecting your confidence in this identification)
-justification=<brief explanation of why you assigned this confidence level>
-
-Examples:
-  - “CRM” → type=component, nature=activity, capability=”Manage customer relationships”
-  - “ITIL” → type=component, nature=practice, capability=”how to manage IT services”
-  - “Kubernetes” → type=component, nature=activity, capability=”Orchestrate containers”
-  - “Data Warehouse” → type=component, nature=data, capability=”consolidated business intelligence data”
-  - “Coaching” → type=component, nature=knowledge, capability=”interpersonal skills for support”`
-;
-
+// Prompt text lives in prompts/identify-capability.md. Resolved via getPrompt().
 
 /**
  * Parse LLM capability identification response.
@@ -126,7 +81,7 @@ export async function identifyCapability(component: any, llmCall?: any): Promise
     };
   }
 
-  const prompt = interpolate(CAPABILITY_IDENTIFICATION_PROMPT, {
+  const prompt = getPrompt('identify-capability').build({
     component: component.name || '',
     description: component.description ?? '',
     context: component.context ?? '',

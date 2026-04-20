@@ -19,26 +19,12 @@ import {
   centroidEvolution,
   entropyConfidence,
 } from '../../../lib/phase-distribution.mjs';
-import { interpolate } from '../../../lib/prompts/interpolate.mjs';
+import { getPrompt } from '../../../lib/prompts/registry.mjs';
 
 const PHASE_NAMES = ['phase1', 'phase2', 'phase3', 'phase4'] as const;
 type PhaseName = (typeof PHASE_NAMES)[number];
 
-const PROMPT_TEMPLATE = `You are an expert in Wardley Mapping and technology evolution.
-
-Classify the following component into exactly ONE evolution phase.
-
-The four phases are:
-- Phase1: novel, poorly understood, high uncertainty, experimental
-- Phase2: emerging understanding, being built to solve specific needs
-- Phase3: well-understood, feature-rich, multiple competing implementations
-- Phase4: standardized, utility, cost-driven, ubiquitous
-
-Component: {{component}}
-Description: {{description}}
-Context: {{context}}
-
-Reply with EXACTLY ONE TOKEN — one of: Phase1, Phase2, Phase3, Phase4`;
+// Prompt text lives in prompts/logprob-distribution.md. Resolved via getPrompt().
 
 interface LogprobEntry {
   token: string;
@@ -134,7 +120,7 @@ export class LogprobDistributionStrategy extends BaseStrategy {
   }
 
   async evaluate(component: ComponentInput): Promise<EvolutionResult> {
-    const prompt = interpolate(PROMPT_TEMPLATE, {
+    const prompt = getPrompt('logprob-distribution').build({
       component: component.name || '',
       description: component.description ?? '',
       context: component.context ?? '',

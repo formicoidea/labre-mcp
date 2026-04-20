@@ -16,8 +16,8 @@ import {
   verifyViaWebSearch,
   combineWithPriorResult,
   createWebSearchCall,
-  WEB_SEARCH_VERIFICATION_PROMPT,
 } from './web-search-verification.mjs';
+import { loadPromptsConfig } from '../../lib/prompts/config.loader.mjs';
 
 // ─── Mock Web Search Helpers ────────────────────────────────────────────────
 
@@ -550,30 +550,28 @@ describe('combineWithPriorResult', () => {
 
 // ─── Prompt Template ────────────────────────────────────────────────────────
 
-describe('WEB_SEARCH_VERIFICATION_PROMPT', () => {
+describe('web-search-verification template', () => {
+  const template = loadPromptsConfig().templates['web-search-verification'].default.text;
 
-  it('is exported and non-empty', () => {
-    assert.ok(WEB_SEARCH_VERIFICATION_PROMPT);
-    assert.ok(WEB_SEARCH_VERIFICATION_PROMPT.length > 100);
+  it('is non-empty', () => {
+    assert.ok(template.length > 100);
   });
 
   it('contains required template placeholders', () => {
-    assert.ok(WEB_SEARCH_VERIFICATION_PROMPT.includes('{{name}}'),
-      'Prompt must contain {{name}} placeholder');
-    assert.ok(WEB_SEARCH_VERIFICATION_PROMPT.includes('{{contextLine}}'),
-      'Prompt must contain {{contextLine}} placeholder');
+    assert.ok(template.includes('{{name}}'), 'Prompt must contain {{name}} placeholder');
+    assert.ok(template.includes('{{contextLine}}'), 'Prompt must contain {{contextLine}} placeholder');
   });
 
   it('mentions both SOLUTION and CAPABILITY', () => {
-    assert.ok(WEB_SEARCH_VERIFICATION_PROMPT.includes('SOLUTION'));
-    assert.ok(WEB_SEARCH_VERIFICATION_PROMPT.includes('CAPABILITY'));
+    assert.ok(template.includes('SOLUTION'));
+    assert.ok(template.includes('CAPABILITY'));
   });
 
   it('includes evidence format instructions', () => {
-    assert.ok(WEB_SEARCH_VERIFICATION_PROMPT.includes('EVIDENCE_START'));
-    assert.ok(WEB_SEARCH_VERIFICATION_PROMPT.includes('EVIDENCE_END'));
-    assert.ok(WEB_SEARCH_VERIFICATION_PROMPT.includes('REFERENCES_START'));
-    assert.ok(WEB_SEARCH_VERIFICATION_PROMPT.includes('REFERENCES_END'));
+    assert.ok(template.includes('EVIDENCE_START'));
+    assert.ok(template.includes('EVIDENCE_END'));
+    assert.ok(template.includes('REFERENCES_START'));
+    assert.ok(template.includes('REFERENCES_END'));
   });
 });
 

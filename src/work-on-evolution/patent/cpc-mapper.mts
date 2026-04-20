@@ -20,7 +20,7 @@
 import { getStrategyLLM } from '../../lib/llm/registry.mjs';
 import type { CpcEntry, CpcMappingResult } from '../../types/patent.mjs';
 import type { LLMCall } from '../../types/llm.mjs';
-import { interpolate } from '../../lib/prompts/interpolate.mjs';
+import { getPrompt } from '../../lib/prompts/registry.mjs';
 
 // ─── CPC code validation ───────────────────────────────────────────────────
 
@@ -44,38 +44,7 @@ export function isValidCpcCode(code: unknown): boolean {
 
 // ─── LLM prompt templates ──────────────────────────────────────────────────
 
-const PROMPT_PICK_CLASS = `You are a patent classification expert. Given a technology capability, identify the most relevant CPC class code (3 characters: section letter A-H + 2 digits).
-
-CPC sections:
-  A = Human Necessities (medical, agriculture, food)
-  B = Operations & Transport (manufacturing, vehicles, 3D printing)
-  C = Chemistry & Metallurgy (materials, biotech, pharma)
-  D = Textiles & Paper
-  E = Fixed Constructions (buildings, mining)
-  F = Mechanical Engineering (engines, heating, weapons)
-  G = Physics (computing G06, measuring G01, optics G02)
-  H = Electricity (telecom H04, semiconductors H01, power H02)
-
-Common classes:
-  G06 = Computing (software, AI, data processing, databases)
-  H04 = Electric communication (networks, wireless, protocols)
-  H01 = Basic electric elements (semiconductors, batteries)
-  G01 = Measuring & testing (sensors, instruments)
-  B60 = Vehicles (autonomous driving)
-  A61 = Medical & veterinary science
-
-Capability: {{capability}}
-
-Return ONLY the 3-character class code (e.g., G06). Nothing else.`;
-
-const PROMPT_PICK_FROM_LIST = `You are a patent classification expert. Given a technology capability, select the most relevant CPC code(s) from the list below.
-
-Capability: {{capability}}
-{{parent_context}}
-Available codes:
-{{codes_list}}
-
-Select 1-3 most relevant codes. Return ONLY the codes, one per line. Nothing else.`;
+// Prompt text lives in prompts/cpc-mapper.{pick-class,pick-from-list,fallback}.md.
 
 // ─── Internal LLM helpers ───────────────────────────────────────────────────
 
@@ -86,7 +55,7 @@ Select 1-3 most relevant codes. Return ONLY the codes, one per line. Nothing els
  * @returns {Promise<string|null>} 3-char class code or null
  */
 async function llmPickClass(capability: string, llmCall: LLMCall): Promise<string | null> {
-  const prompt = interpolate(PROMPT_PICK_CLASS, { capability });
+  const prompt = getPrompt('cpc-mapper', 'pick-class').build({ capability });
   const response = await llmCall(prompt);
 
   // Extract 3-char class code (letter + 2 digits)
@@ -120,7 +89,7 @@ async function llmPickFromList(capability: string, codeEntries: CpcEntry[], llmC
     ? `\nParent classification path:\n${options.parentPath.map((p: any) => `  ${p.code} (${p.title})`).join(' > ')}\n`
     : '';
 
-  const prompt = interpolate(PROMPT_PICK_FROM_LIST, { capability, parent_context: parentContext, codes_list: codesList });
+  const prompt = getPrompt('cpc-mapper', 'pick-from-list').build({ capability, parent_context: parentContext, codes_list: codesList });
 
   const response = await llmCall(prompt);
 
@@ -148,11 +117,7 @@ function formatCount(n: number): string {
 
 // ─── Standalone LLM fallback (no cache) ─────────────────────────────────────
 
-const LLM_FALLBACK_PROMPT = `You are a patent classification expert. Given a technology capability, identify the 1-3 most relevant CPC sub-class codes (4 characters: section letter A-H + 2 digits + 1 letter).
-
-Capability: {{capability}}
-
-Return ONLY the codes, one per line. Nothing else.`;
+// LLM_FALLBACK_PROMPT moved to prompts/cpc-mapper.fallback.md.
 
 /**
  * Fallback: ask LLM to produce CPC codes without progressive discovery.
@@ -162,7 +127,7 @@ Return ONLY the codes, one per line. Nothing else.`;
  * @returns {Promise<string[]>} Array of 4-char CPC codes
  */
 async function llmFallbackMapping(capability: string, llmCall: LLMCall): Promise<string[]> {
-  const prompt = interpolate(LLM_FALLBACK_PROMPT, { capability });
+  const prompt = getPrompt('cpc-mapper', 'fallback').build({ capability });
   const response = await llmCall(prompt);
 
   const codes = response
