@@ -36,6 +36,8 @@ import { logDebug, logWarning } from '../../lib/mcp-notifications.mjs';
 import { classifyAndLogLLMError } from '../../lib/llm/llm-error-handler.mjs';
 import type { WebSearchVerificationResult, WebSearchEvidence, WebSearchReference } from '../../types/routing.mjs';
 import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
+import { interpolate } from '../../lib/prompts/interpolate.mjs';
+import { parseKeyValueBlock, parseDelimitedBlock } from '../../lib/prompts/parsers.mjs';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -149,9 +151,8 @@ export function parseWebSearchResponse(text: string, name: string) {
   }
 
   // ── Parse classification line ────────────────────────────────────────
-  const classMatch = text.match(/^classification\s*=\s*(solution|capability)/mi);
-  const confMatch = text.match(/^confidence\s*=\s*(-?[\d.]+)/mi);
-  const reasonMatch = text.match(/^reasoning\s*=\s*(.+)/mi);
+  const raw = parseKeyValueBlock(text, ['classification', 'confidence', 'reasoning']);
+  const classValue = raw.classification?.toLowerCase().match(/^(solution|capability)\b/)?.[1];
 
   // ── Parse evidence block ─────────────────────────────────────────────
   const evidence = parseEvidenceBlock(text);
@@ -160,13 +161,11 @@ export function parseWebSearchResponse(text: string, name: string) {
   const references = parseReferencesBlock(text);
 
   // ── Build result ─────────────────────────────────────────────────────
-  if (classMatch) {
-    const classification = classMatch[1].toLowerCase() === 'solution' ? 'solution' : 'capability';
-    const rawConf = confMatch ? parseFloat(confMatch[1]) : 0.70;
+  if (classValue) {
+    const classification = classValue === 'solution' ? 'solution' : 'capability';
+    const rawConf = raw.confidence !== undefined ? parseFloat(raw.confidence) : 0.70;
     const confidence = Math.round(Math.max(0, Math.min(1, rawConf)) * 100) / 100;
-    const reasoning = reasonMatch
-      ? reasonMatch[1].trim()
-      : `Web search classified "${name}" as ${classification}`;
+    const reasoning = raw.reasoning ?? `Web search classified "${name}" as ${classification}`;
 
     return {
       classification,
@@ -191,11 +190,11 @@ export function parseWebSearchResponse(text: string, name: string) {
  */
 function parseEvidenceBlock(text: string) {
   const evidence: WebSearchEvidence[] = [];
-  const evidenceMatch = text.match(/EVIDENCE_START\s*\n([\s\S]*?)\nEVIDENCE_END/i);
+  const block = parseDelimitedBlock(text, 'EVIDENCE_START', 'EVIDENCE_END');
 
-  if (!evidenceMatch) return evidence;
+  if (!block) return evidence;
 
-  const lines = evidenceMatch[1].split('\n').filter(l => l.trim().length > 0);
+  const lines = block.split('\n').filter(l => l.trim().length > 0);
 
   for (const line of lines) {
     const fields: Record<string, string> = {};
@@ -233,11 +232,11 @@ function parseEvidenceBlock(text: string) {
  */
 function parseReferencesBlock(text: string) {
   const references: WebSearchReference[] = [];
-  const refMatch = text.match(/REFERENCES_START\s*\n([\s\S]*?)\nREFERENCES_END/i);
+  const block = parseDelimitedBlock(text, 'REFERENCES_START', 'REFERENCES_END');
 
-  if (!refMatch) return references;
+  if (!block) return references;
 
-  const lines = refMatch[1].split('\n').filter(l => l.trim().length > 0);
+  const lines = block.split('\n').filter(l => l.trim().length > 0);
 
   for (const line of lines) {
     const fields: Record<string, string> = {};
@@ -473,9 +472,7 @@ export async function verifyViaWebSearch(name: string, options: { description?: 
     ? `Additional context: ${options.context}`
     : 'Additional context: (none provided)';
 
-  const prompt = WEB_SEARCH_VERIFICATION_PROMPT
-    .replace(/\{\{name\}\}/g, trimmed)
-    .replace('{{contextLine}}', contextLine);
+  const prompt = interpolate(WEB_SEARCH_VERIFICATION_PROMPT, { name: trimmed, contextLine });
 
   logDebug(TOOL, `Starting web search verification for "${trimmed}"...`);
 

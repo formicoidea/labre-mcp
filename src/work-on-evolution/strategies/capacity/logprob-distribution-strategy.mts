@@ -19,6 +19,7 @@ import {
   centroidEvolution,
   entropyConfidence,
 } from '../../../lib/phase-distribution.mjs';
+import { interpolate } from '../../../lib/prompts/interpolate.mjs';
 
 const PHASE_NAMES = ['phase1', 'phase2', 'phase3', 'phase4'] as const;
 type PhaseName = (typeof PHASE_NAMES)[number];
@@ -133,10 +134,11 @@ export class LogprobDistributionStrategy extends BaseStrategy {
   }
 
   async evaluate(component: ComponentInput): Promise<EvolutionResult> {
-    const prompt = PROMPT_TEMPLATE
-      .replace('{{component}}', component.name || '')
-      .replace('{{description}}', component.description ?? '')
-      .replace('{{context}}', component.context ?? '');
+    const prompt = interpolate(PROMPT_TEMPLATE, {
+      component: component.name || '',
+      description: component.description ?? '',
+      context: component.context ?? '',
+    });
 
     if (!component.context) {
       console.warn(

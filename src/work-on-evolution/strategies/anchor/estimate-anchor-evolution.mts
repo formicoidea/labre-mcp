@@ -14,6 +14,8 @@ import { EstimateAnchorEvolutionInputSchema, type EstimateAnchorEvolutionInput }
 import { getStrategyLLM } from '../../../lib/llm/registry.mjs';
 import { logDebug } from '../../../lib/mcp-notifications.mjs';
 import { evolutionToStage } from '../../../lib/response-formatter.mjs';
+import { interpolate } from '../../../lib/prompts/interpolate.mjs';
+import { parseKeyValueBlock } from '../../../lib/prompts/parsers.mjs';
 
 // ─── Anchor Perception Model ───────────────────────────────────────────────
 
@@ -67,15 +69,15 @@ confidence=X.XX (a number between 0 and 1 reflecting your overall confidence)`;
 // ─── Response Parsing ──────────────────────────────────────────────────────
 
 function parseAnchorResponse(text: string): { phase: number; justification: string; confidence: number } {
-  const phaseMatch = text.match(/^phase=(\d)/mi);
-  const justMatch = text.match(/^justification=(.*)/mi);
-  const confidenceMatch = text.match(/^confidence=(.*)/mi);
+  const raw = parseKeyValueBlock(text, ['phase', 'justification', 'confidence']);
 
-  if (!phaseMatch) {
+  // Original regex captured only the first digit (/^phase=(\d)/), preserve by taking the first char.
+  const phaseRaw = raw.phase?.[0];
+  if (!phaseRaw || !/\d/.test(phaseRaw)) {
     throw new Error(`estimateAnchorEvolution: could not parse LLM response: ${text.slice(0, 200)}`);
   }
 
-  const phase = parseInt(phaseMatch[1], 10);
+  const phase = parseInt(phaseRaw, 10);
 
   if (phase < 1 || phase > 4) {
     throw new Error(`estimateAnchorEvolution: phase out of range (user=${phase})`);
@@ -83,8 +85,8 @@ function parseAnchorResponse(text: string): { phase: number; justification: stri
 
   return {
     phase,
-    justification: justMatch ? justMatch[1].trim() : '',
-    confidence: confidenceMatch ? parseFloat(confidenceMatch[1]) : 0.5,
+    justification: raw.justification ?? '',
+    confidence: raw.confidence !== undefined ? parseFloat(raw.confidence) : 0.5,
   };
 }
 
@@ -102,9 +104,7 @@ export async function estimateAnchorEvolution(args: any, llmCall: any): Promise<
     source = 'user';
     confidence = 1.0;
   } else {
-    const prompt = ANCHOR_EVALUATION_PROMPT
-      .replace('{{anchor}}', name)
-      .replace('{{context}}', context);
+    const prompt = interpolate(ANCHOR_EVALUATION_PROMPT, { anchor: name, context });
 
     const response = await llmCall(prompt);
     const parsed = parseAnchorResponse(response);

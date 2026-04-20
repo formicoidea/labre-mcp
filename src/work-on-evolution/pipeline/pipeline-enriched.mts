@@ -14,6 +14,8 @@
 import { logDebug, logInfo } from '../../lib/mcp-notifications.mjs';
 import { dispatchSolutionStrategies } from '../routing/solution-dispatch.mjs';
 import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
+import { interpolate } from '../../lib/prompts/interpolate.mjs';
+import { parseKeyValueBlock } from '../../lib/prompts/parsers.mjs';
 
 const TOOL = 'estimateEvolution:pipeline';
 
@@ -398,25 +400,22 @@ reasoning=<one sentence explaining your choices>`;
  * @returns {SolutionDiscoveryResult}
  */
 export function parseSolutionDiscoveryResponse(text: string, capabilityName: string): any {
-  const sotaNameMatch = text.match(/^sota_name\s*=\s*(.+)/mi);
-  const sotaDescMatch = text.match(/^sota_description\s*=\s*(.+)/mi);
-  const legacyNameMatch = text.match(/^legacy_name\s*=\s*(.+)/mi);
-  const legacyDescMatch = text.match(/^legacy_description\s*=\s*(.+)/mi);
-  const confMatch = text.match(/^confidence\s*=\s*(-?[\d.]+)/mi);
-  const reasonMatch = text.match(/^reasoning\s*=\s*(.+)/mi);
+  const raw = parseKeyValueBlock(text, [
+    'sota_name', 'sota_description', 'legacy_name', 'legacy_description', 'confidence', 'reasoning',
+  ]);
 
-  const confidence = confMatch
-    ? Math.round(Math.max(0, Math.min(1, parseFloat(confMatch[1]))) * 100) / 100
+  const confidence = raw.confidence !== undefined
+    ? Math.round(Math.max(0, Math.min(1, parseFloat(raw.confidence))) * 100) / 100
     : 0.60;
 
   // Build SotA solution (if found)
   let sota = null;
-  if (sotaNameMatch) {
-    const name = sotaNameMatch[1].trim();
+  if (raw.sota_name !== undefined) {
+    const name = raw.sota_name;
     if (name && name.length > 0 && !/^(none|n\/a|unknown|not applicable)$/i.test(name)) {
       sota = {
         name,
-        description: sotaDescMatch ? sotaDescMatch[1].trim() : `State-of-the-art solution for ${capabilityName}`,
+        description: raw.sota_description ?? `State-of-the-art solution for ${capabilityName}`,
         role: 'sota',
       };
     }
@@ -424,12 +423,12 @@ export function parseSolutionDiscoveryResponse(text: string, capabilityName: str
 
   // Build legacy solution (if found)
   let legacy = null;
-  if (legacyNameMatch) {
-    const name = legacyNameMatch[1].trim();
+  if (raw.legacy_name !== undefined) {
+    const name = raw.legacy_name;
     if (name && name.length > 0 && !/^(none|n\/a|unknown|not applicable)$/i.test(name)) {
       legacy = {
         name,
-        description: legacyDescMatch ? legacyDescMatch[1].trim() : `Legacy solution for ${capabilityName}`,
+        description: raw.legacy_description ?? `Legacy solution for ${capabilityName}`,
         role: 'legacy',
       };
     }
@@ -440,7 +439,7 @@ export function parseSolutionDiscoveryResponse(text: string, capabilityName: str
     legacy,
     capabilityUsed: capabilityName,
     confidence,
-    reasoning: reasonMatch ? reasonMatch[1].trim() : null,
+    reasoning: raw.reasoning ?? null,
   };
 }
 
@@ -485,10 +484,7 @@ export async function discoverPipelineSolutions(capabilityName: string, options:
     ? `Original component (do NOT repeat): "${excludeName}"`
     : '';
 
-  const prompt = SOLUTION_DISCOVERY_PROMPT
-    .replace('{{capability}}', trimmed)
-    .replace('{{contextLine}}', contextLine)
-    .replace('{{excludeLine}}', excludeLine);
+  const prompt = interpolate(SOLUTION_DISCOVERY_PROMPT, { capability: trimmed, contextLine, excludeLine });
 
   logDebug(TOOL, `Discovering solutions for capability "${trimmed}"${excludeName ? ` (excluding "${excludeName}")` : ''}...`);
 

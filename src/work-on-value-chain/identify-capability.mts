@@ -13,6 +13,8 @@ import { IdentifyCapabilityInputSchema, type IdentifyCapabilityInput } from '../
 import type { ParsedCapabilityResponse } from '../schemas/parsed-llm.schema.mjs';
 import { getStrategyLLM } from '../lib/llm/registry.mjs';
 import { logDebug } from '../lib/mcp-notifications.mjs';
+import { interpolate } from '../lib/prompts/interpolate.mjs';
+import { parseKeyValueBlock } from '../lib/prompts/parsers.mjs';
 
 const ELIGIBLE_TYPES = new Set(['component', 'pipeline']);
 
@@ -72,26 +74,25 @@ Examples:
  */
 // any: component is the loose MCP input (name/type/description/context)
 export function parseCapabilityResponse(text: string, component: any): ParsedCapabilityResponse {
-  const typeMatch = text.match(/^type=(\S+)/mi);
-  const natureMatch = text.match(/^nature=(\S+)/mi);
-  const capMatch = text.match(/^capability=(.*)/mi);
-  const confidenceMatch = text.match(/^confidence=(.*)/mi);
-  const justMatch = text.match(/^justification=(.*)/mi);
+  const raw = parseKeyValueBlock(text, ['type', 'nature', 'capability', 'confidence', 'justification']);
 
-  if (!capMatch) {
+  if (raw.capability === undefined) {
     throw new Error(`identifyCapability: could not parse LLM response: ${text.slice(0, 200)}`);
   }
 
-  const llmType = typeMatch ? typeMatch[1].trim().toLowerCase() : 'component';
+  // Original regex for `type` and `nature` captured \S+ (first token).
+  // parseKeyValueBlock captures the full line; reduce to the first token to preserve semantics.
+  const firstToken = (s: string | undefined) => s?.split(/\s+/)[0];
+  const llmType = firstToken(raw.type)?.toLowerCase() ?? 'component';
 
   return {
     type: component.type || llmType,
-    nature: natureMatch ? natureMatch[1].trim().toLowerCase() : 'none',
-    capability: capMatch[1].trim(),
+    nature: firstToken(raw.nature)?.toLowerCase() ?? 'none',
+    capability: raw.capability,
     context: component.context || '',
     name: component.name || '',
-    confidence: confidenceMatch ? parseFloat(confidenceMatch[1]) : 0.5,
-    justification: justMatch ? justMatch[1].trim() : '',
+    confidence: raw.confidence !== undefined ? parseFloat(raw.confidence) : 0.5,
+    justification: raw.justification ?? '',
   };
 }
 
@@ -125,10 +126,11 @@ export async function identifyCapability(component: any, llmCall?: any): Promise
     };
   }
 
-  const prompt = CAPABILITY_IDENTIFICATION_PROMPT
-    .replace('{{component}}', component.name || '')
-    .replace('{{description}}', component.description ?? '')
-    .replace('{{context}}', component.context ?? '');
+  const prompt = interpolate(CAPABILITY_IDENTIFICATION_PROMPT, {
+    component: component.name || '',
+    description: component.description ?? '',
+    context: component.context ?? '',
+  });
 
   const response = await llmCall(prompt);
   const result = parseCapabilityResponse(response, component);

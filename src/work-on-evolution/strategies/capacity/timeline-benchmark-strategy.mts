@@ -22,6 +22,8 @@ interface TimelineMilestone {
 }
 import { identifyCapability } from '../../../work-on-value-chain/identify-capability.mjs';
 import { LLMDirectStrategy } from './llm-direct-strategy.mjs';
+import { interpolate } from '../../../lib/prompts/interpolate.mjs';
+import { parseKeyValueBlock } from '../../../lib/prompts/parsers.mjs';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const MAX_HISTORY_ITERATIONS = 15;
@@ -57,16 +59,19 @@ milestone_date=<year as integer>`;
  * @returns {{ name: string, date: number }}
  */
 export function parseHistoryIterationResponse(text: string): ParsedHistoryIteration {
-  const nameMatch = text.match(/milestone_name[:\s=]*(.*)/i);
-  const dateMatch = text.match(/milestone_date[:\s=]*(\d+)/i);
+  const raw = parseKeyValueBlock(text, ['milestone_name', 'milestone_date'], { separator: 'any', anchored: false });
 
-  if (!nameMatch || !dateMatch) {
+  // Extract leading integer from milestone_date to preserve original /(\d+)/ behavior
+  // (tolerates trailing commentary like "1969 (moon landing)")
+  const dateDigits = raw.milestone_date?.match(/\d+/)?.[0];
+
+  if (raw.milestone_name === undefined || !dateDigits) {
     throw new Error(`TimelineBenchmarkStrategy: could not parse history iteration: ${text.slice(0, 200)}`);
   }
 
   return {
-    name: nameMatch[1].trim(),
-    date: parseInt(dateMatch[1], 10),
+    name: raw.milestone_name,
+    date: parseInt(dateDigits, 10),
   };
 }
 
@@ -191,13 +196,14 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
       const historySection = formatHistorySection(history);
       const pacingGuidance = formatPacingGuidance(history, i, MAX_HISTORY_ITERATIONS);
 
-      const iterationPrompt = HISTORY_ITERATION_PROMPT
-        .replace('{{capability}}', capability.capability)
-        .replace('{{component}}', component.name || '')
-        .replace('{{description}}', component.description ?? '')
-        .replace('{{context}}', component.context ?? '')
-        .replace('{{history_section}}', historySection)
-        .replace('{{pacing_guidance}}', pacingGuidance);
+      const iterationPrompt = interpolate(HISTORY_ITERATION_PROMPT, {
+        capability: capability.capability,
+        component: component.name || '',
+        description: component.description ?? '',
+        context: component.context ?? '',
+        history_section: historySection,
+        pacing_guidance: pacingGuidance,
+      });
 
       let milestone;
       try {

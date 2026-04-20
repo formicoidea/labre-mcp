@@ -13,6 +13,8 @@
 
 import { BaseStrategy } from './base-strategy.mjs';
 import type { ComponentInput, EvolutionResult } from '../../../types/evolution.mjs';
+import { interpolate } from '../../../lib/prompts/interpolate.mjs';
+import { parseKeyValueBlock } from '../../../lib/prompts/parsers.mjs';
 
 const PROMPT_WITH_CAPABILITY = `You are an expert in economic science and technology history.
 
@@ -61,16 +63,15 @@ confidence=X.XX`;
  * @returns {{ evolution: number, confidence: number }}
  */
 function parseLLMResponse(text: string): any {
-  const evoMatch = text.match(/evolution[:\s=]*([\d.]+)/i);
-  const confMatch = text.match(/confidence[:\s=]*([\d.]+)/i);
+  const raw = parseKeyValueBlock(text, ['evolution', 'confidence'], { separator: 'any', anchored: false });
 
-  if (!evoMatch) {
+  if (raw.evolution === undefined) {
     throw new Error(`LLMDirectStrategy: could not parse LLM response: ${text.slice(0, 200)}`);
   }
 
   return {
-    evolution: parseFloat(evoMatch[1]),
-    confidence: confMatch ? parseFloat(confMatch[1]) : 0.6,
+    evolution: parseFloat(raw.evolution),
+    confidence: raw.confidence !== undefined ? parseFloat(raw.confidence) : 0.6,
   };
 }
 
@@ -109,17 +110,20 @@ export class LLMDirectStrategy extends BaseStrategy {
       );
     }
 
+    const dateStr = String(component.date ? new Date(component.date).getFullYear() : 'unknown');
     const prompt = hasCapability
-      ? PROMPT_WITH_CAPABILITY
-          .replace('{{capability}}', component.capability ?? '')
-          .replace('{{description}}', component.description ?? '')
-          .replace('{{context}}', component.context ?? '')
-          .replace('{{date}}', String(component.date ? new Date(component.date).getFullYear() : 'unknown'))
-      : PROMPT_WITHOUT_CAPABILITY
-          .replace('{{component}}', component.name || '')
-          .replace('{{description}}', component.description ?? '')
-          .replace('{{context}}', component.context ?? '')
-          .replace('{{date}}', String(component.date ? new Date(component.date).getFullYear() : 'unknown'));
+      ? interpolate(PROMPT_WITH_CAPABILITY, {
+          capability: component.capability ?? '',
+          description: component.description ?? '',
+          context: component.context ?? '',
+          date: dateStr,
+        })
+      : interpolate(PROMPT_WITHOUT_CAPABILITY, {
+          component: component.name || '',
+          description: component.description ?? '',
+          context: component.context ?? '',
+          date: dateStr,
+        });
 
     const response = await this._llmCall(prompt);
     const parsed = parseLLMResponse(response);

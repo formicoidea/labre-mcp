@@ -28,6 +28,8 @@
 //   // → { classification: 'capability', confidence: 0.82, reasoning: '...' }
 
 import { logDebug } from '../../lib/mcp-notifications.mjs';
+import { interpolate } from '../../lib/prompts/interpolate.mjs';
+import { parseKeyValueBlock } from '../../lib/prompts/parsers.mjs';
 import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
 import type { ComponentTypeDetection } from '../../types/routing.mjs';
 import type { LLMCall } from '../../types/llm.mjs';
@@ -394,9 +396,7 @@ export async function classifySolutionLLM(name: string, llmCall: LLMCall, option
     ? `Context: ${options.context}`
     : 'Context: (none provided)';
 
-  const prompt = SOLUTION_CLASSIFICATION_PROMPT
-    .replace('{{name}}', trimmed)
-    .replace('{{contextLine}}', contextLine);
+  const prompt = interpolate(SOLUTION_CLASSIFICATION_PROMPT, { name: trimmed, contextLine });
 
   logDebug('detectSolution', `LLM classification for "${trimmed}"...`);
 
@@ -421,11 +421,11 @@ export async function classifySolutionLLM(name: string, llmCall: LLMCall, option
  * @returns {SolutionDetectionResult}
  */
 export function parseLLMClassificationResponse(text: string, name: string) {
-  const classMatch = text.match(/^classification\s*=\s*(solution|capability)/mi);
-  const confMatch = text.match(/^confidence\s*=\s*(-?[\d.]+)/mi);
-  const reasonMatch = text.match(/^reasoning\s*=\s*(.+)/mi);
+  const raw = parseKeyValueBlock(text, ['classification', 'confidence', 'reasoning']);
+  // Original regex restricted classification to (solution|capability). Validate to preserve behavior.
+  const classValue = raw.classification?.toLowerCase().match(/^(solution|capability)\b/)?.[1];
 
-  if (!classMatch) {
+  if (!classValue) {
     // Fallback: try to find classification keywords anywhere
     const hasSolution = /\bsolution\b/i.test(text);
     const hasCapability = /\bcapability\b/i.test(text);
@@ -459,17 +459,15 @@ export function parseLLMClassificationResponse(text: string, name: string) {
     };
   }
 
-  const classification = classMatch[1].toLowerCase() === 'solution'
+  const classification = classValue === 'solution'
     ? CLASSIFICATION.SOLUTION
     : CLASSIFICATION.CAPABILITY;
 
-  const confidence = confMatch
-    ? Math.round(Math.max(0, Math.min(1, parseFloat(confMatch[1]))) * 100) / 100
+  const confidence = raw.confidence !== undefined
+    ? Math.round(Math.max(0, Math.min(1, parseFloat(raw.confidence))) * 100) / 100
     : 0.70;
 
-  const reasoning = reasonMatch
-    ? reasonMatch[1].trim()
-    : `LLM classified "${name}" as ${classification}`;
+  const reasoning = raw.reasoning ?? `LLM classified "${name}" as ${classification}`;
 
   return {
     classification,

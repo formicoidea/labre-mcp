@@ -20,6 +20,7 @@
 import { getStrategyLLM } from '../../lib/llm/registry.mjs';
 import type { CpcEntry, CpcMappingResult } from '../../types/patent.mjs';
 import type { LLMCall } from '../../types/llm.mjs';
+import { interpolate } from '../../lib/prompts/interpolate.mjs';
 
 // ─── CPC code validation ───────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ Select 1-3 most relevant codes. Return ONLY the codes, one per line. Nothing els
  * @returns {Promise<string|null>} 3-char class code or null
  */
 async function llmPickClass(capability: string, llmCall: LLMCall): Promise<string | null> {
-  const prompt = PROMPT_PICK_CLASS.replace('{{capability}}', capability);
+  const prompt = interpolate(PROMPT_PICK_CLASS, { capability });
   const response = await llmCall(prompt);
 
   // Extract 3-char class code (letter + 2 digits)
@@ -119,10 +120,7 @@ async function llmPickFromList(capability: string, codeEntries: CpcEntry[], llmC
     ? `\nParent classification path:\n${options.parentPath.map((p: any) => `  ${p.code} (${p.title})`).join(' > ')}\n`
     : '';
 
-  const prompt = PROMPT_PICK_FROM_LIST
-    .replace('{{capability}}', capability)
-    .replace('{{parent_context}}', parentContext)
-    .replace('{{codes_list}}', codesList);
+  const prompt = interpolate(PROMPT_PICK_FROM_LIST, { capability, parent_context: parentContext, codes_list: codesList });
 
   const response = await llmCall(prompt);
 
@@ -164,7 +162,7 @@ Return ONLY the codes, one per line. Nothing else.`;
  * @returns {Promise<string[]>} Array of 4-char CPC codes
  */
 async function llmFallbackMapping(capability: string, llmCall: LLMCall): Promise<string[]> {
-  const prompt = LLM_FALLBACK_PROMPT.replace('{{capability}}', capability);
+  const prompt = interpolate(LLM_FALLBACK_PROMPT, { capability });
   const response = await llmCall(prompt);
 
   const codes = response

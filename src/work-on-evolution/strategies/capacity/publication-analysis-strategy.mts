@@ -17,6 +17,7 @@ import {
   centroidEvolution,
   concentrationConfidence,
 } from '../../../lib/phase-distribution.mjs';
+import { interpolate } from '../../../lib/prompts/interpolate.mjs';
 
 const PUB_PROMPT_TEMPLATE = `You are an expert analyst in Wardley Mapping and technology maturity.
 
@@ -98,10 +99,11 @@ export class PublicationAnalysisStrategy extends BaseStrategy {
     if (component.phaseDistribution) {
       distribution = component.phaseDistribution;
     } else if (this._llmCall) {
-      const prompt = PUB_PROMPT_TEMPLATE
-        .replace('{{component}}', component.name || '')
-        .replace('{{description}}', component.description ?? '')
-        .replace('{{context}}', component.context ?? '');
+      const prompt = interpolate(PUB_PROMPT_TEMPLATE, {
+        component: component.name || '',
+        description: component.description ?? '',
+        context: component.context ?? '',
+      });
 
       if (!component.context) {
         console.warn(
