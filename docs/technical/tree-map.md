@@ -73,6 +73,15 @@ src/
 │   │   │   └── http-api-provider.mts  Wrapper OpenCode-style HTTP (text + logprobs)
 │   │   ├── llm-error-handler.mts  Classification erreurs LLM (rate-limit, timeout, …)
 │   │   └── llm-error-handler.test.mts
+│   ├── prompts/                 ── Registre centralise des prompts LLM (voir prompts.config.json racine)
+│   │   ├── interpolate.mts         Helper de substitution {{var}} (regex globale, toutes occurrences)
+│   │   ├── parsers.mts             parseKeyValueBlock (separator=, any) + parseDelimitedBlock
+│   │   ├── prompts.schema.mts      Zod schema du fichier prompts.config.json
+│   │   ├── config.loader.mts       Lecture JSON + MD, normalisation CRLF, validation variables
+│   │   ├── registry.mts            getPrompt(strategy, name) → { build, parse } (cache, parse paresseux)
+│   │   ├── builders-registry.mts   registerBuilder / getBuilder pour kind=function
+│   │   ├── parsers-registry.mts    registerParser / getParser pour parser.kind=custom
+│   │   └── *.test.mts              Tests unitaires (interpolate, parsers, loader, registry)
 │   └── patent/                  Primitives brevets génériques (BigQuery + indicateurs)
 │       ├── bigquery-client.mts           Client BigQuery générique
 │       ├── bigquery-patent-source.mts    Implem BigQuery de PatentDataSource
@@ -271,7 +280,17 @@ Utiliser cette table pour réparer les imports. Les chemins sont **relatifs à `
 
 **Règle générale** : recalculer le préfixe `../` en fonction de la **profondeur du fichier source** par rapport à `src/`.
 
-## 6. Zones à ignorer
+## 6. Fichiers racine de configuration
+
+| Fichier | Rôle |
+|---|---|
+| `llm.config.json` | Config des providers + strategies LLM (voir `src/lib/llm/`) |
+| `prompts.config.json` | Registre des prompts par stratégie (kind template/function, parser custom/delimited/keyValue) |
+| `prompts/*.md` | 13 fichiers de templates externalisés — référencés par `templateFile` dans `prompts.config.json` |
+| `.env.example` | Documentation des variables d'environnement (OPENCODE_API_KEY, WARDLEY_LLM_CONFIG, WARDLEY_PROMPTS_CONFIG, …) |
+| `.mcp.json` | Enregistrement du serveur MCP auprès de Claude Code |
+
+## 7. Zones à ignorer
 
 - `.claude/worktrees/**` — copies historiques d'anciennes branches de travail ; ne pas éditer.
 - `node_modules/`, `.ouroboros/`, `maps/` (données d'exemple), `docs/` (sauf celui-ci).
