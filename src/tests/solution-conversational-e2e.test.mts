@@ -72,9 +72,11 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
 
       const input = session.buildComponentInput();
 
-      assert.equal(input.isSolution, true);
-      assert.ok(input.context.includes('Container orchestration platform'));
+      assert.equal(input.kind, 'solution');
+      assert.equal(input.description, 'Container orchestration platform');
       assert.ok(input.context.includes('Dominant CNCF project'));
+      // description is a distinct label slot — it is NOT duplicated into context
+      assert.ok(!input.context.includes('Container orchestration platform'));
     });
 
     it('buildComponentInput() includes marketDynamics in enriched context', () => {
@@ -88,7 +90,9 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
 
       const input = session.buildComponentInput();
 
-      assert.ok(input.context.includes('CRM platform'));
+      // description lives in its own slot, NOT duplicated into context
+      assert.equal(input.description, 'CRM platform');
+      assert.ok(!input.context.includes('CRM platform'));
       assert.ok(input.context.includes('Market leader'));
       assert.ok(input.context.includes('Market dynamics'));
       assert.ok(input.context.includes('Few serious competitors'));
@@ -104,7 +108,9 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
 
       const input = session.buildComponentInput();
 
-      assert.ok(input.context.includes('Containerization platform'));
+      // description lives in its own slot
+      assert.equal(input.description, 'Containerization platform');
+      assert.ok(!input.context.includes('Containerization platform'));
       assert.ok(input.context.includes('Adoption pattern'));
       assert.ok(input.context.includes('Universal adoption'));
     });
@@ -119,9 +125,9 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
 
       const input = session.buildComponentInput();
 
-      // Capabilities keep the plain description as context
-      assert.equal(input.context, 'Managing container workloads');
-      assert.equal(input.isSolution, undefined);
+      // Capabilities keep only the user-provided context (description stays separate)
+      assert.equal(input.context, undefined);
+      assert.equal(input.kind, 'capability');
     });
 
     it('buildComponentInput() handles missing optional fields gracefully', () => {
@@ -131,10 +137,10 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
 
       const input = session.buildComponentInput();
 
-      assert.equal(input.isSolution, true);
+      assert.equal(input.kind, 'solution');
       assert.equal(input.name, 'Terraform');
-      // Context should still be a string (even if empty)
-      assert.equal(typeof input.context, 'string');
+      // With no conversational context gathered, context is undefined
+      assert.equal(input.context, undefined);
     });
   });
 
@@ -258,8 +264,10 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
       const input = session.buildComponentInput();
       const ctx = input.context;
 
-      // All parts should be present in the composed context
-      assert.ok(ctx.includes('Cloud data warehouse'));
+      // description is a distinct slot (input.description) — NOT in context
+      assert.equal(input.description, 'Cloud data warehouse');
+      assert.ok(!ctx.includes('Cloud data warehouse'));
+      // solution-specific signals compose into context
       assert.ok(ctx.includes('Leading cloud-native'));
       assert.ok(ctx.includes('Competing with BigQuery'));
       assert.ok(ctx.includes('Rapid enterprise adoption'));
@@ -278,7 +286,7 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
       assert.ok(input.context.includes('Sector: fintech'));
     });
 
-    it('context deduplication avoids repeating description', () => {
+    it('description stays in its own slot, never spills into context', () => {
       const session = new ConversationSession();
       session.update({
         name: 'Redis',
@@ -286,9 +294,9 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
       });
 
       const input = session.buildComponentInput();
-      // Count how many times the description appears
-      const matches = input.context.match(/In-memory data store/g) || [];
-      assert.equal(matches.length, 1, 'Description should not be duplicated');
+      assert.equal(input.description, 'In-memory data store');
+      // With no solution-specific signals gathered, context is undefined
+      assert.equal(input.context, undefined);
     });
   });
 
@@ -329,9 +337,9 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
 
       // Verify the enriched component input
       const component = session2.buildComponentInput();
-      assert.equal(component.isSolution, true);
+      assert.equal(component.kind, 'solution');
       assert.ok(component.description?.includes('Container orchestration'));
-      assert.ok(component.solutionMetadata?.marketPosition?.includes('CNCF'));
+      assert.ok(component.context?.includes('CNCF'));
     });
 
     it('capability path is unchanged: CRM → characteristics → market_signals', async () => {
@@ -369,7 +377,7 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
       assert.ok(session.isReadyForEstimation());
 
       const component = session.buildComponentInput();
-      assert.equal(component.isSolution, true);
+      assert.equal(component.kind, 'solution');
       assert.equal(component.name, 'Docker');
     });
 

@@ -97,12 +97,14 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
     };
   }
 
-  // Step 4: Build component input for strategies
+  // Step 4: Build component input for strategies.
+  // `context` and `description` have distinct semantics — never fall back from
+  // one to the other. Caller supplies each slot independently; missing context
+  // is a signal for strategies to warn, not something to paper over here.
   // any: ComponentInput superset including pipeline-specific fields
   const component: any = {
     name,
-    context: description,
-    description,
+    ...(description ? { description } : {}),
     ...componentData,
   };
 
@@ -158,6 +160,12 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
 
   logDebug(TOOL, `Final routing "${name}": solution=${routingTargets.useSolutionStrategies}, ` +
     `capability=${routingTargets.useCapabilityStrategies}`);
+
+  // Pose the canonical `kind` discriminant on the component as soon as routing
+  // is settled. Downstream enrichment (pipeline-enriched) reads this rather
+  // than the result-side usedSolutionStrategies flag.
+  const effectiveType = verifiedDetection ? verifiedDetection.classification : detection.type;
+  component.kind = effectiveType === COMPONENT_TYPE.SOLUTION ? 'solution' : 'capability';
 
   // Step 5: Evaluate with selected strategy(ies) — dispatched via routing
   const evaluations: Record<string, any> = {};
@@ -269,7 +277,7 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
   logInfo(TOOL, msg('tool.end', { tool: TOOL, component: name, duration }));
 
   // Build routing metadata — use verified detection if available, else naming-only
-  const effectiveType = verifiedDetection ? verifiedDetection.classification : detection.type;
+  // effectiveType already computed above when we posed component.kind
   const effectiveConfidence = verifiedDetection ? verifiedDetection.confidence : detection.confidence;
   const effectiveMethod = verifiedDetection ? verifiedDetection.method : detection.method;
 

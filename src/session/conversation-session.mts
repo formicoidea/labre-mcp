@@ -490,20 +490,51 @@ export class ConversationSession {
    *
    * @returns {import('../work-on-evolution/strategies/capacity/base-strategy.mjs').ComponentInput}
    */
-  // any: ComponentInput-shaped builder result with optional fields and metadata bag
+  /**
+   * Compose the context string passed downstream. Solution-mode slots
+   * (market position, adoption pattern, sector) are folded in here rather
+   * than carried as a separate bag — strategies see a single canonical
+   * `context` slot. Description is also included so solution evaluators
+   * get the full blurb in context, without duplicating earlier parts.
+   */
+  private composeContext(): string | undefined {
+    const parts: string[] = [];
+    const seen = new Set<string>();
+    const push = (value: string | null | undefined) => {
+      if (!value) return;
+      if (seen.has(value)) return;
+      seen.add(value);
+      parts.push(value);
+    };
+    push(this.state.context);
+    if (this.state.componentType === COMPONENT_TYPE.SOLUTION) {
+      push(this.state.solutionContext);
+      if (this.state.marketDynamics) push(`Market dynamics: ${this.state.marketDynamics}`);
+      if (this.state.adoptionPattern) push(`Adoption pattern: ${this.state.adoptionPattern}`);
+    }
+    if (this.state.sector) push(`Sector: ${this.state.sector}`);
+    return parts.length > 0 ? parts.join('. ') : undefined;
+  }
+
+  // any: EvaluationInput-shaped builder result with optional fields and metadata bag
   buildComponentInput(): any {
+    const composedContext = this.composeContext();
+    const kind = this.state.componentType === COMPONENT_TYPE.SOLUTION ? 'solution' : 'capability';
     const input: any = {
+      kind,
       name: this.state.name,
     };
 
     // `context` and `description` have distinct semantics — never fall back from one to the other.
     if (this.state.description) input.description = this.state.description;
-    if (this.state.context) input.context = this.state.context;
+    if (composedContext) input.context = composedContext;
 
-    // Numeric axes
-    if (this.state.certitude != null) input.certitude = this.state.certitude;
-    if (this.state.ubiquity != null) input.ubiquity = this.state.ubiquity;
-    if (this.state.phaseDistribution != null) input.phaseDistribution = this.state.phaseDistribution;
+    // Numeric axes (capability-only — solution inputs don't carry these)
+    if (kind === 'capability') {
+      if (this.state.certitude != null) input.certitude = this.state.certitude;
+      if (this.state.ubiquity != null) input.ubiquity = this.state.ubiquity;
+      if (this.state.phaseDistribution != null) input.phaseDistribution = this.state.phaseDistribution;
+    }
 
     // Loose metadata for LLM-based strategies
     input.metadata = {};
@@ -512,26 +543,13 @@ export class ConversationSession {
     if (this.state.marketDynamics) input.metadata.marketDynamics = this.state.marketDynamics;
     if (this.state.adoptionPattern) input.metadata.adoptionPattern = this.state.adoptionPattern;
 
-    // Solution routing metadata (detected during classification phase)
+    // Routing metadata (detected during classification phase). componentType/...
+    // fields are session-local bookkeeping; the schema carries `routing` for
+    // classification output and `kind` for the discriminant.
     if (this.state.componentType) {
       input.componentType = this.state.componentType;
       input.componentTypeConfidence = this.state.componentTypeConfidence;
       input.componentTypeMethod = this.state.componentTypeMethod;
-      if (this.state.componentType === COMPONENT_TYPE.SOLUTION) {
-        input.isSolution = true;
-      }
-    }
-
-    // Solution-specific canonical bag — absorbs the prior `solutionContext` top-level
-    // leak and pairs it with adoption pattern for strategies that need both.
-    if (this.state.componentType === COMPONENT_TYPE.SOLUTION) {
-      const marketPosition = this.state.solutionContext ?? this.state.marketDynamics ?? null;
-      const solutionMetadata: Record<string, string> = {};
-      if (marketPosition) solutionMetadata.marketPosition = marketPosition;
-      if (this.state.adoptionPattern) solutionMetadata.adoptionPattern = this.state.adoptionPattern;
-      if (Object.keys(solutionMetadata).length > 0) {
-        input.solutionMetadata = solutionMetadata;
-      }
     }
 
     return input;

@@ -213,6 +213,7 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
       let evoResult;
       try {
         evoResult = await llmDirect.evaluate({
+          kind: 'capability',
           name: milestone.name,
           capability: capability.capability,
           nature: capability.nature,
@@ -242,6 +243,7 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
     if (history.length > 0 && history[history.length - 1].date < CURRENT_YEAR) {
       try {
         const presentResult = await llmDirect.evaluate({
+          kind: 'capability',
           name: component.name || capability.capability,
           capability: capability.capability,
           nature: capability.nature,

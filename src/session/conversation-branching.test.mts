@@ -180,18 +180,18 @@ test('buildComponentInput() includes solution fields for solutions', () => {
   const s = new ConversationSession();
   s.update({ name: 'Kafka', solutionContext: 'Event streaming platform' });
   const input = s.buildComponentInput();
-  if (input.isSolution !== true) throw new Error('Missing isSolution');
+  if (input.kind !== 'solution') throw new Error('Wrong kind: ' + input.kind);
   if (input.componentType !== 'solution') throw new Error('Missing componentType');
-  if (input.solutionMetadata?.marketPosition !== 'Event streaming platform') {
-    throw new Error('Missing solutionMetadata.marketPosition');
+  if (!input.context || !input.context.includes('Event streaming platform')) {
+    throw new Error('Missing market position in composed context, got: ' + input.context);
   }
 });
 
-test('buildComponentInput() does NOT include isSolution for capabilities', () => {
+test('buildComponentInput() yields kind=capability for capabilities', () => {
   const s = new ConversationSession();
   s.update({ name: 'CRM', certitude: 0.9, ubiquity: 0.8 });
   const input = s.buildComponentInput();
-  if (input.isSolution === true) throw new Error('Should not have isSolution');
+  if (input.kind !== 'capability') throw new Error('Wrong kind: ' + input.kind);
   if (input.componentType !== 'capability') throw new Error('Wrong componentType');
 });
 

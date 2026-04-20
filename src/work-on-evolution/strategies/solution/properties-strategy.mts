@@ -431,17 +431,12 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
     const solutionName = component.name || 'Unknown Solution';
 
     // Compose context from distinct semantic slots. `context` and `description`
-    // are NOT aliases — context is the user-provided business environment and
-    // description is an enrichable label; both contribute when present.
-    // Additional solution-specific signals are pulled from `solutionMetadata`
-    // so strategies see a single canonical shape regardless of caller.
+    // are NOT aliases — context is the user-provided business environment
+    // (market position / adoption pattern are already composed in by the
+    // session layer when relevant) and description is an enrichable label.
     const contextParts: string[] = [];
     if (component.context) contextParts.push(component.context);
     if (component.description) contextParts.push(component.description);
-    const marketPosition = component.solutionMetadata?.marketPosition;
-    if (marketPosition) contextParts.push(marketPosition);
-    const adoptionPattern = component.solutionMetadata?.adoptionPattern;
-    if (adoptionPattern) contextParts.push(`Adoption pattern: ${adoptionPattern}`);
     const context = contextParts.join('. ') || '';
 
     let propertyEvaluations;

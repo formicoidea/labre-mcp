@@ -4,6 +4,7 @@ import {
   PhaseDistributionSchema,
   ComponentInputSchema,
   SolutionInputSchema,
+  EvaluationInputSchema,
 } from './inputs.schema.mjs';
 
 describe('PhaseDistributionSchema', () => {
@@ -78,18 +79,57 @@ describe('ComponentInputSchema', () => {
 });
 
 describe('SolutionInputSchema', () => {
-  it('carries solutionMetadata.marketPosition / adoptionPattern — no top-level solutionContext', () => {
+  it('defaults kind to "solution" and keeps context flat', () => {
     const r = SolutionInputSchema.safeParse({
       name: 'Kubernetes',
       description: 'Container orchestration',
-      solutionMetadata: {
-        marketPosition: 'Dominant in multi-cloud',
-        adoptionPattern: 'Enterprise mainstream',
-      },
+      context: 'Market position: Dominant in multi-cloud\nAdoption pattern: Enterprise mainstream',
     });
     assert.ok(r.success);
     if (r.success) {
-      assert.equal(r.data.solutionMetadata?.marketPosition, 'Dominant in multi-cloud');
+      assert.equal(r.data.kind, 'solution');
+      assert.match(r.data.context ?? '', /Market position/);
     }
+  });
+
+  it('rejects unknown fields from legacy shape', () => {
+    // Market position & adoption pattern are now composed into `context` by the
+    // session layer — no top-level bag on the schema.
+    const r = SolutionInputSchema.safeParse({
+      name: 'Kubernetes',
+      solutionMetadata: { marketPosition: 'x' },
+    });
+    // Passthrough: extra keys don't fail validation, they're just ignored.
+    assert.ok(r.success);
+    if (r.success) {
+      assert.equal((r.data as any).solutionMetadata, undefined);
+    }
+  });
+});
+
+describe('ComponentInputSchema', () => {
+  it('defaults kind to "capability"', () => {
+    const r = ComponentInputSchema.safeParse({ name: 'CRM' });
+    assert.ok(r.success);
+    if (r.success) assert.equal(r.data.kind, 'capability');
+  });
+});
+
+describe('EvaluationInputSchema (discriminated union)', () => {
+  it('parses a capability input', () => {
+    const r = EvaluationInputSchema.safeParse({ kind: 'capability', name: 'CRM' });
+    assert.ok(r.success);
+    if (r.success) assert.equal(r.data.kind, 'capability');
+  });
+
+  it('parses a solution input', () => {
+    const r = EvaluationInputSchema.safeParse({ kind: 'solution', name: 'Salesforce' });
+    assert.ok(r.success);
+    if (r.success) assert.equal(r.data.kind, 'solution');
+  });
+
+  it('rejects an unknown discriminant value', () => {
+    const r = EvaluationInputSchema.safeParse({ kind: 'banana', name: 'X' });
+    assert.equal(r.success, false);
   });
 });

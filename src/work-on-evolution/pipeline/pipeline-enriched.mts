@@ -55,7 +55,11 @@ const TOOL = 'estimateEvolution:pipeline';
 export async function evaluateCapabilityPivot(standardResult: any, component: any, options: any = {}): Promise<any> {  // any: heterogeneous pipeline options/result bag
   const { evaluateCapabilityFn } = options;
 
-  const isSolution = standardResult.routing?.usedSolutionStrategies === true;
+  // Read the canonical input-side discriminant. `component.kind` is set by
+  // estimate-evolution after routing is resolved; the result-side flag
+  // `standardResult.routing.usedSolutionStrategies` is still written for the
+  // MCP contract but no longer the internal source of truth.
+  const isSolution = component.kind === 'solution';
   const capabilityName = component.capability || component.name;
   const nature = component.nature || 'activity';
 

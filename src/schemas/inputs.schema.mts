@@ -80,8 +80,11 @@ export function phase4Distribution(
  * `context` = business environment where the component exists (user-provided).
  * `description` = label / semantic hint (enrichable by upstream tooling).
  * The two are intentionally distinct — never fall back from one to the other.
+ *
+ * `kind: 'capability'` is the discriminant of the EvaluationInput union.
  */
 export const ComponentInputSchema = z.object({
+  kind: z.literal('capability').default('capability'),
   name: z.string().min(1),
   context: z.string().optional(),
   description: z.string().optional(),
@@ -97,22 +100,29 @@ export type ComponentInput = z.infer<typeof ComponentInputSchema>;
 
 /**
  * Input for named-solution evaluation (e.g. Kubernetes, Stripe).
- * `solutionMetadata.marketPosition` absorbs what used to be `solutionContext`
- * plus `marketDynamics`; `adoptionPattern` moves under the same bag.
+ * Market position / adoption pattern signals are composed into `context`
+ * by the session layer — no separate metadata bag.
+ *
+ * `kind: 'solution'` is the discriminant of the EvaluationInput union.
  */
 export const SolutionInputSchema = z.object({
+  kind: z.literal('solution').default('solution'),
   name: z.string().min(1),
   context: z.string().optional(),
   description: z.string().optional(),
-  solutionMetadata: z.object({
-    marketPosition: z.string().optional(),
-    adoptionPattern: z.string().optional(),
-  }).optional(),
   date: z.union([z.string(), z.date()]).optional(),
   capability: z.string().optional(),
   nature: CapabilityNatureSchema.optional(),
-  isSolution: z.boolean().optional(),
-  routerConfidence: z.number().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 export type SolutionInput = z.infer<typeof SolutionInputSchema>;
+
+/**
+ * Discriminated union over `kind`. Consumers that accept either input type
+ * should parse via this schema and narrow via `input.kind === 'solution'`.
+ */
+export const EvaluationInputSchema = z.discriminatedUnion('kind', [
+  ComponentInputSchema,
+  SolutionInputSchema,
+]);
+export type EvaluationInput = z.infer<typeof EvaluationInputSchema>;

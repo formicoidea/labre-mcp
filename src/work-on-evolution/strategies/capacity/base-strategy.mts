@@ -11,6 +11,7 @@
 //   }
 
 import type { EvolutionResult, ComponentInput } from '../../../types/evolution.mjs';
+import type { EvaluationInput } from '../../../schemas/inputs.schema.mjs';
 export type { EvolutionResult, ComponentInput };
 
 /**
@@ -76,7 +77,7 @@ export class BaseStrategy {
    * @param {ComponentInput} component
    * @returns {EvolutionResult}
    */
-  evaluate(component: ComponentInput): EvolutionResult | Promise<EvolutionResult> {
+  evaluate(component: EvaluationInput): EvolutionResult | Promise<EvolutionResult> {
     throw new Error(`${this.constructor.name}.evaluate() must be implemented`);
   }
 
