@@ -1,7 +1,7 @@
 {
-  "defaultProvider": "claude-sdk",
+  "defaultProvider": "claude",
   "providers": {
-    "claude-sdk": { "kind": "agent-sdk" },
+    "claude": { "kind": "agent-sdk" },
     "opencode": {
       "kind": "http-api",
       "baseUrl": "https://opencode.ai/zen/v1",
@@ -13,16 +13,16 @@
     }
   },
   "strategies": {
-    "publication-analysis": { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
-    "timeline-benchmark":   { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
-    "llm-direct":           { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
-    "cpc-evolution":        { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
-    "cpc-mapper":           { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "low" },
+    "publication-analysis": { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
+    "timeline-benchmark":   { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
+    "llm-direct":           { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
+    "cpc-evolution":        { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
+    "cpc-mapper":           { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "low" },
     "logprob-distribution": { "provider": "opencode",   "model": "kimi-k2.5", "temperature": 0, "topLogprobs": 5 },
-    "properties-strategy":  { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
-    "anchor-evolution":     { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
-    "identify-capability":  { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
-    "dual-verification":    { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
-    "pipeline-enrichment":  { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" }
+    "properties-strategy":  { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
+    "anchor-evolution":     { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
+    "identify-capability":  { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
+    "dual-verification":    { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
+    "pipeline-enrichment":  { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" }
   }
 }

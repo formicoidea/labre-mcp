@@ -31,21 +31,21 @@ function writeConfig(content: unknown): string {
 describe('loadLLMConfig', () => {
   it('parses a valid config', () => {
     writeConfig({
-      defaultProvider: 'claude-sdk',
-      providers: { 'claude-sdk': { kind: 'agent-sdk' } },
+      defaultProvider: 'claude',
+      providers: { 'claude': { kind: 'agent-sdk' } },
       strategies: {
-        'publication-analysis': { provider: 'claude-sdk', model: 'claude-sonnet-4-6' },
+        'publication-analysis': { provider: 'claude', model: 'claude-sonnet-4-6' },
       },
     });
     const cfg = loadLLMConfig();
-    assert.equal(cfg.defaultProvider, 'claude-sdk');
+    assert.equal(cfg.defaultProvider, 'claude');
     assert.equal(cfg.strategies['publication-analysis'].model, 'claude-sonnet-4-6');
   });
 
   it('rejects a config whose defaultProvider is not declared', () => {
     writeConfig({
       defaultProvider: 'ghost',
-      providers: { 'claude-sdk': { kind: 'agent-sdk' } },
+      providers: { 'claude': { kind: 'agent-sdk' } },
       strategies: {},
     });
     assert.throws(() => loadLLMConfig(), /defaultProvider "ghost" is not declared/);
@@ -53,8 +53,8 @@ describe('loadLLMConfig', () => {
 
   it('rejects a strategy referencing an unknown provider', () => {
     writeConfig({
-      defaultProvider: 'claude-sdk',
-      providers: { 'claude-sdk': { kind: 'agent-sdk' } },
+      defaultProvider: 'claude',
+      providers: { 'claude': { kind: 'agent-sdk' } },
       strategies: {
         'bad-one': { provider: 'missing', model: 'x' },
       },
@@ -73,9 +73,9 @@ describe('loadLLMConfig', () => {
 
   it('accepts a copilot-sdk provider with authEnv', () => {
     writeConfig({
-      defaultProvider: 'claude-sdk',
+      defaultProvider: 'claude',
       providers: {
-        'claude-sdk': { kind: 'agent-sdk' },
+        'claude': { kind: 'agent-sdk' },
         copilot: { kind: 'copilot-sdk', authEnv: 'COPILOT_GITHUB_TOKEN' },
       },
       strategies: {},
@@ -87,8 +87,8 @@ describe('loadLLMConfig', () => {
 
   it('memoizes across calls within a process', () => {
     writeConfig({
-      defaultProvider: 'claude-sdk',
-      providers: { 'claude-sdk': { kind: 'agent-sdk' } },
+      defaultProvider: 'claude',
+      providers: { 'claude': { kind: 'agent-sdk' } },
       strategies: {},
     });
     const a = loadLLMConfig();

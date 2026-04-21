@@ -22,14 +22,14 @@ Structure :
 
 ```json
 {
-  "defaultProvider": "claude-sdk",
+  "defaultProvider": "claude",
   "providers": {
-    "claude-sdk": { "kind": "agent-sdk" },
+    "claude": { "kind": "agent-sdk" },
     "opencode":   { "kind": "http-api",    "baseUrl": "https://opencode.ai/zen/v1", "apiKeyEnv": "OPENCODE_API_KEY" },
     "copilot":    { "kind": "copilot-sdk", "authEnv": "COPILOT_GITHUB_TOKEN" }
   },
   "strategies": {
-    "publication-analysis": { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
+    "publication-analysis": { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
     "logprob-distribution": { "provider": "opencode",   "model": "kimi-k2.5", "temperature": 0, "topLogprobs": 5 }
     // ... une entree par strategie
   }

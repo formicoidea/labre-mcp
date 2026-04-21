@@ -37,21 +37,21 @@ function writeConfig(content: unknown): void {
 
 function fullValidConfig() {
   return {
-    defaultProvider: 'claude-sdk',
+    defaultProvider: 'claude',
     providers: {
-      'claude-sdk': { kind: 'agent-sdk' },
+      'claude': { kind: 'agent-sdk' },
       'opencode': { kind: 'http-api', baseUrl: 'https://example.com/v1', apiKeyEnv: 'FAKE_KEY' },
     },
     strategies: {
-      'publication-analysis': { provider: 'claude-sdk', model: 'claude-sonnet-4-6' },
-      'timeline-benchmark':   { provider: 'claude-sdk', model: 'claude-sonnet-4-6' },
-      'llm-direct':           { provider: 'claude-sdk', model: 'claude-sonnet-4-6' },
-      'cpc-evolution':        { provider: 'claude-sdk', model: 'claude-sonnet-4-6' },
-      'cpc-mapper':           { provider: 'claude-sdk', model: 'claude-sonnet-4-6' },
+      'publication-analysis': { provider: 'claude', model: 'claude-sonnet-4-6' },
+      'timeline-benchmark':   { provider: 'claude', model: 'claude-sonnet-4-6' },
+      'llm-direct':           { provider: 'claude', model: 'claude-sonnet-4-6' },
+      'cpc-evolution':        { provider: 'claude', model: 'claude-sonnet-4-6' },
+      'cpc-mapper':           { provider: 'claude', model: 'claude-sonnet-4-6' },
       'logprob-distribution': { provider: 'opencode',   model: 'kimi-k2.5', topLogprobs: 5 },
-      'properties-strategy':  { provider: 'claude-sdk', model: 'claude-sonnet-4-6' },
-      'anchor-evolution':     { provider: 'claude-sdk', model: 'claude-sonnet-4-6' },
-      'identify-capability':  { provider: 'claude-sdk', model: 'claude-sonnet-4-6' },
+      'properties-strategy':  { provider: 'claude', model: 'claude-sonnet-4-6' },
+      'anchor-evolution':     { provider: 'claude', model: 'claude-sonnet-4-6' },
+      'identify-capability':  { provider: 'claude', model: 'claude-sonnet-4-6' },
     },
   };
 }
@@ -78,11 +78,11 @@ describe('registry', () => {
 
   it('rejects a config where logprob-distribution points to agent-sdk', () => {
     const cfg = fullValidConfig();
-    cfg.strategies['logprob-distribution'] = { provider: 'claude-sdk', model: 'claude-sonnet-4-6' };
+    cfg.strategies['logprob-distribution'] = { provider: 'claude', model: 'claude-sonnet-4-6' };
     writeConfig(cfg);
     assert.throws(
       () => getStrategyLogprobLLM('logprob-distribution'),
-      /requires capability "logprobs" but provider "claude-sdk"/,
+      /requires capability "logprobs" but provider "claude"/,
     );
   });
 
