@@ -81,14 +81,13 @@ export async function identifyCapability(component: any, llmCall?: any): Promise
     };
   }
 
-  const prompt = getPrompt('identify-capability').build({
+  const p = getPrompt('identify-capability');
+  const response = await llmCall(p.build({
     component: component.name || '',
     description: component.description ?? '',
     context: component.context ?? '',
-  });
-
-  const response = await llmCall(prompt);
-  const result = parseCapabilityResponse(response, component);
+  }));
+  const result = p.parse(response, component);
 
   // When type was not provided, check if LLM-estimated type is non-eligible
   if (!component.type && !ELIGIBLE_TYPES.has(result.type)) {

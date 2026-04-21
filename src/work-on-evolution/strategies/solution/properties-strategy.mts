@@ -491,7 +491,7 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
   async _evaluateAuto(solutionName: string, context: string, properties: PropertyDef[]): Promise<any> {
     const prompt = buildAutoPrompt(solutionName, context, properties);
     const response = await this._llmCall(prompt);
-    return parseAutoResponse(response, properties);
+    return getPrompt('properties-strategy', 'auto').parse(response, properties);
   }
 
   /**
@@ -509,7 +509,7 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
     for (const prop of properties) {
       const prompt = buildSinglePropertyPrompt(solutionName, context, prop);
       const response = await this._llmCall(prompt);
-      const parsed = parseSinglePropertyResponse(response, prop);
+      const parsed = getPrompt('properties-strategy', 'single').parse(response, prop) as ParsedPropertyEvaluation | null;
 
       if (parsed) {
         results.push(parsed);
@@ -544,7 +544,7 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
 
     const prompt = buildSinglePropertyPrompt(solutionName, context, prop);
     const response = await this._llmCall(prompt);
-    const parsed = parseSinglePropertyResponse(response, prop);
+    const parsed = getPrompt('properties-strategy', 'single').parse(response, prop) as ParsedPropertyEvaluation | null;
 
     if (!parsed) return null;
 

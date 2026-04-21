@@ -459,13 +459,14 @@ export async function discoverPipelineSolutions(capabilityName: string, options:
     ? `Original component (do NOT repeat): "${excludeName}"`
     : '';
 
-  const prompt = getPrompt('pipeline-enrichment', 'solution-discovery').build({ capability: trimmed, context_line: contextLine, exclude_line: excludeLine });
+  const p = getPrompt('pipeline-enrichment', 'solution-discovery');
+  const prompt = p.build({ capability: trimmed, context_line: contextLine, exclude_line: excludeLine });
 
   logDebug(TOOL, `Discovering solutions for capability "${trimmed}"${excludeName ? ` (excluding "${excludeName}")` : ''}...`);
 
   try {
     const response = await llmCall(prompt);
-    const result = parseSolutionDiscoveryResponse(response, trimmed);
+    const result = p.parse(response, trimmed);
 
     logDebug(TOOL, `Solution discovery for "${trimmed}": ` +
       `sota="${result.sota?.name ?? '(none)'}", legacy="${result.legacy?.name ?? '(none)'}", ` +

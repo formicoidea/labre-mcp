@@ -11,6 +11,7 @@
 
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
+import '../../lib/prompts/init.mjs';
 import {
   parseWebSearchResponse,
   verifyViaWebSearch,

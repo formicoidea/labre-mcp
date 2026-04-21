@@ -86,7 +86,7 @@ function extractPhaseProbabilities(logprobs: LogprobEntry[] | null | undefined):
  * Text-only fallback when logprobs are not available: parse the phase name
  * from the response and produce a peaked distribution.
  */
-function parseFallbackPhase(text: string): Record<PhaseName, number> {
+export function parseFallbackPhase(text: string): Record<PhaseName, number> {
   const lower = (text || '').toLowerCase().trim();
   let matched: PhaseName | null = null;
   for (const phase of PHASE_NAMES) {
@@ -120,7 +120,8 @@ export class LogprobDistributionStrategy extends BaseStrategy {
   }
 
   async evaluate(component: ComponentInput): Promise<EvolutionResult> {
-    const prompt = getPrompt('logprob-distribution').build({
+    const p = getPrompt('logprob-distribution');
+    const prompt = p.build({
       component: component.name || '',
       description: component.description ?? '',
       context: component.context ?? '',
@@ -136,7 +137,7 @@ export class LogprobDistributionStrategy extends BaseStrategy {
 
     const probs = (logprobs && logprobs.length > 0)
       ? extractPhaseProbabilities(logprobs)
-      : parseFallbackPhase(text);
+      : (p.parse(text) as Record<PhaseName, number>);
 
     const distribution = phase4Distribution(
       probs.phase1,
@@ -157,4 +158,4 @@ export class LogprobDistributionStrategy extends BaseStrategy {
 }
 
 // Export internals for testing
-export { extractPhaseProbabilities, parseFallbackPhase, PHASE_CENTROIDS };
+export { extractPhaseProbabilities, PHASE_CENTROIDS };

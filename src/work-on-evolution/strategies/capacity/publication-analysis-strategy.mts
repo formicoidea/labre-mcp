@@ -72,7 +72,8 @@ export class PublicationAnalysisStrategy extends BaseStrategy {
     if (component.phaseDistribution) {
       distribution = component.phaseDistribution;
     } else if (this._llmCall) {
-      const prompt = getPrompt('publication-analysis').build({
+      const p = getPrompt('publication-analysis');
+      const prompt = p.build({
         component: component.name || '',
         description: component.description ?? '',
         context: component.context ?? '',
@@ -85,7 +86,7 @@ export class PublicationAnalysisStrategy extends BaseStrategy {
       }
 
       const response = await this._llmCall(prompt);
-      const parsed = parsePubResponse(response);
+      const parsed = p.parse(response);
       const sum = parsed.p1 + parsed.p2 + parsed.p3 + parsed.p4;
       if (sum === 0) {
         throw new Error('PublicationAnalysisStrategy: all phase probabilities are zero');

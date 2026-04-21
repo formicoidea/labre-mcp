@@ -23,7 +23,7 @@ import { getPrompt } from '../../../lib/prompts/registry.mjs';
  * @param {string} text - Raw LLM response
  * @returns {{ evolution: number, confidence: number }}
  */
-function parseLLMResponse(text: string): any {
+export function parseLLMDirectResponse(text: string): any {
   const raw = parseKeyValueBlock(text, ['evolution', 'confidence'], { separator: 'any', anchored: false });
 
   if (raw.evolution === undefined) {
@@ -72,14 +72,17 @@ export class LLMDirectStrategy extends BaseStrategy {
     }
 
     const dateStr = String(component.date ? new Date(component.date).getFullYear() : 'unknown');
+    const p = hasCapability
+      ? getPrompt('llm-direct', 'with-capability')
+      : getPrompt('llm-direct', 'without-capability');
     const prompt = hasCapability
-      ? getPrompt('llm-direct', 'with-capability').build({
+      ? p.build({
           capability: component.capability ?? '',
           description: component.description ?? '',
           context: component.context ?? '',
           date: dateStr,
         })
-      : getPrompt('llm-direct', 'without-capability').build({
+      : p.build({
           component: component.name || '',
           description: component.description ?? '',
           context: component.context ?? '',
@@ -87,7 +90,7 @@ export class LLMDirectStrategy extends BaseStrategy {
         });
 
     const response = await this._llmCall(prompt);
-    const parsed = parseLLMResponse(response);
+    const parsed = p.parse(response);
 
     const evolution = Math.round(
       Math.max(0, Math.min(1, parsed.evolution)) * 1000

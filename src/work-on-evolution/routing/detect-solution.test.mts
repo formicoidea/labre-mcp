@@ -10,6 +10,7 @@
 
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach } from 'node:test';
+import '../../lib/prompts/init.mjs';
 import {
   classifySolutionNaming,
   classifySolutionLLM,

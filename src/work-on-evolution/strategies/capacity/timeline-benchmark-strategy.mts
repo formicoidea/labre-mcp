@@ -175,7 +175,8 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
       const historySection = formatHistorySection(history);
       const pacingGuidance = formatPacingGuidance(history, i, MAX_HISTORY_ITERATIONS);
 
-      const iterationPrompt = getPrompt('timeline-benchmark').build({
+      const tb = getPrompt('timeline-benchmark');
+      const iterationPrompt = tb.build({
         capability: capability.capability,
         component: component.name || '',
         description: component.description ?? '',
@@ -188,7 +189,7 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
       let milestone;
       try {
         const response = await this._llmCall(iterationPrompt);
-        milestone = parseHistoryIterationResponse(response);
+        milestone = tb.parse(response);
       } catch (err) {
         // If LLM fails mid-loop and we have at least one result, use it
         if (history.length > 0) break;

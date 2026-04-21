@@ -46,6 +46,30 @@ export function isValidCpcCode(code: unknown): boolean {
 
 // Prompt text lives in prompts/cpc-mapper.{pick-class,pick-from-list,fallback}.md.
 
+// ─── Response parsers (registered in src/lib/prompts/init.mts) ─────────────
+
+export function parseCpcPickClass(response: string): string | null {
+  const match = response.match(/\b([A-H]\d{2})\b/);
+  return match ? match[1] : null;
+}
+
+export function parseCpcPickFromList(response: string, ctx: { codeEntries: CpcEntry[] }): string[] {
+  const availableCodes = new Set(ctx.codeEntries.map(e => e.code));
+  const selected = response
+    .split(/[\s,;\n]+/)
+    .map(s => s.trim())
+    .filter(s => availableCodes.has(s));
+  return [...new Set(selected)].slice(0, 3);
+}
+
+export function parseCpcFallback(response: string): string[] {
+  const codes = response
+    .split(/[\s,;\n]+/)
+    .map(s => s.trim().toUpperCase())
+    .filter(s => /^[A-H]\d{2}[A-Z]$/.test(s));
+  return [...new Set(codes)].slice(0, 5);
+}
+
 // ─── Internal LLM helpers ───────────────────────────────────────────────────
 
 /**
@@ -55,12 +79,9 @@ export function isValidCpcCode(code: unknown): boolean {
  * @returns {Promise<string|null>} 3-char class code or null
  */
 async function llmPickClass(capability: string, llmCall: LLMCall): Promise<string | null> {
-  const prompt = getPrompt('cpc-mapper', 'pick-class').build({ capability });
-  const response = await llmCall(prompt);
-
-  // Extract 3-char class code (letter + 2 digits)
-  const match = response.match(/\b([A-H]\d{2})\b/);
-  return match ? match[1] : null;
+  const p = getPrompt('cpc-mapper', 'pick-class');
+  const response = await llmCall(p.build({ capability }));
+  return p.parse(response);
 }
 
 /**
@@ -89,19 +110,9 @@ async function llmPickFromList(capability: string, codeEntries: CpcEntry[], llmC
     ? `\nParent classification path:\n${options.parentPath.map((p: any) => `  ${p.code} (${p.title})`).join(' > ')}\n`
     : '';
 
-  const prompt = getPrompt('cpc-mapper', 'pick-from-list').build({ capability, parent_context: parentContext, codes_list: codesList });
-
-  const response = await llmCall(prompt);
-
-  // Extract codes that match entries in our list
-  const availableCodes = new Set(codeEntries.map((e: any) => e.code));
-  const selected = response
-    .split(/[\s,;\n]+/)
-    .map((s: string) => s.trim())
-    .filter((s: string) => availableCodes.has(s));
-
-  // Deduplicate, cap at 3
-  return [...new Set(selected)].slice(0, 3) as string[];
+  const p = getPrompt('cpc-mapper', 'pick-from-list');
+  const response = await llmCall(p.build({ capability, parent_context: parentContext, codes_list: codesList }));
+  return p.parse(response, { codeEntries });
 }
 
 /**
@@ -127,15 +138,9 @@ function formatCount(n: number): string {
  * @returns {Promise<string[]>} Array of 4-char CPC codes
  */
 async function llmFallbackMapping(capability: string, llmCall: LLMCall): Promise<string[]> {
-  const prompt = getPrompt('cpc-mapper', 'fallback').build({ capability });
-  const response = await llmCall(prompt);
-
-  const codes = response
-    .split(/[\s,;\n]+/)
-    .map((s: string) => s.trim().toUpperCase())
-    .filter((s: string) => /^[A-H]\d{2}[A-Z]$/.test(s));
-
-  return [...new Set(codes)].slice(0, 5) as string[];
+  const p = getPrompt('cpc-mapper', 'fallback');
+  const response = await llmCall(p.build({ capability }));
+  return p.parse(response);
 }
 
 // ─── Progressive discovery engine ───────────────────────────────────────────

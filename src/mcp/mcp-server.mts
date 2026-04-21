@@ -22,6 +22,8 @@ process.env._WARDLEY_NESTED = '1';
 // Spec: https://modelcontextprotocol.io/specification
 
 import { createInterface } from 'node:readline';
+// Register every prompt parser with the registry before any tool handler runs.
+import '../lib/prompts/init.mjs';
 import { ESTIMATE_EVOLUTION_TOOL, handleEstimateEvolution } from './mcp-tool.mjs';
 import { EVALUATE_MAP_TOOL, handleEvaluateMap } from '../work-on-evolution/evaluate-map/evaluate-map.mjs';
 import { IDENTIFY_CAPABILITY_TOOL, handleIdentifyCapability } from '../work-on-value-chain/identify-capability.mjs';

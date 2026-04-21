@@ -39,7 +39,7 @@ const INDUSTRY_PERCEPTION = {
 
 // ─── Response Parsing ──────────────────────────────────────────────────────
 
-function parseAnchorResponse(text: string): { phase: number; justification: string; confidence: number } {
+export function parseAnchorResponse(text: string): { phase: number; justification: string; confidence: number } {
   const raw = parseKeyValueBlock(text, ['phase', 'justification', 'confidence']);
 
   // Original regex captured only the first digit (/^phase=(\d)/), preserve by taking the first char.
@@ -75,10 +75,9 @@ export async function estimateAnchorEvolution(args: any, llmCall: any): Promise<
     source = 'user';
     confidence = 1.0;
   } else {
-    const prompt = getPrompt('anchor-evolution').build({ anchor: name, context });
-
-    const response = await llmCall(prompt);
-    const parsed = parseAnchorResponse(response);
+    const p = getPrompt('anchor-evolution');
+    const response = await llmCall(p.build({ anchor: name, context }));
+    const parsed = p.parse(response);
     phase = parsed.phase;
     justification = parsed.justification;
     source = 'llm';
