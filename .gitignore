@@ -13,6 +13,12 @@ dist/
 .env.local
 .env.*.local
 
+# ── Per-user LLM routing config ───────────────
+# llm.config.json is per-machine: each user picks a profile from
+# llm.config.example.json and adapts it locally (pick provider, models,
+# effort, etc.). The canonical example stays tracked.
+llm.config.json
+
 # ── Package manager ───────────────────────────
 # pnpm is the project's package manager; ignore npm/yarn lockfiles
 package-lock.json

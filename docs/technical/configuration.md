@@ -16,7 +16,9 @@
 
 ## Configuration LLM — llm.config.json
 
-Chaque capacite/strategie du MCP declare independamment son provider (HTTP API ou runtime agentique) et ses parametres d'appel. Le fichier par defaut est `llm.config.json` a la racine ; pour un override local sans toucher au depot, pointer `WARDLEY_LLM_CONFIG` vers `llm.config.local.json` (gitignore).
+Chaque capacite/strategie du MCP declare independamment son provider (HTTP API ou runtime agentique) et ses parametres d'appel.
+
+> **Fichier par-utilisateur.** `llm.config.json` est **gitignore** — chaque poste choisit son profil (Claude API, Copilot subscription, mix) sans polluer l'historique. A l'installation : `cp llm.config.example.json llm.config.json`, puis adapter. Pour un override supplementaire sans toucher a ce fichier, pointer `WARDLEY_LLM_CONFIG` vers un autre chemin (ex. `./llm.config.local.json`).
 
 Structure :
 
@@ -50,6 +52,96 @@ Matrice des capabilities par type de provider :
 | `agent-sdk`   | ✓ | ✓ | ✗ |
 | `http-api`    | ✓ | ✗ | ✓ |
 | `copilot-sdk` | ✓ | ✓ | ✗ |
+
+### Profils de configuration
+
+Trois profils types couvrent les scenarios actuels. Copier-coller le bloc choisi dans `llm.config.json` (apres `cp llm.config.example.json llm.config.json`).
+
+#### Profil 1 — Claude (poste principal, API Anthropic via Agent SDK)
+
+Toutes les strategies passent par Claude via le runtime Agent SDK ; `logprob-distribution` route vers OpenCode pour recuperer les logprobs (Agent SDK ne les expose pas). `copilot` est declare mais inutilise — aucune credit consommee.
+
+```json
+{
+  "defaultProvider": "claude",
+  "providers": {
+    "claude":   { "kind": "agent-sdk" },
+    "opencode": { "kind": "http-api",    "baseUrl": "https://opencode.ai/zen/v1", "apiKeyEnv": "OPENCODE_API_KEY" },
+    "copilot":  { "kind": "copilot-sdk", "authEnv": "COPILOT_GITHUB_TOKEN" }
+  },
+  "strategies": {
+    "publication-analysis": { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
+    "timeline-benchmark":   { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
+    "llm-direct":           { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
+    "cpc-evolution":        { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
+    "cpc-mapper":           { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "low"  },
+    "logprob-distribution": { "provider": "opencode", "model": "kimi-k2.5", "temperature": 0, "topLogprobs": 5 },
+    "properties-strategy":  { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
+    "anchor-evolution":     { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
+    "identify-capability":  { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
+    "dual-verification":    { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
+    "pipeline-enrichment":  { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" }
+  }
+}
+```
+
+#### Profil 2 — Copilot (poste secondaire, subscription GitHub Copilot)
+
+Toutes les strategies passent par le runtime Copilot (subscription). `COPILOT_GITHUB_TOKEN` dans `.env` ou `gh auth login` prealable. `logprob-distribution` reste sur OpenCode — Copilot SDK n'expose pas de logprobs. `claude` est declare mais inutilise.
+
+```json
+{
+  "defaultProvider": "copilot",
+  "providers": {
+    "claude":   { "kind": "agent-sdk" },
+    "opencode": { "kind": "http-api",    "baseUrl": "https://opencode.ai/zen/v1", "apiKeyEnv": "OPENCODE_API_KEY" },
+    "copilot":  { "kind": "copilot-sdk", "authEnv": "COPILOT_GITHUB_TOKEN" }
+  },
+  "strategies": {
+    "publication-analysis": { "provider": "copilot",  "model": "gpt-5" },
+    "timeline-benchmark":   { "provider": "copilot",  "model": "gpt-5" },
+    "llm-direct":           { "provider": "copilot",  "model": "gpt-5" },
+    "cpc-evolution":        { "provider": "copilot",  "model": "gpt-5" },
+    "cpc-mapper":           { "provider": "copilot",  "model": "gpt-5" },
+    "logprob-distribution": { "provider": "opencode", "model": "kimi-k2.5", "temperature": 0, "topLogprobs": 5 },
+    "properties-strategy":  { "provider": "copilot",  "model": "gpt-5" },
+    "anchor-evolution":     { "provider": "copilot",  "model": "gpt-5" },
+    "identify-capability":  { "provider": "copilot",  "model": "gpt-5" },
+    "dual-verification":    { "provider": "copilot",  "model": "gpt-5" },
+    "pipeline-enrichment":  { "provider": "copilot",  "model": "gpt-5" }
+  }
+}
+```
+
+> Modele alternatif : le plan Copilot donne aussi acces a `claude-sonnet-4-6` — remplacer `"model": "gpt-5"` si tu veux conserver la qualite des prompts calibres pour Claude mais facturer via Copilot.
+
+#### Profil 3 — Mixte (reasoning lourd sur Claude, taches courtes sur Copilot)
+
+Mix des deux providers : Claude pour les strategies a fort effort (structured complexes, raisonnement long), Copilot pour les appels courts (ex. `cpc-mapper` low effort), OpenCode pour les logprobs. Interessant quand le user veut limiter la consommation Anthropic sans basculer tout son pipeline.
+
+```json
+{
+  "defaultProvider": "claude",
+  "providers": {
+    "claude":   { "kind": "agent-sdk" },
+    "opencode": { "kind": "http-api",    "baseUrl": "https://opencode.ai/zen/v1", "apiKeyEnv": "OPENCODE_API_KEY" },
+    "copilot":  { "kind": "copilot-sdk", "authEnv": "COPILOT_GITHUB_TOKEN" }
+  },
+  "strategies": {
+    "publication-analysis": { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
+    "timeline-benchmark":   { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
+    "llm-direct":           { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
+    "cpc-evolution":        { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
+    "cpc-mapper":           { "provider": "copilot",  "model": "gpt-5" },
+    "logprob-distribution": { "provider": "opencode", "model": "kimi-k2.5", "temperature": 0, "topLogprobs": 5 },
+    "properties-strategy":  { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
+    "anchor-evolution":     { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
+    "identify-capability":  { "provider": "copilot",  "model": "gpt-5" },
+    "dual-verification":    { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
+    "pipeline-enrichment":  { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" }
+  }
+}
+```
 
 ### Utiliser GitHub Copilot SDK comme provider
 

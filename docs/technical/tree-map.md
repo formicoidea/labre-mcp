@@ -288,7 +288,8 @@ Utiliser cette table pour réparer les imports. Les chemins sont **relatifs à `
 
 | Fichier | Rôle |
 |---|---|
-| `llm.config.json` | Config des providers + strategies LLM (voir `src/lib/llm/`) |
+| `llm.config.json` | Config des providers + strategies LLM (voir `src/lib/llm/`) — **gitignore, par-utilisateur** |
+| `llm.config.example.json` | Gabarit de depart (3 profils documentes dans `docs/technical/configuration.md`) |
 | `prompts.config.json` | Registre des prompts par stratégie (kind template/function, parser custom/delimited/keyValue) |
 | `prompts/*.md` | 13 fichiers de templates externalisés — référencés par `templateFile` dans `prompts.config.json` |
 | `.env.example` | Documentation des variables d'environnement (OPENCODE_API_KEY, WARDLEY_LLM_CONFIG, WARDLEY_PROMPTS_CONFIG, …) |
