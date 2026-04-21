@@ -81,6 +81,8 @@ src/
 │   │   ├── registry.mts            getPrompt(strategy, name) → { build, parse } (cache, parse paresseux)
 │   │   ├── builders-registry.mts   registerBuilder / getBuilder pour kind=function
 │   │   ├── parsers-registry.mts    registerParser / getParser pour parser.kind=custom
+│   │   ├── init.mts                Registration centrale des 14 parsers (side-effect import, importe depuis mcp-server.mts)
+│   │   ├── registry-parse-equivalence.test.mts  Suite de non-regression byte-for-byte des 13 parsers
 │   │   └── *.test.mts              Tests unitaires (interpolate, parsers, loader, registry)
 │   └── patent/                  Primitives brevets génériques (BigQuery + indicateurs)
 │       ├── bigquery-client.mts           Client BigQuery générique

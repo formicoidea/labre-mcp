@@ -78,7 +78,7 @@ Kinds de prompt :
 | `kind` | Description | Champs |
 |---|---|---|
 | `template` | Texte externe + substitution `{{var}}` | `templateFile`, `variables[]` |
-| `function` | Builder TS enregistre via `registerBuilder` | `builderId` |
+| `function` | Builder TS enregistre via `registerBuilder` | `builderId` *(schema-only, aucun prompt ne l'utilise actuellement — les 16 prompts sont en `template`)* |
 
 Kinds de parser :
 
@@ -91,20 +91,28 @@ Kinds de parser :
 Regles :
 
 - Les templates utilisent la syntaxe `{{var}}`. Le loader verifie au demarrage que **chaque `{{var}}` du template est declare dans `variables[]`** et inversement (fail-fast sur dérive).
+- **Convention snake_case** pour les noms de variables template (uniforme sur les 16 prompts : `context_line`, `exclude_line`, `current_year`, `property_block`, etc.). Les variables locales JS peuvent rester en camelCase et sont mappees vers snake_case au site d'appel `.build({ context_line: contextLine })`.
 - Les fins de ligne sont normalisees `\r\n` → `\n` a la lecture (garantit un prompt identique byte-for-byte sous Windows/Linux).
 - La cross-validation avec `llm.config.json` est **souple** : certaines strategies (web-search-verification, solution-classification) sont des prompts techniques consommes via un `llmCall` injecte par un parent — pas besoin d'entree LLM dediee.
 - `getPrompt(strategy, name)` retourne `{ build, parse }`. Le parser est resolu paresseusement — seul `.parse()` exige que le parser soit enregistre.
+- Les parsers sont enregistres au demarrage via `src/lib/prompts/init.mts`, importe en tete de `src/mcp/mcp-server.mts` (`import '../lib/prompts/init.mjs'`). Chaque `parser.id` declare dans `prompts.config.json` doit pointer vers une fonction enregistree ; sinon `.parse()` throw avec un message explicite pointant la clé manquante.
 
 Runtime API cote code :
 
 ```typescript
 import { getPrompt } from './lib/prompts/registry.mjs';
+// init.mjs est importe une fois au demarrage (mcp-server.mts en tete) pour
+// que chaque parser.id du JSON soit enregistre avant le premier .parse().
 
-const prompt = getPrompt('identify-capability').build({ component, description, context });
+const p = getPrompt('identify-capability');
+const prompt = p.build({ component, description, context });
 const response = await llmCall(prompt);
-// For parsers registered via registerParser(...) :
-// const result = getPrompt('identify-capability').parse(response, ctx);
+const result = p.parse(response, { name: component, type, context });
 ```
+
+## Test de non-régression des parsers
+
+`src/lib/prompts/registry-parse-equivalence.test.mts` verifie pour chaque parser enregistre que `getPrompt(...).parse(sample, ctx)` produit la meme valeur que l'appel direct `parseXxx(sample, ctx)`. Lock de non-regression byte-for-byte sur le round-trip registry : toute derive silencieuse du registry (cache, resolution paresseuse, etc.) est capturee immediatement par la CI.
 
 ## Fichier .env
 
