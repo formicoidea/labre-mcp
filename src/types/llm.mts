@@ -27,8 +27,6 @@ export interface ClaudeLLMConfig {
   model?: string;
   /** @default 'high' */
   effort?: 'low' | 'medium' | 'high';
-  /** @default 0.10 */
-  maxBudgetUsd?: number;
   /** Optional system prompt */
   systemPrompt?: string;
 }

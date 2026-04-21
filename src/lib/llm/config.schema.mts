@@ -20,7 +20,6 @@ export const StrategyConfigSchema = z.object({
   provider: z.string().min(1),
   model: z.string().min(1),
   effort: z.enum(['low', 'medium', 'high']).optional(),
-  maxBudgetUsd: z.number().positive().optional(),
   temperature: z.number().min(0).max(2).optional(),
   topLogprobs: z.number().int().positive().optional(),
   maxTokens: z.number().int().positive().optional(),

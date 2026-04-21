@@ -15,7 +15,6 @@ export function createAgentSdkProvider(): LLMProvider {
       return createLLMCall({
         model: strategy.model,
         effort: strategy.effort,
-        maxBudgetUsd: strategy.maxBudgetUsd,
         systemPrompt: strategy.systemPrompt,
       });
     },
@@ -28,7 +27,6 @@ export function createAgentSdkProvider(): LLMProvider {
         schema,
         model: strategy.model,
         effort: strategy.effort,
-        maxBudgetUsd: strategy.maxBudgetUsd,
       });
     },
 

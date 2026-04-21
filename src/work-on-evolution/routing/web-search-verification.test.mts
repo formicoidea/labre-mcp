@@ -590,7 +590,6 @@ describe('createWebSearchCall', () => {
   it('accepts custom configuration', () => {
     const fn = createWebSearchCall({
       model: 'claude-haiku-4-5',
-      maxBudgetUsd: 0.05,
       maxTurns: 2,
     });
     assert.equal(typeof fn, 'function');

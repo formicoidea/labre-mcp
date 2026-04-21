@@ -12,7 +12,7 @@ describe('agent-sdk provider', () => {
   });
 
   it('exposes a callable text function', () => {
-    const call = p.text({ provider: 'x', model: 'claude-sonnet-4-6', effort: 'low', maxBudgetUsd: 0.01 });
+    const call = p.text({ provider: 'x', model: 'claude-sonnet-4-6', effort: 'low' });
     assert.equal(typeof call, 'function');
   });
 

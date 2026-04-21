@@ -335,15 +335,13 @@ function createFallbackResult(name: string, reason: string): WebSearchVerificati
  *
  * @param {Object} [config={}]
  * @param {string} [config.model='claude-sonnet-4-6'] - Model to use
- * @param {number} [config.maxBudgetUsd=0.08]         - Budget limit per call
  * @param {number} [config.maxTurns=3]                 - Max tool-use turns (search + analyze)
  * @returns {function(string, Object?): Promise<string>}
  */
-// any: config bag accepts diverse Claude Agent SDK options (model, effort, maxBudgetUsd, maxTurns, ...)
+// any: config bag accepts diverse Claude Agent SDK options (model, effort, maxTurns, ...)
 export function createWebSearchCall(config: any = {}) {
   const {
     model = 'claude-sonnet-4-6',
-    maxBudgetUsd = 0.08,
     maxTurns = 3,
   } = config;
 
@@ -358,7 +356,6 @@ export function createWebSearchCall(config: any = {}) {
       model,
       maxTurns,
       effort: 'high',
-      maxBudgetUsd,
       persistSession: false,
       // Allow WebSearch and WebFetch; disallow filesystem/code tools
       disallowedTools: ['Write', 'Edit', 'Bash', 'Glob', 'Grep', 'Read', 'Agent', 'NotebookEdit'],

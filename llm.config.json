@@ -9,16 +9,16 @@
     }
   },
   "strategies": {
-    "publication-analysis": { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
-    "timeline-benchmark":   { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
-    "llm-direct":           { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
-    "cpc-evolution":        { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
-    "cpc-mapper":           { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "low",  "maxBudgetUsd": 0.05 },
+    "publication-analysis": { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
+    "timeline-benchmark":   { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
+    "llm-direct":           { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
+    "cpc-evolution":        { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
+    "cpc-mapper":           { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "low" },
     "logprob-distribution": { "provider": "opencode",   "model": "kimi-k2.5", "temperature": 0, "topLogprobs": 5 },
-    "properties-strategy":  { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
-    "anchor-evolution":     { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
-    "identify-capability":  { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
-    "dual-verification":    { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 },
-    "pipeline-enrichment":  { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high", "maxBudgetUsd": 0.10 }
+    "properties-strategy":  { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
+    "anchor-evolution":     { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
+    "identify-capability":  { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
+    "dual-verification":    { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
+    "pipeline-enrichment":  { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" }
   }
 }

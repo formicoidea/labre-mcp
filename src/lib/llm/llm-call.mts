@@ -65,7 +65,6 @@ export function createLLMCall(config: ClaudeLLMConfig = {}): LLMCall {
   const {
     model = 'claude-sonnet-4-6',
     effort = 'high',
-    maxBudgetUsd = 0.10,
     systemPrompt,
   } = config;
 
@@ -81,7 +80,6 @@ export function createLLMCall(config: ClaudeLLMConfig = {}): LLMCall {
       model,
       maxTurns: 1,
       effort,
-      maxBudgetUsd,
       persistSession: false,
       disallowedTools: ['Write', 'Edit', 'Bash', 'Glob', 'Grep', 'Read'],
     };
@@ -135,7 +133,6 @@ export function createStructuredLLMCall<T = unknown>(
     schema,
     model = 'claude-sonnet-4-6',
     effort = 'high',
-    maxBudgetUsd = 0.10,
   } = config;
 
   if (!schema) {
@@ -153,7 +150,6 @@ export function createStructuredLLMCall<T = unknown>(
       model,
       maxTurns: 1,
       effort,
-      maxBudgetUsd,
       persistSession: false,
       disallowedTools: ['Write', 'Edit', 'Bash', 'Glob', 'Grep', 'Read'],
       outputFormat: { type: 'json_schema', schema },
