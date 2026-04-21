@@ -24,6 +24,7 @@ import {
   parseCpcPickFromList,
   parseCpcFallback,
 } from '../../work-on-evolution/patent/cpc-mapper.mjs';
+import { parseCpcSotExtraction } from '../../work-on-evolution/strategies/capacity/cpc-evolution-strategy.mjs';
 import { parseSolutionDiscoveryResponse } from '../../work-on-evolution/pipeline/pipeline-enriched.mjs';
 import { parseWebSearchResponse } from '../../work-on-evolution/routing/web-search-verification.mjs';
 import { parseLLMClassificationResponse } from '../../work-on-evolution/routing/detect-solution.mjs';
@@ -32,19 +33,7 @@ import {
   parseSinglePropertyResponse,
 } from '../../work-on-evolution/strategies/solution/properties-strategy.mjs';
 
-// cpc-evolution.sot-extraction has no named parser function — the response
-// (`NAME | DESCRIPTION | EVOLUTION`) is parsed inline in the strategy for
-// now. When that parsing moves out, add its registration here.
-// For now we expose a stub so getPrompt(...).parse() does not throw
-// unexpectedly; calling it will surface the work to do.
-registerParser('cpcSotExtraction', () => {
-  throw new Error(
-    `parser 'cpcSotExtraction' is a placeholder. cpc-evolution.sot-extraction ` +
-    `currently parses its response inline inside cpc-evolution-strategy.mts. ` +
-    `Extract it and register a real function here to enable getPrompt().parse() for this prompt.`,
-  );
-});
-
+registerParser('cpcSotExtraction',      parseCpcSotExtraction);
 registerParser('identifyCapability',    parseCapabilityResponse);
 registerParser('anchorEvolution',       parseAnchorResponse);
 registerParser('publicationPhases',     parsePubResponse);

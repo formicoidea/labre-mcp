@@ -22,6 +22,7 @@ import {
   parseCpcFallback,
 } from '../../work-on-evolution/patent/cpc-mapper.mjs';
 import { parseSolutionDiscoveryResponse } from '../../work-on-evolution/pipeline/pipeline-enriched.mjs';
+import { parseCpcSotExtraction } from '../../work-on-evolution/strategies/capacity/cpc-evolution-strategy.mjs';
 import { parseWebSearchResponse } from '../../work-on-evolution/routing/web-search-verification.mjs';
 import { parseLLMClassificationResponse } from '../../work-on-evolution/routing/detect-solution.mjs';
 
@@ -125,6 +126,19 @@ describe('registry round-trip equivalence', () => {
     assert.deepEqual(
       getPrompt('solution-classification').parse(text, 'CRM'),
       parseLLMClassificationResponse(text, 'CRM'),
+    );
+  });
+
+  it('cpcSotExtraction: registry.parse === parseCpcSotExtraction', () => {
+    const text = 'Amazon EKS | Managed Kubernetes service on AWS | 0.82';
+    assert.deepEqual(
+      getPrompt('cpc-evolution', 'sot-extraction').parse(text),
+      parseCpcSotExtraction(text),
+    );
+    // Malformed line returns null
+    assert.deepEqual(
+      getPrompt('cpc-evolution', 'sot-extraction').parse('no pipes here'),
+      parseCpcSotExtraction('no pipes here'),
     );
   });
 });

@@ -29,6 +29,30 @@ import { toErrorMessage } from '../../../lib/errors.mjs';
 import type { IndicatorConfig, PatentData, IndicatorResults } from '../../../types/patent.mjs';
 import { getPrompt } from '../../../lib/prompts/registry.mjs';
 
+// ─── Response parser (registered in src/lib/prompts/init.mts) ──────────────
+
+/**
+ * Parse the cpc-evolution sot-extraction response.
+ *
+ * Expected format (single line): NAME | DESCRIPTION | EVOLUTION
+ * Returns null when the line is missing or malformed. Caps name/description
+ * lengths at the values the prompt requests (30 / 40 chars). Does NOT clamp
+ * the evolution value — that floor/ceiling is a strategy-level policy applied
+ * by the call-site after this parser returns.
+ */
+export function parseCpcSotExtraction(
+  response: string,
+): { name: string; description: string; evolution: number | null } | null {
+  const match = response.match(/^(.+?)\s*\|\s*(.+?)\s*\|\s*([\d.]+)\s*$/m);
+  if (!match) return null;
+  const evo = parseFloat(match[3]);
+  return {
+    name: match[1].trim().substring(0, 30),
+    description: match[2].trim().substring(0, 40),
+    evolution: Number.isFinite(evo) ? evo : null,
+  };
+}
+
 // ─── Default indicator configuration ────────────────────────────────────────
 
 /**
@@ -582,7 +606,8 @@ export class CpcEvolutionStrategy extends BaseStrategy {
       .map((t: any) => `${t.code}: ${t.title}`)
       .join('\n');
 
-    const prompt = getPrompt('cpc-evolution', 'sot-extraction').build({
+    const p = getPrompt('cpc-evolution', 'sot-extraction');
+    const prompt = p.build({
       cpc_context: cpcContext,
       component_name: component.name || '',
       evolution_score: evolution.toFixed(2),
@@ -591,13 +616,13 @@ export class CpcEvolutionStrategy extends BaseStrategy {
 
     try {
       const response = await this._llmCall(prompt);
-      const match = response.match(/^(.+?)\s*\|\s*(.+?)\s*\|\s*([\d.]+)\s*$/m);
-      if (match) {
-        const evo = parseFloat(match[3]);
+      const raw = p.parse(response) as { name: string; description: string; evolution: number | null } | null;
+      if (raw) {
         return {
-          name: match[1].trim().substring(0, 30),
-          description: match[2].trim().substring(0, 40),
-          evolution: Number.isFinite(evo) ? Math.max(evolution, Math.min(1, evo)) : null,
+          name: raw.name,
+          description: raw.description,
+          // Clamp policy: SotA evolution cannot be lower than the component's own score.
+          evolution: raw.evolution !== null ? Math.max(evolution, Math.min(1, raw.evolution)) : null,
         };
       }
     } catch {
