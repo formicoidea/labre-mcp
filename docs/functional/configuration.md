@@ -5,6 +5,7 @@
 | Variable | Valeur | Description |
 |---|---|---|
 | `OPENCODE_API_KEY` | `sk-...` | Cle API OpenCode, requise pour toute strategie routee vers un provider `http-api` (par defaut : logprob-distribution) |
+| `COPILOT_GITHUB_TOKEN` | `ghp_...` / `gho_...` | *(Optionnel)* Token GitHub, lu uniquement si une strategie route vers un provider `copilot-sdk`. A defaut, le SDK Copilot bascule sur `gh auth login` / `GH_TOKEN` / `GITHUB_TOKEN`. |
 | `WARDLEY_LLM_CONFIG` | chemin absolu ou relatif | Override du fichier de configuration LLM. Par defaut : `<racine>/llm.config.json`. |
 | `WARDLEY_PROMPTS_CONFIG` | chemin absolu ou relatif | Override du fichier de configuration des prompts. Par defaut : `<racine>/prompts.config.json`. |
 | `WARDLEY_VERBOSE` | `1`, `true`, `yes` | Active les messages debug dans les notifications. Desactive par defaut. |
@@ -24,7 +25,8 @@ Structure :
   "defaultProvider": "claude-sdk",
   "providers": {
     "claude-sdk": { "kind": "agent-sdk" },
-    "opencode":   { "kind": "http-api", "baseUrl": "https://opencode.ai/zen/v1", "apiKeyEnv": "OPENCODE_API_KEY" }
+    "opencode":   { "kind": "http-api",    "baseUrl": "https://opencode.ai/zen/v1", "apiKeyEnv": "OPENCODE_API_KEY" },
+    "copilot":    { "kind": "copilot-sdk", "authEnv": "COPILOT_GITHUB_TOKEN" }
   },
   "strategies": {
     "publication-analysis": { "provider": "claude-sdk", "model": "claude-sonnet-4-6", "effort": "high" },
@@ -36,16 +38,44 @@ Structure :
 
 Regles :
 
-- Les **secrets** ne vivent jamais dans le JSON. Le provider reference l'env var par son nom (`apiKeyEnv`).
+- Les **secrets** ne vivent jamais dans le JSON. Le provider reference l'env var par son nom (`apiKeyEnv` pour une cle API HTTP, `authEnv` pour un token GitHub Copilot).
 - Une strategie absente du JSON tombe automatiquement sur le `defaultProvider`.
 - La config est validee **au chargement** : si une strategie necessite une capability (`text`, `structured`, `logprobs`) que le provider assigne ne supporte pas, le demarrage echoue avec un message explicite.
+- Un provider declare mais non reference par une strategie n'est jamais instancie — il reste disponible en option sans consommer de credit ni bloquer le demarrage.
 
 Matrice des capabilities par type de provider :
 
 | Provider kind | text | structured | logprobs |
 |---|:---:|:---:|:---:|
-| `agent-sdk` | ✓ | ✓ | ✗ |
-| `http-api`  | ✓ | ✗ | ✓ |
+| `agent-sdk`   | ✓ | ✓ | ✗ |
+| `http-api`    | ✓ | ✗ | ✓ |
+| `copilot-sdk` | ✓ | ✓ | ✗ |
+
+### Utiliser GitHub Copilot SDK comme provider
+
+Le provider `copilot-sdk` permet de router une strategie vers le runtime agentique de GitHub Copilot CLI. Utile sur un poste qui dispose d'une subscription Copilot mais pas de cle API Anthropic ni de session Claude Code active.
+
+Prerequis :
+
+- Une subscription GitHub Copilot active.
+- Le CLI `copilot` installe globalement (`npm i -g @github/copilot`) — le SDK le lance comme sous-processus JSON-RPC.
+- Authentification : soit `gh auth login` prealable, soit `COPILOT_GITHUB_TOKEN` exporte dans l'environnement.
+
+Basculer une strategie vers Copilot (exemple : `cpc-mapper`) :
+
+```json
+{
+  "strategies": {
+    "cpc-mapper": { "provider": "copilot", "model": "gpt-5" }
+  }
+}
+```
+
+Limitations :
+
+- Pas de logprobs — la strategie `logprob-distribution` doit rester sur un provider `http-api` dont la reponse expose les logprobs.
+- Sortie structuree via "voie B" : le prompt embarque le JSON Schema, le modele repond en texte libre, le code fait `JSON.parse` + validation optionnelle. Moins strict qu'une contrainte `json_schema` native — les prompts complexes peuvent necessiter un retry interne (gere automatiquement).
+- Public preview du SDK (`@github/copilot-sdk` 0.2.x) : breaking changes probables, version epinglee strictement dans `package.json`.
 
 ## Configuration des prompts — prompts.config.json
 

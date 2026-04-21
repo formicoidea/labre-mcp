@@ -65,10 +65,24 @@ describe('loadLLMConfig', () => {
   it('rejects a provider with an unsupported kind', () => {
     writeConfig({
       defaultProvider: 'x',
-      providers: { x: { kind: 'copilot-cli' } },
+      providers: { x: { kind: 'nonexistent-kind' } },
       strategies: {},
     });
     assert.throws(() => loadLLMConfig(), /failed validation/);
+  });
+
+  it('accepts a copilot-sdk provider with authEnv', () => {
+    writeConfig({
+      defaultProvider: 'claude-sdk',
+      providers: {
+        'claude-sdk': { kind: 'agent-sdk' },
+        copilot: { kind: 'copilot-sdk', authEnv: 'COPILOT_GITHUB_TOKEN' },
+      },
+      strategies: {},
+    });
+    const cfg = loadLLMConfig();
+    assert.equal(cfg.providers.copilot.kind, 'copilot-sdk');
+    assert.equal(cfg.providers.copilot.authEnv, 'COPILOT_GITHUB_TOKEN');
   });
 
   it('memoizes across calls within a process', () => {

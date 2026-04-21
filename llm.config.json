@@ -6,6 +6,10 @@
       "kind": "http-api",
       "baseUrl": "https://opencode.ai/zen/v1",
       "apiKeyEnv": "OPENCODE_API_KEY"
+    },
+    "copilot": {
+      "kind": "copilot-sdk",
+      "authEnv": "COPILOT_GITHUB_TOKEN"
     }
   },
   "strategies": {

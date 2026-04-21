@@ -9,9 +9,10 @@
 //      return a cached call instance
 
 import { loadLLMConfig } from './config.loader.mjs';
-import type { LLMConfig, StrategyConfig } from './config.schema.mjs';
+import type { LLMConfig, ProviderConfig, ProviderKind, StrategyConfig } from './config.schema.mjs';
 import { createAgentSdkProvider } from './providers/agent-sdk-provider.mjs';
 import { createHttpApiProvider } from './providers/http-api-provider.mjs';
+import { createCopilotSdkProvider } from './providers/copilot-sdk-provider.mjs';
 import type { LLMCapability, LLMProvider } from './providers/provider.types.mjs';
 import { STRATEGY_CAPABILITIES, type StrategyId } from './strategy-ids.mjs';
 import type { LLMCall, StructuredLLMCall, LogprobLLMCall } from '../../types/llm.mjs';
@@ -22,14 +23,22 @@ const providerCache = new Map<string, LLMProvider>();
 const testOverrides = new Map<CallCacheKey, unknown>();
 let validated = false;
 
+const PROVIDER_FACTORIES: Record<ProviderKind, (cfg: ProviderConfig) => LLMProvider> = {
+  'agent-sdk':   () => createAgentSdkProvider(),
+  'http-api':    (cfg) => createHttpApiProvider(cfg),
+  'copilot-sdk': (cfg) => createCopilotSdkProvider(cfg),
+};
+
 function instantiateProvider(id: string, cfg: LLMConfig): LLMProvider {
   const cached = providerCache.get(id);
   if (cached) return cached;
   const providerCfg = cfg.providers[id];
   if (!providerCfg) throw new Error(`Unknown provider "${id}"`);
-  const provider = providerCfg.kind === 'agent-sdk'
-    ? createAgentSdkProvider()
-    : createHttpApiProvider(providerCfg);
+  const factory = PROVIDER_FACTORIES[providerCfg.kind];
+  if (!factory) {
+    throw new Error(`No factory registered for provider kind "${providerCfg.kind}"`);
+  }
+  const provider = factory(providerCfg);
   providerCache.set(id, provider);
   return provider;
 }

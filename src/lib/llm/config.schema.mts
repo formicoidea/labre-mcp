@@ -6,13 +6,18 @@
 
 import { z } from 'zod';
 
-export const ProviderKindSchema = z.enum(['agent-sdk', 'http-api']);
+export const ProviderKindSchema = z.enum(['agent-sdk', 'http-api', 'copilot-sdk']);
 export type ProviderKind = z.infer<typeof ProviderKindSchema>;
 
 export const ProviderConfigSchema = z.object({
   kind: ProviderKindSchema,
   baseUrl: z.string().url().optional(),
+  // HTTP API providers reference an API key env var name (e.g. OPENCODE_API_KEY).
   apiKeyEnv: z.string().min(1).optional(),
+  // GitHub Copilot SDK references a GitHub auth env var name (e.g. COPILOT_GITHUB_TOKEN).
+  // Kept distinct from apiKeyEnv: a GitHub token is not an API key, and the
+  // Copilot SDK also falls back to `gh auth login` credentials when unset.
+  authEnv: z.string().min(1).optional(),
 });
 export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
 
