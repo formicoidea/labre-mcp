@@ -16,7 +16,7 @@ In Wardley Mapping, there is a critical distinction between NAMED COMPONENTS and
 Your task: classify the following component name as either a SOLUTION or a CAPABILITY.
 
 Component: "{{name}}"
-{{contextLine}}
+{{context_line}}
 
 Decision rules (apply in order):
 1. Does this name refer to a SPECIFIC named product, framework, methodology, standard, model, or specification?

@@ -440,7 +440,7 @@ export async function verifyViaWebSearch(name: string, options: { description?: 
     ? `Additional context: ${options.context}`
     : 'Additional context: (none provided)';
 
-  const prompt = getPrompt('web-search-verification').build({ name: trimmed, contextLine });
+  const prompt = getPrompt('web-search-verification').build({ name: trimmed, context_line: contextLine });
 
   logDebug(TOOL, `Starting web search verification for "${trimmed}"...`);
 

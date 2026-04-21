@@ -459,7 +459,7 @@ export async function discoverPipelineSolutions(capabilityName: string, options:
     ? `Original component (do NOT repeat): "${excludeName}"`
     : '';
 
-  const prompt = getPrompt('pipeline-enrichment', 'solution-discovery').build({ capability: trimmed, contextLine, excludeLine });
+  const prompt = getPrompt('pipeline-enrichment', 'solution-discovery').build({ capability: trimmed, context_line: contextLine, exclude_line: excludeLine });
 
   logDebug(TOOL, `Discovering solutions for capability "${trimmed}"${excludeName ? ` (excluding "${excludeName}")` : ''}...`);
 

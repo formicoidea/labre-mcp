@@ -23,6 +23,7 @@ import { dirname, join } from 'node:path';
 import { SolutionBaseStrategy } from './solution-base-strategy.mjs';
 import type { SolutionInput, SolutionEvolutionResult } from '../../../types/solution.mjs';
 import type { ParsedAutoResponse, ParsedPropertyEvaluation } from '../../../schemas/parsed-llm.schema.mjs';
+import { getPrompt } from '../../../lib/prompts/registry.mjs';
 import { toErrorMessage, errorCode } from '../../../lib/errors.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -209,27 +210,12 @@ function buildAutoPrompt(solutionName: string, context: string, properties: Prop
     ].join('\n');
   }).join('\n\n');
 
-  return `You are a Wardley Mapping evolution expert.
-
-Evaluate the solution "${solutionName}" against each of the 12 evolution properties below.
-${context ? `Context: ${context}` : ''}
-
-For each property, determine which phase (1–4) best describes the CURRENT state of "${solutionName}".
-
-EVOLUTION PROPERTIES AND PHASE DESCRIPTIONS:
-${propertyBlock}
-
-INSTRUCTIONS:
-- Evaluate "${solutionName}" as a SPECIFIC SOLUTION/PRODUCT, not the general capability it provides.
-- Consider the current market state, not where it was years ago.
-- For each property, choose the single phase (1, 2, 3, or 4) that best fits.
-- Provide a brief reason (one sentence) for each evaluation.
-
-MANDATORY OUTPUT FORMAT — exactly 12 lines, one per property:
-${properties.map(p => `${p.name}=PHASE|reason`).join('\n')}
-
-Where PHASE is 1, 2, 3, or 4 and reason is a brief explanation.
-Example: Market=3|Growing competitive market with multiple established vendors`;
+  return getPrompt('properties-strategy', 'auto').build({
+    solution_name: solutionName,
+    context_line: context ? `Context: ${context}` : '',
+    property_block: propertyBlock,
+    format_lines: properties.map(p => `${p.name}=PHASE|reason`).join('\n'),
+  });
 }
 
 /**
@@ -242,21 +228,15 @@ Example: Market=3|Growing competitive market with multiple established vendors`;
  */
 function buildSinglePropertyPrompt(solutionName: string, context: string, property: PropertyDef): string {
   const phases = property.phases || {};
-  return `You are a Wardley Mapping evolution expert.
-
-Evaluate the solution "${solutionName}" for the property: "${property.name}"
-${context ? `Context: ${context}` : ''}
-
-Phase descriptions for "${property.name}":
-  Phase 1 (Genesis):   ${phases['1'] || 'N/A'}
-  Phase 2 (Custom):    ${phases['2'] || 'N/A'}
-  Phase 3 (Product):   ${phases['3'] || 'N/A'}
-  Phase 4 (Commodity): ${phases['4'] || 'N/A'}
-
-Which phase (1–4) best describes the current state of "${solutionName}" for this property?
-
-MANDATORY FORMAT (last line, no text after):
-${property.name}=PHASE|reason`;
+  return getPrompt('properties-strategy', 'single').build({
+    solution_name: solutionName,
+    property_name: property.name,
+    context_line: context ? `Context: ${context}` : '',
+    phase1: phases['1'] || 'N/A',
+    phase2: phases['2'] || 'N/A',
+    phase3: phases['3'] || 'N/A',
+    phase4: phases['4'] || 'N/A',
+  });
 }
 
 // ─── Response Parsing ──────────────────────────────────────────────────────

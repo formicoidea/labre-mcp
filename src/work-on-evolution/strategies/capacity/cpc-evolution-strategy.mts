@@ -27,6 +27,7 @@ import { computeEvolution } from '../../s-curve/s-curve.mjs';
 import { getCpcTitle } from '../../patent/cpc-taxonomy-cache.mjs';
 import { toErrorMessage } from '../../../lib/errors.mjs';
 import type { IndicatorConfig, PatentData, IndicatorResults } from '../../../types/patent.mjs';
+import { getPrompt } from '../../../lib/prompts/registry.mjs';
 
 // ─── Default indicator configuration ────────────────────────────────────────
 
@@ -581,18 +582,12 @@ export class CpcEvolutionStrategy extends BaseStrategy {
       .map((t: any) => `${t.code}: ${t.title}`)
       .join('\n');
 
-    const prompt = `Given the CPC patent domain:
-${cpcContext}
-
-The component "${component.name}" is evaluated at evolution ${evolution.toFixed(2)} (${phase}).
-
-Wardley evolution axis: Genesis [0, 0.18] | Custom [0.18, 0.26] | Product [0.26, 0.70] | Commodity [0.70, 1.0]
-
-Name ONE concrete product or service that represents the most commoditized/utility form of this capability domain — something more evolved than "${component.name}". Estimate its evolution position on the Wardley axis.
-
-MANDATORY FORMAT (one line):
-NAME | SHORT_DESCRIPTION | EVOLUTION
-(max 30 chars for NAME, max 40 chars for SHORT_DESCRIPTION, EVOLUTION as decimal 0-1)`;
+    const prompt = getPrompt('cpc-evolution', 'sot-extraction').build({
+      cpc_context: cpcContext,
+      component_name: component.name || '',
+      evolution_score: evolution.toFixed(2),
+      phase,
+    });
 
     try {
       const response = await this._llmCall(prompt);

@@ -14,8 +14,8 @@ IMPORTANT RULES:
 - Choose solutions that are widely recognized and representative of their evolution stage.
 
 Capability: "{{capability}}"
-{{contextLine}}
-{{excludeLine}}
+{{context_line}}
+{{exclude_line}}
 
 MANDATORY OUTPUT FORMAT (exactly 6 lines, no additional text):
 sota_name=<specific solution name>

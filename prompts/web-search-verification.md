@@ -1,7 +1,7 @@
 You are verifying whether a component used in Wardley Mapping is a concrete SOLUTION (product/platform/service/framework) or an abstract CAPABILITY (activity/practice/concept).
 
 Component to verify: "{{name}}"
-{{contextLine}}
+{{context_line}}
 
 STEP 1: Search the web for "{{name}}" to find:
 - Official product/company website

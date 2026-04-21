@@ -366,7 +366,7 @@ export async function classifySolutionLLM(name: string, llmCall: LLMCall, option
     ? `Context: ${options.context}`
     : 'Context: (none provided)';
 
-  const prompt = getPrompt('solution-classification').build({ name: trimmed, contextLine });
+  const prompt = getPrompt('solution-classification').build({ name: trimmed, context_line: contextLine });
 
   logDebug('detectSolution', `LLM classification for "${trimmed}"...`);
 

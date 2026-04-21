@@ -559,7 +559,7 @@ describe('web-search-verification template', () => {
 
   it('contains required template placeholders', () => {
     assert.ok(template.includes('{{name}}'), 'Prompt must contain {{name}} placeholder');
-    assert.ok(template.includes('{{contextLine}}'), 'Prompt must contain {{contextLine}} placeholder');
+    assert.ok(template.includes('{{context_line}}'), 'Prompt must contain {{context_line}} placeholder');
   });
 
   it('mentions both SOLUTION and CAPABILITY', () => {
