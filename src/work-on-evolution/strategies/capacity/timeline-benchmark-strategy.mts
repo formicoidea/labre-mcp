@@ -20,7 +20,7 @@ interface TimelineMilestone {
   evolution: number;
   confidence: number;
 }
-import { identifyCapability } from '../../../work-on-value-chain/identify-capability.mjs';
+import { identifyCapability } from '../../../work-on-value-chain/write/component/identify-capability.mjs';
 import { LLMDirectStrategy } from './llm-direct-strategy.mjs';
 import { parseKeyValueBlock } from '../../../lib/prompts/parsers.mjs';
 import { getPrompt } from '../../../lib/prompts/registry.mjs';

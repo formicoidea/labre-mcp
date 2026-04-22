@@ -26,7 +26,7 @@ import { createInterface } from 'node:readline';
 import '../lib/prompts/init.mjs';
 import { ESTIMATE_EVOLUTION_TOOL, handleEstimateEvolution } from './mcp-tool.mjs';
 import { EVALUATE_MAP_TOOL, handleEvaluateMap } from '../work-on-evolution/evaluate-map/evaluate-map.mjs';
-import { IDENTIFY_CAPABILITY_TOOL, handleIdentifyCapability } from '../work-on-value-chain/identify-capability.mjs';
+import { IDENTIFY_CAPABILITY_TOOL, handleIdentifyCapability } from '../work-on-value-chain/write/component/identify-capability.mjs';
 import { ESTIMATE_ANCHOR_EVOLUTION_TOOL, handleEstimateAnchorEvolution } from '../work-on-evolution/strategies/anchor/estimate-anchor-evolution.mjs';
 import { logInfo, logError, logWarning } from '../lib/mcp-notifications.mjs';
 import { classifyAndLogLLMError, classifyLLMError } from '../lib/llm/llm-error-handler.mjs';

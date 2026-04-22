@@ -10,7 +10,7 @@ export { startServer, REGISTERED_TOOLS, TOOL_HANDLERS, handleRequest } from './m
 // ─── Tools ──────────────────────────────────────────────────────────────────
 export { ESTIMATE_EVOLUTION_TOOL, handleEstimateEvolution } from './mcp/mcp-tool.mjs';
 export { EVALUATE_MAP_TOOL, handleEvaluateMap } from './work-on-evolution/evaluate-map/evaluate-map.mjs';
-export { IDENTIFY_CAPABILITY_TOOL, handleIdentifyCapability } from './work-on-value-chain/identify-capability.mjs';
+export { IDENTIFY_CAPABILITY_TOOL, handleIdentifyCapability } from './work-on-value-chain/write/component/identify-capability.mjs';
 export { ESTIMATE_ANCHOR_EVOLUTION_TOOL, handleEstimateAnchorEvolution } from './work-on-evolution/strategies/anchor/estimate-anchor-evolution.mjs';
 
 // ─── Strategy Registry ──────────────────────────────────────────────────────

@@ -31,7 +31,7 @@
 //   //   justification: '...',
 //   // }
 
-import { identifyCapability, parseCapabilityResponse } from '../../work-on-value-chain/identify-capability.mjs';
+import { identifyCapability, parseCapabilityResponse } from '../../work-on-value-chain/write/component/identify-capability.mjs';
 import { logDebug } from '../../lib/mcp-notifications.mjs';
 import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
 

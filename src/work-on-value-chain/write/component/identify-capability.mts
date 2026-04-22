@@ -8,14 +8,14 @@
 // handler (handleIdentifyCapability) for direct invocation via MCP clients.
 
 import { z } from 'zod';
-import type { McpToolDefinition, JsonSchema } from '../types/mcp.mjs';
-import { IdentifyCapabilityInputSchema, type IdentifyCapabilityInput } from '../schemas/identify-capability.schema.mjs';
-import type { ParsedCapabilityResponse } from '../schemas/parsed-llm.schema.mjs';
-import { getStrategyLLM } from '../lib/llm/registry.mjs';
-import { logDebug } from '../lib/mcp-notifications.mjs';
-import { parseKeyValueBlock } from '../lib/prompts/parsers.mjs';
-import { getPrompt } from '../lib/prompts/registry.mjs';
-import { tryDegradeAmbient } from '../lib/degradation/index.mjs';
+import type { McpToolDefinition, JsonSchema } from '../../../types/mcp.mjs';
+import { IdentifyCapabilityInputSchema, type IdentifyCapabilityInput } from '../../../schemas/identify-capability.schema.mjs';
+import type { ParsedCapabilityResponse } from '../../../schemas/parsed-llm.schema.mjs';
+import { getStrategyLLM } from '../../../lib/llm/registry.mjs';
+import { logDebug } from '../../../lib/mcp-notifications.mjs';
+import { parseKeyValueBlock } from '../../../lib/prompts/parsers.mjs';
+import { getPrompt } from '../../../lib/prompts/registry.mjs';
+import { tryDegradeAmbient } from '../../../lib/degradation/index.mjs';
 
 const ELIGIBLE_TYPES = new Set(['component', 'pipeline']);
 

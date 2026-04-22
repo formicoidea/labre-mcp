@@ -14,7 +14,7 @@ import { loadStrategies, getStrategy, listStrategies } from './strategies/capaci
 import { BaseStrategy } from './strategies/capacity/base-strategy.mjs';
 import { ConversationSession } from '../session/conversation-session.mjs';
 import { getStrategyLLM, getStrategyLogprobLLM } from '../lib/llm/registry.mjs';
-import { identifyCapability } from '../work-on-value-chain/identify-capability.mjs';
+import { identifyCapability } from '../work-on-value-chain/write/component/identify-capability.mjs';
 import { logDebug, logInfo, logError } from '../lib/mcp-notifications.mjs';
 import { createMessageResolverFromArgs } from '../lib/progress-messages.mjs';
 import {

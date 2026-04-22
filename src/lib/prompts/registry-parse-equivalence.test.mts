@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import './init.mjs';
 import { getPrompt } from './registry.mjs';
 
-import { parseCapabilityResponse } from '../../work-on-value-chain/identify-capability.mjs';
+import { parseCapabilityResponse } from '../../work-on-value-chain/write/component/identify-capability.mjs';
 import { parseAnchorResponse } from '../../work-on-evolution/strategies/anchor/estimate-anchor-evolution.mjs';
 import { parsePubResponse } from '../../work-on-evolution/strategies/capacity/publication-analysis-strategy.mjs';
 import { parseFallbackPhase } from '../../work-on-evolution/strategies/capacity/logprob-distribution-strategy.mjs';
