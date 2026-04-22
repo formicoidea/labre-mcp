@@ -15,11 +15,11 @@ Les capability strategies evaluent les capacites abstraites via 7 strategies plu
 
 ## Auto-decouverte
 
-Les strategies sont decouvertes automatiquement au demarrage via `src/work-on-evolution/strategies/capacity/registry.mts`. Tout fichier `*-strategy.mts` dans ce dossier est charge et enregistre. Aucune modification du registre n'est necessaire pour ajouter une strategie.
+Les strategies sont decouvertes automatiquement au demarrage via `src/work-on-evolution/write/strategies/capacity/registry.mts`. Tout fichier `*-strategy.mts` dans ce dossier est charge et enregistre. Aucune modification du registre n'est necessaire pour ajouter une strategie.
 
 ## Interface commune
 
-Chaque strategie etend `BaseStrategy` (`src/work-on-evolution/strategies/capacity/base-strategy.mts`) :
+Chaque strategie etend `BaseStrategy` (`src/work-on-evolution/write/strategies/capacity/base-strategy.mts`) :
 
 ```typescript
 import { BaseStrategy } from './base-strategy.mjs';
@@ -55,7 +55,7 @@ class MaStrategy extends BaseStrategy {
 
 ---
 
-## 1. S-Curve (`s-curve`)
+## 1. S-Curve (`write:capacity:s-curve`)
 
 **Principe** : Projette le couple (certitude, ubiquite) sur le modele dual sigmoide pour obtenir une evolution deterministe.
 
@@ -87,7 +87,7 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 ---
 
-## 2. Publication Analysis (`publication-analysis`)
+## 2. Publication Analysis (`write:capacity:publication-analysis`)
 
 **Principe** : Analyse la distribution des types de publications (wonder/build/operate/usage) pour deduire le stade d'evolution via un centroide pondere.
 
@@ -112,7 +112,7 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 ---
 
-## 3. Timeline Benchmark (`timeline-benchmark`)
+## 3. Timeline Benchmark (`write:capacity:timeline-benchmark`)
 
 **Principe** : Construit une timeline historique du composant via des appels LLM iteratifs, puis positionne le composant par rapport aux jalons temporels.
 
@@ -130,7 +130,7 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 ---
 
-## 4. LLM Direct (`llm-direct`)
+## 4. LLM Direct (`write:capacity:llm-direct`)
 
 **Principe** : Demande directement au LLM d'estimer l'evolution, la certitude et l'ubiquite du composant.
 
@@ -146,7 +146,7 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 ---
 
-## 5. Logprob Distribution (`logprob-distribution`)
+## 5. Logprob Distribution (`write:capacity:logprob-distribution`)
 
 **Principe** : Utilise les log-probabilites des tokens du LLM pour analyser la distribution de probabilite sur les 4 stades d'evolution.
 
@@ -268,7 +268,7 @@ flowchart LR
 - La phase est convertie en valeur d'evolution via les midpoints
 - La confiance depend du ratio de proprietes evaluees et du mode (auto vs conversationnel)
 
-## Properties Strategy (`solution-properties`)
+## Properties Strategy (`write:solution:properties`)
 
 Seule solution strategy actuellement implementee. Supporte deux modes :
 
@@ -285,7 +285,7 @@ Le resultat solution etend `EvolutionResult` avec des champs supplementaires :
 |---|---|---|
 | `evolution` | number [0-1] | Position sur l'axe d'evolution |
 | `confidence` | number [0-1] | Score de confiance |
-| `method` | string | `"solution-properties"` |
+| `method` | string | `"write:solution:properties"` |
 | `properties` | array | Detail par propriete (phase, label, confiance) |
 | `stage` | string | Genesis / Custom / Product / Commodity |
 | `meanPhase` | number | Phase moyenne (1-4) |

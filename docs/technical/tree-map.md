@@ -10,9 +10,9 @@
 | Outil MCP | Rôle | Entrée principale |
 |---|---|---|
 | `estimateEvolution` | Évalue l'évolution d'un composant (genesis → commodity) via 7 stratégies | `src/mcp/mcp-tool.mts` |
-| `evaluateMap` | Évalue qualitativement une carte OWM | `src/work-on-evolution/evaluate-map/evaluate-map.mts` |
-| `identifyCapability` | Identifie capabilities / solutions dans un texte | `src/work-on-value-chain/identify-capability.mts` |
-| `estimateAnchorEvolution` | Évolution du composant ancre (user need) | `src/work-on-evolution/strategies/anchor/estimate-anchor-evolution.mts` |
+| `evaluateMap` | Évalue qualitativement une carte OWM | `src/work-on-evolution/write/evaluate-map/evaluate-map.mts` |
+| `identifyCapability` | Identifie capabilities / solutions dans un texte | `src/work-on-value-chain/write/component/identify-capability.mts` |
+| `estimateAnchorEvolution` | Évolution du composant ancre (user need) | `src/work-on-evolution/write/strategies/anchor/estimate-anchor-evolution.mts` |
 
 ## 2. Points d'entrée
 
@@ -118,93 +118,89 @@ src/
 │   └── solution-result-assembly.test.mts
 │
 ├── work-on-value-chain/         ── Tools centrés value chain / capabilities
-│   └── identify-capability.mts
+│   ├── read/                    (slot vide pour stratégies "parametre fourni en input, raffinement")
+│   │   ├── anchor/      { base-strategy.mts, registry.mts }
+│   │   ├── component/   { base-strategy.mts, registry.mts }
+│   │   └── chain/       { base-strategy.mts, registry.mts }
+│   └── write/                   (stratégies "parametre inventé depuis rien")
+│       ├── anchor/      { base-strategy.mts, registry.mts }
+│       ├── component/
+│       │   ├── base-strategy.mts, registry.mts
+│       │   ├── identify-capability.mts                Décode un nom → capability (nature activity/practice/knowledge/data)
+│       │   ├── infer-capability-from-solution.mts     Déduit la capability sous-jacente d'une solution nommée
+│       │   ├── dual-verification-orchestrator.mts     Pipeline 3 tiers naming/LLM/web-search
+│       │   ├── concurrent-verification.mts            Variante parallèle (LLM + web-search concurrents)
+│       │   ├── verification-reconciliation.mts        Réconciliation des signaux
+│       │   ├── verification-signals.mts               Constructeurs de VerificationSignal
+│       │   ├── signal-combiner.mts                    Fusion des signaux → verdict
+│       │   ├── web-search-verification.mts            Tier 3 via Agent SDK (web search)
+│       │   └── wardley-type-classification.mts        Classification activity/practice/data/knowledge
+│       └── chain/       { base-strategy.mts, registry.mts }
 │
 └── work-on-evolution/           ── Cœur : pipeline d'évaluation d'évolution
     │
-    ├── estimate-evolution.mts                    Orchestrateur principal (à la racine du domaine)
-    ├── skill-handler.mts                         Handler Agent SDK dédié à estimateEvolution
+    ├── read/                    (slot vide pour "evolution fournie en input → correction/raffinement")
+    │   ├── base-strategy.mts
+    │   └── registry.mts
     │
-    ├── evaluate-map/
-    │   ├── evaluate-map.mts                      Tool evaluateMap
-    │   └── evaluate-map-notifications.test.mts
-    │
-    ├── lib/                     Helpers locaux au domaine evolution
-    │   ├── evolution-input-validation.mts
-    │   └── evolution-input-validation.test.mts
-    │
-    ├── routing/                 Classification + aiguillage mode/stratégie
-    │   ├── classification-gate.mts               Gate économique (skip LLM si évident)
-    │   ├── classification-gate.test.mts
-    │   ├── classification-gate-economic.test.mts
-    │   ├── detect-solution.mts                   Solution vs capacity
-    │   ├── detect-solution.test.mts
-    │   ├── eval-mode-dispatcher.mts              Aiguillage fast/thorough
-    │   ├── eval-mode-dispatcher.test.mts
-    │   ├── fallback-routing-trigger.test.mts
-    │   ├── mode-router.mts                       conversational vs oneshot
-    │   ├── mode-router.test.mts
-    │   ├── routing-wiring.test.mts
-    │   ├── solution-capability-router.mts
-    │   ├── solution-capability-router.test.mts
-    │   ├── solution-dispatch.mts
-    │   ├── wardley-type-classification.mts
-    │   ├── web-search-verification.mts
-    │   └── web-search-verification.test.mts
-    │
-    ├── pipeline/                Pipeline enriched + vérification duale
-    │   ├── concurrent-verification.mts
-    │   ├── dual-verification-concurrent.test.mts
-    │   ├── dual-verification-orchestrator.mts
-    │   ├── dual-verification-orchestrator.test.mts
-    │   ├── pipeline-capability-inference.mts
-    │   ├── pipeline-capability-input.test.mts
-    │   ├── pipeline-enriched.mts                 Mode enriched (pivot capability + bornes SotA/legacy)
-    │   ├── pipeline-entrypoint-wiring.test.mts
-    │   ├── pipeline-owm-syntax.test.mts
-    │   ├── pipeline-solution-discovery.test.mts
-    │   ├── signal-combiner.mts
-    │   ├── signal-combiner.test.mts
-    │   ├── verification-reconciliation.mts
-    │   ├── verification-signals.mts
-    │   └── verification-signals.test.mts
-    │
-    ├── patent/                  Partie CPC-spécifique (brevets) — les primitives génériques sont dans src/lib/patent/
-    │   ├── cpc-mapper.mts                        Mapping capability → CPC codes
-    │   ├── cpc-taxonomy-cache.mts                Cache hiérarchie CPC
-    │   └── *.test.mts                            Tests de la stratégie CPC (confidence, cross-validation, …)
-    │
-    ├── s-curve/                 Transformation S-curve (partagée par plusieurs stratégies)
-    │   ├── s-curve.mts                           computeEvolution, PUB_TYPE_CENTROIDS
-    │   └── s-curve-transform.js                  (.js : consommé par promptfoo)
-    │
-    └── strategies/              Registres de stratégies pluggables
-        ├── anchor/
-        │   ├── estimate-anchor-evolution.mts     Tool estimateAnchorEvolution
-        │   └── estimate-evolution-pilot.test.mts
+    └── write/                   (toutes les stratégies actuelles : évolution inventée depuis un nom)
         │
-        ├── capacity/            7 stratégies "capacity" (quel niveau d'évolution ?)
-        │   ├── base-strategy.mts                 Contrat de base
-        │   ├── registry.mts                      Auto-discovery (readdir + import())
-        │   ├── llm-direct-strategy.mts
-        │   ├── logprob-distribution-strategy.mts
-        │   ├── publication-analysis-strategy.mts
-        │   ├── s-curve-strategy.mts
-        │   ├── timeline-benchmark-strategy.mts
-        │   ├── cpc-evolution-strategy.mts        Stratégie CPC (778 l — logique complète ici, primitives dans lib/patent/)
-        │   └── …  (+ tests pluggability/integration)
+        ├── estimate-evolution.mts                Orchestrateur principal
+        ├── skill-handler.mts                     Handler Agent SDK dédié à estimateEvolution
+        ├── skill-handler-parse.test.mts
         │
-        └── solution/            Stratégies "solution" (phase + propriétés produit)
-            ├── registry.mts
-            ├── solution-base-strategy.mts
-            ├── properties-strategy.mts
-            ├── phase-classifier.mts
-            ├── aggregate-properties.mts
-            ├── assemble-result.mts
-            ├── solution-evolution-result.mts
-            ├── evolution-properties.json         Données de référence
-            └── …  (+ tests)
+        ├── evaluate-map/
+        │   ├── evaluate-map.mts                  Tool evaluateMap
+        │   └── *.test.mts
+        │
+        ├── lib/                                  Helpers locaux au domaine evolution
+        │   ├── evolution-input-validation.mts
+        │   └── evolution-input-validation.test.mts
+        │
+        ├── routing/                              Classification + aiguillage mode/stratégie
+        │   ├── classification-gate.mts           Gate économique (skip LLM si évident)
+        │   ├── detect-solution.mts               Solution vs capacity (naming+LLM, les pipelines de vérification sont dans work-on-value-chain/write/component/)
+        │   ├── mode-router.mts                   conversational vs oneshot
+        │   ├── solution-capability-router.mts
+        │   ├── solution-dispatch.mts
+        │   └── *.test.mts
+        │
+        ├── pipeline/                             Pipeline enriched (les modules d'identification ont migré vers work-on-value-chain/write/component/)
+        │   ├── pipeline-enriched.mts             Mode enriched (pivot capability + bornes SotA/legacy)
+        │   └── *.test.mts
+        │
+        ├── patent/                               Partie CPC-spécifique (brevets) — les primitives génériques sont dans src/lib/patent/
+        │   ├── cpc-mapper.mts                    Mapping capability → CPC codes
+        │   ├── cpc-taxonomy-cache.mts            Cache hiérarchie CPC
+        │   └── *.test.mts
+        │
+        ├── s-curve/                              Transformation S-curve (partagée par plusieurs stratégies)
+        │   ├── s-curve.mts                       computeEvolution, PUB_TYPE_CENTROIDS
+        │   └── s-curve-transform.js              (.js : consommé par promptfoo)
+        │
+        └── strategies/                           Registres de stratégies pluggables (namespace method = "write:<family>:<name>")
+            ├── anchor/
+            │   └── estimate-anchor-evolution.mts Tool estimateAnchorEvolution
+            │
+            ├── capacity/                         6 stratégies "capacity"
+            │   ├── base-strategy.mts, registry.mts
+            │   ├── s-curve-strategy.mts              method = write:capacity:s-curve
+            │   ├── llm-direct-strategy.mts            method = write:capacity:llm-direct
+            │   ├── publication-analysis-strategy.mts  method = write:capacity:publication-analysis
+            │   ├── timeline-benchmark-strategy.mts    method = write:capacity:timeline-benchmark
+            │   ├── logprob-distribution-strategy.mts  method = write:capacity:logprob-distribution
+            │   └── cpc-evolution-strategy.mts         method = write:capacity:cpc-evolution
+            │
+            └── solution/                         Stratégies "solution" (12 propriétés produit)
+                ├── registry.mts, solution-base-strategy.mts
+                ├── properties-strategy.mts           method = write:solution:properties
+                ├── phase-classifier.mts, aggregate-properties.mts, assemble-result.mts
+                ├── solution-evolution-result.mts
+                └── evolution-properties.json         Données de référence
 ```
+
+> Le namespace `<mode>:<family>:<strategy>` est documenté dans
+> [strategy-namespace-convention.md](strategy-namespace-convention.md).
 
 ## 4. Graphe de dépendances (haut niveau)
 
@@ -239,6 +235,23 @@ Partagé par tous : src/lib/{llm/llm-call, mcp-notifications, response-formatter
 
 Utiliser cette table pour réparer les imports. Les chemins sont **relatifs à `src/`** sauf indication.
 
+**Round 3 (read/write split + component identification migration — avril 2026)** :
+
+| Ancien | Nouveau |
+|---|---|
+| `./work-on-value-chain/identify-capability.mts` | `./work-on-value-chain/write/component/identify-capability.mts` |
+| `./work-on-evolution/pipeline/dual-verification-orchestrator.mts` | `./work-on-value-chain/write/component/dual-verification-orchestrator.mts` |
+| `./work-on-evolution/pipeline/concurrent-verification.mts` | `./work-on-value-chain/write/component/concurrent-verification.mts` |
+| `./work-on-evolution/pipeline/verification-reconciliation.mts` | `./work-on-value-chain/write/component/verification-reconciliation.mts` |
+| `./work-on-evolution/pipeline/verification-signals.mts` | `./work-on-value-chain/write/component/verification-signals.mts` |
+| `./work-on-evolution/pipeline/signal-combiner.mts` | `./work-on-value-chain/write/component/signal-combiner.mts` |
+| `./work-on-evolution/pipeline/pipeline-capability-inference.mts` | `./work-on-value-chain/write/component/infer-capability-from-solution.mts` (renommé) |
+| `./work-on-evolution/routing/web-search-verification.mts` | `./work-on-value-chain/write/component/web-search-verification.mts` |
+| `./work-on-evolution/routing/wardley-type-classification.mts` | `./work-on-value-chain/write/component/wardley-type-classification.mts` |
+| `./work-on-evolution/<tout le reste>` | `./work-on-evolution/write/<tout le reste>` |
+| `method: 's-curve'` / `publication-analysis` / … | `method: 'write:capacity:s-curve'` / `write:capacity:publication-analysis` / … |
+| `method: 'solution-properties'` | `method: 'write:solution:properties'` |
+
 **Round 2 (doctrine — avril 2026)** :
 
 | Ancien | Nouveau |
@@ -247,7 +260,7 @@ Utiliser cette table pour réparer les imports. Les chemins sont **relatifs à `
 | `./mcp/skill-handler.mts` | `./work-on-evolution/skill-handler.mts` |
 | `./work-on-evolution/patent/cpc-evolution-strategy.mts` (778 l) | `./work-on-evolution/strategies/capacity/cpc-evolution-strategy.mts` (remplace le proxy) |
 | `./work-on-evolution/patent/{bigquery-*,patent-data-source,patent-indicators,mock-patent-source}.mts` | `./lib/patent/*.mts` |
-| `src/work-on-evolution/s-curve/calibrate-s-curve.mts` | `scripts/calibrate-s-curve.mts` (hors `src/`) |
+| `src/work-on-evolution/write/s-curve/calibrate-s-curve.mts` | `scripts/calibrate-s-curve.mts` (hors `src/`) |
 
 **Round 1 (réorg initiale)** :
 

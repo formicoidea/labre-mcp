@@ -72,9 +72,9 @@ Aucune duplication entre le JSON Schema MCP, les interfaces TS et la validation 
 |---|---|
 | `src/mcp/mcp-server.mts` | Serveur JSON-RPC 2.0 stdio, registre de 4 outils, dispatch |
 | `src/mcp/mcp-tool.mts` | Definition et handler de `estimateEvolution` |
-| `src/work-on-evolution/evaluate-map/evaluate-map.mts` | Definition et handler de `evaluateMap` |
-| `src/work-on-value-chain/identify-capability.mts` | Definition et handler de `identifyCapability` |
-| `src/work-on-evolution/strategies/anchor/estimate-anchor-evolution.mts` | Definition et handler de `estimateAnchorEvolution` |
+| `src/work-on-evolution/write/evaluate-map/evaluate-map.mts` | Definition et handler de `evaluateMap` |
+| `src/work-on-value-chain/write/component/identify-capability.mts` | Definition et handler de `identifyCapability` |
+| `src/work-on-evolution/write/strategies/anchor/estimate-anchor-evolution.mts` | Definition et handler de `estimateAnchorEvolution` |
 
 ### Schemas (Zod)
 
@@ -92,56 +92,56 @@ Aucune duplication entre le JSON Schema MCP, les interfaces TS et la validation 
 
 | Module | Role |
 |---|---|
-| `src/work-on-evolution/routing/classification-gate.mts` | Gate fixe : mots-cles + signaux contextuels → espace economique |
-| `src/work-on-evolution/routing/mode-router.mts` | Detection automatique du mode (oneshot/guided) + dispatch |
-| `src/work-on-evolution/estimate-evolution.mts` | Orchestration oneshot : classification → strategies → formatage |
+| `src/work-on-evolution/write/routing/classification-gate.mts` | Gate fixe : mots-cles + signaux contextuels → espace economique |
+| `src/work-on-evolution/write/routing/mode-router.mts` | Detection automatique du mode (oneshot/guided) + dispatch |
+| `src/work-on-evolution/write/estimate-evolution.mts` | Orchestration oneshot : classification → strategies → formatage |
 | `src/session/conversation-session.mts` | Machine a etats pour le mode guide (5 phases) |
-| `src/work-on-evolution/skill-handler.mts` | Parsing de langage naturel → appels API structures |
-| `src/work-on-value-chain/identify-capability.mts` | Decode les noms techniques (CRM → gestion relation client) via LLM |
+| `src/work-on-evolution/write/skill-handler.mts` | Parsing de langage naturel → appels API structures |
+| `src/work-on-value-chain/write/component/identify-capability.mts` | Decode les noms techniques (CRM → gestion relation client) via LLM |
 
 ### Routage Solution / Capability
 
 | Module | Role |
 |---|---|
-| `src/work-on-evolution/routing/solution-capability-router.mts` | Detection du type de composant (solution vs capability) et dispatch |
-| `src/work-on-evolution/routing/detect-solution.mts` | Heuristiques de nommage + fallback LLM (tiers 1 et 2) |
-| `src/work-on-evolution/pipeline/dual-verification-orchestrator.mts` | Orchestration des 3 tiers de verification avec court-circuit |
-| `src/work-on-evolution/routing/web-search-verification.mts` | Verification tier 3 via recherche web |
-| `src/work-on-evolution/pipeline/signal-combiner.mts` | Fusion des signaux LLM + web search en verdict unique |
-| `src/work-on-evolution/routing/eval-mode-dispatcher.mts` | Dispatch vers les registres de strategies selon le mode eval |
+| `src/work-on-evolution/write/routing/solution-capability-router.mts` | Detection du type de composant (solution vs capability) et dispatch |
+| `src/work-on-evolution/write/routing/detect-solution.mts` | Heuristiques de nommage + fallback LLM (tiers 1 et 2) |
+| `src/work-on-value-chain/write/component/dual-verification-orchestrator.mts` | Orchestration des 3 tiers de verification avec court-circuit |
+| `src/work-on-value-chain/write/component/web-search-verification.mts` | Verification tier 3 via recherche web |
+| `src/work-on-value-chain/write/component/signal-combiner.mts` | Fusion des signaux LLM + web search en verdict unique |
+| `src/work-on-evolution/write/routing/eval-mode-dispatcher.mts` | Dispatch vers les registres de strategies selon le mode eval |
 
 ### Strategies Capability
 
 | Module | Role |
 |---|---|
-| `src/work-on-evolution/strategies/capacity/registry.mts` | Auto-decouverte et cache des fichiers `*-strategy.mts` |
-| `src/work-on-evolution/strategies/capacity/base-strategy.mts` | Interface abstraite (`evaluate()` + `validateResult()`) |
-| `src/work-on-evolution/strategies/capacity/s-curve-strategy.mts` | Modele dual sigmoide (certitude × ubiquite) |
-| `src/work-on-evolution/strategies/capacity/publication-analysis-strategy.mts` | Distribution wonder/build/operate/usage |
-| `src/work-on-evolution/strategies/capacity/timeline-benchmark-strategy.mts` | Timeline historique recursive |
-| `src/work-on-evolution/strategies/capacity/llm-direct-strategy.mts` | Estimation LLM directe (blend 70% s-curve + 30% LLM) |
-| `src/work-on-evolution/strategies/capacity/logprob-distribution-strategy.mts` | Logprobs OpenCode → distribution de probabilite |
-| `src/work-on-evolution/strategies/capacity/cpc-evolution-strategy.mts` | Brevets CPC via BigQuery (8 indicateurs certitude+ubiquite) |
+| `src/work-on-evolution/write/strategies/capacity/registry.mts` | Auto-decouverte et cache des fichiers `*-strategy.mts` |
+| `src/work-on-evolution/write/strategies/capacity/base-strategy.mts` | Interface abstraite (`evaluate()` + `validateResult()`) |
+| `src/work-on-evolution/write/strategies/capacity/s-curve-strategy.mts` | Modele dual sigmoide (certitude × ubiquite) |
+| `src/work-on-evolution/write/strategies/capacity/publication-analysis-strategy.mts` | Distribution wonder/build/operate/usage |
+| `src/work-on-evolution/write/strategies/capacity/timeline-benchmark-strategy.mts` | Timeline historique recursive |
+| `src/work-on-evolution/write/strategies/capacity/llm-direct-strategy.mts` | Estimation LLM directe (blend 70% s-curve + 30% LLM) |
+| `src/work-on-evolution/write/strategies/capacity/logprob-distribution-strategy.mts` | Logprobs OpenCode → distribution de probabilite |
+| `src/work-on-evolution/write/strategies/capacity/cpc-evolution-strategy.mts` | Brevets CPC via BigQuery (8 indicateurs certitude+ubiquite) |
 
 ### Strategies Solution
 
 | Module | Role |
 |---|---|
-| `src/work-on-evolution/strategies/solution/registry.mts` | Auto-decouverte des fichiers `*-strategy.mts` dans `solution/` |
-| `src/work-on-evolution/strategies/solution/solution-base-strategy.mts` | Classe abstraite solution (etend `BaseStrategy`) |
-| `src/work-on-evolution/strategies/solution/properties-strategy.mts` | Evaluation des 12 proprietes Wardley (auto + conversationnel) |
-| `src/work-on-evolution/strategies/solution/evolution-properties.json` | Reference : 12 proprietes × 4 phases avec descriptions |
-| `src/work-on-evolution/strategies/solution/phase-classifier.mts` | Mapping propriete → phase (1-4) |
-| `src/work-on-evolution/strategies/solution/aggregate-properties.mts` | Agregation ponderee des phases en evolution [0-1] |
-| `src/work-on-evolution/strategies/solution/assemble-result.mts` | Enrichissement des resultats (stage, distribution, confiance) |
-| `src/work-on-evolution/strategies/solution/solution-evolution-result.mts` | Modele de resultat solution avec validation |
+| `src/work-on-evolution/write/strategies/solution/registry.mts` | Auto-decouverte des fichiers `*-strategy.mts` dans `solution/` |
+| `src/work-on-evolution/write/strategies/solution/solution-base-strategy.mts` | Classe abstraite solution (etend `BaseStrategy`) |
+| `src/work-on-evolution/write/strategies/solution/properties-strategy.mts` | Evaluation des 12 proprietes Wardley (auto + conversationnel) |
+| `src/work-on-evolution/write/strategies/solution/evolution-properties.json` | Reference : 12 proprietes × 4 phases avec descriptions |
+| `src/work-on-evolution/write/strategies/solution/phase-classifier.mts` | Mapping propriete → phase (1-4) |
+| `src/work-on-evolution/write/strategies/solution/aggregate-properties.mts` | Agregation ponderee des phases en evolution [0-1] |
+| `src/work-on-evolution/write/strategies/solution/assemble-result.mts` | Enrichissement des resultats (stage, distribution, confiance) |
+| `src/work-on-evolution/write/strategies/solution/solution-evolution-result.mts` | Modele de resultat solution avec validation |
 
 ### Mathematiques
 
 | Module | Role |
 |---|---|
-| `src/work-on-evolution/s-curve/s-curve.mts` | Modele S-curve : sigmoide generalisee, bandes, zones, projection |
-| `src/work-on-evolution/s-curve/s-curve-visualizer.html` | Visualiseur interactif HTML5 Canvas |
+| `src/work-on-evolution/write/s-curve/s-curve.mts` | Modele S-curve : sigmoide generalisee, bandes, zones, projection |
+| `src/work-on-evolution/write/s-curve/s-curve-visualizer.html` | Visualiseur interactif HTML5 Canvas |
 
 ### Infrastructure LLM
 

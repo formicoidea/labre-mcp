@@ -12,7 +12,7 @@ Toute reponse contient les champs `degraded` (boolean) et `degradationEvents` (a
 | `patent-indicators` | Module non chargeable (probleme de build). Verifier `npm run typecheck`. |
 | `web-search` | Agent SDK non disponible ou rate-limit. Le routing solution/capability bascule sur le defaut `capability`. |
 | `llm:claude` / `llm:opencode` / `llm:identify-capability` / `llm:anchor-evolution` | Erreur LLM (timeout, 401, rate limit, empty response). Voir `detail.error` dans l'event. |
-| `cpc-evolution` | Erreur inattendue dans le pipeline CPC (safety net). Le `detail` contient le message original. |
+| `write:capacity:cpc-evolution` | Erreur inattendue dans le pipeline CPC (safety net). Le `detail` contient le message original. |
 | `evaluateMap:<componentName>` | Une evaluation par-composant a leve une exception. Le composant est marque `skipped` avec la raison. |
 
 Les memes informations apparaissent en notifications MCP (canal `wardley-assistant`, niveau `warning`) — affichees en temps reel dans Claude Code. Voir [degradation.md](degradation.md) pour la conception du framework.
@@ -48,7 +48,7 @@ Note : cette cle n'est necessaire que pour les strategies utilisant le backend O
 
 **Solutions** :
 1. Augmenter le timeout dans `.mcp.json`
-2. Utiliser une seule strategie au lieu de `"all"` : `"strategy": "s-curve"`
+2. Utiliser une seule strategie au lieu de `"all"` : `"strategy": "write:capacity:s-curve"`
 3. Verifier la connectivite reseau vers `opencode.ai`
 
 ### logprob-distribution error 500
@@ -114,7 +114,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | npx tsx --env-file=.env 
 # Appel complet (initialize + call)
 printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"test","version":"1.0"}}}
 {"jsonrpc":"2.0","method":"notifications/initialized"}
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"estimateEvolution","arguments":{"name":"ERP","strategy":"s-curve","certitude":0.9,"ubiquity":0.85}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"estimateEvolution","arguments":{"name":"ERP","strategy":"write:capacity:s-curve","certitude":0.9,"ubiquity":0.85}}}
 ' | npx tsx --env-file=.env src/mcp/mcp-server.mts
 ```
 
@@ -135,12 +135,12 @@ printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion
 pnpm test
 
 # Un fichier specifique (via tsx)
-npx tsx --test src/work-on-evolution/routing/classification-gate.test.mts
+npx tsx --test src/work-on-evolution/write/routing/classification-gate.test.mts
 ```
 
 ### Visualiser le modele S-curve
 
-Ouvrir `src/work-on-evolution/s-curve/s-curve-visualizer.html` dans un navigateur pour visualiser interactivement le modele dual sigmoide et ajuster les parametres.
+Ouvrir `src/work-on-evolution/write/s-curve/s-curve-visualizer.html` dans un navigateur pour visualiser interactivement le modele dual sigmoide et ajuster les parametres.
 
 Permet d'ajuster les parametres kUpper, kLower, x0, yMin, yMax, nu du modele.
 
@@ -167,7 +167,7 @@ La detection est automatique : si vous fournissez assez de parametres, c'est du 
 
 ### Comment ajouter une strategie ?
 
-Creer un fichier `src/work-on-evolution/strategies/capacity/ma-strategy.mts` qui etend `BaseStrategy`. Le registre le decouvre automatiquement. Voir [Extensibilite](extending.md).
+Creer un fichier `src/work-on-evolution/write/strategies/capacity/ma-strategy.mts` qui etend `BaseStrategy`. Le registre le decouvre automatiquement. Voir [Extensibilite](extending.md).
 
 ### Que signifie "extra-competitif" ?
 

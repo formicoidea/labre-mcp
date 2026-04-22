@@ -1,21 +1,26 @@
 # Extensibilite
 
+> **Convention** : chaque `method` suit le format `<mode>:<family>:<strategy>`.
+> Voir [strategy-namespace-convention.md](strategy-namespace-convention.md)
+> pour le detail de `mode` (read / write / analyze) et `family`
+> (capacity / solution / anchor / component / chain).
+
 ## Ajouter une nouvelle strategie capability
 
 C'est la forme d'extension la plus simple — aucune modification de code existant n'est necessaire.
 
 ### Etape 1 : Creer le fichier
 
-Creer `src/work-on-evolution/strategies/capacity/ma-strategy.mts` :
+Creer `src/work-on-evolution/write/strategies/capacity/ma-strategy.mts` :
 
 ```typescript
 import { BaseStrategy } from './base-strategy.mjs';
-import type { ComponentInput, EvolutionResult } from '../../../types/evolution.mjs';
+import type { ComponentInput, EvolutionResult } from '../../../../types/evolution.mjs';
 
 export class MaStrategy extends BaseStrategy {
-  // Identifiant unique de la strategie
+  // Identifiant unique de la strategie (convention <mode>:<family>:<strategy>)
   static get method(): string {
-    return 'ma-strategy';
+    return 'write:capacity:ma-strategy';
   }
 
   // Evaluation du composant
@@ -37,7 +42,7 @@ export class MaStrategy extends BaseStrategy {
 
 ### Etape 2 : C'est tout
 
-Le registre (`src/work-on-evolution/strategies/capacity/registry.mts`) decouvre automatiquement tout fichier `*-strategy.mts` dans le dossier. Pas besoin de modifier le registre, le serveur ou les handlers.
+Le registre (`src/work-on-evolution/write/strategies/capacity/registry.mts`) decouvre automatiquement tout fichier `*-strategy.mts` dans le dossier. Pas besoin de modifier le registre, le serveur ou les handlers.
 
 ### Contrat a respecter
 
@@ -76,19 +81,19 @@ async evaluate(component) {
 
 ## Ajouter une solution strategy
 
-Meme principe que les capability strategies, mais dans le dossier `src/work-on-evolution/strategies/solution/`.
+Meme principe que les capability strategies, mais dans le dossier `src/work-on-evolution/write/strategies/solution/`.
 
 ### Etape 1 : Creer le fichier
 
-Creer `src/work-on-evolution/strategies/solution/ma-strategy.mts` :
+Creer `src/work-on-evolution/write/strategies/solution/ma-strategy.mts` :
 
 ```typescript
 import { SolutionBaseStrategy } from './solution-base-strategy.mjs';
-import type { SolutionInput, SolutionEvolutionResult } from '../../../types/solution.mjs';
+import type { SolutionInput, SolutionEvolutionResult } from '../../../../types/solution.mjs';
 
 export class MaStrategy extends SolutionBaseStrategy {
   static get method(): string {
-    return 'ma-solution-strategy';
+    return 'write:solution:ma-strategy';
   }
 
   async evaluate(component: SolutionInput): Promise<SolutionEvolutionResult> {
@@ -108,7 +113,7 @@ export class MaStrategy extends SolutionBaseStrategy {
 
 ### Etape 2 : C'est tout
 
-Le registre (`src/work-on-evolution/strategies/solution/registry.mts`) decouvre automatiquement tout fichier `*-strategy.mts` dans le dossier.
+Le registre (`src/work-on-evolution/write/strategies/solution/registry.mts`) decouvre automatiquement tout fichier `*-strategy.mts` dans le dossier.
 
 ### Contrat a respecter
 

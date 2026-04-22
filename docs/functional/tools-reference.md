@@ -31,7 +31,7 @@ Estime la position d'evolution d'un composant sur l'axe de Wardley (0 = Genesis,
 | `operate` | number [0-1] | non | Proportion de publications "exploitation". Utilise par pub-analysis. |
 | `usage` | number [0-1] | non | Proportion de publications "usage courant". Utilise par pub-analysis. |
 | `space` | enum | non | Pre-classification : `economic`, `social_good`, `common_good`. Si omis, detection automatique. |
-| `strategy` | string | non | Strategie a utiliser. `"all"` par defaut. Ou un nom specifique (ex: `"s-curve"`). |
+| `strategy` | string | non | Strategie a utiliser. `"all"` par defaut. Ou un nom specifique (ex: `"write:capacity:s-curve"`). |
 | `mode` | enum | non | `oneshot`, `guided`, `conversational`, `auto`, `default`. Auto-detection par defaut. |
 | `sessionState` | string | non | Etat serialise d'une session multi-tour (mode guide). |
 | `forceEstimate` | boolean | non | Force l'estimation avec les donnees disponibles (mode guide). `false` par defaut. |
@@ -132,8 +132,8 @@ Le routeur detecte automatiquement "Kubernetes" comme une solution et route vers
     "evalMode": "exclusive"
   },
   "evaluations": {
-    "s-curve": { "evolution": 0.76, "confidence": 0.85, "method": "s-curve" },
-    "llm-direct": { "evolution": 0.72, "confidence": 0.90, "method": "llm-direct" }
+    "write:capacity:s-curve": { "evolution": 0.76, "confidence": 0.85, "method": "write:capacity:s-curve" },
+    "write:capacity:llm-direct": { "evolution": 0.72, "confidence": 0.90, "method": "write:capacity:llm-direct" }
   },
   "message": "Component \"ERP\" classified as economic. Evaluated with 6 strategy(ies).",
   "formatted": "## Evolution Estimation: ERP\n...",
@@ -155,10 +155,10 @@ Le routeur detecte automatiquement "Kubernetes" comme une solution et route vers
     "evalMode": "exclusive"
   },
   "evaluations": {
-    "solution-properties": {
+    "write:solution:properties": {
       "evolution": 0.55,
       "confidence": 0.88,
-      "method": "solution-properties",
+      "method": "write:solution:properties",
       "stage": "Product",
       "meanPhase": 2.8,
       "phaseDistribution": { "1": 0, "2": 4, "3": 6, "4": 2 },

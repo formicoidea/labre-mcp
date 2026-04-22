@@ -70,7 +70,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | npx tsx --env-file=.env 
 ```bash
 printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"test","version":"1.0"}}}
 {"jsonrpc":"2.0","method":"notifications/initialized"}
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"estimateEvolution","arguments":{"name":"ERP","context":"Logiciel de gestion integre pour PME","mode":"oneshot","space":"economic","certitude":0.9,"ubiquity":0.85,"strategy":"s-curve"}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"estimateEvolution","arguments":{"name":"ERP","context":"Logiciel de gestion integre pour PME","mode":"oneshot","space":"economic","certitude":0.9,"ubiquity":0.85,"strategy":"write:capacity:s-curve"}}}
 ' | npx tsx --env-file=.env src/mcp/mcp-server.mts
 ```
 

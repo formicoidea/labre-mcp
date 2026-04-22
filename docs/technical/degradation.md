@@ -76,7 +76,7 @@ Les `source` doivent etre des identifiants stables et courts. Conventions actuel
 | `patent-indicators` | Calcul des 8 indicateurs purs. |
 | `web-search` | Verification web search (Agent SDK query). |
 | `llm:claude` / `llm:opencode` / `llm:identify-capability` / `llm:anchor-evolution` | Appels LLM (suffixe optionnel = role). |
-| `cpc-evolution` | Erreur inattendue dans le pipeline CPC (safety net). |
+| `write:capacity:cpc-evolution` | Erreur inattendue dans le pipeline CPC (safety net). |
 | `evaluateMap:<componentName>` | Erreur lors de l'evaluation d'un composant dans `evaluateMap`. |
 
 Quand vous ajoutez une nouvelle dependance, choisissez un identifiant similaire (`<service>` ou `<service>:<sous-action>`).
@@ -173,6 +173,6 @@ Le module est couvert par :
 - `src/lib/degradation/with-degradation.test.mts` — `tryDegrade` / `tryDegradeAmbient`
 - `src/lib/degradation/mcp-wrapper.test.mts` — wrapping + preflight
 - `src/mcp/mcp-server-dispatch.test.mts` — fusion `degraded` + `degradationEvents` dans la reponse
-- `src/work-on-evolution/strategies/capacity/cpc-degradation.test.mts` — bout-en-bout sur la strategie CPC
+- `src/work-on-evolution/write/strategies/capacity/cpc-degradation.test.mts` — bout-en-bout sur la strategie CPC
 
 Lancer : `npx tsx --test src/lib/degradation/*.test.mts src/mcp/mcp-server-dispatch.test.mts`.
