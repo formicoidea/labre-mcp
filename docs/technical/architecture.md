@@ -28,6 +28,30 @@ flowchart TD
     RF --> N["Notifications\nclaude/channel + notifications/message"]
 ```
 
+## Couche de degradation
+
+Toutes les invocations MCP sont enveloppees au dispatch par `withMcpDegradation` (`src/lib/degradation/`). Cette couche etablit un `DegradationCollector` par invocation (via AsyncLocalStorage) et fusionne `degraded` + `degradationEvents` dans la reponse JSON-RPC.
+
+```
+client MCP -> mcp-server.mts
+                  |
+                  v
+            withMcpDegradation
+                  | (DegradationCollector + AsyncLocalStorage)
+                  v
+            handler(args) -> routing -> strategies -> loaders
+                                          |
+                                          | tryDegradeAmbient autour des appels externes
+                                          | (BigQuery, LLM, web search, fichiers reseau)
+                                          v
+                                  collector.record / collector.recordError
+                  |
+                  v
+            { ...result, degraded, degradationEvents }
+```
+
+Au boot, `src/mcp/boot-health-checks.mts` enregistre un health-check par dependance externe (`bigquery`, `llm:claude`, `llm:opencode`, `web-search`). Voir [degradation.md](degradation.md) pour les details.
+
 ## TypeScript strict + Zod
 
 Le projet est en **TypeScript strict** (`tsconfig.json` → `"strict": true`), extensions `.mts` (ESM strict). La chaine de build `tsc` compile `src/**/*.mts` vers `dist/**/*.mjs` + `dist/**/*.d.mts`.

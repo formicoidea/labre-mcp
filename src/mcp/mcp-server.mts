@@ -28,7 +28,7 @@ import { ESTIMATE_EVOLUTION_TOOL, handleEstimateEvolution } from './mcp-tool.mjs
 import { EVALUATE_MAP_TOOL, handleEvaluateMap } from '../work-on-evolution/evaluate-map/evaluate-map.mjs';
 import { IDENTIFY_CAPABILITY_TOOL, handleIdentifyCapability } from '../work-on-value-chain/identify-capability.mjs';
 import { ESTIMATE_ANCHOR_EVOLUTION_TOOL, handleEstimateAnchorEvolution } from '../work-on-evolution/strategies/anchor/estimate-anchor-evolution.mjs';
-import { logInfo, logError } from '../lib/mcp-notifications.mjs';
+import { logInfo, logError, logWarning } from '../lib/mcp-notifications.mjs';
 import { classifyAndLogLLMError, classifyLLMError } from '../lib/llm/llm-error-handler.mjs';
 import type {
   McpToolDefinition,
@@ -39,6 +39,11 @@ import type {
   McpServerCapabilities,
 } from '../types/mcp.mjs';
 import { toErrorMessage, errorCode } from '../lib/errors.mjs';
+import {
+  withMcpDegradation,
+  runAllHealthChecks,
+} from '../lib/degradation/index.mjs';
+import { registerDefaultHealthChecks } from './boot-health-checks.mjs';
 
 // ─── Tool Registry ──────────────────────────────────────────────────────────
 
@@ -160,14 +165,33 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
       const startTime = Date.now();
 
       try {
-        const result = await handler(toolArgs);
+        // Wrap the handler in the standard degradation envelope so every
+        // tool result carries `degraded` + `degradationEvents` fields, and
+        // any handler that has been migrated receives the per-invocation
+        // collector via its optional 2nd argument.
+        const wrapped = await withMcpDegradation(toolName, async (collector) => {
+          return await handler(toolArgs, collector);
+        });
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
-        // Info-level: tool invocation end (success)
+        // Info-level: tool invocation end (success — possibly degraded)
         const endMsg = toolSubject
-          ? `${toolName} completed for "${toolSubject}" in ${elapsed}s`
-          : `${toolName} completed in ${elapsed}s`;
+          ? `${toolName} completed for "${toolSubject}" in ${elapsed}s${wrapped.degraded ? ' (degraded)' : ''}`
+          : `${toolName} completed in ${elapsed}s${wrapped.degraded ? ' (degraded)' : ''}`;
         logInfo(toolName, endMsg);
+
+        // Backward-compatible serialization: existing handlers return an
+        // object; merge `degraded` + `degradationEvents` as siblings rather
+        // than wrapping (preserves the public shape, adds two optional
+        // fields). Non-object results fall back to the explicit envelope.
+        const payload =
+          wrapped.result !== null && typeof wrapped.result === 'object' && !Array.isArray(wrapped.result)
+            ? {
+                ...(wrapped.result as Record<string, unknown>),
+                degraded: wrapped.degraded,
+                degradationEvents: wrapped.degradationEvents,
+              }
+            : wrapped;
 
         return {
           jsonrpc: '2.0',
@@ -176,7 +200,7 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
             content: [
               {
                 type: 'text',
-                text: JSON.stringify(result, null, 2),
+                text: JSON.stringify(payload, null, 2),
               },
             ],
           },
@@ -232,6 +256,16 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
  * Writes JSON-RPC responses to stdout (one per line).
  */
 export function startServer() {
+  // Register every default health check and surface known-down dependencies
+  // in the server log so operators see the warning before the first tool
+  // call rather than discovering it inside a degraded result.
+  registerDefaultHealthChecks();
+  void runAllHealthChecks().then((events) => {
+    for (const evt of events) {
+      logWarning('boot', `[${evt.source}] ${evt.reason}`);
+    }
+  });
+
   const rl = createInterface({
     input: process.stdin,
     terminal: false,

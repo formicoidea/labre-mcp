@@ -1,5 +1,22 @@
 # Depannage
 
+## Comprendre `degraded: true` dans une reponse MCP
+
+Toute reponse contient les champs `degraded` (boolean) et `degradationEvents` (array). Quand `degraded === true`, **le resultat est valide mais une ou plusieurs dependances externes etaient inaccessibles** — typiquement le pipeline a utilise des fallbacks neutres et la confiance s'en ressent. Lisez `degradationEvents[]` pour identifier la cause :
+
+| `source` | Que verifier |
+|---|---|
+| `bigquery` | `BIGQUERY_PROJECT_ID` et `GOOGLE_APPLICATION_CREDENTIALS` dans `.env`. La strategie CPC est inoperante sans ces variables. |
+| `cpc-mapper` / `cpc-mapper:progressive` / `cpc-mapper:llm` | LLM injoignable au moment du mapping capability -> codes CPC. Verifier la cle API OpenCode et la connectivite. |
+| `cpc-taxonomy-cache` | Cache local des titres CPC indisponible. Non-bloquant — le mapper retombe sur le LLM. |
+| `patent-indicators` | Module non chargeable (probleme de build). Verifier `npm run typecheck`. |
+| `web-search` | Agent SDK non disponible ou rate-limit. Le routing solution/capability bascule sur le defaut `capability`. |
+| `llm:claude` / `llm:opencode` / `llm:identify-capability` / `llm:anchor-evolution` | Erreur LLM (timeout, 401, rate limit, empty response). Voir `detail.error` dans l'event. |
+| `cpc-evolution` | Erreur inattendue dans le pipeline CPC (safety net). Le `detail` contient le message original. |
+| `evaluateMap:<componentName>` | Une evaluation par-composant a leve une exception. Le composant est marque `skipped` avec la raison. |
+
+Les memes informations apparaissent en notifications MCP (canal `wardley-assistant`, niveau `warning`) — affichees en temps reel dans Claude Code. Voir [degradation.md](degradation.md) pour la conception du framework.
+
 ## Erreurs courantes
 
 ### "Nested MCP server detected — exiting cleanly"

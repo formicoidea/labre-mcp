@@ -138,6 +138,8 @@ Etend `EvolutionResult` avec des champs supplementaires :
 
 Le flow moderne utilise **Zod comme source de verite unique** — le schema Zod genere a la fois le JSON Schema expose au client MCP, le type TypeScript, et la validation runtime. Plus de duplication entre `inputSchema` literal et fonction `validateInput()` manuelle.
 
+> **Convention obligatoire** : tout handler MCP est automatiquement enveloppe par `withMcpDegradation` au niveau du dispatch (`src/mcp/mcp-server.mts`). En contrepartie, **tout appel a un service externe (LLM, BigQuery, web search, fichier reseau) DOIT passer par `tryDegradeAmbient`** — pas de `try { ... } catch {}` muet. Voir [degradation.md](degradation.md) pour le detail du framework.
+
 ### Etape 1 : Creer le schema Zod
 
 Creer `src/schemas/mon-outil.schema.mts` :
@@ -174,23 +176,31 @@ export const MON_OUTIL_TOOL: McpToolDefinition = {
   inputSchema: z.toJSONSchema(MonOutilInputSchema, { io: 'input' }) as JsonSchema,
 };
 
-// Handler : Zod valide les args, lance une ZodError structuree si invalide
+// Handler : Zod valide les args, lance une ZodError structuree si invalide.
+// Le wrapper withMcpDegradation est applique automatiquement par le serveur ;
+// il suffit d'envelopper tout appel externe dans tryDegradeAmbient.
+import { tryDegradeAmbient } from './lib/degradation/index.mjs';
+
 export async function handleMonOutil(args: Record<string, unknown>): Promise<unknown> {
   const input: MonOutilInput = MonOutilInputSchema.parse(args);
   const TOOL = 'monOutil';
 
   logInfo(TOOL, `Starting monOutil for "${input.param1}" (mode=${input.mode})...`);
-  try {
-    // Logique metier — input est strictement type via z.infer
-    const result = { result: `Traite: ${input.param1}` };
-    logInfo(TOOL, `monOutil completed for "${input.param1}"`);
-    return result;
-  } catch (err) {
-    logError(TOOL, `monOutil failed: ${toErrorMessage(err)}`);
-    throw err;
-  }
+
+  // Tout appel a une dependance externe passe par tryDegradeAmbient :
+  // si elle echoue, le resultat reste valide et la reponse MCP signale
+  // degraded:true avec une notification warning correspondante.
+  const llmResult = await tryDegradeAmbient(
+    'llm:mon-outil',
+    () => callLLM(input.param1),
+    'fallback',
+  );
+
+  return { result: llmResult };
 }
 ```
+
+> Nouvelle dependance externe ? Enregistrez aussi un health-check au boot dans `src/mcp/boot-health-checks.mts` — voir [degradation.md](degradation.md).
 
 ### Etape 3 : Enregistrer dans le serveur
 

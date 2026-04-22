@@ -38,6 +38,7 @@ import type { WebSearchVerificationResult, WebSearchEvidence, WebSearchReference
 import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
 import { parseKeyValueBlock, parseDelimitedBlock } from '../../lib/prompts/parsers.mjs';
 import { getPrompt } from '../../lib/prompts/registry.mjs';
+import { getCurrentCollector } from '../../lib/degradation/index.mjs';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -454,6 +455,15 @@ export async function verifyViaWebSearch(name: string, options: { description?: 
     return result;
   } catch (err) {
     logWarning(TOOL, `Web search verification failed for "${trimmed}": ${toErrorMessage(err)}`);
+
+    // Surface the failure on the ambient degradation collector so the MCP
+    // result reports degraded:true with a 'web-search' source. Falling
+    // back to 'capability' with low confidence is the existing behavior;
+    // we just stop hiding it.
+    const collector = getCurrentCollector();
+    if (collector) {
+      collector.recordError('web-search', err, { recoverable: true });
+    }
 
     return {
       classification: 'capability',

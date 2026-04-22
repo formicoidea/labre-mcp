@@ -21,6 +21,7 @@ import { getStrategyLLM } from '../../lib/llm/registry.mjs';
 import type { CpcEntry, CpcMappingResult } from '../../types/patent.mjs';
 import type { LLMCall } from '../../types/llm.mjs';
 import { getPrompt } from '../../lib/prompts/registry.mjs';
+import { getCurrentCollector } from '../../lib/degradation/index.mjs';
 
 // ─── CPC code validation ───────────────────────────────────────────────────
 
@@ -262,26 +263,33 @@ export async function mapCapabilityToCPC(capability: string, options: { llmCall?
     ? options.llmCall
     : getStrategyLLM('cpc-mapper');
 
-  // Path 1: Progressive discovery with taxonomy cache
+  // Path 1: Progressive discovery with taxonomy cache. Failures fall
+  // through to the LLM fallback below — record on the ambient collector
+  // so the user can correlate the eventual ULTIMATE_DEFAULT_CODES path
+  // with its root cause.
   if (options.taxonomyCache) {
+    const collector = getCurrentCollector();
     try {
       const result = await progressiveDiscovery(cap, llmCall, options.taxonomyCache);
       if (result.codes.length > 0) {
         return { codes: result.codes.slice(0, 5), titles: result.titles };
       }
-    } catch {
-      // Progressive discovery failed — fall through
+    } catch (err) {
+      if (collector) collector.recordError('cpc-mapper:progressive', err, { recoverable: true });
     }
   }
 
   // Path 2: LLM fallback (no cache, returns 4-char codes, no titles)
-  try {
-    const codes = await llmFallbackMapping(cap, llmCall);
-    if (codes.length > 0) {
-      return { codes: codes.slice(0, 5), titles: {} };
+  {
+    const collector = getCurrentCollector();
+    try {
+      const codes = await llmFallbackMapping(cap, llmCall);
+      if (codes.length > 0) {
+        return { codes: codes.slice(0, 5), titles: {} };
+      }
+    } catch (err) {
+      if (collector) collector.recordError('cpc-mapper:llm', err, { recoverable: true });
     }
-  } catch {
-    // LLM failed entirely
   }
 
   // Path 3: Ultimate default

@@ -16,6 +16,7 @@ import { logDebug } from '../../../lib/mcp-notifications.mjs';
 import { evolutionToStage } from '../../../lib/response-formatter.mjs';
 import { parseKeyValueBlock } from '../../../lib/prompts/parsers.mjs';
 import { getPrompt } from '../../../lib/prompts/registry.mjs';
+import { tryDegradeAmbient, getCurrentCollector } from '../../../lib/degradation/index.mjs';
 
 // ─── Anchor Perception Model ───────────────────────────────────────────────
 
@@ -76,12 +77,37 @@ export async function estimateAnchorEvolution(args: any, llmCall: any): Promise<
     confidence = 1.0;
   } else {
     const p = getPrompt('anchor-evolution');
-    const response = await llmCall(p.build({ anchor: name, context }));
-    const parsed = p.parse(response);
-    phase = parsed.phase;
-    justification = parsed.justification;
-    source = 'llm';
-    confidence = parsed.confidence;
+    // Wrap the LLM call: a failure flips the ambient MCP envelope's
+    // degraded flag and falls back to phase 2 (Custom-built) at low
+    // confidence rather than throwing.
+    const response = await tryDegradeAmbient(
+      'llm:anchor-evolution',
+      () => llmCall(p.build({ anchor: name, context })),
+      '',
+    );
+    if (response) {
+      const parsed = p.parse(response);
+      phase = parsed.phase;
+      justification = parsed.justification;
+      source = 'llm';
+      confidence = parsed.confidence;
+    } else {
+      // tryDegradeAmbient returned the empty fallback — record the
+      // recovery decision and use a safe neutral default.
+      phase = 2;
+      justification = 'LLM call failed — defaulting to phase 2 (Custom-built)';
+      source = 'fallback';
+      confidence = 0.2;
+      const collector = getCurrentCollector();
+      if (collector) {
+        collector.record({
+          source: 'llm:anchor-evolution',
+          reason: 'LLM returned empty response — using phase 2 fallback',
+          severity: 'warning',
+          recoverable: true,
+        });
+      }
+    }
   }
 
   const evolution = (PHASE_MIDPOINTS as Record<number, number>)[phase];

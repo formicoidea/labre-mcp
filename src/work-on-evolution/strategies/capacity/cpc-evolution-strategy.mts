@@ -28,6 +28,12 @@ import { getCpcTitle } from '../../patent/cpc-taxonomy-cache.mjs';
 import { toErrorMessage } from '../../../lib/errors.mjs';
 import type { IndicatorConfig, PatentData, IndicatorResults } from '../../../types/patent.mjs';
 import { getPrompt } from '../../../lib/prompts/registry.mjs';
+import {
+  getCurrentCollector,
+  runHealthCheck,
+  tryDegradeAmbient,
+} from '../../../lib/degradation/index.mjs';
+import { emptyPatentData } from '../../../lib/patent/patent-data-source.mjs';
 
 // ─── Response parser (registered in src/lib/prompts/init.mts) ──────────────
 
@@ -282,6 +288,12 @@ export class CpcEvolutionStrategy extends BaseStrategy {
       // If anything in the pipeline throws unexpectedly (BigQuery timeout,
       // s-curve NaN, indicator bug, etc.), we still return a valid result
       // with minimum confidence so Phase B weighting naturally deprioritizes it.
+      // Also surface the unexpected failure on the ambient collector so the
+      // MCP result reports degraded:true with the underlying reason.
+      const collector = getCurrentCollector();
+      if (collector) {
+        collector.recordError('cpc-evolution', err, { recoverable: true });
+      }
       return this._buildFallbackResult(err);
     }
   }
@@ -295,6 +307,24 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    * @private
    */
   async _evaluateInternal(component: any): Promise<any> {
+    // Step 0: Pre-flight — surface a missing BigQuery configuration up-front
+    // rather than letting _fetchPatentData fall back silently. Recorded on
+    // the ambient collector (see src/lib/degradation/context.mts) so the MCP
+    // result reports degraded:true with the missing env vars.
+    const collector = getCurrentCollector();
+    if (collector) {
+      const bqEvent = await runHealthCheck('bigquery');
+      if (bqEvent) {
+        collector.record({
+          source: bqEvent.source,
+          reason: bqEvent.reason,
+          severity: bqEvent.severity,
+          recoverable: true,
+          detail: bqEvent.detail,
+        });
+      }
+    }
+
     // Step 1: Resolve CPC codes for the component
     const cpcCodes = await this._resolveCpcCodes(component);
 
@@ -643,43 +673,52 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    */
   async _resolveCpcCodes(component: any): Promise<any> {
     if (this._cpcMapper) {
-      try {
-        const result = await this._cpcMapper.mapToCpc(component);
-        // Handle both old (string[]) and new ({codes, titles}) return formats
+      // Injected mapper (typically tests/mocks). Fallback to default mapper
+      // when it throws — record the failure so the user sees why CPC is
+      // degraded.
+      const result = await tryDegradeAmbient(
+        'cpc-mapper',
+        async () => this._cpcMapper.mapToCpc(component),
+        null,
+      );
+      if (result !== null) {
         return Array.isArray(result) ? result : result.codes || [];
-      } catch {
-        // Mapper failed — try default mapper below
       }
     }
 
-    // Lazy-load CPC mapper + taxonomy cache
-    try {
-      const { mapComponentToCpc } = await import('../../patent/cpc-mapper.mjs');
-      const { setCpcTitle } = await import('../../patent/cpc-taxonomy-cache.mjs');
+    // Lazy-load CPC mapper + taxonomy cache. Wrapped in tryDegradeAmbient
+    // so a missing/failed module surfaces as a degradation event instead
+    // of an empty array silently degrading every downstream indicator.
+    return await tryDegradeAmbient(
+      'cpc-mapper',
+      async () => {
+        const { mapComponentToCpc } = await import('../../patent/cpc-mapper.mjs');
+        const { setCpcTitle } = await import('../../patent/cpc-taxonomy-cache.mjs');
 
-      // Try to create taxonomy cache for progressive discovery
-      let taxonomyCache = null;
-      try {
-        const { createTaxonomyCache } = await import('../../patent/cpc-taxonomy-cache.mjs');
-        taxonomyCache = await createTaxonomyCache();
-      } catch {
-        // Cache unavailable — mapper will use LLM fallback
-      }
+        // Try to create taxonomy cache for progressive discovery — its
+        // absence is informational only, the mapper falls back to LLM.
+        const taxonomyCache = await tryDegradeAmbient(
+          'cpc-taxonomy-cache',
+          async () => {
+            const { createTaxonomyCache } = await import('../../patent/cpc-taxonomy-cache.mjs');
+            return await createTaxonomyCache();
+          },
+          null,
+        );
 
-      const result = await mapComponentToCpc(component, this._llmCall, { taxonomyCache });
+        const result = await mapComponentToCpc(component, this._llmCall, { taxonomyCache });
 
-      // Register titles from discovery into the global title store
-      if (result.titles) {
-        for (const [code, title] of Object.entries(result.titles)) {
-          setCpcTitle(code, title as string);
+        // Register titles from discovery into the global title store
+        if (result.titles) {
+          for (const [code, title] of Object.entries(result.titles)) {
+            setCpcTitle(code, title as string);
+          }
         }
-      }
 
-      return result.codes || [];
-    } catch {
-      // Module not available or failed — return empty
-      return [];
-    }
+        return result.codes || [];
+      },
+      [],
+    );
   }
 
   /**
@@ -691,25 +730,31 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    */
   async _fetchPatentData(cpcCodes: string[]): Promise<any> {
     if (cpcCodes.length === 0) {
-      return { totalPatents: 0, patents: [] };
+      return emptyPatentData();
     }
+
+    const empty = emptyPatentData();
 
     if (this._patentSource) {
-      try {
-        return await this._patentSource.fetchByCpc(cpcCodes);
-      } catch {
-        return { totalPatents: 0, patents: [] };
-      }
+      return await tryDegradeAmbient(
+        'bigquery',
+        async () => this._patentSource.fetchByCpc(cpcCodes),
+        empty,
+      );
     }
 
-    // Lazy-load BigQuery patent source
-    try {
-      const { createPatentSource } = await import('../../../lib/patent/bigquery-patent-source.mjs');
-      const source = createPatentSource();
-      return await source.fetchByCpc(cpcCodes);
-    } catch {
-      return { totalPatents: 0, patents: [] };
-    }
+    // Lazy-load BigQuery patent source. Failure here is the canonical
+    // "BigQuery not available" path — recorded under source 'bigquery'
+    // so the user can correlate with the boot-time pre-flight event.
+    return await tryDegradeAmbient(
+      'bigquery',
+      async () => {
+        const { createPatentSource } = await import('../../../lib/patent/bigquery-patent-source.mjs');
+        const source = createPatentSource();
+        return await source.fetchByCpc(cpcCodes);
+      },
+      empty,
+    );
   }
 
   /**
@@ -723,53 +768,55 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    */
   // any: return shape uses 'ubiquity' (legacy) instead of IndicatorResults.ubiquite
   async _computeIndicators(patentData: PatentData, cpcCodes: string[]): Promise<any> {
-    try {
-      const indicators = await import('../../../lib/patent/patent-indicators.mjs');
+    const neutral = {
+      certitude: {
+        convergenceHHI: 0.5,
+        stabiliteTaxonomique: 0.5,
+        densiteCitation: 0.5,
+        retrecissementClaims: 0.5,
+      },
+      ubiquity: {
+        diversiteAssignees: 0.5,
+        couvertureGeo: 0.5,
+        diffusionSectorielle: 0.5,
+        ratioExpires: 0.5,
+      },
+    };
 
-      // Build certitude indicator config from strategy config (for toggling)
-      const certitudeConfig = Object.entries(this._certitudeIndicators)
-        .map(([key, cfg]: [string, any]) => ({ key, weight: cfg.weight, enabled: cfg.enabled }));
-      const ubiquiteConfig = Object.entries(this._ubiquityIndicators)
-        .map(([key, cfg]: [string, any]) => ({ key, weight: cfg.weight, enabled: cfg.enabled }));
+    return await tryDegradeAmbient(
+      'patent-indicators',
+      async () => {
+        const indicators = await import('../../../lib/patent/patent-indicators.mjs');
 
-      // Delegate to computeAllIndicators which calls each pure function
-      const result = indicators.computeAllIndicators(patentData, {
-        certitudeConfig,
-        ubiquiteConfig,
-      });
+        // Build certitude indicator config from strategy config (for toggling)
+        const certitudeConfig = Object.entries(this._certitudeIndicators)
+          .map(([key, cfg]: [string, any]) => ({ key, weight: cfg.weight, enabled: cfg.enabled }));
+        const ubiquiteConfig = Object.entries(this._ubiquityIndicators)
+          .map(([key, cfg]: [string, any]) => ({ key, weight: cfg.weight, enabled: cfg.enabled }));
 
-      // Extract individual scores into our expected format
-      return {
-        certitude: {
-          convergenceHHI:       result.scores.convergenceHHI ?? 0.5,
-          stabiliteTaxonomique: result.scores.stabiliteTaxonomique ?? 0.5,
-          densiteCitation:      result.scores.densiteCitation ?? 0.5,
-          retrecissementClaims: result.scores.retrecissementClaims ?? 0.5,
-        },
-        ubiquity: {
-          diversiteAssignees:   result.scores.diversiteAssignees ?? 0.5,
-          couvertureGeo:        result.scores.couvertureGeo ?? 0.5,
-          diffusionSectorielle: result.scores.diffusionSectorielle ?? 0.5,
-          ratioExpires:         result.scores.ratioExpires ?? 0.5,
-        },
-      };
-    } catch {
-      // Indicator module not available — return neutral defaults
-      return {
-        certitude: {
-          convergenceHHI: 0.5,
-          stabiliteTaxonomique: 0.5,
-          densiteCitation: 0.5,
-          retrecissementClaims: 0.5,
-        },
-        ubiquity: {
-          diversiteAssignees: 0.5,
-          couvertureGeo: 0.5,
-          diffusionSectorielle: 0.5,
-          ratioExpires: 0.5,
-        },
-      };
-    }
+        // Delegate to computeAllIndicators which calls each pure function
+        const result = indicators.computeAllIndicators(patentData, {
+          certitudeConfig,
+          ubiquiteConfig,
+        });
+
+        return {
+          certitude: {
+            convergenceHHI:       result.scores.convergenceHHI ?? 0.5,
+            stabiliteTaxonomique: result.scores.stabiliteTaxonomique ?? 0.5,
+            densiteCitation:      result.scores.densiteCitation ?? 0.5,
+            retrecissementClaims: result.scores.retrecissementClaims ?? 0.5,
+          },
+          ubiquity: {
+            diversiteAssignees:   result.scores.diversiteAssignees ?? 0.5,
+            couvertureGeo:        result.scores.couvertureGeo ?? 0.5,
+            diffusionSectorielle: result.scores.diffusionSectorielle ?? 0.5,
+            ratioExpires:         result.scores.ratioExpires ?? 0.5,
+          },
+        };
+      },
+      neutral,
+    );
   }
 }
 

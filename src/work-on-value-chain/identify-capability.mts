@@ -15,6 +15,7 @@ import { getStrategyLLM } from '../lib/llm/registry.mjs';
 import { logDebug } from '../lib/mcp-notifications.mjs';
 import { parseKeyValueBlock } from '../lib/prompts/parsers.mjs';
 import { getPrompt } from '../lib/prompts/registry.mjs';
+import { tryDegradeAmbient } from '../lib/degradation/index.mjs';
 
 const ELIGIBLE_TYPES = new Set(['component', 'pipeline']);
 
@@ -82,11 +83,18 @@ export async function identifyCapability(component: any, llmCall?: any): Promise
   }
 
   const p = getPrompt('identify-capability');
-  const response = await llmCall(p.build({
-    component: component.name || '',
-    description: component.description ?? '',
-    context: component.context ?? '',
-  }));
+  // Wrap the LLM call so a failure (rate limit, auth, network) surfaces
+  // on the ambient degradation collector — the caller still receives a
+  // valid capability shape, but the MCP envelope flips degraded:true.
+  const response = await tryDegradeAmbient(
+    'llm:identify-capability',
+    () => llmCall(p.build({
+      component: component.name || '',
+      description: component.description ?? '',
+      context: component.context ?? '',
+    })),
+    '',
+  );
   const result = p.parse(response, component);
 
   // When type was not provided, check if LLM-estimated type is non-eligible

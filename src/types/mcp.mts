@@ -22,8 +22,18 @@ export interface McpToolDefinition {
   inputSchema: JsonSchema;
 }
 
-/** Handler dispatché par le serveur MCP pour un outil. */
-export type ToolHandler = (args: Record<string, unknown>) => Promise<unknown>;
+/**
+ * Handler dispatched by the MCP server for a tool.
+ *
+ * The optional second parameter is a `DegradationCollector` (typed as
+ * `unknown` here to keep this types module dependency-free). Handlers that
+ * have been migrated to the degradation framework consume it; legacy
+ * handlers simply ignore the second argument.
+ */
+export type ToolHandler = (
+  args: Record<string, unknown>,
+  collector?: unknown,
+) => Promise<unknown>;
 
 // ─── JSON-RPC 2.0 ──────────────────────────────────────────────────────────
 

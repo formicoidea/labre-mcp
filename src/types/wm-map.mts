@@ -65,6 +65,20 @@ export interface MapItemEvaluation {
   reason?: string;
   /** Difference between newMaturity and originalMaturity (added during reporting) */
   delta?: number;
+  /**
+   * Degradation events captured while evaluating this specific component.
+   * Empty when no external dependency degraded. Populated by the per-
+   * component sub-collector in evaluateMapComponents (see
+   * src/lib/degradation/).
+   */
+  degradationEvents?: Array<{
+    source: string;
+    reason: string;
+    severity: 'info' | 'warning' | 'error';
+    recoverable: boolean;
+    detail?: unknown;
+    at: string;
+  }>;
 }
 
 /** Options for evaluateMapComponents / evaluateMapFile */

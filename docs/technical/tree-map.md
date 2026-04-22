@@ -30,8 +30,10 @@ src/
 ├── index.mts                    API programmatique (re-exports publics)
 │
 ├── mcp/                         ── Couche MCP (transport + dispatch)
-│   ├── mcp-server.mts           Serveur JSON-RPC stdio, registre + dispatcher
-│   ├── mcp-tool.mts             Tool "estimateEvolution" (schéma + handler)
+│   ├── mcp-server.mts                Serveur JSON-RPC stdio, registre + dispatcher (wrap chaque appel via withMcpDegradation)
+│   ├── mcp-tool.mts                  Tool "estimateEvolution" (schéma + handler)
+│   ├── boot-health-checks.mts        Enregistrement des health-checks par défaut (bigquery, llm:*, web-search)
+│   ├── mcp-server-dispatch.test.mts  Test de la fusion Degradable au dispatch
 │   └── mcp-tool-transparent.test.mts
 │
 ├── schemas/                     ── Schémas Zod (source de vérité unique)
@@ -61,6 +63,15 @@ src/
 │   ├── phase-distribution.test.mts
 │   ├── progress-messages.mts    Messages de progression standards
 │   ├── response-formatter.mts   Formatage sortie tool (FR/EN, markdown)
+│   ├── degradation/             ── Framework générique de dégradation (voir docs/technical/degradation.md)
+│   │   ├── types.mts                 Degradable<T> / DegradationEvent / HealthCheck
+│   │   ├── registry.mts              registerHealthCheck / runHealthCheck / runAllHealthChecks
+│   │   ├── collector.mts             DegradationCollector (record / recordError / merge / wrap)
+│   │   ├── context.mts               AsyncLocalStorage : getCurrentCollector / withCollector
+│   │   ├── with-degradation.mts      tryDegrade / tryDegradeAmbient
+│   │   ├── mcp-wrapper.mts           withMcpDegradation (wrapper standard pour tout handler MCP)
+│   │   ├── index.mts                 Re-exports publics
+│   │   └── *.test.mts
 │   ├── llm/
 │   │   ├── llm-call.mts           Factories bas niveau : createLLMCall / createStructuredLLMCall / createOpenCode*Call
 │   │   ├── copilot-sdk-call.mts   Factories GitHub Copilot SDK (text + structured via voie B JSON-parse)

@@ -21,6 +21,11 @@ import { estimateEvolutionOneShot } from '../estimate-evolution.mjs';
 import { logDebug, logInfo, logError } from '../../lib/mcp-notifications.mjs';
 import { createMessageResolverFromArgs } from '../../lib/progress-messages.mjs';
 import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
+import {
+  DegradationCollector,
+  getCurrentCollector,
+  withCollector,
+} from '../../lib/degradation/index.mjs';
 
 // ─── .wm Parser ─────────────────────────────────────────────────────────────
 
@@ -165,6 +170,13 @@ export async function evaluateMapComponents(parsedMap: ParsedWardleyMap, options
     ...parsedMap.components.map((c: any) => ({ ...c, type: 'component' })),
   ];
 
+  // Parent collector lives in the ambient AsyncLocalStorage when this
+  // function runs inside an MCP invocation. Per-component sub-collectors
+  // are merged back into it so the global `degraded` flag reflects every
+  // failure across the batch, while each evaluations[] entry carries its
+  // own `degradationEvents` for fine-grained client-side display.
+  const parentCollector = getCurrentCollector();
+
   for (let i = 0; i < allItems.length; i++) {
     const item = allItems[i];
 
@@ -209,13 +221,19 @@ export async function evaluateMapComponents(parsedMap: ParsedWardleyMap, options
       continue;
     }
 
+    // Per-component sub-collector. estimateEvolutionOneShot and every
+    // strategy below it observe THIS collector via AsyncLocalStorage, so
+    // events captured during this iteration belong to this component
+    // only — they're attached to its evaluations[] entry below.
+    const subCollector = new DegradationCollector(`evaluateMap:${item.name}`);
+
     // Evaluate via estimateEvolution
     try {
-      const result = await estimateEvolutionOneShot({
+      const result = await withCollector(subCollector, () => estimateEvolutionOneShot({
         name: item.name,
         description: context,
         strategy,
-      });
+      }));
 
       const stratResults: Record<string, any> = {};
       let bestEvolution = item.maturity;
@@ -255,11 +273,16 @@ export async function evaluateMapComponents(parsedMap: ParsedWardleyMap, options
         classification: 'economic',
         strategies: stratResults,
         skipped: false,
+        degradationEvents: subCollector.getEvents(),
       });
     } catch (err) {
       logError(TOOL, msg
         ? msg('error.generic', { tool: TOOL, error: toErrorMessage(err) })
         : `Error evaluating "${item.name}": ${toErrorMessage(err)}`);
+      // Record the unexpected throw on the sub-collector before merging,
+      // so the parent's degraded flag flips and the per-component entry
+      // includes the failure in its degradationEvents.
+      subCollector.recordError(`evaluateMap:${item.name}`, err, { recoverable: true });
       evaluations.push({
         name: item.name,
         type: item.type,
@@ -269,7 +292,12 @@ export async function evaluateMapComponents(parsedMap: ParsedWardleyMap, options
         strategies: null,
         skipped: true,
         reason: toErrorMessage(err),
+        degradationEvents: subCollector.getEvents(),
       });
+    } finally {
+      // Merge the per-component events into the parent so the global
+      // result reports degraded:true when any component degraded.
+      if (parentCollector) parentCollector.merge(subCollector);
     }
   }
 
