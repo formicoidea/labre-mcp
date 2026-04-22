@@ -85,7 +85,7 @@ Le fichier `.mcp.json` a la racine enregistre le serveur automatiquement :
       "command": "cmd",
       "args": ["/c", "npx", "tsx", "--env-file=.env", "src/mcp/mcp-server.mts"],
       "cwd": "C:\\...\\WardleyAssistant",
-      "timeout": 600
+      "timeout": 180000
     }
   }
 }
