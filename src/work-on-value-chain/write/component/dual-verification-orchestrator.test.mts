@@ -10,6 +10,11 @@
 //
 // All tests use mocks — no real LLM or web search calls are made.
 
+// Register prompt parsers before any test runs (needed because
+// verifyClassification reaches the web-search-verification path which parses
+// prompt responses even in mock mode).
+import '../../../lib/prompts/init.mjs';
+
 import {
   verifyClassification,
   classifyNamingOnly,

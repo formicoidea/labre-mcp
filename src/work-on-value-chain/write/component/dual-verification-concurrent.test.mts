@@ -12,6 +12,11 @@
 //
 // All tests use mocks. No real LLM or web search calls are made.
 
+// Register prompt parsers before any test runs (needed because
+// verifyConcurrentFull calls the web-search-verification path which parses
+// prompt responses even in mock mode).
+import '../../../lib/prompts/init.mjs';
+
 import {
   verifyConcurrent,
   verifyConcurrentFull,
