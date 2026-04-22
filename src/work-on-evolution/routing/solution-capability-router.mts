@@ -63,4 +63,4 @@ export {
   WARDLEY_TYPE,
   WARDLEY_TYPE_PATTERNS,
   classifyWardleyType,
-} from './wardley-type-classification.mjs';
+} from '../../work-on-value-chain/write/component/wardley-type-classification.mjs';

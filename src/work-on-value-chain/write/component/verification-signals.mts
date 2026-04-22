@@ -1,5 +1,5 @@
-import type { VerificationSignal } from '../../types/pipeline.mjs';
-import { toErrorMessage } from '../../lib/errors.mjs';
+import type { VerificationSignal } from '../../../types/pipeline.mjs';
+import { toErrorMessage } from '../../../lib/errors.mjs';
 
 /**
  * Verification signal builders and timeout racing utility.

@@ -15,8 +15,8 @@
 // It sits within the verification pipeline, consuming verification signal
 // outputs and producing a reconciled classification.
 
-import { logDebug } from '../../lib/mcp-notifications.mjs';
-import type { VerificationSignal, CombinedSignalResult } from '../../types/pipeline.mjs';
+import { logDebug } from '../../../lib/mcp-notifications.mjs';
+import type { VerificationSignal, CombinedSignalResult } from '../../../types/pipeline.mjs';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 

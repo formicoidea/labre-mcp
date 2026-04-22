@@ -32,13 +32,13 @@
 //   // → { classification: 'capability', confidence: 0.88, evidence: [...], references: [...] }
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import { logDebug, logWarning } from '../../lib/mcp-notifications.mjs';
-import { classifyAndLogLLMError } from '../../lib/llm/llm-error-handler.mjs';
-import type { WebSearchVerificationResult, WebSearchEvidence, WebSearchReference } from '../../types/routing.mjs';
-import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
-import { parseKeyValueBlock, parseDelimitedBlock } from '../../lib/prompts/parsers.mjs';
-import { getPrompt } from '../../lib/prompts/registry.mjs';
-import { getCurrentCollector } from '../../lib/degradation/index.mjs';
+import { logDebug, logWarning } from '../../../lib/mcp-notifications.mjs';
+import { classifyAndLogLLMError } from '../../../lib/llm/llm-error-handler.mjs';
+import type { WebSearchVerificationResult, WebSearchEvidence, WebSearchReference } from '../../../types/routing.mjs';
+import { toErrorMessage, errorCode } from '../../../lib/errors.mjs';
+import { parseKeyValueBlock, parseDelimitedBlock } from '../../../lib/prompts/parsers.mjs';
+import { getPrompt } from '../../../lib/prompts/registry.mjs';
+import { getCurrentCollector } from '../../../lib/degradation/index.mjs';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

@@ -26,7 +26,7 @@ import {
 } from '../../work-on-evolution/patent/cpc-mapper.mjs';
 import { parseCpcSotExtraction } from '../../work-on-evolution/strategies/capacity/cpc-evolution-strategy.mjs';
 import { parseSolutionDiscoveryResponse } from '../../work-on-evolution/pipeline/pipeline-enriched.mjs';
-import { parseWebSearchResponse } from '../../work-on-evolution/routing/web-search-verification.mjs';
+import { parseWebSearchResponse } from '../../work-on-value-chain/write/component/web-search-verification.mjs';
 import { parseLLMClassificationResponse } from '../../work-on-evolution/routing/detect-solution.mjs';
 import {
   parseAutoResponse,

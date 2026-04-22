@@ -26,8 +26,8 @@ import {
   determineRoutingTargets,
   dispatchSolutionStrategies,
 } from './routing/solution-dispatch.mjs';
-import { classifyWardleyType } from './routing/wardley-type-classification.mjs';
-import { verifyClassification } from './pipeline/dual-verification-orchestrator.mjs';
+import { classifyWardleyType } from '../work-on-value-chain/write/component/wardley-type-classification.mjs';
+import { verifyClassification } from '../work-on-value-chain/write/component/dual-verification-orchestrator.mjs';
 import { runEnrichedPipeline } from './pipeline/pipeline-enriched.mjs';
 import { validateOneShotInput, resolveClassification, VALID_SPACES } from './lib/evolution-input-validation.mjs';
 import { toErrorMessage, errorCode } from '../lib/errors.mjs';

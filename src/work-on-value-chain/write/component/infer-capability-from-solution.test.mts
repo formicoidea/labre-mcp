@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import {
   capabilityToLabel,
   inferCapabilityFromSolution,
-} from './pipeline-capability-inference.mjs';
+} from './infer-capability-from-solution.mjs';
 
 describe('capabilityToLabel — activity', () => {
   it('removes leading verb and nominalizes', () => {

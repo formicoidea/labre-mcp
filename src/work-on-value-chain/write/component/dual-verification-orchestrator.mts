@@ -37,13 +37,13 @@ import {
   detectComponentType,
   COMPONENT_TYPE,
   CONFIDENCE_THRESHOLD,
-} from '../../lib/component-detection.mjs';
+} from '../../../lib/component-detection.mjs';
 import {
   determineRoutingTargets,
-} from '../routing/solution-dispatch.mjs';
-import { classifySolutionLLM } from '../routing/detect-solution.mjs';
-import { verifyViaWebSearch, combineWithPriorResult } from '../routing/web-search-verification.mjs';
-import { logDebug } from '../../lib/mcp-notifications.mjs';
+} from '../../../work-on-evolution/routing/solution-dispatch.mjs';
+import { classifySolutionLLM } from '../../../work-on-evolution/routing/detect-solution.mjs';
+import { verifyViaWebSearch, combineWithPriorResult } from './web-search-verification.mjs';
+import { logDebug } from '../../../lib/mcp-notifications.mjs';
 import {
   raceWithTimeout,
   buildSuccessSignal,
@@ -304,7 +304,7 @@ import {
   verifyConcurrentFull,
   DEFAULT_SIGNAL_TIMEOUT_MS,
 } from './concurrent-verification.mjs';
-import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
+import { toErrorMessage, errorCode } from '../../../lib/errors.mjs';
 
 export { verifyConcurrent, verifyConcurrentFull };
 

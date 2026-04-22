@@ -29,7 +29,7 @@ import {
   verifyClassification,
   classifyNamingOnly,
   THRESHOLDS,
-} from '../pipeline/dual-verification-orchestrator.mjs';
+} from '../../work-on-value-chain/write/component/dual-verification-orchestrator.mjs';
 
 // ─── Test Suite ──────────────────────────────────────────────────────────────
 
