@@ -157,7 +157,7 @@ export function strategyReasoning(method: string, result: StrategyResultLike, co
   const stage = evolutionToStage(result.evolution ?? 0);
 
   const reasoningMap = {
-    's-curve': () => {
+    'write:capacity:s-curve': () => {
       const cert = component.certitude != null ? component.certitude.toFixed(2) : '?';
       const ubi = component.ubiquity != null ? component.ubiquity.toFixed(2) : '?';
       return (
@@ -167,7 +167,7 @@ export function strategyReasoning(method: string, result: StrategyResultLike, co
       );
     },
 
-    'publication-analysis': () => {
+    'write:capacity:publication-analysis': () => {
       const bins = component.phaseDistribution?.bins;
       const distribution = bins && bins.length > 0
         ? bins
@@ -180,24 +180,24 @@ export function strategyReasoning(method: string, result: StrategyResultLike, co
       );
     },
 
-    'timeline-benchmark': () =>
+    'write:capacity:timeline-benchmark': () =>
       `Historical benchmark comparison places "${component.name || 'this component'}" ` +
       `at the **${stage.name}** stage based on known evolution timelines of similar components.`,
 
-    'llm-direct': () =>
+    'write:capacity:llm-direct': () =>
       `Direct LLM assessment positions this component in the **${stage.name}** stage ` +
       `based on semantic understanding of its description and market context.`,
 
-    'logprob-distribution': () =>
+    'write:capacity:logprob-distribution': () =>
       `Log-probability distribution analysis of stage tokens suggests ` +
       `the **${stage.name}** stage with the highest probability mass.`,
 
-    'cpc-evolution': () =>
+    'write:capacity:cpc-evolution': () =>
       `Patent CPC classification analysis positions this component in the **${stage.name}** stage ` +
       `based on patent filing patterns and technology classification codes.`,
 
     'properties': () => buildSolutionPropertiesReasoning(result, stage),
-    'solution-properties': () => buildSolutionPropertiesReasoning(result, stage),
+    'write:solution:properties': () => buildSolutionPropertiesReasoning(result, stage),
   };
 
   const generator = (reasoningMap as Record<string, () => string>)[method];

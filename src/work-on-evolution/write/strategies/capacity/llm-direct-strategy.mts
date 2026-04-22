@@ -55,7 +55,7 @@ export class LLMDirectStrategy extends BaseStrategy {
   }
 
   static get method() {
-    return 'llm-direct';
+    return 'write:capacity:llm-direct';
   }
 
   /**

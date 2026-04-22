@@ -87,11 +87,11 @@ console.log('--- Test 1: Full multi-turn conversation (ERP) ---');
   // Verify at least the analytical strategies produced results
   const evalKeys = Object.keys(turn4.evaluations);
   assert(evalKeys.length > 0, `Turn 4: has ${evalKeys.length} strategy results`);
-  const sCurveResult = turn4.evaluations['s-curve'];
+  const sCurveResult = turn4.evaluations['write:capacity:s-curve'];
   if (sCurveResult && !sCurveResult.error) {
     assert(typeof sCurveResult.evolution === 'number', 'Turn 4: s-curve has numeric evolution');
     assert(typeof sCurveResult.confidence === 'number', 'Turn 4: s-curve has numeric confidence');
-    assert(sCurveResult.method === 's-curve', 'Turn 4: s-curve method identifier matches');
+    assert(sCurveResult.method === 'write:capacity:s-curve', 'Turn 4: s-curve method identifier matches');
   }
 }
 console.log();
@@ -389,8 +389,8 @@ console.log('--- Test 10: formatConversationalTurn for all states ---');
     classification: { space: 'economic', reason: 'Economic component', requiresReQuestion: false },
     reQuestions: null,
     evaluations: {
-      's-curve': { evolution: 0.72, confidence: 0.85, method: 's-curve' },
-      'llm-direct': { evolution: 0.68, confidence: 0.70, method: 'llm-direct' },
+      'write:capacity:s-curve': { evolution: 0.72, confidence: 0.85, method: 'write:capacity:s-curve' },
+      'write:capacity:llm-direct': { evolution: 0.68, confidence: 0.70, method: 'write:capacity:llm-direct' },
     },
     summary: {
       gathered: { name: 'ERP', certitude: 0.9, ubiquity: 0.85 },
@@ -421,7 +421,7 @@ console.log('--- Test 11: Strategy selection ---');
 {
   const result = await estimateEvolutionConversational({
     data: { name: 'ERP', description: 'Enterprise resource planning', certitude: 0.9, ubiquity: 0.85 },
-    strategy: 's-curve',
+    strategy: 'write:capacity:s-curve',
   });
   // The session should gather the data and advance; let's force if needed
   const final = result.phase === 'complete'
@@ -429,13 +429,13 @@ console.log('--- Test 11: Strategy selection ---');
     : await estimateEvolutionConversational({
         sessionState: result.sessionState,
         forceEstimate: true,
-        strategy: 's-curve',
+        strategy: 'write:capacity:s-curve',
       });
 
   assert(final.phase === 'complete', 'Strategy selection: completed');
   if (final.evaluations) {
     const keys = Object.keys(final.evaluations);
-    assert(keys.includes('s-curve'), 'Strategy selection: s-curve was evaluated');
+    assert(keys.includes('write:capacity:s-curve'), 'Strategy selection: s-curve was evaluated');
   }
 }
 console.log();

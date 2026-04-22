@@ -247,7 +247,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
 
   /** @returns {string} Strategy identifier for registry. */
   static get method() {
-    return 'cpc-evolution';
+    return 'write:capacity:cpc-evolution';
   }
 
   /**

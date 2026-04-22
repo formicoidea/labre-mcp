@@ -66,17 +66,17 @@ describe('response-formatter — formatConfidence', () => {
 
 describe('response-formatter — strategyReasoning', () => {
   const component = { name: 'ERP', certitude: 0.9, ubiquity: 0.85 };
-  const result = { evolution: 0.75, confidence: 0.85, method: 's-curve' };
+  const result = { evolution: 0.75, confidence: 0.85, method: 'write:capacity:s-curve' };
 
   it('s-curve reasoning mentions certitude and ubiquity', () => {
-    const r = strategyReasoning('s-curve', result, component);
+    const r = strategyReasoning('write:capacity:s-curve', result, component);
     assert.ok(r.includes('0.90'));
     assert.ok(r.includes('0.85'));
     assert.ok(r.includes('Commodity'));
   });
 
   it('publication-analysis reasoning mentions the stage', () => {
-    const r = strategyReasoning('publication-analysis', result, component);
+    const r = strategyReasoning('write:capacity:publication-analysis', result, component);
     assert.ok(r.includes('Commodity'));
   });
 
@@ -89,15 +89,15 @@ describe('response-formatter — strategyReasoning', () => {
 
 describe('response-formatter — formatStrategyResult', () => {
   it('renders error as warning', () => {
-    const out = formatStrategyResult('llm-direct', { error: 'not configured' });
+    const out = formatStrategyResult('write:capacity:llm-direct', { error: 'not configured' });
     assert.ok(out.includes('⚠️'));
     assert.ok(out.includes('not configured'));
   });
 
   it('renders success with evolution, confidence, reasoning', () => {
     const out = formatStrategyResult(
-      's-curve',
-      { evolution: 0.75, confidence: 0.85, method: 's-curve' },
+      'write:capacity:s-curve',
+      { evolution: 0.75, confidence: 0.85, method: 'write:capacity:s-curve' },
       { name: 'ERP', certitude: 0.9, ubiquity: 0.85 },
     );
     assert.ok(out.includes('Evolution'));
@@ -111,14 +111,14 @@ describe('response-formatter — formatResponse', () => {
     const result = {
       classification: { space: 'economic', reason: 'economic', requiresReQuestion: false },
       evaluations: {
-        's-curve': { evolution: 0.75, confidence: 0.85, method: 's-curve' },
+        'write:capacity:s-curve': { evolution: 0.75, confidence: 0.85, method: 'write:capacity:s-curve' },
       },
       parsedInput: { name: 'ERP', certitude: 0.9, ubiquity: 0.85 },
     };
     const out = formatResponse(result);
     assert.ok(out.includes('ERP'));
     assert.ok(out.includes('Economic Space'));
-    assert.ok(out.includes('s-curve'));
+    assert.ok(out.includes('write:capacity:s-curve'));
   });
 
   it('renders re-questioning block for social_good', () => {
@@ -137,7 +137,7 @@ describe('response-formatter — formatResponse', () => {
     const result = {
       classification: { space: 'economic', reason: 'e', requiresReQuestion: false },
       evaluations: {
-        's-curve': { evolution: 0.75, confidence: 0.85, method: 's-curve' },
+        'write:capacity:s-curve': { evolution: 0.75, confidence: 0.85, method: 'write:capacity:s-curve' },
       },
       parsedInput: { name: 'ERP' },
     };
@@ -149,7 +149,7 @@ describe('response-formatter — formatResponse', () => {
     const result = {
       classification: { space: 'economic', reason: 'e', requiresReQuestion: false },
       evaluations: {
-        'llm-direct': { error: 'not configured' },
+        'write:capacity:llm-direct': { error: 'not configured' },
       },
       parsedInput: { name: 'Widget' },
     };

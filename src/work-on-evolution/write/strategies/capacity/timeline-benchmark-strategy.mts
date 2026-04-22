@@ -144,7 +144,7 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
   }
 
   static get method() {
-    return 'timeline-benchmark';
+    return 'write:capacity:timeline-benchmark';
   }
 
   static get disabled() {

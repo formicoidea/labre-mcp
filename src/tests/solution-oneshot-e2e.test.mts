@@ -139,9 +139,9 @@ describe('Solution oneshot E2E — Sub-AC 1', () => {
       );
 
       const methods = Object.keys(evaluations);
-      assert.ok(methods.includes('solution-properties'));
+      assert.ok(methods.includes('write:solution:properties'));
 
-      const result = evaluations['solution-properties'];
+      const result = evaluations['write:solution:properties'];
       assert.ok(!result.error);
 
       // EvolutionResult contract
@@ -149,7 +149,7 @@ describe('Solution oneshot E2E — Sub-AC 1', () => {
       assert.ok(result.evolution >= 0 && result.evolution <= 1);
       assert.equal(typeof result.confidence, 'number');
       assert.ok(result.confidence >= 0 && result.confidence <= 1);
-      assert.equal(result.method, 'solution-properties');
+      assert.equal(result.method, 'write:solution:properties');
 
       // Solution-specific: 12 properties
       assert.ok(Array.isArray(result.properties));
@@ -160,7 +160,7 @@ describe('Solution oneshot E2E — Sub-AC 1', () => {
       const evals = await dispatchSolutionStrategies(
         { name: 'Kubernetes' }, { llmCall: mockLlm, strategy: 'all' }
       );
-      const result = evals['solution-properties'];
+      const result = evals['write:solution:properties'];
       assert.ok(result.evolution >= 0.45 && result.evolution <= 0.65,
         `Expected ~0.55, got ${result.evolution}`);
     });
@@ -178,7 +178,7 @@ describe('Solution oneshot E2E — Sub-AC 1', () => {
       const evals = await dispatchSolutionStrategies(
         { name: 'TCP/IP' }, { llmCall: mockLlm4, strategy: 'all' }
       );
-      assert.ok(evals['solution-properties'].evolution >= 0.75);
+      assert.ok(evals['write:solution:properties'].evolution >= 0.75);
     });
 
     it('each property weight is 1/12', async () => {
@@ -186,7 +186,7 @@ describe('Solution oneshot E2E — Sub-AC 1', () => {
         { name: 'Kubernetes' }, { llmCall: mockLlm, strategy: 'all' }
       );
       const expected = 1 / 12;
-      for (const prop of evals['solution-properties'].properties) {
+      for (const prop of evals['write:solution:properties'].properties) {
         assert.ok(Math.abs(prop.weight - expected) < 0.001,
           `${prop.property}: ${prop.weight} ≠ ~${expected}`);
       }
@@ -196,7 +196,7 @@ describe('Solution oneshot E2E — Sub-AC 1', () => {
       const evals = await dispatchSolutionStrategies(
         { name: 'Kubernetes' }, { llmCall: mockLlm, strategy: 'all' }
       );
-      const names = evals['solution-properties'].properties.map(p => p.property);
+      const names = evals['write:solution:properties'].properties.map(p => p.property);
       const expected = [
         'Market', 'Knowledge management', 'Market perception',
         'User perception', 'Industry perception', 'Value focus',
@@ -223,7 +223,7 @@ describe('Solution oneshot E2E — Sub-AC 1', () => {
       const evals = await dispatchSolutionStrategies(
         { name: 'K8s' }, { llmCall: errorLlm, strategy: 'all' }
       );
-      assert.ok(evals['solution-properties']?.error, 'should have error entry');
+      assert.ok(evals['write:solution:properties']?.error, 'should have error entry');
     });
   });
 
@@ -237,7 +237,7 @@ describe('Solution oneshot E2E — Sub-AC 1', () => {
         name: 'CRM',
         description: 'Customer relationship management',
         space: 'economic',
-        strategy: 's-curve',
+        strategy: 'write:capacity:s-curve',
         certitude: 0.85,
         ubiquity: 0.8,
       });
@@ -250,9 +250,9 @@ describe('Solution oneshot E2E — Sub-AC 1', () => {
       assert.equal(result.routing.usedCapabilityStrategies, true);
       assert.equal(result.routing.usedSolutionStrategies, false);
       assert.equal(result.routing.evalMode, 'exclusive');
-      assert.ok(result.evaluations['s-curve']);
-      assert.equal(typeof result.evaluations['s-curve'].evolution, 'number');
-      assert.equal(typeof result.evaluations['s-curve'].confidence, 'number');
+      assert.ok(result.evaluations['write:capacity:s-curve']);
+      assert.equal(typeof result.evaluations['write:capacity:s-curve'].evolution, 'number');
+      assert.equal(typeof result.evaluations['write:capacity:s-curve'].confidence, 'number');
     });
   });
 
@@ -295,8 +295,8 @@ describe('Solution oneshot E2E — Sub-AC 1', () => {
       assert.ok(methods.length > 0, 'at least one evaluation entry');
 
       // No capability strategies should be present
-      const capMethods = ['s-curve', 'llm-direct', 'publication-analysis',
-        'timeline-benchmark', 'logprob-distribution', 'cpc-evolution'];
+      const capMethods = ['write:capacity:s-curve', 'write:capacity:llm-direct', 'write:capacity:publication-analysis',
+        'write:capacity:timeline-benchmark', 'write:capacity:logprob-distribution', 'write:capacity:cpc-evolution'];
       for (const m of capMethods) {
         assert.ok(!result.evaluations[m],
           `should NOT have capability "${m}" in exclusive solution routing`);
@@ -314,7 +314,7 @@ describe('Solution oneshot E2E — Sub-AC 1', () => {
           assert.equal(typeof evalResult.method, 'string');
 
           // Solution-specific: properties array if solution-properties method
-          if (evalResult.method === 'solution-properties') {
+          if (evalResult.method === 'write:solution:properties') {
             assert.ok(Array.isArray(evalResult.properties));
             assert.equal(evalResult.properties.length, 12);
           }

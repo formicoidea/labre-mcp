@@ -116,7 +116,7 @@ export class LogprobDistributionStrategy extends BaseStrategy {
   }
 
   static get method() {
-    return 'logprob-distribution';
+    return 'write:capacity:logprob-distribution';
   }
 
   async evaluate(component: ComponentInput): Promise<EvolutionResult> {

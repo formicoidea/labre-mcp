@@ -99,7 +99,7 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
     const rawResult = {
       evolution: 0.55,
       confidence: 0.85,
-      method: 'solution-properties',
+      method: 'write:solution:properties',
       properties: [
         { property: 'Market', phase: 3, label: 'Product', weight: 1 / 12, reason: 'Established market' },
         { property: 'Knowledge management', phase: 3, label: 'Product', weight: 1 / 12, reason: 'Widely documented' },
@@ -153,7 +153,7 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
       const enriched = assembleSolutionResult(rawResult);
       assert.equal(enriched.evolution, 0.55);
       assert.equal(enriched.confidence, 0.85);
-      assert.equal(enriched.method, 'solution-properties');
+      assert.equal(enriched.method, 'write:solution:properties');
       assert.ok(Array.isArray(enriched.trace));
       assert.equal(enriched.properties.length, 12);
     });
@@ -181,7 +181,7 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
       const mixedResult = {
         evolution: 0.68,
         confidence: 0.80,
-        method: 'solution-properties',
+        method: 'write:solution:properties',
         properties: [
           { property: 'Market', phase: 4, weight: 1 / 12 },
           { property: 'Knowledge management', phase: 3, weight: 1 / 12 },
@@ -212,10 +212,10 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
   describe('assembleSolutionEvaluations: batch processing', () => {
     it('enriches all evaluations in the map', () => {
       const evals = {
-        'solution-properties': {
+        'write:solution:properties': {
           evolution: 0.55,
           confidence: 0.85,
-          method: 'solution-properties',
+          method: 'write:solution:properties',
           properties: Array.from({ length: 12 }, (_, i) => ({
             property: `Prop${i}`, phase: 3, weight: 1 / 12,
           })),
@@ -224,8 +224,8 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
       };
 
       const assembled = assembleSolutionEvaluations(evals, { mode: 'auto' });
-      assert.ok(assembled['solution-properties'].stage);
-      assert.ok(assembled['solution-properties'].phaseDistribution);
+      assert.ok(assembled['write:solution:properties'].stage);
+      assert.ok(assembled['write:solution:properties'].phaseDistribution);
       assert.deepEqual(assembled['solution-dispatch-error'], { error: 'test error' });
     });
   });
@@ -239,7 +239,7 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
       const raw = {
         evolution: 0.55,
         confidence: 0.85,
-        method: 'solution-properties',
+        method: 'write:solution:properties',
         properties: [
           { property: 'Market', phase: 3, reason: 'Established market' },
           { property: 'Knowledge management', phase: 3, reason: 'Widely documented' },
@@ -250,7 +250,7 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
       assert.ok(structured instanceof SolutionEvolutionResult);
       assert.equal(typeof structured.evolution, 'number');
       assert.equal(typeof structured.confidence, 'number');
-      assert.equal(structured.method, 'solution-properties');
+      assert.equal(structured.method, 'write:solution:properties');
     });
 
     it('throws for error results', () => {
@@ -305,13 +305,13 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
       const result = {
         evolution: 0.55,
         confidence: 0.85,
-        method: 'solution-properties',
+        method: 'write:solution:properties',
         properties: Array.from({ length: 12 }, () => ({ phase: 3 })),
         phaseDistribution: { 1: 0, 2: 0, 3: 12, 4: 0 },
         dominantPhase: { phase: 3, count: 12, label: 'Product' },
       };
 
-      const reasoning = strategyReasoning('solution-properties', result, { name: 'Kubernetes' });
+      const reasoning = strategyReasoning('write:solution:properties', result, { name: 'Kubernetes' });
       assert.ok(reasoning.includes('12-property'), 'should mention 12-property evaluation');
       assert.ok(reasoning.includes('Product'), 'should mention the Product stage');
       assert.ok(reasoning.includes('12× Product'), 'should include phase distribution');
@@ -360,7 +360,7 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
       const result = {
         evolution: 0.55,
         confidence: 0.80,
-        method: 'solution-properties',
+        method: 'write:solution:properties',
         stage: 'Product',
         meanPhase: 3.0,
         properties: [
@@ -376,7 +376,7 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
         },
       };
 
-      const formatted = formatStrategyResult('solution-properties', result, { name: 'Kubernetes' });
+      const formatted = formatStrategyResult('write:solution:properties', result, { name: 'Kubernetes' });
 
       // Check property breakdown with reasons
       assert.ok(formatted.includes('Market: **Product** (phase 3)'), 'should show Market as Product');
@@ -394,13 +394,13 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
       const bareResult = {
         evolution: 0.55,
         confidence: 0.80,
-        method: 'solution-properties',
+        method: 'write:solution:properties',
         properties: [
           { property: 'Market', phase: 3, label: 'Product' },
         ],
       };
 
-      const formatted = formatStrategyResult('solution-properties', bareResult, { name: 'X' });
+      const formatted = formatStrategyResult('write:solution:properties', bareResult, { name: 'X' });
       assert.ok(formatted.includes('Market: **Product**'));
       // No summary stats (no stage, meanPhase, confidenceMetadata)
       assert.ok(!formatted.includes('Mean phase:'));
@@ -418,10 +418,10 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
         classification: { space: 'economic', reason: 'Market component', requiresReQuestion: false },
         reQuestions: null,
         evaluations: {
-          'solution-properties': {
+          'write:solution:properties': {
             evolution: 0.62,
             confidence: 0.85,
-            method: 'solution-properties',
+            method: 'write:solution:properties',
             stage: 'Product',
             meanPhase: 3.17,
             phaseDistribution: { 1: 0, 2: 2, 3: 8, 4: 2 },
@@ -456,7 +456,7 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
       // Verify markdown structure
       assert.ok(formatted.includes('## Evolution Estimation: Kubernetes'));
       assert.ok(formatted.includes('Named Solution'));
-      assert.ok(formatted.includes('solution-properties'));
+      assert.ok(formatted.includes('write:solution:properties'));
       assert.ok(formatted.includes('Property breakdown'));
       assert.ok(formatted.includes('Market: **Product**'));
     });
@@ -467,10 +467,10 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
         classification: { space: 'economic', reason: 'Market component', requiresReQuestion: false },
         reQuestions: null,
         evaluations: {
-          's-curve': {
+          'write:capacity:s-curve': {
             evolution: 0.75,
             confidence: 0.60,
-            method: 's-curve',
+            method: 'write:capacity:s-curve',
           },
         },
         routing: {
@@ -490,7 +490,7 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
 
       assert.ok(formatted.includes('## Evolution Estimation: CRM'));
       assert.ok(formatted.includes('Abstract Capability'));
-      assert.ok(formatted.includes('s-curve'));
+      assert.ok(formatted.includes('write:capacity:s-curve'));
       assert.ok(!formatted.includes('Property breakdown'), 'capability should not have property breakdown');
     });
   });
@@ -506,14 +506,14 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
         { llmCall: mockLlmPhase3, strategy: 'all', mode: 'auto' }
       );
 
-      const result = evaluations['solution-properties'];
+      const result = evaluations['write:solution:properties'];
       assert.ok(!result.error, `Strategy should succeed: ${result?.error}`);
 
       // Original EvolutionResult contract fields
       assert.equal(typeof result.evolution, 'number');
       assert.ok(result.evolution >= 0 && result.evolution <= 1);
       assert.equal(typeof result.confidence, 'number');
-      assert.equal(result.method, 'solution-properties');
+      assert.equal(result.method, 'write:solution:properties');
       assert.ok(Array.isArray(result.properties));
       assert.equal(result.properties.length, 12);
 
@@ -542,7 +542,7 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
         { llmCall: singlePropLlm, strategy: 'all', mode: 'conversational' }
       );
 
-      const result = evaluations['solution-properties'];
+      const result = evaluations['write:solution:properties'];
       assert.ok(!result.error);
       assert.equal(result.confidenceMetadata?.mode, 'conversational');
       assert.ok(result.stage, 'should have stage');
@@ -554,7 +554,7 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
         { llmCall: mockLlmMixed, strategy: 'all', mode: 'auto' }
       );
 
-      const result = evaluations['solution-properties'];
+      const result = evaluations['write:solution:properties'];
       assert.ok(!result.error);
       assert.ok(result.phaseDistribution);
       // mockLlmMixed: 5 properties at phase 4, 7 at phase 3
@@ -568,7 +568,7 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
       const evaluations = await dispatchSolutionStrategies(
         { name: 'K8s' }, { llmCall: errorLlm, strategy: 'all' }
       );
-      const result = evaluations['solution-properties'];
+      const result = evaluations['write:solution:properties'];
       assert.ok(result.error, 'should have error entry');
       assert.equal(result.stage, undefined, 'error results should not be enriched');
     });
@@ -584,17 +584,17 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
         name: 'ERP',
         description: 'Enterprise resource planning',
         space: 'economic',
-        strategy: 's-curve',
+        strategy: 'write:capacity:s-curve',
         certitude: 0.9,
         ubiquity: 0.85,
       });
 
       assert.equal(result.mode, 'oneshot');
-      assert.ok(result.evaluations['s-curve']);
-      const scurve = result.evaluations['s-curve'];
+      assert.ok(result.evaluations['write:capacity:s-curve']);
+      const scurve = result.evaluations['write:capacity:s-curve'];
       assert.equal(typeof scurve.evolution, 'number');
       assert.equal(typeof scurve.confidence, 'number');
-      assert.equal(scurve.method, 's-curve');
+      assert.equal(scurve.method, 'write:capacity:s-curve');
 
       // Should NOT have solution-specific enrichment
       assert.equal(scurve.stage, undefined, 'capability result should not have stage from assembler');
@@ -654,12 +654,12 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
         name: 'CRM',
         description: 'Customer relationship management',
         space: 'economic',
-        strategy: 's-curve',
+        strategy: 'write:capacity:s-curve',
         certitude: 0.85,
         ubiquity: 0.80,
       });
 
-      const scurve = capResult.evaluations['s-curve'];
+      const scurve = capResult.evaluations['write:capacity:s-curve'];
       assert.equal(typeof scurve.evolution, 'number');
       assert.equal(typeof scurve.confidence, 'number');
       assert.equal(typeof scurve.method, 'string');
@@ -669,7 +669,7 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
         { name: 'Kubernetes' },
         { llmCall: mockLlmPhase3, strategy: 'all' }
       );
-      const solResult = solEvals['solution-properties'];
+      const solResult = solEvals['write:solution:properties'];
       assert.equal(typeof solResult.evolution, 'number');
       assert.equal(typeof solResult.confidence, 'number');
       assert.equal(typeof solResult.method, 'string');
@@ -683,21 +683,21 @@ describe('AC 9010203 Sub-AC 3: Solution result assembly and formatting', () => {
 
     it('formatStrategyResult works for both capability and solution results', () => {
       // Capability
-      const capFormatted = formatStrategyResult('s-curve', {
-        evolution: 0.75, confidence: 0.60, method: 's-curve',
+      const capFormatted = formatStrategyResult('write:capacity:s-curve', {
+        evolution: 0.75, confidence: 0.60, method: 'write:capacity:s-curve',
       }, { name: 'CRM', certitude: 0.9, ubiquity: 0.85 });
 
-      assert.ok(capFormatted.includes('s-curve'));
+      assert.ok(capFormatted.includes('write:capacity:s-curve'));
       assert.ok(capFormatted.includes('Evolution:'));
       assert.ok(capFormatted.includes('Confidence:'));
 
       // Solution
-      const solFormatted = formatStrategyResult('solution-properties', {
-        evolution: 0.55, confidence: 0.85, method: 'solution-properties',
+      const solFormatted = formatStrategyResult('write:solution:properties', {
+        evolution: 0.55, confidence: 0.85, method: 'write:solution:properties',
         properties: [{ property: 'Market', phase: 3, label: 'Product' }],
       }, { name: 'Kubernetes' });
 
-      assert.ok(solFormatted.includes('solution-properties'));
+      assert.ok(solFormatted.includes('write:solution:properties'));
       assert.ok(solFormatted.includes('Evolution:'));
       assert.ok(solFormatted.includes('Confidence:'));
       assert.ok(solFormatted.includes('Property breakdown'));

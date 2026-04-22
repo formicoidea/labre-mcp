@@ -377,7 +377,7 @@ function fuzzyMatchProperty(rawName: string, properties: PropertyDef[]): string 
  * @example
  *   const strategy = new PropertiesStrategy({ llmCall: myLlmFn });
  *   const result = await strategy.evaluate({ name: 'Kubernetes' });
- *   // → { evolution: 0.62, confidence: 0.85, method: 'solution-properties', properties: [...] }
+ *   // → { evolution: 0.62, confidence: 0.85, method: 'write:solution:properties', properties: [...] }
  */
 export class PropertiesStrategy extends SolutionBaseStrategy {
   // any: llmCall is a closure with diverse signatures across backends
@@ -394,7 +394,7 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
   }
 
   static get method() {
-    return 'solution-properties';
+    return 'write:solution:properties';
   }
 
   /**

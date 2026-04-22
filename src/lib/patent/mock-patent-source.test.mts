@@ -43,7 +43,7 @@ function assertValidResult(result, ctx = '') {
   assert.ok(result.evolution >= 0 && result.evolution <= 1, `${p}evolution in [0,1]`);
   assert.equal(typeof result.confidence, 'number', `${p}confidence must be number`);
   assert.ok(result.confidence >= 0.1 && result.confidence <= 0.95, `${p}confidence in [0.1,0.95]`);
-  assert.equal(result.method, 'cpc-evolution', `${p}method = cpc-evolution`);
+  assert.equal(result.method, 'write:capacity:cpc-evolution', `${p}method = cpc-evolution`);
   assert.equal(typeof result.certitude, 'number', `${p}certitude must be number`);
   assert.equal(typeof result.ubiquity, 'number', `${p}ubiquity must be number`);
   assert.ok(Array.isArray(result.trace), `${p}trace must be array`);

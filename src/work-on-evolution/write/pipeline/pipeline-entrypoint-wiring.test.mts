@@ -44,7 +44,7 @@ describe('Pipeline entrypoint wiring: owmOutput with 3 positioned components', (
 
     const standardResult = {
       evolution: 0.65,
-      evaluations: { 'llm-direct': { evolution: 0.65, confidence: 0.85 } },
+      evaluations: { 'write:capacity:llm-direct': { evolution: 0.65, confidence: 0.85 } },
       routing: { usedSolutionStrategies: true },
       classification: { space: 'economic' },
       message: 'Evaluated with 1 strategy(ies).',
@@ -60,7 +60,7 @@ describe('Pipeline entrypoint wiring: owmOutput with 3 positioned components', (
     const result = await runEnrichedPipeline(standardResult, component, {
       llmCall: mockLLM,
       evaluateCapabilityFn: async () => ({
-        evaluations: { 'llm-direct': { evolution: 0.55, confidence: 0.80 } },
+        evaluations: { 'write:capacity:llm-direct': { evolution: 0.55, confidence: 0.80 } },
         routing: {},
         wardleyType: { type: 'activity' },
       }),

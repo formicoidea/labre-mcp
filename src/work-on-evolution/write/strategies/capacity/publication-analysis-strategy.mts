@@ -63,7 +63,7 @@ export class PublicationAnalysisStrategy extends BaseStrategy {
   }
 
   static get method() {
-    return 'publication-analysis';
+    return 'write:capacity:publication-analysis';
   }
 
   async evaluate(component: ComponentInput): Promise<EvolutionResult> {

@@ -136,7 +136,7 @@ describe('PropertiesStrategy', () => {
 
   describe('static method', () => {
     it('returns solution-properties', () => {
-      assert.equal(PropertiesStrategy.method, 'solution-properties');
+      assert.equal(PropertiesStrategy.method, 'write:solution:properties');
     });
   });
 
@@ -154,7 +154,7 @@ describe('PropertiesStrategy', () => {
       assert.ok(result.evolution >= 0 && result.evolution <= 1);
       assert.equal(typeof result.confidence, 'number');
       assert.ok(result.confidence >= 0 && result.confidence <= 1);
-      assert.equal(result.method, 'solution-properties');
+      assert.equal(result.method, 'write:solution:properties');
 
       // Solution-specific extensions
       assert.ok(Array.isArray(result.properties));
@@ -284,7 +284,7 @@ describe('PropertiesStrategy', () => {
       assert.equal(callCount, 12);
 
       assert.equal(typeof result.evolution, 'number');
-      assert.equal(result.method, 'solution-properties');
+      assert.equal(result.method, 'write:solution:properties');
       assert.ok(Array.isArray(result.properties));
     });
   });
@@ -847,12 +847,12 @@ describe('Registry auto-discovery', () => {
     const strategies = await loadSolutionStrategies();
 
     assert.ok(
-      strategies.has('solution-properties'),
+      strategies.has('write:solution:properties'),
       `Expected registry to contain "solution-properties". Found: ${[...strategies.keys()].join(', ')}`
     );
 
-    const Cls = strategies.get('solution-properties');
+    const Cls = strategies.get('write:solution:properties');
     assert.ok(Cls.prototype instanceof SolutionBaseStrategy);
-    assert.equal(Cls.method, 'solution-properties');
+    assert.equal(Cls.method, 'write:solution:properties');
   });
 });

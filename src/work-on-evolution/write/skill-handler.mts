@@ -45,19 +45,19 @@ const SPACE_ALIASES = {
  */
 const STRATEGY_ALIASES = {
   all: 'all',
-  's-curve': 's-curve',
-  scurve: 's-curve',
-  'publication-analysis': 'publication-analysis',
-  'pub-analysis': 'publication-analysis',
-  publication: 'publication-analysis',
-  'timeline-benchmark': 'timeline-benchmark',
-  timeline: 'timeline-benchmark',
-  benchmark: 'timeline-benchmark',
-  'llm-direct': 'llm-direct',
-  llm: 'llm-direct',
-  direct: 'llm-direct',
-  'logprob-distribution': 'logprob-distribution',
-  logprob: 'logprob-distribution',
+  's-curve': 'write:capacity:s-curve',
+  scurve: 'write:capacity:s-curve',
+  'publication-analysis': 'write:capacity:publication-analysis',
+  'pub-analysis': 'write:capacity:publication-analysis',
+  publication: 'write:capacity:publication-analysis',
+  'timeline-benchmark': 'write:capacity:timeline-benchmark',
+  timeline: 'write:capacity:timeline-benchmark',
+  benchmark: 'write:capacity:timeline-benchmark',
+  'llm-direct': 'write:capacity:llm-direct',
+  llm: 'write:capacity:llm-direct',
+  direct: 'write:capacity:llm-direct',
+  'logprob-distribution': 'write:capacity:logprob-distribution',
+  logprob: 'write:capacity:logprob-distribution',
 };
 
 /**

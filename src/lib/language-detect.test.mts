@@ -182,7 +182,7 @@ assertEqual(
 console.log('\n--- Chinese messages ---');
 const zhMsg = createMessageResolver('zh');
 assertEqual(
-  zhMsg('step.strategy', { strategy: 's-curve', component: 'ERP' }),
+  zhMsg('step.strategy', { strategy: 'write:capacity:s-curve', component: 'ERP' }),
   '正在运行策略「s-curve」:「ERP」…',
   'Chinese strategy message'
 );

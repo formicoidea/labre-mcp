@@ -19,7 +19,7 @@
 //   {
 //     evolution:   number,   // Evolution value, 0–1 (competitive axis)
 //     confidence:  number,   // Confidence score 0–1
-//     method:      string,   // Strategy identifier (e.g. 'solution-properties')
+//     method:      string,   // Strategy identifier (e.g. 'write:solution:properties')
 //     trace:       array     // Trace of reasoning steps (optional)
 //   }
 

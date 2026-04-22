@@ -61,12 +61,12 @@ describe('SolutionBaseStrategy', () => {
       const result = {
         evolution: 0.55,
         confidence: 0.85,
-        method: 'solution-properties',
+        method: 'write:solution:properties',
       };
       const validated = BaseStrategy.validateResult(result);
       assert.equal(validated.evolution, 0.55);
       assert.equal(validated.confidence, 0.85);
-      assert.equal(validated.method, 'solution-properties');
+      assert.equal(validated.method, 'write:solution:properties');
     });
 
     it('rejects missing evolution', () => {
@@ -267,7 +267,7 @@ describe('SolutionBaseStrategy', () => {
       const result = {
         evolution: 0.55,
         confidence: 0.85,
-        method: 'solution-properties',
+        method: 'write:solution:properties',
         properties: [
           { property: 'Market', phase: 3, label: 'Product', weight: 1/12 },
           { property: 'Knowledge', phase: 2, label: 'Custom', weight: 1/12 },

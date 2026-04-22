@@ -182,7 +182,7 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
 
       // Phase A: Run all non-s-curve strategies first (they may produce certitude/ubiquity)
       for (const [method, StrategyCls] of strategies) {
-        if (method === 's-curve') continue;
+        if (method === 'write:capacity:s-curve') continue;
         try {
           logDebug(TOOL, msg('step.strategy', { strategy: method, component: name }));
           const instance = createStrategyInstance(StrategyCls);
@@ -216,17 +216,17 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
       }
 
       // Phase C: Run s-curve with enriched component
-      const scurveCls = strategies.get('s-curve');
+      const scurveCls = strategies.get('write:capacity:s-curve');
       if (scurveCls) {
         try {
-          logDebug(TOOL, msg('step.strategy', { strategy: 's-curve', component: name }));
+          logDebug(TOOL, msg('step.strategy', { strategy: 'write:capacity:s-curve', component: name }));
           const instance = createStrategyInstance(scurveCls);
           const result = await Promise.resolve(instance.evaluate(enrichedComponent));
-          evaluations['s-curve'] = result;
-          logDebug(TOOL, msg('step.strategy.result', { strategy: 's-curve', evolution: result.evolution, confidence: result.confidence }));
+          evaluations['write:capacity:s-curve'] = result;
+          logDebug(TOOL, msg('step.strategy.result', { strategy: 'write:capacity:s-curve', evolution: result.evolution, confidence: result.confidence }));
         } catch (err) {
-          evaluations['s-curve'] = { error: toErrorMessage(err) };
-          logDebug(TOOL, msg('step.strategy.error', { strategy: 's-curve', error: toErrorMessage(err) }));
+          evaluations['write:capacity:s-curve'] = { error: toErrorMessage(err) };
+          logDebug(TOOL, msg('step.strategy.error', { strategy: 'write:capacity:s-curve', error: toErrorMessage(err) }));
         }
       }
     } else {
@@ -365,27 +365,27 @@ function createStrategyInstance(StrategyCls: any): any {
   const method = StrategyCls.method;
 
   // s-curve: purely analytical
-  if (method === 's-curve') {
+  if (method === 'write:capacity:s-curve') {
     return new StrategyCls();
   }
 
   // Enriched analytical strategies: inject LLM for deeper analysis
-  if (method === 'publication-analysis' || method === 'timeline-benchmark') {
+  if (method === 'write:capacity:publication-analysis' || method === 'write:capacity:timeline-benchmark') {
     return new StrategyCls({ llmCall: getStrategyLLM(method) });
   }
 
   // LLM-required strategies: inject Agent SDK llmCall
-  if (method === 'llm-direct') {
+  if (method === 'write:capacity:llm-direct') {
     return new StrategyCls({ llmCall: getStrategyLLM('llm-direct') });
   }
 
   // CPC evolution strategy: inject LLM for CPC mapper (patent source uses env vars)
-  if (method === 'cpc-evolution') {
+  if (method === 'write:capacity:cpc-evolution') {
     return new StrategyCls({ llmCall: getStrategyLLM('cpc-evolution') });
   }
 
   // Logprob strategy: inject OpenCode/kimi logprob call
-  if (method === 'logprob-distribution') {
+  if (method === 'write:capacity:logprob-distribution') {
     return new StrategyCls({ llmLogprobCall: getStrategyLogprobLLM('logprob-distribution') });
   }
 

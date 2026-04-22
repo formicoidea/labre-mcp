@@ -11,7 +11,7 @@ import { computeEvolution } from '../../s-curve/s-curve.mjs';
 export class SCurveStrategy extends BaseStrategy {
 
   static get method() {
-    return 's-curve';
+    return 'write:capacity:s-curve';
   }
 
   /**

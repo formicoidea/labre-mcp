@@ -143,7 +143,7 @@ describe('evaluateMap — progress notifications', () => {
   it('emits info-level log at start and end for map evaluation', async () => {
     setVerbose(false); // debug suppressed, only info visible
     const result = await evaluateMapFile(testFile, {
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       updateFile: false,
     });
 
@@ -170,7 +170,7 @@ describe('evaluateMap — progress notifications', () => {
   it('emits debug-level logs for intermediate steps when verbose is on', async () => {
     setVerbose(true);
     await evaluateMapFile(testFile, {
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       updateFile: false,
     });
 
@@ -197,7 +197,7 @@ describe('evaluateMap — progress notifications', () => {
   it('suppresses debug messages when verbose is off', async () => {
     setVerbose(false);
     await evaluateMapFile(testFile, {
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       updateFile: false,
     });
 
@@ -210,7 +210,7 @@ describe('evaluateMap — progress notifications', () => {
   it('emits debug for file update when updateFile is true', async () => {
     setVerbose(true);
     await evaluateMapFile(testFile, {
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       updateFile: true,
     });
 
@@ -228,7 +228,7 @@ describe('evaluateMap — progress notifications', () => {
   it('emits English-localized messages for English file path', async () => {
     setVerbose(false);
     await evaluateMapFile(testFile, {
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       updateFile: false,
     });
 
@@ -247,7 +247,7 @@ describe('evaluateMap — progress notifications', () => {
   it('does not alter the returned result structure', async () => {
     setVerbose(true); // Even with verbose, output unchanged
     const result = await evaluateMapFile(testFile, {
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       updateFile: false,
     });
 
@@ -276,7 +276,7 @@ describe('evaluateMap — progress notifications', () => {
   it('all notifications use "evaluateMap" as logger name', async () => {
     setVerbose(true);
     await evaluateMapFile(testFile, {
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       updateFile: false,
     });
 
@@ -298,7 +298,7 @@ describe('evaluateMap — progress notifications', () => {
   it('all notifications follow JSON-RPC 2.0 notification format', async () => {
     setVerbose(true);
     await evaluateMapFile(testFile, {
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       updateFile: false,
     });
 
@@ -320,7 +320,7 @@ describe('evaluateMap — progress notifications', () => {
   it('info end message includes component count and duration', async () => {
     setVerbose(false);
     const result = await evaluateMapFile(testFile, {
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       updateFile: false,
     });
 

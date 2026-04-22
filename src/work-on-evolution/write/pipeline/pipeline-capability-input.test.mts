@@ -71,7 +71,7 @@ describe('Pipeline with capability input (AC 5)', () => {
     const standardResult = {
       mode: 'oneshot',
       evaluations: {
-        'llm-direct': { evolution: 0.55, confidence: 0.85 },
+        'write:capacity:llm-direct': { evolution: 0.55, confidence: 0.85 },
       },
       routing: {
         usedSolutionStrategies: false, // KEY: input is capability, not solution
@@ -148,8 +148,8 @@ describe('Pipeline with capability input (AC 5)', () => {
     // When routing.usedSolutionStrategies === false, Step 1 should NOT re-evaluate
     const standardResult = {
       evaluations: {
-        'llm-direct': { evolution: 0.42, confidence: 0.75 },
-        's-curve': { evolution: 0.38, confidence: 0.60 },
+        'write:capacity:llm-direct': { evolution: 0.42, confidence: 0.75 },
+        'write:capacity:s-curve': { evolution: 0.38, confidence: 0.60 },
       },
       routing: { usedSolutionStrategies: false },
     };
@@ -186,7 +186,7 @@ describe('Pipeline with capability input (AC 5)', () => {
 
     const standardResult = {
       evaluations: {
-        'llm-direct': { evolution: 0.50, confidence: 0.80 },
+        'write:capacity:llm-direct': { evolution: 0.50, confidence: 0.80 },
       },
       routing: { usedSolutionStrategies: false },
       evolution: 0.50,
@@ -213,7 +213,7 @@ describe('Pipeline with capability input (AC 5)', () => {
   it('graceful degradation: capability input without llmCall produces OWM with capability only', async () => {
     const standardResult = {
       evaluations: {
-        'llm-direct': { evolution: 0.60, confidence: 0.80 },
+        'write:capacity:llm-direct': { evolution: 0.60, confidence: 0.80 },
       },
       routing: { usedSolutionStrategies: false },
       evolution: 0.60,
@@ -242,7 +242,7 @@ describe('Pipeline with capability input (AC 5)', () => {
   it('capability label in OWM uses component name when no capabilityLabel', async () => {
     const standardResult = {
       evaluations: {
-        'llm-direct': { evolution: 0.45, confidence: 0.70 },
+        'write:capacity:llm-direct': { evolution: 0.45, confidence: 0.70 },
       },
       routing: { usedSolutionStrategies: false },
       evolution: 0.45,

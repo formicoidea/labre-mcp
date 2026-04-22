@@ -438,11 +438,11 @@ describe('SolutionEvolutionResult', () => {
       const result = new SolutionEvolutionResult({
         evolution: 0.55,
         confidence: 0.85,
-        method: 'solution-properties',
+        method: 'write:solution:properties',
       });
       assert.equal(result.evolution, 0.55);
       assert.equal(result.confidence, 0.85);
-      assert.equal(result.method, 'solution-properties');
+      assert.equal(result.method, 'write:solution:properties');
       assert.deepEqual(result.trace, []);
       assert.deepEqual(result.properties, []);
       assert.equal(result.confidenceMetadata, null);
@@ -572,10 +572,10 @@ describe('SolutionEvolutionResult', () => {
     it('creates result from 12 uniform scores (all phase 3)', () => {
       const scores = build12Scores(3);
       const result = SolutionEvolutionResult.fromPropertyScores(scores, {
-        method: 'solution-properties',
+        method: 'write:solution:properties',
       });
       assert.equal(result.evolution, 0.55);
-      assert.equal(result.method, 'solution-properties');
+      assert.equal(result.method, 'write:solution:properties');
       assert.equal(result.propertyCount, 12);
       assert.equal(result.stage, 'Product');
     });
@@ -583,7 +583,7 @@ describe('SolutionEvolutionResult', () => {
     it('creates result from 12 mixed scores (half phase 2, half phase 4)', () => {
       const scores = buildMixedScores();
       const result = SolutionEvolutionResult.fromPropertyScores(scores, {
-        method: 'solution-properties',
+        method: 'write:solution:properties',
       });
       // Expected: (6 * 0.29 + 6 * 0.85) / 12 = (1.74 + 5.10) / 12 = 0.57
       assert.equal(result.evolution, 0.57);
@@ -672,7 +672,7 @@ describe('SolutionEvolutionResult', () => {
       const plain = {
         evolution: 0.55,
         confidence: 0.85,
-        method: 'solution-properties',
+        method: 'write:solution:properties',
         trace: [{ step: 'test' }],
         properties: [
           { property: 'Market', phase: 3, label: 'Product', weight: 1 / 12, reason: 'Test' },
@@ -682,7 +682,7 @@ describe('SolutionEvolutionResult', () => {
       const result = SolutionEvolutionResult.fromEvolutionResult(plain);
       assert.equal(result.evolution, 0.55);
       assert.equal(result.confidence, 0.85);
-      assert.equal(result.method, 'solution-properties');
+      assert.equal(result.method, 'write:solution:properties');
       assert.equal(result.propertyCount, 2);
       assert.ok(result.properties[0] instanceof PropertyScore);
       assert.equal(result.properties[0].id, 'market');
@@ -719,7 +719,7 @@ describe('SolutionEvolutionResult', () => {
     it('passes for a valid result', () => {
       const scores = build12Scores(3);
       const result = SolutionEvolutionResult.fromPropertyScores(scores, {
-        method: 'solution-properties',
+        method: 'write:solution:properties',
       });
       // Should not throw
       const validated = result.validate();
@@ -738,7 +738,7 @@ describe('SolutionEvolutionResult', () => {
     it('result passes BaseStrategy.validateResult', () => {
       const scores = build12Scores(3);
       const result = SolutionEvolutionResult.fromPropertyScores(scores, {
-        method: 'solution-properties',
+        method: 'write:solution:properties',
       });
       // Core contract validation
       BaseStrategy.validateResult(result.toEvolutionResult());
@@ -751,7 +751,7 @@ describe('SolutionEvolutionResult', () => {
     it('returns plain object with EvolutionResult shape', () => {
       const scores = build12Scores(3);
       const result = SolutionEvolutionResult.fromPropertyScores(scores, {
-        method: 'solution-properties',
+        method: 'write:solution:properties',
       });
       const plain = result.toEvolutionResult();
       assert.equal(typeof plain.evolution, 'number');
@@ -795,13 +795,13 @@ describe('SolutionEvolutionResult', () => {
     it('includes all top-level fields', () => {
       const scores = build12Scores(3);
       const result = SolutionEvolutionResult.fromPropertyScores(scores, {
-        method: 'solution-properties',
+        method: 'write:solution:properties',
         mode: 'auto',
       });
       const json = result.toJSON();
       assert.equal(json.evolution, 0.55);
       assert.ok(json.confidence > 0);
-      assert.equal(json.method, 'solution-properties');
+      assert.equal(json.method, 'write:solution:properties');
       assert.equal(json.stage, 'Product');
       assert.equal(json.meanPhase, 3);
       assert.deepEqual(json.phaseDistribution, { 1: 0, 2: 0, 3: 12, 4: 0 });

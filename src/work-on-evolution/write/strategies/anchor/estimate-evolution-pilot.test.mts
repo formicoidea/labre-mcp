@@ -82,7 +82,7 @@ describe('estimateEvolution pilot — progress notifications', () => {
       name: 'ERP',
       description: 'Enterprise resource planning for large corporations',
       space: 'economic',
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       certitude: 0.9,
       ubiquity: 0.85,
     });
@@ -90,7 +90,7 @@ describe('estimateEvolution pilot — progress notifications', () => {
     // Result should be unchanged
     assert.equal(result.mode, 'oneshot');
     assert.equal(result.classification.space, 'economic');
-    assert.ok(result.evaluations['s-curve'], 's-curve evaluation present');
+    assert.ok(result.evaluations['write:capacity:s-curve'], 's-curve evaluation present');
 
     // Info-level notifications at start and end
     const infoMsgs = byLevel(cap.messages, 'info');
@@ -132,7 +132,7 @@ describe('estimateEvolution pilot — progress notifications', () => {
       name: 'ERP',
       description: 'Enterprise resource planning',
       space: 'economic',
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       certitude: 0.9,
       ubiquity: 0.85,
     });
@@ -145,7 +145,7 @@ describe('estimateEvolution pilot — progress notifications', () => {
     const hasClassification = debugTexts.some(t => t.includes('economic') || t.includes('classif'));
     assert.ok(hasClassification, 'Debug should mention classification step');
 
-    const hasStrategy = debugTexts.some(t => t.includes('s-curve'));
+    const hasStrategy = debugTexts.some(t => t.includes('write:capacity:s-curve'));
     assert.ok(hasStrategy, 'Debug should mention strategy execution');
   });
 
@@ -155,7 +155,7 @@ describe('estimateEvolution pilot — progress notifications', () => {
       name: 'ERP',
       description: 'Enterprise resource planning',
       space: 'economic',
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       certitude: 0.9,
       ubiquity: 0.85,
     });
@@ -172,7 +172,7 @@ describe('estimateEvolution pilot — progress notifications', () => {
       name: 'ERP',
       description: "Logiciel de gestion d'entreprise pour les grandes sociétés françaises",
       space: 'economic',
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       certitude: 0.9,
       ubiquity: 0.85,
     });
@@ -194,7 +194,7 @@ describe('estimateEvolution pilot — progress notifications', () => {
       name: 'ERP',
       description: 'Enterprise resource planning for large corporations',
       space: 'economic',
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       certitude: 0.9,
       ubiquity: 0.85,
     });
@@ -239,7 +239,7 @@ describe('estimateEvolution pilot — progress notifications', () => {
       name: 'ERP',
       description: 'Enterprise resource planning',
       space: 'economic',
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       certitude: 0.9,
       ubiquity: 0.85,
     });
@@ -250,9 +250,9 @@ describe('estimateEvolution pilot — progress notifications', () => {
     assert.equal(result.classification.space, 'economic');
     assert.equal(result.reQuestions, null);
     assert.ok(result.evaluations, 'evaluations present');
-    assert.ok(result.evaluations['s-curve'], 's-curve result present');
-    assert.ok(typeof result.evaluations['s-curve'].evolution === 'number', 'evolution is number');
-    assert.ok(typeof result.evaluations['s-curve'].confidence === 'number', 'confidence is number');
+    assert.ok(result.evaluations['write:capacity:s-curve'], 's-curve result present');
+    assert.ok(typeof result.evaluations['write:capacity:s-curve'].evolution === 'number', 'evolution is number');
+    assert.ok(typeof result.evaluations['write:capacity:s-curve'].confidence === 'number', 'confidence is number');
     assert.ok(typeof result.message === 'string', 'message is string');
   });
 
@@ -264,7 +264,7 @@ describe('estimateEvolution pilot — progress notifications', () => {
       name: 'ERP',
       description: 'Enterprise resource planning',
       space: 'economic',
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       certitude: 0.9,
       ubiquity: 0.85,
     });
@@ -285,7 +285,7 @@ describe('estimateEvolution pilot — progress notifications', () => {
       name: 'ERP',
       description: 'Enterprise resource planning',
       space: 'economic',
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       certitude: 0.9,
       ubiquity: 0.85,
     });

@@ -167,11 +167,11 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
         }
       );
 
-      const result = evaluations['solution-properties'];
+      const result = evaluations['write:solution:properties'];
       assert.ok(!result.error, `Strategy should succeed: ${result?.error}`);
       assert.equal(typeof result.evolution, 'number');
       assert.ok(result.evolution >= 0 && result.evolution <= 1);
-      assert.equal(result.method, 'solution-properties');
+      assert.equal(result.method, 'write:solution:properties');
       assert.ok(Array.isArray(result.properties));
       assert.equal(result.properties.length, 12);
     });
@@ -225,7 +225,7 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
         { llmCall: singlePropLlm, strategy: 'all', mode: 'conversational' }
       );
 
-      const result = evaluations['solution-properties'];
+      const result = evaluations['write:solution:properties'];
       assert.ok(!result.error, `Strategy error: ${result?.error}`);
       assert.equal(callCount, 12, `Conversational mode should make 12 LLM calls, got ${callCount}`);
     });
@@ -420,7 +420,7 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
         }
       );
 
-      const result = evaluations['solution-properties'];
+      const result = evaluations['write:solution:properties'];
       assert.ok(!result.error);
       assert.equal(callCount, 12, 'Conversational mode: 12 per-property LLM calls');
       assert.equal(result.properties.length, 12);
@@ -445,7 +445,7 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
         }
       );
 
-      const result = evaluations['solution-properties'];
+      const result = evaluations['write:solution:properties'];
       assert.ok(!result.error);
       assert.equal(callCount, 1, 'Auto mode: single batch LLM call');
       assert.equal(result.properties.length, 12);
@@ -465,7 +465,7 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
         }
       );
 
-      const result = evaluations['solution-properties'];
+      const result = evaluations['write:solution:properties'];
       assert.ok(!result.error);
 
       // EvolutionResult contract
@@ -473,7 +473,7 @@ describe('Solution conversational E2E — Sub-AC 2', () => {
       assert.ok(result.evolution >= 0 && result.evolution <= 1);
       assert.equal(typeof result.confidence, 'number');
       assert.ok(result.confidence >= 0 && result.confidence <= 1);
-      assert.equal(result.method, 'solution-properties');
+      assert.equal(result.method, 'write:solution:properties');
 
       // Solution-specific: 12 properties with equal weights
       assert.ok(Array.isArray(result.properties));

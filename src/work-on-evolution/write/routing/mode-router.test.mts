@@ -155,7 +155,7 @@ const r1 = await routeEstimateEvolution({
   name: 'ERP',
   description: 'Enterprise resource planning',
   space: 'economic',
-  strategy: 's-curve',
+  strategy: 'write:capacity:s-curve',
   certitude: 0.9,
   ubiquity: 0.85,
 });

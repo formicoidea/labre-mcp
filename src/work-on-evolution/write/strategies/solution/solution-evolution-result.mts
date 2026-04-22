@@ -22,7 +22,7 @@
 //     // ... 10 more properties
 //   ];
 //   const result = SolutionEvolutionResult.fromPropertyScores(scores, {
-//     method: 'solution-properties',
+//     method: 'write:solution:properties',
 //     mode: 'auto',
 //   });
 //   result.validate(); // throws if contract violated
@@ -401,7 +401,7 @@ export class ConfidenceMetadata {
  * @example
  *   // Construction from property scores
  *   const result = SolutionEvolutionResult.fromPropertyScores(scores, {
- *     method: 'solution-properties',
+ *     method: 'write:solution:properties',
  *     mode: 'auto',
  *   });
  *
@@ -409,7 +409,7 @@ export class ConfidenceMetadata {
  *   const result = new SolutionEvolutionResult({
  *     evolution: 0.55,
  *     confidence: 0.85,
- *     method: 'solution-properties',
+ *     method: 'write:solution:properties',
  *     properties: [...],
  *   });
  *
@@ -453,7 +453,7 @@ export class SolutionEvolutionResult {
     /** @type {number} Overall confidence score (0–1) */
     this.confidence = Math.round(confidence * 1000) / 1000;
 
-    /** @type {string} Strategy identifier (e.g. 'solution-properties') */
+    /** @type {string} Strategy identifier (e.g. 'write:solution:properties') */
     this.method = method;
 
     /** @type {Array} Reasoning trace */

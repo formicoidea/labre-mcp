@@ -22,7 +22,7 @@ describe('parseConversationalInput — structured formats', () => {
       '- Name: LLM\n- Context: Text generation for coding\n- Strategy: s-curve',
     );
     assert.equal(r.name, 'LLM');
-    assert.equal(r.strategy, 's-curve');
+    assert.equal(r.strategy, 'write:capacity:s-curve');
     assert.ok(r.description?.includes('Text generation'));
   });
 

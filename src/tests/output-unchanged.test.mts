@@ -68,7 +68,7 @@ describe('AC 8: Existing tool output unchanged', () => {
       name: 'ERP',
       description: 'Enterprise resource planning for large corporations',
       space: 'economic',
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       certitude: 0.9,
       ubiquity: 0.85,
     });
@@ -96,7 +96,7 @@ describe('AC 8: Existing tool output unchanged', () => {
     assert.equal(typeof result.message, 'string', 'message must be string');
 
     // Verify s-curve evaluation shape
-    const scurve = result.evaluations['s-curve'];
+    const scurve = result.evaluations['write:capacity:s-curve'];
     assert.ok(scurve, 's-curve evaluation must exist');
     assert.equal(typeof scurve.evolution, 'number', 'evolution must be number');
     assert.equal(typeof scurve.confidence, 'number', 'confidence must be number');
@@ -139,7 +139,7 @@ describe('AC 8: Existing tool output unchanged', () => {
       name: 'ERP',
       description: 'Enterprise resource planning',
       space: 'economic',
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       certitude: 0.9,
       ubiquity: 0.85,
     });
@@ -208,7 +208,7 @@ describe('AC 8: Existing tool output unchanged', () => {
           name: 'ERP',
           context: 'Enterprise resource planning',
           space: 'economic',
-          strategy: 's-curve',
+          strategy: 'write:capacity:s-curve',
           certitude: 0.9,
           ubiquity: 0.85,
         },
@@ -286,7 +286,7 @@ describe('AC 8: Existing tool output unchanged', () => {
       name: 'ERP',
       description: 'Enterprise resource planning',
       space: 'economic',
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       certitude: 0.9,
       ubiquity: 0.85,
     });
@@ -377,7 +377,7 @@ style wardley`;
       name: 'ERP',
       description: 'Enterprise resource planning',
       space: 'economic',
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       certitude: 0.9,
       ubiquity: 0.85,
     };
@@ -402,13 +402,13 @@ style wardley`;
 
     // Evolution values should be identical (deterministic s-curve)
     assert.equal(
-      resultQuiet.evaluations['s-curve'].evolution,
-      resultVerbose.evaluations['s-curve'].evolution,
+      resultQuiet.evaluations['write:capacity:s-curve'].evolution,
+      resultVerbose.evaluations['write:capacity:s-curve'].evolution,
       'Evolution value unchanged by verbose mode'
     );
     assert.equal(
-      resultQuiet.evaluations['s-curve'].confidence,
-      resultVerbose.evaluations['s-curve'].confidence,
+      resultQuiet.evaluations['write:capacity:s-curve'].confidence,
+      resultVerbose.evaluations['write:capacity:s-curve'].confidence,
       'Confidence value unchanged by verbose mode'
     );
   });

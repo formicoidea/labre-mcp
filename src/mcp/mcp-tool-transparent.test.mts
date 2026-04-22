@@ -224,7 +224,7 @@ describe('AC 12: MCP tool transparent solution + capability support', () => {
         name: 'ERP',
         context: 'Enterprise resource planning for corporations',
         space: 'economic',
-        strategy: 's-curve',
+        strategy: 'write:capacity:s-curve',
         certitude: 0.9,
         ubiquity: 0.85,
       });
@@ -236,13 +236,13 @@ describe('AC 12: MCP tool transparent solution + capability support', () => {
       assert.equal(result.reQuestions, null);
 
       // s-curve result valid
-      const sc = result.evaluations['s-curve'];
+      const sc = result.evaluations['write:capacity:s-curve'];
       assert.ok(sc, 's-curve must be present');
       assert.ok(!sc.error, 's-curve should not error');
       assert.equal(typeof sc.evolution, 'number');
       assert.ok(sc.evolution >= 0 && sc.evolution <= 1);
       assert.equal(typeof sc.confidence, 'number');
-      assert.equal(sc.method, 's-curve');
+      assert.equal(sc.method, 'write:capacity:s-curve');
 
       // Routing metadata
       assertRoutingMetadataShape(result.routing, 'ERP');
@@ -263,7 +263,7 @@ describe('AC 12: MCP tool transparent solution + capability support', () => {
             name: 'DevOps',
             context: 'Development operations',
             space: 'economic',
-            strategy: 's-curve',
+            strategy: 'write:capacity:s-curve',
             certitude: 0.75,
             ubiquity: 0.80,
           },
@@ -376,7 +376,7 @@ describe('AC 12: MCP tool transparent solution + capability support', () => {
         name: 'infrastructure as code',
         context: 'Codifying infrastructure provisioning',
         space: 'economic',
-        strategy: 's-curve',
+        strategy: 'write:capacity:s-curve',
         certitude: 0.7,
         ubiquity: 0.8,
       });

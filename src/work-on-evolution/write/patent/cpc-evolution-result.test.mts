@@ -1,7 +1,7 @@
 // Test: CPC Evolution Strategy produces correct EvolutionResult shape
 //
 // Validates AC 2: Strategy produces EvolutionResult with
-// evolution, confidence, method:'cpc-evolution', certitude, ubiquity, and trace fields.
+// evolution, confidence, method:'write:capacity:cpc-evolution', certitude, ubiquity, and trace fields.
 //
 // Uses mock PatentDataSource and CPC mapper to isolate the strategy
 // from BigQuery and LLM dependencies.
@@ -132,7 +132,7 @@ async function main() {
   console.log('Strategy Identity:');
 
   await runTest('static method returns "cpc-evolution"', () => {
-    assert.equal(CpcEvolutionStrategy.method, 'cpc-evolution');
+    assert.equal(CpcEvolutionStrategy.method, 'write:capacity:cpc-evolution');
   });
 
   await runTest('extends BaseStrategy', () => {
@@ -210,7 +210,7 @@ async function main() {
     });
     const result = await strategy.evaluate(COMPONENT_FULL);
 
-    assert.equal(result.method, 'cpc-evolution');
+    assert.equal(result.method, 'write:capacity:cpc-evolution');
   });
 
   await runTest('certitude is a number in [0, 1]', async () => {
@@ -269,7 +269,7 @@ async function main() {
     assert.ok(steps.includes('patent-count'), 'trace missing patent-count step');
     assert.ok(steps.includes('aggregated') || steps.includes('certitude-indicators'),
       'trace missing aggregation/indicator step');
-    assert.ok(steps.includes('s-curve'), 'trace missing s-curve step');
+    assert.ok(steps.includes('write:capacity:s-curve'), 'trace missing s-curve step');
     assert.ok(steps.includes('confidence'), 'trace missing confidence step');
   });
 
@@ -302,7 +302,7 @@ async function main() {
     assert.ok('certitude' in result);
     assert.ok('ubiquity' in result);
     assert.ok('trace' in result);
-    assert.equal(result.method, 'cpc-evolution');
+    assert.equal(result.method, 'write:capacity:cpc-evolution');
   });
 
   await runTest('sparse data has lower confidence than rich data', async () => {
@@ -350,7 +350,7 @@ async function main() {
     assert.ok('ubiquity' in result);
     assert.ok('trace' in result);
 
-    assert.equal(result.method, 'cpc-evolution');
+    assert.equal(result.method, 'write:capacity:cpc-evolution');
     assert.ok(result.confidence >= 0.1, 'confidence should be >= 0.1 even with no data');
     assert.ok(result.confidence <= 0.95, 'confidence should be <= 0.95');
     BaseStrategy.validateResult(result);
@@ -368,7 +368,7 @@ async function main() {
     });
     const result = await strategy.evaluate(COMPONENT_MINIMAL);
 
-    assert.equal(result.method, 'cpc-evolution');
+    assert.equal(result.method, 'write:capacity:cpc-evolution');
     assert.equal(typeof result.evolution, 'number');
     assert.equal(typeof result.confidence, 'number');
     assert.equal(typeof result.certitude, 'number');
@@ -387,7 +387,7 @@ async function main() {
       cpcMapper: mockCpcMapper,
     });
     const result = await strategy.evaluate(COMPONENT_FULL);
-    const scurveStep = result.trace.find(t => t.step === 's-curve');
+    const scurveStep = result.trace.find(t => t.step === 'write:capacity:s-curve');
 
     assert.ok(scurveStep, 'trace must have s-curve step');
     assert.ok('evolution' in scurveStep, 's-curve step missing evolution');

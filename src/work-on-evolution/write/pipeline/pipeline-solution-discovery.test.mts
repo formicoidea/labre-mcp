@@ -307,7 +307,7 @@ describe('runEnrichedPipeline with solution discovery', () => {
 
     const standardResult = {
       evaluations: {
-        'llm-direct': { evolution: 0.55, confidence: 0.80 },
+        'write:capacity:llm-direct': { evolution: 0.55, confidence: 0.80 },
       },
       routing: { usedSolutionStrategies: false },
     };
@@ -373,7 +373,7 @@ describe('runEnrichedPipeline with solution discovery', () => {
   it('works when llmCall is not provided (graceful degradation)', async () => {
     const standardResult = {
       evaluations: {
-        'llm-direct': { evolution: 0.55, confidence: 0.80 },
+        'write:capacity:llm-direct': { evolution: 0.55, confidence: 0.80 },
       },
       routing: { usedSolutionStrategies: false },
     };
@@ -398,7 +398,7 @@ describe('runEnrichedPipeline with solution discovery', () => {
     const standardResult = {
       mode: 'oneshot',
       evaluations: {
-        'llm-direct': { evolution: 0.55, confidence: 0.80 },
+        'write:capacity:llm-direct': { evolution: 0.55, confidence: 0.80 },
       },
       routing: { usedSolutionStrategies: false },
       classification: { space: 'economic' },

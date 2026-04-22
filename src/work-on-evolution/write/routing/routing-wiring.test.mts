@@ -21,7 +21,7 @@ describe('AC 5020202: Routing wiring through mode-router and response-formatter'
       name: 'ERP',
       description: 'Enterprise resource planning',
       space: 'economic',
-      strategy: 's-curve',
+      strategy: 'write:capacity:s-curve',
       certitude: 0.9,
       ubiquity: 0.85,
     });
@@ -145,7 +145,7 @@ describe('AC 5020202: Routing wiring through mode-router and response-formatter'
       classification: { space: 'economic', reason: 'Market component', requiresReQuestion: false },
       reQuestions: null,
       evaluations: {
-        's-curve': { evolution: 0.75, confidence: 0.60, method: 's-curve' },
+        'write:capacity:s-curve': { evolution: 0.75, confidence: 0.60, method: 'write:capacity:s-curve' },
       },
       routing: {
         type: 'capability',
@@ -174,7 +174,7 @@ describe('AC 5020202: Routing wiring through mode-router and response-formatter'
       classification: { space: 'economic', reason: 'Market', requiresReQuestion: false },
       reQuestions: null,
       evaluations: {
-        's-curve': { evolution: 0.75, confidence: 0.60, method: 's-curve' },
+        'write:capacity:s-curve': { evolution: 0.75, confidence: 0.60, method: 'write:capacity:s-curve' },
       },
       routing: {
         type: 'capability',
@@ -202,7 +202,7 @@ describe('AC 5020202: Routing wiring through mode-router and response-formatter'
       classification: { space: 'economic', reason: 'Market', requiresReQuestion: false },
       reQuestions: null,
       evaluations: {
-        's-curve': { evolution: 0.75, confidence: 0.60, method: 's-curve' },
+        'write:capacity:s-curve': { evolution: 0.75, confidence: 0.60, method: 'write:capacity:s-curve' },
       },
       message: 'Test',
     };
