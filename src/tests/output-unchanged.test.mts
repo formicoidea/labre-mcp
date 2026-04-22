@@ -12,8 +12,8 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { setVerbose } from '../lib/mcp-notifications.mjs';
-import { estimateEvolutionOneShot } from '../work-on-evolution/estimate-evolution.mjs';
-import { parseWardleyMap, formatEvaluationReport } from '../work-on-evolution/evaluate-map/evaluate-map.mjs';
+import { estimateEvolutionOneShot } from '../work-on-evolution/write/estimate-evolution.mjs';
+import { parseWardleyMap, formatEvaluationReport } from '../work-on-evolution/write/evaluate-map/evaluate-map.mjs';
 import { handleRequest, REGISTERED_TOOLS, TOOL_HANDLERS } from '../mcp/mcp-server.mjs';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────

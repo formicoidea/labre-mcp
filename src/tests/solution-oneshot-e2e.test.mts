@@ -14,7 +14,7 @@
 
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { estimateEvolutionOneShot } from '../work-on-evolution/estimate-evolution.mjs';
+import { estimateEvolutionOneShot } from '../work-on-evolution/write/estimate-evolution.mjs';
 import {
   detectComponentType,
   COMPONENT_TYPE,
@@ -23,7 +23,7 @@ import {
   determineRoutingTargets,
   dispatchSolutionStrategies,
   EVAL_MODES,
-} from '../work-on-evolution/routing/solution-dispatch.mjs';
+} from '../work-on-evolution/write/routing/solution-dispatch.mjs';
 
 // ─── Test Suite ───────────────────────────────────────────────────────────
 

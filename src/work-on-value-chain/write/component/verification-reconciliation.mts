@@ -6,7 +6,7 @@
 // into a single classification decision.
 
 import { COMPONENT_TYPE } from '../../../lib/component-detection.mjs';
-import { determineRoutingTargets } from '../../../work-on-evolution/routing/solution-dispatch.mjs';
+import { determineRoutingTargets } from '../../../work-on-evolution/write/routing/solution-dispatch.mjs';
 import type { VerificationSignal, CombinedSignalResult } from '../../../types/pipeline.mjs';
 import type { ComponentTypeDetection } from '../../../types/routing.mjs';
 

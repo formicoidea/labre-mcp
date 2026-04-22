@@ -1,7 +1,7 @@
 // Classification gate types.
 //
 // Transcribed from JSDoc @typedef in
-// src/work-on-evolution/routing/classification-gate.mjs.
+// src/work-on-evolution/write/routing/classification-gate.mjs.
 
 /** Espace économique déterminé par le classification gate. */
 export type EconomicSpace = 'social_good' | 'common_good' | 'economic';

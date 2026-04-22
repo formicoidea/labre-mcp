@@ -1,7 +1,7 @@
 // Routing & mode-router types.
 //
 // Transcribed from JSDoc @typedef in
-// src/work-on-evolution/routing/mode-router.mjs, with the conditional
+// src/work-on-evolution/write/routing/mode-router.mjs, with the conditional
 // pipeline fields promoted to a proper discriminated union.
 
 import type { EvolutionResult } from './evolution.mjs';

@@ -10,11 +10,11 @@
 import { z } from 'zod';
 import type { McpToolDefinition, JsonSchema } from '../types/mcp.mjs';
 import { EstimateEvolutionInputSchema, type EstimateEvolutionInput } from '../schemas/estimate-evolution.schema.mjs';
-import { classifyComponent, buildReQuestions } from '../work-on-evolution/routing/classification-gate.mjs';
-import { loadStrategies, getStrategy, listStrategies } from '../work-on-evolution/strategies/capacity/registry.mjs';
-import { BaseStrategy } from '../work-on-evolution/strategies/capacity/base-strategy.mjs';
-import { estimateEvolutionOneShot, estimateEvolutionConversational } from '../work-on-evolution/estimate-evolution.mjs';
-import { routeEstimateEvolution, detectMode, MODES } from '../work-on-evolution/routing/mode-router.mjs';
+import { classifyComponent, buildReQuestions } from '../work-on-evolution/write/routing/classification-gate.mjs';
+import { loadStrategies, getStrategy, listStrategies } from '../work-on-evolution/write/strategies/capacity/registry.mjs';
+import { BaseStrategy } from '../work-on-evolution/write/strategies/capacity/base-strategy.mjs';
+import { estimateEvolutionOneShot, estimateEvolutionConversational } from '../work-on-evolution/write/estimate-evolution.mjs';
+import { routeEstimateEvolution, detectMode, MODES } from '../work-on-evolution/write/routing/mode-router.mjs';
 import { toErrorMessage, errorCode } from '../lib/errors.mjs';
 
 // ─── MCP Tool Definition Schema ──────────────────────────────────────────────

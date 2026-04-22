@@ -2,10 +2,10 @@
 // and confidence measures (entropy, concentration).
 //
 // Single source of truth for the arithmetic that was previously duplicated in:
-//   - work-on-evolution/s-curve/s-curve.mts (pubEvolution)
-//   - work-on-evolution/strategies/capacity/publication-analysis-strategy.mts
+//   - work-on-evolution/write/s-curve/s-curve.mts (pubEvolution)
+//   - work-on-evolution/write/strategies/capacity/publication-analysis-strategy.mts
 //     (advancedPubEvolution, concentration)
-//   - work-on-evolution/strategies/capacity/logprob-distribution-strategy.mts
+//   - work-on-evolution/write/strategies/capacity/logprob-distribution-strategy.mts
 //     (normalizedEntropy, centroid loop)
 
 import type { PhaseDistribution } from '../schemas/inputs.schema.mjs';

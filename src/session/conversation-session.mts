@@ -31,7 +31,7 @@
 //   // ... exchange more turns ...
 //   if (session.isReadyForEstimation()) { ... }
 
-import { classifyComponent, buildReQuestions } from '../work-on-evolution/routing/classification-gate.mjs';
+import { classifyComponent, buildReQuestions } from '../work-on-evolution/write/routing/classification-gate.mjs';
 import type { SessionState, SessionExchange, SessionSummary } from '../types/session.mjs';
 import type { PhaseDistribution } from '../schemas/inputs.schema.mjs';
 import { phase4Distribution } from '../schemas/inputs.schema.mjs';
@@ -454,7 +454,7 @@ export class ConversationSession {
 
   /**
    * Get the classification result for the current component.
-   * @returns {import('../work-on-evolution/routing/classification-gate.mjs').ClassificationResult | null}
+   * @returns {import('../work-on-evolution/write/routing/classification-gate.mjs').ClassificationResult | null}
    */
   getClassification() {
     if (!this.state.name) return null;
@@ -488,7 +488,7 @@ export class ConversationSession {
    * Build the component input object for strategy evaluation.
    * Merges all gathered and inferred data.
    *
-   * @returns {import('../work-on-evolution/strategies/capacity/base-strategy.mjs').ComponentInput}
+   * @returns {import('../work-on-evolution/write/strategies/capacity/base-strategy.mjs').ComponentInput}
    */
   /**
    * Compose the context string passed downstream. Solution-mode slots

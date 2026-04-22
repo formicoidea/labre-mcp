@@ -1,7 +1,7 @@
 // Zod schema for PatentData — used at the BigQuery/mock boundary to validate
 // the exact runtime shape expected by the 8 patent indicators.
 // Source of truth for both the runtime validator (validatePatentData) and
-// the TypeScript types used across src/lib/patent/ and work-on-evolution/patent/.
+// the TypeScript types used across src/lib/patent/ and work-on-evolution/write/patent/.
 
 import { z } from 'zod';
 

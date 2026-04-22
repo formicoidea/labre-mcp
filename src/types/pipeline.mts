@@ -1,7 +1,7 @@
 // Enriched pipeline types (capability pivot + SotA/legacy discovery).
 //
 // Transcribed from JSDoc @typedef in
-// src/work-on-evolution/pipeline/pipeline-enriched.mjs.
+// src/work-on-evolution/write/pipeline/pipeline-enriched.mjs.
 
 import type { CapabilityNature } from './evolution.mjs';
 import type { EvaluationsMap, RoutingMetadata } from './routing.mjs';

@@ -12,7 +12,7 @@ import {
   detectComponentType,
   COMPONENT_TYPE,
 } from '../../../lib/component-detection.mjs';
-import { classifySolutionLLM } from '../../../work-on-evolution/routing/detect-solution.mjs';
+import { classifySolutionLLM } from '../../../work-on-evolution/write/routing/detect-solution.mjs';
 import { verifyViaWebSearch, combineWithPriorResult } from './web-search-verification.mjs';
 import { logDebug } from '../../../lib/mcp-notifications.mjs';
 import {

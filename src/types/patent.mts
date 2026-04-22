@@ -1,4 +1,4 @@
-// Patent domain types — used by lib/patent/* and work-on-evolution/patent/*
+// Patent domain types — used by lib/patent/* and work-on-evolution/write/patent/*
 //
 // Source of truth lives in src/schemas/patent.schema.mts (Zod). This file
 // re-exports the inferred types for convenience and keeps indicator/BigQuery

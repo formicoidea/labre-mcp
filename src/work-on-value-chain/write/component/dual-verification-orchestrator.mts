@@ -40,8 +40,8 @@ import {
 } from '../../../lib/component-detection.mjs';
 import {
   determineRoutingTargets,
-} from '../../../work-on-evolution/routing/solution-dispatch.mjs';
-import { classifySolutionLLM } from '../../../work-on-evolution/routing/detect-solution.mjs';
+} from '../../../work-on-evolution/write/routing/solution-dispatch.mjs';
+import { classifySolutionLLM } from '../../../work-on-evolution/write/routing/detect-solution.mjs';
 import { verifyViaWebSearch, combineWithPriorResult } from './web-search-verification.mjs';
 import { logDebug } from '../../../lib/mcp-notifications.mjs';
 import {

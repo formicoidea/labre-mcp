@@ -13,7 +13,7 @@ import { describe, it, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { handleEstimateEvolution, ESTIMATE_EVOLUTION_TOOL } from './mcp-tool.mjs';
 import { handleRequest, REGISTERED_TOOLS, TOOL_HANDLERS } from './mcp-server.mjs';
-import { routeEstimateEvolution } from '../work-on-evolution/routing/mode-router.mjs';
+import { routeEstimateEvolution } from '../work-on-evolution/write/routing/mode-router.mjs';
 import {
   detectComponentType,
   COMPONENT_TYPE,
@@ -21,7 +21,7 @@ import {
 import {
   determineRoutingTargets,
   EVAL_MODES,
-} from '../work-on-evolution/routing/solution-dispatch.mjs';
+} from '../work-on-evolution/write/routing/solution-dispatch.mjs';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 

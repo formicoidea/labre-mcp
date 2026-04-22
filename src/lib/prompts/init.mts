@@ -14,24 +14,24 @@
 import { registerParser } from './parsers-registry.mjs';
 
 import { parseCapabilityResponse } from '../../work-on-value-chain/write/component/identify-capability.mjs';
-import { parseAnchorResponse } from '../../work-on-evolution/strategies/anchor/estimate-anchor-evolution.mjs';
-import { parsePubResponse } from '../../work-on-evolution/strategies/capacity/publication-analysis-strategy.mjs';
-import { parseFallbackPhase } from '../../work-on-evolution/strategies/capacity/logprob-distribution-strategy.mjs';
-import { parseHistoryIterationResponse } from '../../work-on-evolution/strategies/capacity/timeline-benchmark-strategy.mjs';
-import { parseLLMDirectResponse } from '../../work-on-evolution/strategies/capacity/llm-direct-strategy.mjs';
+import { parseAnchorResponse } from '../../work-on-evolution/write/strategies/anchor/estimate-anchor-evolution.mjs';
+import { parsePubResponse } from '../../work-on-evolution/write/strategies/capacity/publication-analysis-strategy.mjs';
+import { parseFallbackPhase } from '../../work-on-evolution/write/strategies/capacity/logprob-distribution-strategy.mjs';
+import { parseHistoryIterationResponse } from '../../work-on-evolution/write/strategies/capacity/timeline-benchmark-strategy.mjs';
+import { parseLLMDirectResponse } from '../../work-on-evolution/write/strategies/capacity/llm-direct-strategy.mjs';
 import {
   parseCpcPickClass,
   parseCpcPickFromList,
   parseCpcFallback,
-} from '../../work-on-evolution/patent/cpc-mapper.mjs';
-import { parseCpcSotExtraction } from '../../work-on-evolution/strategies/capacity/cpc-evolution-strategy.mjs';
-import { parseSolutionDiscoveryResponse } from '../../work-on-evolution/pipeline/pipeline-enriched.mjs';
+} from '../../work-on-evolution/write/patent/cpc-mapper.mjs';
+import { parseCpcSotExtraction } from '../../work-on-evolution/write/strategies/capacity/cpc-evolution-strategy.mjs';
+import { parseSolutionDiscoveryResponse } from '../../work-on-evolution/write/pipeline/pipeline-enriched.mjs';
 import { parseWebSearchResponse } from '../../work-on-value-chain/write/component/web-search-verification.mjs';
-import { parseLLMClassificationResponse } from '../../work-on-evolution/routing/detect-solution.mjs';
+import { parseLLMClassificationResponse } from '../../work-on-evolution/write/routing/detect-solution.mjs';
 import {
   parseAutoResponse,
   parseSinglePropertyResponse,
-} from '../../work-on-evolution/strategies/solution/properties-strategy.mjs';
+} from '../../work-on-evolution/write/strategies/solution/properties-strategy.mjs';
 
 registerParser('cpcSotExtraction',      parseCpcSotExtraction);
 registerParser('identifyCapability',    parseCapabilityResponse);
