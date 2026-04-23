@@ -141,23 +141,37 @@ export async function dispatchSolutionStrategies(component: any, options: any = 
 
   if (strategy === 'all') {
     const strategies = await loadSolutionStrategies();
-    const strategyNames = [...strategies.keys()];
+    const strategyEntries = [...strategies];
+    const strategyNames = strategyEntries.map(([m]) => m);
 
     logDebug('solution-dispatch',
       `Running ${strategyNames.length} solution strategy(ies) for "${component.name}": ${strategyNames.join(', ')}`);
+    for (const method of strategyNames) {
+      logDebug('solution-dispatch', `Running solution strategy "${method}" on "${component.name}"...`);
+    }
 
-    for (const [method, StrategyCls] of strategies) {
-      try {
-        logDebug('solution-dispatch', `Running solution strategy "${method}" on "${component.name}"...`);
+    // Solution strategies are independent — parallelize via Promise.allSettled.
+    // AsyncLocalStorage keeps the ambient degradation collector isolated per
+    // async branch so per-strategy events do not bleed.
+    const settled = await Promise.allSettled(
+      strategyEntries.map(async ([method, StrategyCls]) => {
         const instance = createSolutionStrategyInstance(StrategyCls, { llmCall, mode });
         const rawResult = await Promise.resolve(instance.evaluate(solutionComponent));
-        // Enrich with structured metadata (phase distribution, stage, confidence metadata)
+        return { method, rawResult } as const;
+      }),
+    );
+    for (let i = 0; i < settled.length; i++) {
+      const [method] = strategyEntries[i];
+      const r = settled[i];
+      if (r.status === 'fulfilled') {
+        const { rawResult } = r.value;
         evaluations[method] = assembleSolutionResult(rawResult, { mode });
         logDebug('solution-dispatch',
           `Solution "${method}": evolution=${rawResult.evolution}, confidence=${rawResult.confidence}`);
-      } catch (err) {
-        evaluations[method] = { error: toErrorMessage(err) };
-        logDebug('solution-dispatch', `Solution "${method}" failed: ${toErrorMessage(err)}`);
+      } else {
+        const err = toErrorMessage(r.reason);
+        evaluations[method] = { error: err };
+        logDebug('solution-dispatch', `Solution "${method}" failed: ${err}`);
       }
     }
   } else {

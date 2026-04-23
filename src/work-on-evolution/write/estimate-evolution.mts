@@ -180,18 +180,21 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
 
       logDebug(TOOL, `Loaded ${strategyNames.length} capability strategies for "${name}": ${strategyNames.join(', ')}`);
 
-      // Phase A: Run all non-s-curve strategies first (they may produce certitude/ubiquity)
-      for (const [method, StrategyCls] of strategies) {
-        if (method === 'write:capacity:s-curve') continue;
-        try {
-          logDebug(TOOL, msg('step.strategy', { strategy: method, component: name }));
-          const instance = createStrategyInstance(StrategyCls);
-          const result = await Promise.resolve(instance.evaluate(component));
+      // Phase A: Run all non-s-curve strategies in parallel via the shared
+      // helper. Phase B (enrichment) and Phase C (s-curve) stay sequential
+      // below because they depend on phase A outputs.
+      const phaseA = [...strategies].filter(([m]) => m !== 'write:capacity:s-curve');
+      for (const [method] of phaseA) {
+        logDebug(TOOL, msg('step.strategy', { strategy: method, component: name }));
+      }
+      const phaseAOutcomes = await evaluateStrategiesInParallel(phaseA, component);
+      for (const { method, result, error } of phaseAOutcomes) {
+        if (error == null) {
           evaluations[method] = result;
           logDebug(TOOL, msg('step.strategy.result', { strategy: method, evolution: result.evolution, confidence: result.confidence }));
-        } catch (err) {
-          evaluations[method] = { error: toErrorMessage(err) };
-          logDebug(TOOL, msg('step.strategy.error', { strategy: method, error: toErrorMessage(err) }));
+        } else {
+          evaluations[method] = { error };
+          logDebug(TOOL, msg('step.strategy.error', { strategy: method, error }));
         }
       }
 
@@ -393,6 +396,40 @@ function createStrategyInstance(StrategyCls: any): any {
   return new StrategyCls();
 }
 
+/**
+ * Evaluate a set of strategy entries against a component in parallel.
+ *
+ * Each strategy is independent (no cross-strategy state), so they run
+ * concurrently via `Promise.allSettled`. Input order is preserved in the
+ * output array, which lets callers zip the result back with their own
+ * per-strategy logging/i18n context.
+ *
+ * The degradation collector uses AsyncLocalStorage (see src/lib/degradation/
+ * context.mts) so each async branch inherits the caller's ambient context —
+ * per-strategy events do not bleed between concurrent frames.
+ *
+ * A strategy that throws produces `{ error }` for that slot; the other
+ * strategies are unaffected.
+ */
+// any: StrategyCtor is a constructor type with shifting `new (...args: any[])` signatures
+export async function evaluateStrategiesInParallel(
+  entries: ReadonlyArray<readonly [string, any]>,
+  component: any,
+): Promise<Array<{ method: string; result: any; error?: string }>> {
+  const settled = await Promise.allSettled(
+    entries.map(async ([method, StrategyCls]) => {
+      const instance = createStrategyInstance(StrategyCls);
+      const result = await Promise.resolve(instance.evaluate(component));
+      return { method, result } as const;
+    }),
+  );
+  return settled.map((r, i) => {
+    const [method] = entries[i];
+    if (r.status === 'fulfilled') return { method, result: r.value.result };
+    return { method, result: null, error: toErrorMessage(r.reason) };
+  });
+}
+
 // ─── Conversational Mode ────────────────────────────────────────────────────
 
 /**
@@ -580,19 +617,21 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
     if (convRoutingTargets.useCapabilityStrategies) {
       if (selectedStrategy === 'all') {
         const strategies = await loadStrategies();
-        const strategyNames = [...strategies.keys()];
+        const strategyEntries = [...strategies];
+        const strategyNames = strategyEntries.map(([m]) => m);
         logDebug(TOOL, `Running ${strategyNames.length} capability strategies: ${strategyNames.join(', ')}`);
+        for (const method of strategyNames) {
+          logDebug(TOOL, `Running strategy "${method}" on "${session.state.name}"...`);
+        }
 
-        for (const [method, StrategyCls] of strategies) {
-          try {
-            logDebug(TOOL, `Running strategy "${method}" on "${session.state.name}"...`);
-            const instance = createStrategyInstance(StrategyCls);
-            const result = await Promise.resolve(instance.evaluate(component));
+        const outcomes = await evaluateStrategiesInParallel(strategyEntries, component);
+        for (const { method, result, error } of outcomes) {
+          if (error == null) {
             evaluations[method] = result;
             logDebug(TOOL, `Strategy "${method}": evolution=${result.evolution}, confidence=${result.confidence}`);
-          } catch (err) {
-            evaluations[method] = { error: toErrorMessage(err) };
-            logDebug(TOOL, `Strategy "${method}" failed: ${toErrorMessage(err)}`);
+          } else {
+            evaluations[method] = { error };
+            logDebug(TOOL, `Strategy "${method}" failed: ${error}`);
           }
         }
       } else {

@@ -177,112 +177,169 @@ export async function evaluateMapComponents(parsedMap: ParsedWardleyMap, options
   // own `degradationEvents` for fine-grained client-side display.
   const parentCollector = getCurrentCollector();
 
-  for (let i = 0; i < allItems.length; i++) {
-    const item = allItems[i];
+  // Components are evaluated in parallel — each iteration owns its own
+  // sub-collector via AsyncLocalStorage isolation (see
+  // src/lib/degradation/context.mts). Post-settle we re-walk the results
+  // in input order to push the final evaluations[] entries and merge the
+  // sub-collectors into the parent collector; Promise.allSettled insulates
+  // unexpected throws.
+  //
+  // No concurrency cap is applied intentionally (deliberate project choice).
+  // Large maps (20+ components x N strategies) may hit provider rate-limits;
+  // such errors surface in evaluations[i].reason and are non-fatal.
+  type PerItemOutcome = {
+    entry: MapItemEvaluation;
+    subCollector: DegradationCollector | null;
+  };
 
-    // Debug: per-component progress
-    if (msg) {
-      logDebug(TOOL, msg('step.evaluation.progress', {
-        current: i + 1,
-        total: allItems.length,
-        component: item.name,
-      }));
-    }
-
-    // Classification gate
-    const classification = classifyComponent(item.name, context);
-
-    // Debug: classification result
-    if (msg) {
-      logDebug(TOOL, msg('step.classification', {
-        component: item.name,
-        space: classification.space,
-      }));
-    }
-
-    if (classification.requiresReQuestion) {
-      // Debug: skipped component
+  const settled = await Promise.allSettled(
+    allItems.map(async (item, i): Promise<PerItemOutcome> => {
+      // Debug: per-component progress
       if (msg) {
-        logDebug(TOOL, msg('step.evaluation.skipped', {
+        logDebug(TOOL, msg('step.evaluation.progress', {
+          current: i + 1,
+          total: allItems.length,
           component: item.name,
-          reason: classification.space,
         }));
       }
-      evaluations.push({
-        name: item.name,
-        type: item.type,
-        originalMaturity: item.maturity,
-        newMaturity: null,
-        classification: classification.space,
-        strategies: null,
-        skipped: true,
-        reason: classification.reason,
-      });
-      continue;
-    }
 
-    // Per-component sub-collector. estimateEvolutionOneShot and every
-    // strategy below it observe THIS collector via AsyncLocalStorage, so
-    // events captured during this iteration belong to this component
-    // only — they're attached to its evaluations[] entry below.
-    const subCollector = new DegradationCollector(`evaluateMap:${item.name}`);
+      // Classification gate
+      const classification = classifyComponent(item.name, context);
 
-    // Evaluate via estimateEvolution
-    try {
-      const result = await withCollector(subCollector, () => estimateEvolutionOneShot({
-        name: item.name,
-        description: context,
-        strategy,
-      }));
-
-      const stratResults: Record<string, any> = {};
-      let bestEvolution = item.maturity;
-
-      if (result.evaluations) {
-        for (const [method, ev] of Object.entries(result.evaluations) as [string, any][]) {
-          if (!ev.error) {
-            stratResults[method] = { evolution: ev.evolution, confidence: ev.confidence };
-          }
-        }
-
-        // Pick the strategy with highest confidence
-        const best = (Object.entries(stratResults) as [string, any][])
-          .filter(([, v]) => v.evolution >= 0 && v.evolution <= 1)
-          .sort((a, b) => b[1].confidence - a[1].confidence)[0];
-
-        if (best) {
-          bestEvolution = Math.round(best[1].evolution * 100) / 100;
-          // Debug: best evolution picked
-          if (msg) {
-            logDebug(TOOL, msg('step.evaluation.bestpick', {
-              component: item.name,
-              evolution: bestEvolution,
-              strategy: best[0],
-              confidence: best[1].confidence,
-            }));
-          }
-        }
+      // Debug: classification result
+      if (msg) {
+        logDebug(TOOL, msg('step.classification', {
+          component: item.name,
+          space: classification.space,
+        }));
       }
 
-      evaluations.push({
-        name: item.name,
-        type: item.type,
-        originalMaturity: item.maturity,
-        newMaturity: bestEvolution,
-        delta: Math.round((bestEvolution - item.maturity) * 100) / 100,
-        classification: 'economic',
-        strategies: stratResults,
-        skipped: false,
-        degradationEvents: subCollector.getEvents(),
-      });
-    } catch (err) {
+      if (classification.requiresReQuestion) {
+        // Debug: skipped component
+        if (msg) {
+          logDebug(TOOL, msg('step.evaluation.skipped', {
+            component: item.name,
+            reason: classification.space,
+          }));
+        }
+        return {
+          entry: {
+            name: item.name,
+            type: item.type,
+            originalMaturity: item.maturity,
+            newMaturity: null,
+            classification: classification.space,
+            strategies: null,
+            skipped: true,
+            reason: classification.reason,
+          },
+          subCollector: null,
+        };
+      }
+
+      // Per-component sub-collector. estimateEvolutionOneShot and every
+      // strategy below it observe THIS collector via AsyncLocalStorage, so
+      // events captured during this iteration belong to this component only.
+      const subCollector = new DegradationCollector(`evaluateMap:${item.name}`);
+
+      try {
+        const result = await withCollector(subCollector, () => estimateEvolutionOneShot({
+          name: item.name,
+          description: context,
+          strategy,
+        }));
+
+        const stratResults: Record<string, any> = {};
+        let bestEvolution = item.maturity;
+
+        if (result.evaluations) {
+          for (const [method, ev] of Object.entries(result.evaluations) as [string, any][]) {
+            if (!ev.error) {
+              stratResults[method] = { evolution: ev.evolution, confidence: ev.confidence };
+            }
+          }
+
+          // Pick the strategy with highest confidence
+          const best = (Object.entries(stratResults) as [string, any][])
+            .filter(([, v]) => v.evolution >= 0 && v.evolution <= 1)
+            .sort((a, b) => b[1].confidence - a[1].confidence)[0];
+
+          if (best) {
+            bestEvolution = Math.round(best[1].evolution * 100) / 100;
+            // Debug: best evolution picked
+            if (msg) {
+              logDebug(TOOL, msg('step.evaluation.bestpick', {
+                component: item.name,
+                evolution: bestEvolution,
+                strategy: best[0],
+                confidence: best[1].confidence,
+              }));
+            }
+          }
+        }
+
+        return {
+          entry: {
+            name: item.name,
+            type: item.type,
+            originalMaturity: item.maturity,
+            newMaturity: bestEvolution,
+            delta: Math.round((bestEvolution - item.maturity) * 100) / 100,
+            classification: 'economic',
+            strategies: stratResults,
+            skipped: false,
+            degradationEvents: subCollector.getEvents(),
+          },
+          subCollector,
+        };
+      } catch (err) {
+        logError(TOOL, msg
+          ? msg('error.generic', { tool: TOOL, error: toErrorMessage(err) })
+          : `Error evaluating "${item.name}": ${toErrorMessage(err)}`);
+        // Record the unexpected throw on the sub-collector before merging,
+        // so the parent's degraded flag flips and the per-component entry
+        // includes the failure in its degradationEvents.
+        subCollector.recordError(`evaluateMap:${item.name}`, err, { recoverable: true });
+        return {
+          entry: {
+            name: item.name,
+            type: item.type,
+            originalMaturity: item.maturity,
+            newMaturity: null,
+            classification: 'economic',
+            strategies: null,
+            skipped: true,
+            reason: toErrorMessage(err),
+            degradationEvents: subCollector.getEvents(),
+          },
+          subCollector,
+        };
+      }
+    }),
+  );
+
+  // Walk outcomes in input order so the output array is deterministic.
+  // Merge each per-component sub-collector into the parent so the global
+  // result reports degraded:true when any component degraded.
+  for (let i = 0; i < settled.length; i++) {
+    const item = allItems[i];
+    const r = settled[i];
+    if (r.status === 'fulfilled') {
+      evaluations.push(r.value.entry);
+      if (parentCollector && r.value.subCollector) {
+        parentCollector.merge(r.value.subCollector);
+      }
+    } else {
+      // Defensive — the inner try/catch returns a structured entry, so this
+      // branch should not normally be hit. Kept to make Promise.allSettled
+      // totally non-throwing in practice.
+      const reason = toErrorMessage(r.reason);
       logError(TOOL, msg
-        ? msg('error.generic', { tool: TOOL, error: toErrorMessage(err) })
-        : `Error evaluating "${item.name}": ${toErrorMessage(err)}`);
-      // Record the unexpected throw on the sub-collector before merging,
-      // so the parent's degraded flag flips and the per-component entry
-      // includes the failure in its degradationEvents.
-      subCollector.recordError(`evaluateMap:${item.name}`, err, { recoverable: true });
+        ? msg('error.generic', { tool: TOOL, error: reason })
+        : `Unexpected throw evaluating "${item.name}": ${reason}`);
+      if (parentCollector) {
+        parentCollector.recordError(`evaluateMap:${item.name}`, r.reason, { recoverable: true });
+      }
       evaluations.push({
         name: item.name,
         type: item.type,
@@ -291,13 +348,8 @@ export async function evaluateMapComponents(parsedMap: ParsedWardleyMap, options
         classification: 'economic',
         strategies: null,
         skipped: true,
-        reason: toErrorMessage(err),
-        degradationEvents: subCollector.getEvents(),
+        reason,
       });
-    } finally {
-      // Merge the per-component events into the parent so the global
-      // result reports degraded:true when any component degraded.
-      if (parentCollector) parentCollector.merge(subCollector);
     }
   }
 
