@@ -52,6 +52,22 @@ client MCP -> mcp-server.mts
 
 Au boot, `src/mcp/boot-health-checks.mts` enregistre un health-check par dependance externe (`bigquery`, `llm:claude`, `llm:opencode`, `web-search`). Voir [degradation.md](degradation.md) pour les details.
 
+## Parallélisation des appels indépendants
+
+Partout où le MCP lance plusieurs appels indépendants dans la même invocation, on utilise **`Promise.allSettled`** — jamais un `for...of + await` séquentiel. Concrètement :
+
+- **Phase A capability** (`src/work-on-evolution/write/estimate-evolution.mts`) : les 5-6 stratégies non-s-curve tournent en parallèle via le helper exporté `evaluateStrategiesInParallel(entries, component)`. La phase B (moyenne certitude/ubiquity) et la phase C (s-curve enrichi) restent séquentielles car elles dépendent des résultats précédents.
+- **Solution dispatch** (`src/work-on-evolution/write/routing/solution-dispatch.mts:149`) : les stratégies solution tournent en parallèle quand `strategy === 'all'`.
+- **`evaluateMap`** (`src/work-on-evolution/write/evaluate-map/evaluate-map.mts`) : les composants d'une map sont évalués en parallèle. Chaque composant reçoit son propre `DegradationCollector` injecté via `withCollector` et est mergé dans le collector parent après le settle, dans l'ordre d'input pour un output déterministe.
+
+**Isolation des collectors** : la parallélisation est sûre parce que `src/lib/degradation/context.mts` utilise `AsyncLocalStorage`. Chaque branche async d'un `Promise.allSettled` hérite du contexte parent et voit son propre collector ambient — zéro fuite d'événements entre branches concurrentes. Cet invariant est vérifié empiriquement par `src/work-on-evolution/write/estimate-evolution.parallel.test.mts`.
+
+**Choix délibérés** :
+- Pas de borne de concurrence. Les maps larges peuvent saturer un provider LLM ; ces erreurs remontent dans `evaluations[i].reason` sans bloquer le batch. Ré-ouvrable en backlog si ça se manifeste.
+- Pas de timeout per-stratégie. Une stratégie lente bloque uniquement son slot, pas le batch.
+
+**Garde pour les nouvelles contributions** : dès qu'un call-site boucle sur un ensemble d'opérations indépendantes (stratégies, composants, signals), il doit utiliser `Promise.allSettled` — pas `for...of await`. Préserver la sémantique "une erreur n'en tue pas les autres" via un `try` interne ou le shape `{ status: 'fulfilled' | 'rejected' }`.
+
 ## TypeScript strict + Zod
 
 Le projet est en **TypeScript strict** (`tsconfig.json` → `"strict": true`), extensions `.mts` (ESM strict). La chaine de build `tsc` compile `src/**/*.mts` vers `dist/**/*.mjs` + `dist/**/*.d.mts`.
@@ -215,7 +231,7 @@ flowchart TD
     subgraph CapPipe["Pipeline Capability"]
         direction TB
         CLoad["loadStrategies()"]
-        CLoad --> PhaseA["Phase A : llm-direct, logprob,\npub-analysis, timeline, sector-agent"]
+        CLoad --> PhaseA["Phase A (parallèle) : llm-direct, logprob,\npub-analysis, timeline, sector-agent\nvia evaluateStrategiesInParallel → Promise.allSettled"]
         PhaseA --> PhaseB["Phase B : enrichissement\nmoyenne certitude/ubiquity"]
         PhaseB --> PhaseC["Phase C : s-curve enrichie"]
     end

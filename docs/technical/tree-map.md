@@ -145,7 +145,8 @@ src/
     │
     └── write/                   (toutes les stratégies actuelles : évolution inventée depuis un nom)
         │
-        ├── estimate-evolution.mts                Orchestrateur principal
+        ├── estimate-evolution.mts                Orchestrateur principal ; exporte evaluateStrategiesInParallel pour la phase A
+        ├── estimate-evolution.parallel.test.mts  Vérifie Promise.allSettled + isolation AsyncLocalStorage du collector
         ├── skill-handler.mts                     Handler Agent SDK dédié à estimateEvolution
         ├── skill-handler-parse.test.mts
         │
