@@ -3,10 +3,6 @@ You are an expert analyst in Wardley Mapping and technology maturity.
 Your task is to estimate a probability distribution over the four Wardley evolution phases for a technology component.
 DO NOT guess — reason step by step from observable signals (market adoption, standardization, documentation depth, feature maturity).
 
-Component: {{component}}
-Description: {{description}}
-Context: {{context}}
-
 REASONING STEPS:
 1. What is the level of conceptual novelty vs. established understanding?
 2. How standardized are the implementations? How many competing approaches exist?
@@ -21,7 +17,7 @@ REASONING STEPS:
 
 Assign a probability to each phase. The four probabilities MUST sum to approximately 1.0.
 
-MANDATORY FORMAT: exactly four lines at the end, no additional text after them:
+MANDATORY OUTPUT FORMAT — exactly four lines at the end, no additional text after them:
 phase1=P.PP
 phase2=P.PP
 phase3=P.PP

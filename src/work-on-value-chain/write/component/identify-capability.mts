@@ -83,16 +83,17 @@ export async function identifyCapability(component: any, llmCall?: any): Promise
   }
 
   const p = getPrompt('identify-capability');
+  const built = p.build({
+    component: component.name || '',
+    description: component.description ?? '',
+    context: component.context ?? '',
+  });
   // Wrap the LLM call so a failure (rate limit, auth, network) surfaces
   // on the ambient degradation collector — the caller still receives a
   // valid capability shape, but the MCP envelope flips degraded:true.
   const response = await tryDegradeAmbient(
     'llm:identify-capability',
-    () => llmCall(p.build({
-      component: component.name || '',
-      description: component.description ?? '',
-      context: component.context ?? '',
-    })),
+    () => llmCall(built.user, undefined, { systemPrompt: built.system }),
     '',
   );
   const result = p.parse(response, component);

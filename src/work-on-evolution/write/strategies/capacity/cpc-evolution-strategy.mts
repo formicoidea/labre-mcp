@@ -637,7 +637,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
       .join('\n');
 
     const p = getPrompt('cpc-evolution', 'sot-extraction');
-    const prompt = p.build({
+    const built = p.build({
       cpc_context: cpcContext,
       component_name: component.name || '',
       evolution_score: evolution.toFixed(2),
@@ -645,7 +645,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
     });
 
     try {
-      const response = await this._llmCall(prompt);
+      const response = await this._llmCall(built.user, undefined, { systemPrompt: built.system });
       const raw = p.parse(response) as { name: string; description: string; evolution: number | null } | null;
       if (raw) {
         return {

@@ -75,7 +75,7 @@ export class LLMDirectStrategy extends BaseStrategy {
     const p = hasCapability
       ? getPrompt('llm-direct', 'with-capability')
       : getPrompt('llm-direct', 'without-capability');
-    const prompt = hasCapability
+    const built = hasCapability
       ? p.build({
           capability: component.capability ?? '',
           description: component.description ?? '',
@@ -89,7 +89,7 @@ export class LLMDirectStrategy extends BaseStrategy {
           date: dateStr,
         });
 
-    const response = await this._llmCall(prompt);
+    const response = await this._llmCall(built.user, undefined, { systemPrompt: built.system });
     const parsed = p.parse(response);
 
     const evolution = Math.round(

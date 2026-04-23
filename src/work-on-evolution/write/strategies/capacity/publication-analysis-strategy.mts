@@ -12,6 +12,7 @@
 
 import { BaseStrategy } from './base-strategy.mjs';
 import type { ComponentInput, EvolutionResult, PhaseDistribution } from '../../../../types/evolution.mjs';
+import type { LLMCall } from '../../../../types/llm.mjs';
 import { phase4Distribution } from '../../../../schemas/inputs.schema.mjs';
 import {
   centroidEvolution,
@@ -54,7 +55,7 @@ function parsePubResponse(text: string): { p1: number; p2: number; p3: number; p
 }
 
 export class PublicationAnalysisStrategy extends BaseStrategy {
-  _llmCall: ((prompt: string) => Promise<string>) | null;
+  _llmCall: LLMCall | null;
 
   // any: constructor options bag — injected dependencies vary by test/integration harness
   constructor({ llmCall }: any = {}) {
@@ -73,7 +74,7 @@ export class PublicationAnalysisStrategy extends BaseStrategy {
       distribution = component.phaseDistribution;
     } else if (this._llmCall) {
       const p = getPrompt('publication-analysis');
-      const prompt = p.build({
+      const built = p.build({
         component: component.name || '',
         description: component.description ?? '',
         context: component.context ?? '',
@@ -85,7 +86,7 @@ export class PublicationAnalysisStrategy extends BaseStrategy {
         );
       }
 
-      const response = await this._llmCall(prompt);
+      const response = await this._llmCall(built.user, undefined, { systemPrompt: built.system });
       const parsed = p.parse(response);
       const sum = parsed.p1 + parsed.p2 + parsed.p3 + parsed.p4;
       if (sum === 0) {

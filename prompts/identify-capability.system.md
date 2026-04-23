@@ -13,23 +13,19 @@ IMPORTANT: Many component labels are technical solution names, not capabilities.
 You must look BEHIND the label to find the underlying capability.
 The essence of capability transcends time, innovation after innovation.
 
-Component: {{component}}
-Description: {{description}}
-Context: {{context}}
-
 For component and pipeline types, identify the nature and reformulate the label using these naming conventions:
 - Activity: a phrase that begins with an infinitive verb
-    ex: “Manage customer relationships,” “Orchestrate containers,” “Brew beer”
-- Practice: a phrase that begins with “how to...”
-    ex: “how to manage a project”, “how to drive a car”
-- Knowledge: a phrase that begins with “technical expertise...” or “interpersonal skills...”
-    e.g., “welding know-how,” “managerial interpersonal skills”
+    ex: "Manage customer relationships," "Orchestrate containers," "Brew beer"
+- Practice: a phrase that begins with "how to..."
+    ex: "how to manage a project", "how to drive a car"
+- Knowledge: a phrase that begins with "technical expertise..." or "interpersonal skills..."
+    e.g., "welding know-how," "managerial interpersonal skills"
 - Data: the title describes the data itself
-    e.g., “ambient temperature,” “conversion rate,” “GPS coordinates”
+    e.g., "ambient temperature," "conversion rate," "GPS coordinates"
 
 For anchor, market, or ecosystem types, set nature=none and keep the original label as capability.
 
-MANDATORY FORMAT: exactly five lines at the end, no additional text after them:
+MANDATORY OUTPUT FORMAT — exactly five lines at the end, no additional text after them:
 type=<anchor|component|pipeline|market|ecosystem>
 nature=<activity|practice|knowledge|data|none>
 capability=<the underlying capability described following its nature's naming convention>
@@ -37,8 +33,8 @@ confidence=X.XX (a number between 0 and 1 reflecting your confidence in this ide
 justification=<brief explanation of why you assigned this confidence level>
 
 Examples:
-  - “CRM” → type=component, nature=activity, capability=”Manage customer relationships”
-  - “ITIL” → type=component, nature=practice, capability=”how to manage IT services”
-  - “Kubernetes” → type=component, nature=activity, capability=”Orchestrate containers”
-  - “Data Warehouse” → type=component, nature=data, capability=”consolidated business intelligence data”
-  - “Coaching” → type=component, nature=knowledge, capability=”interpersonal skills for support”
+  - "CRM" → type=component, nature=activity, capability="Manage customer relationships"
+  - "ITIL" → type=component, nature=practice, capability="how to manage IT services"
+  - "Kubernetes" → type=component, nature=activity, capability="Orchestrate containers"
+  - "Data Warehouse" → type=component, nature=data, capability="consolidated business intelligence data"
+  - "Coaching" → type=component, nature=knowledge, capability="interpersonal skills for support"

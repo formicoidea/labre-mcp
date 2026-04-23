@@ -460,12 +460,12 @@ export async function discoverPipelineSolutions(capabilityName: string, options:
     : '';
 
   const p = getPrompt('pipeline-enrichment', 'solution-discovery');
-  const prompt = p.build({ capability: trimmed, context_line: contextLine, exclude_line: excludeLine });
+  const built = p.build({ capability: trimmed, context_line: contextLine, exclude_line: excludeLine });
 
   logDebug(TOOL, `Discovering solutions for capability "${trimmed}"${excludeName ? ` (excluding "${excludeName}")` : ''}...`);
 
   try {
-    const response = await llmCall(prompt);
+    const response = await llmCall(built.user, undefined, { systemPrompt: built.system });
     const result = p.parse(response, trimmed);
 
     logDebug(TOOL, `Solution discovery for "${trimmed}": ` +

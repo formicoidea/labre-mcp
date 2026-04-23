@@ -9,16 +9,26 @@
 /** Variables d'interpolation pour un template `{{key}}`. */
 export type TemplateVariables = Record<string, string | number | boolean | undefined>;
 
+/** Per-call options that can override factory-level configuration. */
+export interface LLMCallOptions {
+  /** System prompt override. Takes priority over the factory-level systemPrompt
+   *  when both are provided. Intended to carry the `.system.md` content of a
+   *  split prompt definition. */
+  systemPrompt?: string;
+}
+
 /** Fonction d'appel LLM texte → texte. */
 export type LLMCall = (
   prompt: string,
   variables?: TemplateVariables,
+  opts?: LLMCallOptions,
 ) => Promise<string>;
 
 /** Fonction d'appel LLM texte → JSON structuré (validé par schéma). */
 export type StructuredLLMCall<T = unknown> = (
   prompt: string,
   variables?: TemplateVariables,
+  opts?: LLMCallOptions,
 ) => Promise<T>;
 
 /** Config du backend Claude Agent SDK. */
@@ -47,6 +57,8 @@ export interface OpenCodeConfig {
   apiKey?: string;
   /** @default 0 */
   temperature?: number;
+  /** Optional system prompt, emitted as the first `role: "system"` message. */
+  systemPrompt?: string;
 }
 
 /** Config du backend OpenCode avec logprobs. */
@@ -71,4 +83,5 @@ export interface LogprobResult {
 export type LogprobLLMCall = (
   prompt: string,
   variables?: TemplateVariables,
+  opts?: LLMCallOptions,
 ) => Promise<LogprobResult>;

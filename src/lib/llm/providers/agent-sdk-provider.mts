@@ -27,6 +27,7 @@ export function createAgentSdkProvider(): LLMProvider {
         schema,
         model: strategy.model,
         effort: strategy.effort,
+        systemPrompt: strategy.systemPrompt,
       });
     },
 

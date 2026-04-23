@@ -104,7 +104,7 @@ export function parseFallbackPhase(text: string): Record<PhaseName, number> {
 }
 
 export class LogprobDistributionStrategy extends BaseStrategy {
-  _llmLogprobCall: (prompt: string) => Promise<{ text: string; logprobs: LogprobEntry[] }>;
+  _llmLogprobCall: import('../../../../types/llm.mjs').LogprobLLMCall;
 
   // any: constructor options bag — test/integration harness shape varies
   constructor({ llmLogprobCall }: any = {}) {
@@ -121,7 +121,7 @@ export class LogprobDistributionStrategy extends BaseStrategy {
 
   async evaluate(component: ComponentInput): Promise<EvolutionResult> {
     const p = getPrompt('logprob-distribution');
-    const prompt = p.build({
+    const built = p.build({
       component: component.name || '',
       description: component.description ?? '',
       context: component.context ?? '',
@@ -133,7 +133,7 @@ export class LogprobDistributionStrategy extends BaseStrategy {
       );
     }
 
-    const { text, logprobs } = await this._llmLogprobCall(prompt);
+    const { text, logprobs } = await this._llmLogprobCall(built.user, undefined, { systemPrompt: built.system });
 
     const probs = (logprobs && logprobs.length > 0)
       ? extractPhaseProbabilities(logprobs)

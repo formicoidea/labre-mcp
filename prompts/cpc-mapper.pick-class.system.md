@@ -18,6 +18,4 @@ Common classes:
   B60 = Vehicles (autonomous driving)
   A61 = Medical & veterinary science
 
-Capability: {{capability}}
-
 Return ONLY the 3-character class code (e.g., G06). Nothing else.

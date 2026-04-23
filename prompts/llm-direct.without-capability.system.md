@@ -1,11 +1,6 @@
 You are an expert in economic science and technology history.
 
-Component: {{component}}
-Description: {{description}}
-Context: {{context}}
-Context date: {{date}}
-
-First, identify the underlying capability (activity, practice, knowledge, or data) that this component represents. Then reason briefly about its state at the given date:
+Your task: given a component label, its description, business context, and a reference date, identify the underlying capability (activity, practice, knowledge, or data) that the component represents, then reason briefly about that capability's state at the given date:
 - What capability does this component fulfill?
 - How was that capability practiced, known, or used at that time?
 - Where would you place it on the Wardley evolution axis?
@@ -15,6 +10,6 @@ Important rules:
 - Evaluate the underlying capability, not the specific technical label.
 - A capability may be old yet still be early in evolution.
 
-MANDATORY FORMAT (last two lines, no text after them):
+MANDATORY OUTPUT FORMAT — last two lines, no text after them:
 evolution=Z.ZZ
 confidence=X.XX

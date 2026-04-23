@@ -89,10 +89,10 @@ src/
 │   ├── prompts/                 ── Registre centralise des prompts LLM (voir prompts.config.json racine)
 │   │   ├── interpolate.mts         Helper de substitution {{var}} (regex globale, toutes occurrences)
 │   │   ├── parsers.mts             parseKeyValueBlock (separator=, any) + parseDelimitedBlock
-│   │   ├── prompts.schema.mts      Zod schema du fichier prompts.config.json
-│   │   ├── config.loader.mts       Lecture JSON + MD, normalisation CRLF, validation variables
-│   │   ├── registry.mts            getPrompt(strategy, name) → { build, parse } (cache, parse paresseux)
-│   │   ├── builders-registry.mts   registerBuilder / getBuilder pour kind=function
+│   │   ├── prompts.schema.mts      Zod schema du fichier prompts.config.json (templateFile: string | {system, user})
+│   │   ├── config.loader.mts       Lecture JSON + MD, normalisation CRLF, validation variables, rejet {{...}} dans .system.md
+│   │   ├── registry.mts            getPrompt(strategy, name) → { build, parse } — build() retourne { system?, user }
+│   │   ├── builders-registry.mts   registerBuilder / getBuilder pour kind=function (retour string | {system, user})
 │   │   ├── parsers-registry.mts    registerParser / getParser pour parser.kind=custom
 │   │   ├── init.mts                Registration centrale des 14 parsers (side-effect import, importe depuis mcp-server.mts)
 │   │   ├── registry-parse-equivalence.test.mts  Suite de non-regression byte-for-byte des 13 parsers
@@ -315,7 +315,7 @@ Utiliser cette table pour réparer les imports. Les chemins sont **relatifs à `
 | `llm.config.json` | Config des providers + strategies LLM (voir `src/lib/llm/`) — **gitignore, par-utilisateur** |
 | `llm.config.example.json` | Gabarit de depart (3 profils documentes dans `docs/technical/configuration.md`) |
 | `prompts.config.json` | Registre des prompts par stratégie (kind template/function, parser custom/delimited/keyValue) |
-| `prompts/*.md` | 13 fichiers de templates externalisés — référencés par `templateFile` dans `prompts.config.json` |
+| `prompts/*.system.md` / `prompts/*.user.md` | 16 prompts splités en paires (rôle/règles/format statiques dans `.system.md`, variables uniquement dans `.user.md`) — référencés par `templateFile: { system, user }` dans `prompts.config.json`. Règle dure : aucun `{{...}}` dans un fichier `.system.md` (vérifié par le loader). |
 | `.env.example` | Documentation des variables d'environnement (OPENCODE_API_KEY, WARDLEY_LLM_CONFIG, WARDLEY_PROMPTS_CONFIG, …) |
 | `.mcp.json` | Enregistrement du serveur MCP auprès de Claude Code |
 

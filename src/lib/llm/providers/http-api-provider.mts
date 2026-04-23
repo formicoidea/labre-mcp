@@ -21,6 +21,7 @@ export function createHttpApiProvider(providerConfig: ProviderConfig): LLMProvid
         baseUrl,
         apiKey,
         temperature: strategy.temperature,
+        systemPrompt: strategy.systemPrompt,
       });
     },
 
@@ -37,6 +38,7 @@ export function createHttpApiProvider(providerConfig: ProviderConfig): LLMProvid
         baseUrl,
         apiKey,
         topLogprobs: strategy.topLogprobs,
+        systemPrompt: strategy.systemPrompt,
       });
     },
   };

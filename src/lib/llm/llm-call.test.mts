@@ -82,6 +82,46 @@ describe('createOpenCodeCall — fetch stubbed', () => {
     const call = createOpenCodeCall({ apiKey: 'k' });
     await assert.rejects(() => call('x', {}), /empty response/);
   });
+
+  it('injects factory-level systemPrompt as the first role:"system" message', async () => {
+    globalThis.fetch = (async (_url: any, init: any) => {
+      capturedBody = JSON.parse(init.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 });
+    }) as typeof fetch;
+
+    const call = createOpenCodeCall({ apiKey: 'k', systemPrompt: 'You are an expert.' });
+    await call('hello', {});
+
+    assert.equal(capturedBody.messages.length, 2);
+    assert.deepEqual(capturedBody.messages[0], { role: 'system', content: 'You are an expert.' });
+    assert.equal(capturedBody.messages[1].role, 'user');
+    assert.equal(capturedBody.messages[1].content, 'hello');
+  });
+
+  it('lets per-call opts.systemPrompt override the factory-level systemPrompt', async () => {
+    globalThis.fetch = (async (_url: any, init: any) => {
+      capturedBody = JSON.parse(init.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 });
+    }) as typeof fetch;
+
+    const call = createOpenCodeCall({ apiKey: 'k', systemPrompt: 'factory default' });
+    await call('hi', {}, { systemPrompt: 'per-call override' });
+
+    assert.equal(capturedBody.messages[0].content, 'per-call override');
+  });
+
+  it('omits the system message when no systemPrompt is provided', async () => {
+    globalThis.fetch = (async (_url: any, init: any) => {
+      capturedBody = JSON.parse(init.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 });
+    }) as typeof fetch;
+
+    const call = createOpenCodeCall({ apiKey: 'k' });
+    await call('hi', {});
+
+    assert.equal(capturedBody.messages.length, 1);
+    assert.equal(capturedBody.messages[0].role, 'user');
+  });
 });
 
 describe('createOpenCodeLogprobCall — fetch stubbed', () => {
@@ -127,5 +167,22 @@ describe('createOpenCodeLogprobCall — fetch stubbed', () => {
   it('throws when apiKey missing', async () => {
     const call = createOpenCodeLogprobCall({ apiKey: undefined });
     await assert.rejects(() => call('x', {}), /OPENCODE_API_KEY/);
+  });
+
+  it('injects systemPrompt as role:"system" when provided', async () => {
+    let capturedBody: any;
+    globalThis.fetch = (async (_url: any, init: any) => {
+      capturedBody = JSON.parse(init.body);
+      return new Response(
+        JSON.stringify({ choices: [{ message: { content: 'x' }, logprobs: { content: [] } }] }),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+
+    const call = createOpenCodeLogprobCall({ apiKey: 'k', systemPrompt: 'classify strictly' });
+    await call('q', {});
+
+    assert.equal(capturedBody.messages[0].role, 'system');
+    assert.equal(capturedBody.messages[0].content, 'classify strictly');
   });
 });

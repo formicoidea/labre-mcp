@@ -81,7 +81,8 @@ export function parseCpcFallback(response: string): string[] {
  */
 async function llmPickClass(capability: string, llmCall: LLMCall): Promise<string | null> {
   const p = getPrompt('cpc-mapper', 'pick-class');
-  const response = await llmCall(p.build({ capability }));
+  const built = p.build({ capability });
+  const response = await llmCall(built.user, undefined, { systemPrompt: built.system });
   return p.parse(response);
 }
 
@@ -112,7 +113,8 @@ async function llmPickFromList(capability: string, codeEntries: CpcEntry[], llmC
     : '';
 
   const p = getPrompt('cpc-mapper', 'pick-from-list');
-  const response = await llmCall(p.build({ capability, parent_context: parentContext, codes_list: codesList }));
+  const built = p.build({ capability, parent_context: parentContext, codes_list: codesList });
+  const response = await llmCall(built.user, undefined, { systemPrompt: built.system });
   return p.parse(response, { codeEntries });
 }
 
@@ -140,7 +142,8 @@ function formatCount(n: number): string {
  */
 async function llmFallbackMapping(capability: string, llmCall: LLMCall): Promise<string[]> {
   const p = getPrompt('cpc-mapper', 'fallback');
-  const response = await llmCall(p.build({ capability }));
+  const built = p.build({ capability });
+  const response = await llmCall(built.user, undefined, { systemPrompt: built.system });
   return p.parse(response);
 }
 

@@ -138,4 +138,99 @@ describe('loadPromptsConfig', () => {
     const b = loadPromptsConfig();
     assert.strictEqual(a, b);
   });
+
+  describe('split templateFile (system + user)', () => {
+    it('loads both files and stores system alongside user text', () => {
+      writeTemplate('sys.md', 'You are an expert.');
+      writeTemplate('user.md', 'Evaluate: {{target}}');
+      const path = writeConfig({
+        s: {
+          default: {
+            kind: 'template',
+            templateFile: { system: 'sys.md', user: 'user.md' },
+            variables: ['target'],
+            parser: { kind: 'custom', id: 'p' },
+          },
+        },
+      });
+      process.env.WARDLEY_PROMPTS_CONFIG = path;
+      const loaded = loadPromptsConfig();
+      const entry = loaded.templates.s.default;
+      assert.equal(entry.system, 'You are an expert.');
+      assert.equal(entry.text, 'Evaluate: {{target}}');
+      assert.deepEqual(entry.variables, ['target']);
+    });
+
+    it('normalizes CRLF in both system and user files', () => {
+      writeTemplate('sys.md', 'line1\r\nline2');
+      writeTemplate('user.md', 'a\r\nb\r\n{{v}}');
+      const path = writeConfig({
+        s: {
+          default: {
+            kind: 'template',
+            templateFile: { system: 'sys.md', user: 'user.md' },
+            variables: ['v'],
+            parser: { kind: 'custom', id: 'p' },
+          },
+        },
+      });
+      process.env.WARDLEY_PROMPTS_CONFIG = path;
+      const loaded = loadPromptsConfig();
+      assert.equal(loaded.templates.s.default.system, 'line1\nline2');
+      assert.equal(loaded.templates.s.default.text, 'a\nb\n{{v}}');
+    });
+
+    it('rejects placeholders in the system file', () => {
+      writeTemplate('sys.md', 'You are {{role}}.');
+      writeTemplate('user.md', 'Hello {{v}}');
+      const path = writeConfig({
+        s: {
+          default: {
+            kind: 'template',
+            templateFile: { system: 'sys.md', user: 'user.md' },
+            variables: ['v'],
+            parser: { kind: 'custom', id: 'p' },
+          },
+        },
+      });
+      process.env.WARDLEY_PROMPTS_CONFIG = path;
+      assert.throws(
+        () => loadPromptsConfig(),
+        /system file must not contain \{\{\.\.\.\}\} placeholders/,
+      );
+    });
+
+    it('rejects user placeholders that do not match declared variables', () => {
+      writeTemplate('sys.md', 'system content');
+      writeTemplate('user.md', 'Hello {{name}}');
+      const path = writeConfig({
+        s: {
+          default: {
+            kind: 'template',
+            templateFile: { system: 'sys.md', user: 'user.md' },
+            variables: ['other'],
+            parser: { kind: 'custom', id: 'p' },
+          },
+        },
+      });
+      process.env.WARDLEY_PROMPTS_CONFIG = path;
+      assert.throws(() => loadPromptsConfig(), /not declared in variables|not used in template/);
+    });
+
+    it('reports a helpful error when the system file is missing', () => {
+      writeTemplate('user.md', 'Hello {{v}}');
+      const path = writeConfig({
+        s: {
+          default: {
+            kind: 'template',
+            templateFile: { system: 'missing-sys.md', user: 'user.md' },
+            variables: ['v'],
+            parser: { kind: 'custom', id: 'p' },
+          },
+        },
+      });
+      process.env.WARDLEY_PROMPTS_CONFIG = path;
+      assert.throws(() => loadPromptsConfig(), /cannot read system file/);
+    });
+  });
 });

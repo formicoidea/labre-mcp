@@ -439,12 +439,12 @@ export async function verifyViaWebSearch(name: string, options: { description?: 
     : 'Additional context: (none provided)';
 
   const p = getPrompt('web-search-verification');
-  const prompt = p.build({ name: trimmed, context_line: contextLine });
+  const built = p.build({ name: trimmed, context_line: contextLine });
 
   logDebug(TOOL, `Starting web search verification for "${trimmed}"...`);
 
   try {
-    const response = await webSearchCall(prompt);
+    const response = await webSearchCall(built.user, undefined, { systemPrompt: built.system });
     const result = p.parse(response, trimmed);
 
     logDebug(TOOL,

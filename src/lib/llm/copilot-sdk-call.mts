@@ -77,12 +77,22 @@ export interface CopilotSdkStructuredConfig<T = unknown> extends CopilotSdkTextC
 async function runSingleTurn(
   client: CopilotClient,
   model: string,
-  fullPrompt: string,
+  userPrompt: string,
+  systemPrompt?: string,
 ): Promise<string> {
-  const session = await client.createSession({
+  // any: SessionConfig.systemMessage is part of the SDK public preview surface.
+  // When a systemPrompt is provided we use `replace` mode so the caller's
+  // content fully controls the system message — the SDK's default CLI foundation
+  // (code-change rules, tool-efficiency guardrails, etc.) is not meaningful for
+  // pure evaluation calls and would leak into the model's framing.
+  const sessionConfig: any = {
     model,
     onPermissionRequest: approveAll,
-  });
+  };
+  if (systemPrompt) {
+    sessionConfig.systemMessage = { mode: 'replace', content: systemPrompt };
+  }
+  const session = await client.createSession(sessionConfig);
 
   let fullText = '';
   let errorFromSession: unknown = null;
@@ -103,7 +113,7 @@ async function runSingleTurn(
   });
 
   try {
-    await session.send({ prompt: fullPrompt });
+    await session.send({ prompt: userPrompt });
     await done;
   } finally {
     try {
@@ -146,12 +156,12 @@ export function createCopilotSdkTextCall(config: CopilotSdkTextConfig = {}): LLM
   const {
     model = 'gpt-5',
     githubToken,
-    systemPrompt,
+    systemPrompt: factorySystemPrompt,
   } = config;
 
-  return async function copilotSdkTextCall(prompt, variables) {
+  return async function copilotSdkTextCall(prompt, variables, opts) {
     const interpolated = interpolate(prompt, variables);
-    const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${interpolated}` : interpolated;
+    const effectiveSystemPrompt = opts?.systemPrompt ?? factorySystemPrompt;
 
     const errorContext = { logger: 'copilot-sdk-call', model };
 
@@ -159,7 +169,7 @@ export function createCopilotSdkTextCall(config: CopilotSdkTextConfig = {}): LLM
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
         return await withClient(githubToken, (client) =>
-          runSingleTurn(client, model, fullPrompt),
+          runSingleTurn(client, model, interpolated, effectiveSystemPrompt),
         );
       } catch (err) {
         lastError = err;
@@ -191,7 +201,7 @@ export function createCopilotSdkStructuredCall<T = unknown>(
     schema,
     model = 'gpt-5',
     githubToken,
-    systemPrompt,
+    systemPrompt: factorySystemPrompt,
     validate,
   } = config;
 
@@ -204,10 +214,14 @@ export function createCopilotSdkStructuredCall<T = unknown>(
     `Respond ONLY with a single JSON object matching this JSON Schema. ` +
     `No prose, no markdown, no code fences.\n\n${schemaJson}`;
 
-  return async function copilotSdkStructuredCall(prompt, variables) {
+  return async function copilotSdkStructuredCall(prompt, variables, opts) {
     const interpolated = interpolate(prompt, variables);
-    const preamble = systemPrompt ? `${systemPrompt}\n\n` : '';
-    const basePrompt = `${preamble}${interpolated}\n\n${outputContract}`;
+    const effectiveSystemPrompt = opts?.systemPrompt ?? factorySystemPrompt;
+    // The output contract is strategy-static (same schema each call) and
+    // belongs in the system message so the user message stays minimal.
+    const systemForCall = effectiveSystemPrompt
+      ? `${effectiveSystemPrompt}\n\n${outputContract}`
+      : outputContract;
 
     const errorContext = { logger: 'copilot-sdk-call-structured', model };
 
@@ -216,21 +230,21 @@ export function createCopilotSdkStructuredCall<T = unknown>(
       try {
         // 1st network attempt of this retry cycle.
         const raw = await withClient(githubToken, (client) =>
-          runSingleTurn(client, model, basePrompt),
+          runSingleTurn(client, model, interpolated, systemForCall),
         );
 
         const parsed = tryParseAndValidate<T>(raw, validate);
         if (parsed.ok) return parsed.value;
 
         // 2nd attempt in the same retry cycle: ask the model to correct itself.
-        const correctionPrompt =
-          `${basePrompt}\n\n` +
+        const correctionUserPrompt =
+          `${interpolated}\n\n` +
           `Your previous response was not a valid JSON object ` +
           `matching the schema (reason: ${parsed.reason}). ` +
           `Return ONLY the JSON object, no prose, no code fences.`;
 
         const rawRetry = await withClient(githubToken, (client) =>
-          runSingleTurn(client, model, correctionPrompt),
+          runSingleTurn(client, model, correctionUserPrompt, systemForCall),
         );
 
         const parsedRetry = tryParseAndValidate<T>(rawRetry, validate);

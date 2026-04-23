@@ -65,11 +65,15 @@ export function createLLMCall(config: ClaudeLLMConfig = {}): LLMCall {
   const {
     model = 'claude-sonnet-4-6',
     effort = 'high',
-    systemPrompt,
+    systemPrompt: factorySystemPrompt,
   } = config;
 
-  return async function llmCall(prompt, variables) {
+  return async function llmCall(prompt, variables, opts) {
     const interpolatedPrompt = interpolate(prompt, variables);
+    // Per-call opts.systemPrompt wins over factory-level config.systemPrompt.
+    // This lets split-prompt call-sites carry the .system.md content while
+    // leaving factory-level overrides available for strategies that don't.
+    const effectiveSystemPrompt = opts?.systemPrompt ?? factorySystemPrompt;
 
     // Prevent nested session detection that causes silent empty responses
     if (process.env.CLAUDECODE) {
@@ -84,8 +88,8 @@ export function createLLMCall(config: ClaudeLLMConfig = {}): LLMCall {
       disallowedTools: ['Write', 'Edit', 'Bash', 'Glob', 'Grep', 'Read'],
     };
 
-    if (systemPrompt) {
-      options.systemPrompt = systemPrompt;
+    if (effectiveSystemPrompt) {
+      options.systemPrompt = effectiveSystemPrompt;
     }
 
     const errorContext = { logger: 'llm-call', model };
@@ -133,14 +137,16 @@ export function createStructuredLLMCall<T = unknown>(
     schema,
     model = 'claude-sonnet-4-6',
     effort = 'high',
+    systemPrompt: factorySystemPrompt,
   } = config;
 
   if (!schema) {
     throw new Error('createStructuredLLMCall requires a schema');
   }
 
-  return async function structuredLLMCall(prompt, variables) {
+  return async function structuredLLMCall(prompt, variables, opts) {
     const interpolatedPrompt = interpolate(prompt, variables);
+    const effectiveSystemPrompt = opts?.systemPrompt ?? factorySystemPrompt;
 
     if (process.env.CLAUDECODE) {
       delete process.env.CLAUDECODE;
@@ -154,6 +160,10 @@ export function createStructuredLLMCall<T = unknown>(
       disallowedTools: ['Write', 'Edit', 'Bash', 'Glob', 'Grep', 'Read'],
       outputFormat: { type: 'json_schema', schema },
     };
+
+    if (effectiveSystemPrompt) {
+      options.systemPrompt = effectiveSystemPrompt;
+    }
 
     const errorContext = { logger: 'llm-call-structured', model };
 
@@ -204,10 +214,12 @@ export function createOpenCodeCall(config: OpenCodeConfig = {}): LLMCall {
     baseUrl = 'https://opencode.ai/zen/v1',
     apiKey = process.env.OPENCODE_API_KEY,
     temperature = 0,
+    systemPrompt: factorySystemPrompt,
   } = config;
 
-  return async function openCodeCall(prompt, variables) {
+  return async function openCodeCall(prompt, variables, opts) {
     const interpolatedPrompt = interpolate(prompt, variables);
+    const effectiveSystemPrompt = opts?.systemPrompt ?? factorySystemPrompt;
 
     const errorContext = { logger: 'opencode-call', model };
 
@@ -216,6 +228,12 @@ export function createOpenCodeCall(config: OpenCodeConfig = {}): LLMCall {
       classifyAndLogLLMError(authErr, errorContext);
       throw authErr;
     }
+
+    const messages: Array<{ role: string; content: string }> = [];
+    if (effectiveSystemPrompt) {
+      messages.push({ role: 'system', content: effectiveSystemPrompt });
+    }
+    messages.push({ role: 'user', content: interpolatedPrompt });
 
     let response: Response;
     try {
@@ -227,7 +245,7 @@ export function createOpenCodeCall(config: OpenCodeConfig = {}): LLMCall {
         },
         body: JSON.stringify({
           model,
-          messages: [{ role: 'user', content: interpolatedPrompt }],
+          messages,
           temperature,
         }),
       });
@@ -267,10 +285,12 @@ export function createOpenCodeLogprobCall(
     baseUrl = 'https://opencode.ai/zen/v1',
     apiKey = process.env.OPENCODE_API_KEY,
     topLogprobs = 5,
+    systemPrompt: factorySystemPrompt,
   } = config;
 
-  return async function openCodeLogprobCall(prompt, variables): Promise<LogprobResult> {
+  return async function openCodeLogprobCall(prompt, variables, opts): Promise<LogprobResult> {
     const interpolatedPrompt = interpolate(prompt, variables);
+    const effectiveSystemPrompt = opts?.systemPrompt ?? factorySystemPrompt;
 
     const errorContext = { logger: 'opencode-logprob', model };
 
@@ -279,6 +299,12 @@ export function createOpenCodeLogprobCall(
       classifyAndLogLLMError(authErr, errorContext);
       throw authErr;
     }
+
+    const messages: Array<{ role: string; content: string }> = [];
+    if (effectiveSystemPrompt) {
+      messages.push({ role: 'system', content: effectiveSystemPrompt });
+    }
+    messages.push({ role: 'user', content: interpolatedPrompt });
 
     let response: Response;
     try {
@@ -290,7 +316,7 @@ export function createOpenCodeLogprobCall(
         },
         body: JSON.stringify({
           model,
-          messages: [{ role: 'user', content: interpolatedPrompt }],
+          messages,
           temperature: 0,
           logprobs: true,
           top_logprobs: topLogprobs,

@@ -77,12 +77,13 @@ export async function estimateAnchorEvolution(args: any, llmCall: any): Promise<
     confidence = 1.0;
   } else {
     const p = getPrompt('anchor-evolution');
+    const built = p.build({ anchor: name, context });
     // Wrap the LLM call: a failure flips the ambient MCP envelope's
     // degraded flag and falls back to phase 2 (Custom-built) at low
     // confidence rather than throwing.
     const response = await tryDegradeAmbient(
       'llm:anchor-evolution',
-      () => llmCall(p.build({ anchor: name, context })),
+      () => llmCall(built.user, undefined, { systemPrompt: built.system }),
       '',
     );
     if (response) {

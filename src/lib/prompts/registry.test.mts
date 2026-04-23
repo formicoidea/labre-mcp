@@ -55,7 +55,7 @@ describe('getPrompt — template + custom parser', () => {
     registerParser('myParser', (response) => response.toUpperCase());
 
     const p = getPrompt('s');
-    assert.equal(p.build({ name: 'world' }), 'Hello world!');
+    assert.deepEqual(p.build({ name: 'world' }), { user: 'Hello world!' });
     assert.equal(p.parse('result'), 'RESULT');
   });
 
@@ -82,7 +82,89 @@ describe('getPrompt — function builder', () => {
     registerParser('p', () => null);
 
     const p = getPrompt('s');
-    assert.equal(p.build({ x: 42 }), 'built from 42');
+    assert.deepEqual(p.build({ x: 42 }), { user: 'built from 42' });
+  });
+
+  it('accepts a builder that returns a { system, user } object', () => {
+    setup({
+      s: { default: { kind: 'function', builderId: 'splitBuilder', parser: { kind: 'custom', id: 'p' } } },
+    });
+    registerBuilder('splitBuilder', (ctx) => ({
+      system: 'You are a test assistant.',
+      user: `value=${ctx.value}`,
+    }));
+    registerParser('p', () => null);
+
+    const p = getPrompt('s');
+    assert.deepEqual(p.build({ value: 'abc' }), {
+      system: 'You are a test assistant.',
+      user: 'value=abc',
+    });
+  });
+
+  it('throws when a builder returns an invalid shape', () => {
+    setup({
+      s: { default: { kind: 'function', builderId: 'badBuilder', parser: { kind: 'custom', id: 'p' } } },
+    });
+    // any: intentionally returning a non-conforming shape to exercise validation.
+    registerBuilder('badBuilder', (() => ({ oops: true })) as any);
+    registerParser('p', () => null);
+
+    const p = getPrompt('s');
+    assert.throws(() => p.build({}), /returned an invalid shape/);
+  });
+});
+
+describe('getPrompt — split template (system + user)', () => {
+  it('loads split template and emits both system and user on build', () => {
+    setup(
+      {
+        s: {
+          default: {
+            kind: 'template',
+            templateFile: { system: 'sys.md', user: 'user.md' },
+            variables: ['name'],
+            parser: { kind: 'custom', id: 'p' },
+          },
+        },
+      },
+      {
+        'sys.md': 'You are an assistant. Output format: UPPER.',
+        'user.md': 'Name: {{name}}',
+      },
+    );
+    registerParser('p', () => null);
+
+    const p = getPrompt('s');
+    assert.deepEqual(p.build({ name: 'alice' }), {
+      system: 'You are an assistant. Output format: UPPER.',
+      user: 'Name: alice',
+    });
+  });
+
+  it('rejects a split template whose system file contains placeholders', () => {
+    setup(
+      {
+        s: {
+          default: {
+            kind: 'template',
+            templateFile: { system: 'sys.md', user: 'user.md' },
+            variables: ['name'],
+            parser: { kind: 'custom', id: 'p' },
+          },
+        },
+      },
+      {
+        'sys.md': 'Hello {{name}}, you are an assistant.',
+        'user.md': 'Name: {{name}}',
+      },
+    );
+    registerParser('p', () => null);
+
+    assert.throws(
+      () => getPrompt('s'),
+      /system file must not contain \{\{\.\.\.\}\} placeholders/,
+    );
   });
 });
 
@@ -140,7 +222,7 @@ describe('getPrompt — error paths', () => {
       { 't.md': 'x' },
     );
     const p = getPrompt('s');  // build() does not require parser registration
-    assert.equal(p.build({}), 'x');
+    assert.deepEqual(p.build({}), { user: 'x' });
     assert.throws(() => p.parse('response'), /parser "ghost" is not registered/);
   });
 

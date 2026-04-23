@@ -13,11 +13,7 @@ IMPORTANT RULES:
 - If the original input component is itself a named solution, do NOT repeat it — choose different representative solutions.
 - Choose solutions that are widely recognized and representative of their evolution stage.
 
-Capability: "{{capability}}"
-{{context_line}}
-{{exclude_line}}
-
-MANDATORY OUTPUT FORMAT (exactly 6 lines, no additional text):
+MANDATORY OUTPUT FORMAT — exactly 6 lines, no additional text:
 sota_name=<specific solution name>
 sota_description=<one sentence describing what it is and why it's SotA>
 legacy_name=<specific solution name>

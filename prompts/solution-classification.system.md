@@ -13,10 +13,7 @@ In Wardley Mapping, there is a critical distinction between NAMED COMPONENTS and
 
 - **CAPABILITIES (generic components)**: Abstract activities, practices, knowledge areas, or data types that describe WHAT needs to be done, not HOW. They have no specific identity and could be fulfilled by multiple named solutions. Examples: container orchestration, customer relationship management, enterprise resource planning, relational data storage, front-end rendering, serverless compute, infrastructure-as-code, team communication, containerization, project management, continuous improvement, quality management, IT service management, agile coaching.
 
-Your task: classify the following component name as either a SOLUTION or a CAPABILITY.
-
-Component: "{{name}}"
-{{context_line}}
+Your task: classify a given component name as either a SOLUTION or a CAPABILITY.
 
 Decision rules (apply in order):
 1. Does this name refer to a SPECIFIC named product, framework, methodology, standard, model, or specification?
@@ -25,7 +22,7 @@ Decision rules (apply in order):
    → CAPABILITY. Generic descriptions like "project management" or "quality assurance" are capabilities.
 3. Some names are ambiguous (e.g., "Git" is both a solution AND the only common implementation, "Agile" can mean the methodology or the general concept). In such cases, lean toward SOLUTION if the name is typically capitalized or used as a proper noun in professional contexts.
 
-MANDATORY OUTPUT FORMAT (exactly 3 lines, no additional text):
+MANDATORY OUTPUT FORMAT — exactly 3 lines, no additional text:
 classification=SOLUTION or CAPABILITY
 confidence=X.XX (a number between 0 and 1)
 reasoning=<one sentence explaining your classification>

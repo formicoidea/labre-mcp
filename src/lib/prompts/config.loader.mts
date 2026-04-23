@@ -16,10 +16,19 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve, isAbsolute, dirname } from 'node:path';
-import { PromptsConfigSchema, type PromptsConfig, type PromptEntry } from './prompts.schema.mjs';
+import {
+  PromptsConfigSchema,
+  isSplitTemplateFile,
+  type PromptsConfig,
+  type PromptEntry,
+} from './prompts.schema.mjs';
 
 export interface ResolvedTemplate {
+  /** User-message text (variables allowed here). */
   text: string;
+  /** Optional system-message text — present only for split templates.
+   *  Must be invariant (no {{...}} placeholders). */
+  system?: string;
   variables: readonly string[];
 }
 
@@ -107,33 +116,87 @@ export function loadPromptsConfig(): LoadedPrompts {
     for (const [name, entry] of Object.entries(prompts)) {
       if ((entry as PromptEntry).kind !== 'template') continue;
       const tEntry = entry as Extract<PromptEntry, { kind: 'template' }>;
-      const templatePath = isAbsolute(tEntry.templateFile)
-        ? tEntry.templateFile
-        : resolve(configDir, tEntry.templateFile);
 
-      let rawTemplate: string;
-      try {
-        rawTemplate = readFileSync(templatePath, 'utf8');
-      } catch (err) {
-        throw new Error(
-          `Prompt "${strategy}/${name}": cannot read template ${templatePath}: ${(err as Error).message}`,
+      if (isSplitTemplateFile(tEntry.templateFile)) {
+        templates[strategy][name] = loadSplitTemplate(
+          strategy,
+          name,
+          tEntry.templateFile,
+          tEntry.variables,
+          configDir,
+        );
+      } else {
+        templates[strategy][name] = loadLegacyTemplate(
+          strategy,
+          name,
+          tEntry.templateFile,
+          tEntry.variables,
+          configDir,
         );
       }
-
-      // Normalize CRLF → LF. Windows text files often carry \r\n; the JS string
-      // constants used \n exclusively, so preserving behaviour requires this.
-      const text = rawTemplate.replace(/\r\n/g, '\n');
-
-      const templateVars = extractTemplateVars(text);
-      validateVariables(strategy, name, templateVars, tEntry.variables);
-
-      templates[strategy][name] = { text, variables: tEntry.variables };
     }
   }
 
   cached = { config, templates };
   cachedPath = path;
   return cached;
+}
+
+function readTemplateFile(
+  strategy: string,
+  name: string,
+  role: 'template' | 'system' | 'user',
+  relativePath: string,
+  configDir: string,
+): string {
+  const full = isAbsolute(relativePath) ? relativePath : resolve(configDir, relativePath);
+  try {
+    // Normalize CRLF → LF for Windows parity with the JS string constants
+    // the registry used before templates moved to disk.
+    return readFileSync(full, 'utf8').replace(/\r\n/g, '\n');
+  } catch (err) {
+    throw new Error(
+      `Prompt "${strategy}/${name}": cannot read ${role} file ${full}: ${(err as Error).message}`,
+    );
+  }
+}
+
+function loadLegacyTemplate(
+  strategy: string,
+  name: string,
+  templateFile: string,
+  declaredVars: readonly string[],
+  configDir: string,
+): ResolvedTemplate {
+  const text = readTemplateFile(strategy, name, 'template', templateFile, configDir);
+  validateVariables(strategy, name, extractTemplateVars(text), declaredVars);
+  return { text, variables: declaredVars };
+}
+
+function loadSplitTemplate(
+  strategy: string,
+  name: string,
+  templateFile: { system: string; user: string },
+  declaredVars: readonly string[],
+  configDir: string,
+): ResolvedTemplate {
+  const system = readTemplateFile(strategy, name, 'system', templateFile.system, configDir);
+  const user = readTemplateFile(strategy, name, 'user', templateFile.user, configDir);
+
+  // System content must be invariant — caching and role separation only work
+  // when the system stays byte-identical across calls.
+  const systemVars = extractTemplateVars(system);
+  if (systemVars.length > 0) {
+    throw new Error(
+      `Prompt "${strategy}/${name}": system file must not contain {{...}} placeholders ` +
+      `(found: ${JSON.stringify(systemVars)}). Move variable content to the user file.`,
+    );
+  }
+
+  // User file must declare exactly the variables listed in the config.
+  validateVariables(strategy, name, extractTemplateVars(user), declaredVars);
+
+  return { text: user, system, variables: declaredVars };
 }
 
 export function getLoadedPromptsConfigPath(): string | undefined {

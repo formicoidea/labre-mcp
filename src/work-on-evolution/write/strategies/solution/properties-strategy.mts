@@ -23,7 +23,7 @@ import { dirname, join } from 'node:path';
 import { SolutionBaseStrategy } from './solution-base-strategy.mjs';
 import type { SolutionInput, SolutionEvolutionResult } from '../../../../types/solution.mjs';
 import type { ParsedAutoResponse, ParsedPropertyEvaluation } from '../../../../schemas/parsed-llm.schema.mjs';
-import { getPrompt } from '../../../../lib/prompts/registry.mjs';
+import { getPrompt, type BuiltPrompt } from '../../../../lib/prompts/registry.mjs';
 import { toErrorMessage, errorCode } from '../../../../lib/errors.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -198,7 +198,7 @@ const FALLBACK_PROPERTIES = [
  * @param {object[]} properties  - The 12-property reference
  * @returns {string} LLM prompt
  */
-function buildAutoPrompt(solutionName: string, context: string, properties: PropertyDef[]): string {
+function buildAutoPrompt(solutionName: string, context: string, properties: PropertyDef[]): BuiltPrompt {
   const propertyBlock = properties.map((prop, i) => {
     const phases = prop.phases || {};
     return [
@@ -226,7 +226,7 @@ function buildAutoPrompt(solutionName: string, context: string, properties: Prop
  * @param {object} property      - Single property definition
  * @returns {string} LLM prompt
  */
-function buildSinglePropertyPrompt(solutionName: string, context: string, property: PropertyDef): string {
+function buildSinglePropertyPrompt(solutionName: string, context: string, property: PropertyDef): BuiltPrompt {
   const phases = property.phases || {};
   return getPrompt('properties-strategy', 'single').build({
     solution_name: solutionName,
@@ -489,8 +489,8 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
    * @private
    */
   async _evaluateAuto(solutionName: string, context: string, properties: PropertyDef[]): Promise<any> {
-    const prompt = buildAutoPrompt(solutionName, context, properties);
-    const response = await this._llmCall(prompt);
+    const built = buildAutoPrompt(solutionName, context, properties);
+    const response = await this._llmCall(built.user, undefined, { systemPrompt: built.system });
     return getPrompt('properties-strategy', 'auto').parse(response, properties);
   }
 
@@ -507,8 +507,8 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
     const results = [];
 
     for (const prop of properties) {
-      const prompt = buildSinglePropertyPrompt(solutionName, context, prop);
-      const response = await this._llmCall(prompt);
+      const built = buildSinglePropertyPrompt(solutionName, context, prop);
+      const response = await this._llmCall(built.user, undefined, { systemPrompt: built.system });
       const parsed = getPrompt('properties-strategy', 'single').parse(response, prop) as ParsedPropertyEvaluation | null;
 
       if (parsed) {
@@ -542,8 +542,8 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
       );
     }
 
-    const prompt = buildSinglePropertyPrompt(solutionName, context, prop);
-    const response = await this._llmCall(prompt);
+    const built = buildSinglePropertyPrompt(solutionName, context, prop);
+    const response = await this._llmCall(built.user, undefined, { systemPrompt: built.system });
     const parsed = getPrompt('properties-strategy', 'single').parse(response, prop) as ParsedPropertyEvaluation | null;
 
     if (!parsed) return null;

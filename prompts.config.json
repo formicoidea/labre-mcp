@@ -2,7 +2,10 @@
   "identify-capability": {
     "default": {
       "kind": "template",
-      "templateFile": "prompts/identify-capability.md",
+      "templateFile": {
+        "system": "prompts/identify-capability.system.md",
+        "user": "prompts/identify-capability.user.md"
+      },
       "variables": ["component", "description", "context"],
       "parser": { "kind": "custom", "id": "identifyCapability" }
     }
@@ -10,7 +13,10 @@
   "anchor-evolution": {
     "default": {
       "kind": "template",
-      "templateFile": "prompts/anchor-evolution.md",
+      "templateFile": {
+        "system": "prompts/anchor-evolution.system.md",
+        "user": "prompts/anchor-evolution.user.md"
+      },
       "variables": ["anchor", "context"],
       "parser": { "kind": "custom", "id": "anchorEvolution" }
     }
@@ -18,7 +24,10 @@
   "publication-analysis": {
     "default": {
       "kind": "template",
-      "templateFile": "prompts/publication-analysis.md",
+      "templateFile": {
+        "system": "prompts/publication-analysis.system.md",
+        "user": "prompts/publication-analysis.user.md"
+      },
       "variables": ["component", "description", "context"],
       "parser": { "kind": "custom", "id": "publicationPhases" }
     }
@@ -26,7 +35,10 @@
   "logprob-distribution": {
     "default": {
       "kind": "template",
-      "templateFile": "prompts/logprob-distribution.md",
+      "templateFile": {
+        "system": "prompts/logprob-distribution.system.md",
+        "user": "prompts/logprob-distribution.user.md"
+      },
       "variables": ["component", "description", "context"],
       "parser": { "kind": "custom", "id": "logprobFallback" }
     }
@@ -34,7 +46,10 @@
   "timeline-benchmark": {
     "default": {
       "kind": "template",
-      "templateFile": "prompts/timeline-benchmark.md",
+      "templateFile": {
+        "system": "prompts/timeline-benchmark.system.md",
+        "user": "prompts/timeline-benchmark.user.md"
+      },
       "variables": ["capability", "component", "description", "context", "current_year", "history_section", "pacing_guidance"],
       "parser": { "kind": "custom", "id": "timelineIteration" }
     }
@@ -42,13 +57,19 @@
   "llm-direct": {
     "with-capability": {
       "kind": "template",
-      "templateFile": "prompts/llm-direct.with-capability.md",
+      "templateFile": {
+        "system": "prompts/llm-direct.with-capability.system.md",
+        "user": "prompts/llm-direct.with-capability.user.md"
+      },
       "variables": ["capability", "description", "context", "date"],
       "parser": { "kind": "custom", "id": "llmDirect" }
     },
     "without-capability": {
       "kind": "template",
-      "templateFile": "prompts/llm-direct.without-capability.md",
+      "templateFile": {
+        "system": "prompts/llm-direct.without-capability.system.md",
+        "user": "prompts/llm-direct.without-capability.user.md"
+      },
       "variables": ["component", "description", "context", "date"],
       "parser": { "kind": "custom", "id": "llmDirect" }
     }
@@ -56,7 +77,10 @@
   "cpc-evolution": {
     "sot-extraction": {
       "kind": "template",
-      "templateFile": "prompts/cpc-evolution.sot-extraction.md",
+      "templateFile": {
+        "system": "prompts/cpc-evolution.sot-extraction.system.md",
+        "user": "prompts/cpc-evolution.sot-extraction.user.md"
+      },
       "variables": ["cpc_context", "component_name", "evolution_score", "phase"],
       "parser": { "kind": "custom", "id": "cpcSotExtraction" }
     }
@@ -64,19 +88,28 @@
   "cpc-mapper": {
     "pick-class": {
       "kind": "template",
-      "templateFile": "prompts/cpc-mapper.pick-class.md",
+      "templateFile": {
+        "system": "prompts/cpc-mapper.pick-class.system.md",
+        "user": "prompts/cpc-mapper.pick-class.user.md"
+      },
       "variables": ["capability"],
       "parser": { "kind": "custom", "id": "cpcPickClass" }
     },
     "pick-from-list": {
       "kind": "template",
-      "templateFile": "prompts/cpc-mapper.pick-from-list.md",
+      "templateFile": {
+        "system": "prompts/cpc-mapper.pick-from-list.system.md",
+        "user": "prompts/cpc-mapper.pick-from-list.user.md"
+      },
       "variables": ["capability", "parent_context", "codes_list"],
       "parser": { "kind": "custom", "id": "cpcPickFromList" }
     },
     "fallback": {
       "kind": "template",
-      "templateFile": "prompts/cpc-mapper.fallback.md",
+      "templateFile": {
+        "system": "prompts/cpc-mapper.fallback.system.md",
+        "user": "prompts/cpc-mapper.fallback.user.md"
+      },
       "variables": ["capability"],
       "parser": { "kind": "custom", "id": "cpcFallback" }
     }
@@ -84,7 +117,10 @@
   "pipeline-enrichment": {
     "solution-discovery": {
       "kind": "template",
-      "templateFile": "prompts/pipeline-enrichment.solution-discovery.md",
+      "templateFile": {
+        "system": "prompts/pipeline-enrichment.solution-discovery.system.md",
+        "user": "prompts/pipeline-enrichment.solution-discovery.user.md"
+      },
       "variables": ["capability", "context_line", "exclude_line"],
       "parser": { "kind": "custom", "id": "solutionDiscovery" }
     }
@@ -92,7 +128,10 @@
   "web-search-verification": {
     "default": {
       "kind": "template",
-      "templateFile": "prompts/web-search-verification.md",
+      "templateFile": {
+        "system": "prompts/web-search-verification.system.md",
+        "user": "prompts/web-search-verification.user.md"
+      },
       "variables": ["name", "context_line"],
       "parser": { "kind": "custom", "id": "webSearchVerification" }
     }
@@ -100,7 +139,10 @@
   "solution-classification": {
     "default": {
       "kind": "template",
-      "templateFile": "prompts/solution-classification.md",
+      "templateFile": {
+        "system": "prompts/solution-classification.system.md",
+        "user": "prompts/solution-classification.user.md"
+      },
       "variables": ["name", "context_line"],
       "parser": { "kind": "custom", "id": "solutionClassification" }
     }
@@ -108,13 +150,19 @@
   "properties-strategy": {
     "auto": {
       "kind": "template",
-      "templateFile": "prompts/properties-strategy.auto.md",
+      "templateFile": {
+        "system": "prompts/properties-strategy.auto.system.md",
+        "user": "prompts/properties-strategy.auto.user.md"
+      },
       "variables": ["solution_name", "context_line", "property_block", "format_lines"],
       "parser": { "kind": "custom", "id": "propertiesAuto" }
     },
     "single": {
       "kind": "template",
-      "templateFile": "prompts/properties-strategy.single.md",
+      "templateFile": {
+        "system": "prompts/properties-strategy.single.system.md",
+        "user": "prompts/properties-strategy.single.user.md"
+      },
       "variables": ["solution_name", "property_name", "context_line", "phase1", "phase2", "phase3", "phase4"],
       "parser": { "kind": "custom", "id": "propertiesSingle" }
     }
