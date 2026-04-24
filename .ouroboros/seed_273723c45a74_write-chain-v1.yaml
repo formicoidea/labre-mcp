@@ -1,0 +1,203 @@
+goal: Produce a Seed Ouroboros executable specification plus a markdown companion
+  document for the first write:chain:* strategy in WardleyAssistant, defining a 6-step
+  pipeline that transforms a natural language command (naming a real company or business
+  archetype) into complete OWM DSL output with dependency links, covering Wardley
+  cycle phases 1-2 only
+task_type: code
+brownfield_context:
+  project_type: brownfield
+  context_references:
+  - path: src/work-on-value-chain/
+    role: primary
+    summary: Module hosting the first write:chain strategy pipeline to be specified
+  - path: src/work-on-evolution/write/pipeline/pipeline-enriched.mts
+    role: reference
+    summary: Contains generateOwmSyntax function whose contract must be extended for
+      multi-component output with needs links
+  - path: src/work-on-evolution/write/pipeline/pipeline-owm-syntax.test.mts
+    role: reference
+    summary: Test file encoding the existing OWM output contract including component
+      format visibility evolution label coordinates and clamping rules
+  - path: src/work-on-value-chain/write/component/
+    role: reference
+    summary: 5 existing modules (identify-capability web-search-verification dual-verification-orchestrator
+      signal-combiner wardley-type-classification) excluded from V1 pipeline but available
+      for on-demand deepening
+  existing_patterns:
+  - Prompt split .system.md (static zero variables) + .user.md (variables only)
+  - Degradation via tryDegradeAmbient for external calls and withMcpDegradation for
+    MCP handlers with health checks at boot
+  - .mts extension for ESM strict with tsx for dev and mcp scripts
+  - 'any and unknown require justification comment // any: reason'
+  - No context-description fallback — semantically distinct fields
+  - Parallel independent calls via Promise.allSettled never sequential for-of await
+  - Wardley phases use generic names phase1-phase4 not domain-specific labels
+  existing_dependencies:
+  - generateOwmSyntax from pipeline-enriched.mts
+  - tryDegradeAmbient for external call degradation
+  - withMcpDegradation for MCP handler wrapping
+  - wardley-type-classification module for Wardley type categorization
+  - signal-combiner module for signal consolidation
+  - dual-verification-orchestrator for verification arbitrage
+constraints:
+- Specification document only — no code modifications
+- Scope limited to Wardley cycle phases 1-2 (phase 3 delegated to work-on-evolution)
+- Single-shot non-conversational mode — no multi-turn interaction
+- 5 existing write/component/* modules excluded from V1 pipeline (available for on-demand
+  deepening only)
+- All positioning algorithms must be deterministic, not probabilistic
+- Anchor fixed at [0.95, 0.5]
+- Files use .mts extension for ESM strict
+- Comments and commits in English
+- 'any/unknown requires justification comment // any: <reason>'
+- No context↔description fallback
+- Prompts must be split into .system.md (static, zero {{...}}) + .user.md (variables
+  only)
+- Degradation via tryDegradeAmbient + withMcpDegradation + health checks
+- TypeScript types must be explicit and paste-ready
+- Output extends existing generateOwmSyntax with multi-component + needs links
+- Exotic edge cases (empty graph, missing anchor, isolated components, incoherent
+  temporality) remain implicit for V1
+acceptance_criteria:
+- Step 1 (LLM metadata extraction) fully specified with TS types, prompt pair, and
+  degradation paths
+- Step 2 (LLM chain generation) fully specified producing anchor + needs + components
+  + A->B links + rough evolution estimate
+- Step 3 (deterministic Y positioning) specified with algorithm deriving visibility
+  from dependency hierarchy with anchor at 0.95
+- Step 4 (deterministic X positioning) specified with seed by Wardley type (genesis~0.2,
+  custom~0.4, product~0.6, commodity~0.8) then minimization of average distance to
+  connected neighbors
+- Step 5 (label placement) specified with algorithm minimizing label overlap, minimizing
+  link intersection, maximizing node proximity
+- Step 6 (OWM DSL assembly) specified as extension of generateOwmSyntax emitting complete
+  multi-component OWM with needs links
+- Metadata extraction covers angle/perspective, scope, objective, imperatives, temporality
+  with default=present
+- LLM degradation covers retry, fallback model, tryDegradeAmbient for failure/timeout
+- Malformed output validation covers JSON/key-value parsing failure, duplicate components,
+  orphan links, cyclic graphs
+- Each LLM step has .system.md + .user.md prompt pair included in spec
+- Markdown companion contains all paste-ready TS types referenced by Seed
+ontology_schema:
+  name: WardleyValueChainPipeline
+  description: Domain model for the 6-step pipeline transforming a natural language
+    command into a positioned Wardley value chain map in OWM DSL format
+  fields:
+  - name: chainMetadata
+    type: object
+    description: Extracted metadata from NL input containing angle, scope, objective,
+      imperatives, and temporality fields
+    required: true
+  - name: nlCommand
+    type: string
+    description: Raw natural language input naming a real company or business archetype
+    required: true
+  - name: angle
+    type: string
+    description: Perspective or viewpoint from which the value chain is analyzed
+    required: true
+  - name: scope
+    type: string
+    description: Boundary or perimeter of the value chain to construct
+    required: true
+  - name: objective
+    type: string
+    description: Strategic goal the map should illuminate
+    required: true
+  - name: imperatives
+    type: array
+    description: Hard constraints or non-negotiable requirements extracted from the
+      command
+    required: true
+  - name: temporality
+    type: string
+    description: Time horizon for the map with default value present
+    required: true
+  - name: wardleyComponent
+    type: object
+    description: A component in the value chain with name, type classification, and
+      rough evolution estimate
+    required: true
+  - name: dependencyLink
+    type: object
+    description: Directed A->B relationship where A consumes B and A has higher visibility
+    required: true
+  - name: evolutionSeed
+    type: number
+    description: Initial X coordinate estimate by Wardley type (genesis~0.2 custom~0.4
+      product~0.6 commodity~0.8)
+    required: true
+  - name: positionedComponent
+    type: object
+    description: Component with computed coordinates visibility_y and evolution_x
+      after deterministic algorithms
+    required: true
+  - name: labelOffset
+    type: object
+    description: Relative offset coordinates for component label placement minimizing
+      overlap and intersection
+    required: true
+  - name: owmDslOutput
+    type: string
+    description: Complete OWM DSL text with component declarations, coordinates, label
+      offsets, and needs links ready to render
+    required: true
+  - name: anchorPosition
+    type: object
+    description: Fixed position at visibility 0.95 evolution 0.5 for the chain anchor
+      component
+    required: true
+evaluation_principles:
+- name: structural_completeness
+  description: All 6 pipeline steps are fully specified with TypeScript types and
+    prompt pairs for LLM steps and algorithm descriptions for deterministic steps
+  weight: 0.3
+- name: type_precision
+  description: TypeScript types are explicit and paste-ready for direct use in implementation
+    without interpretation
+  weight: 0.2
+- name: degradation_coverage
+  description: Both LLM failure-timeout and malformed output scenarios have concrete
+    handling strategies using tryDegradeAmbient and withMcpDegradation
+  weight: 0.2
+- name: prompt_convention
+  description: All LLM prompts follow the mandatory split into static .system.md and
+    variable .user.md with no monolithic prompts
+  weight: 0.1
+- name: algorithmic_determinism
+  description: Positioning Y and X and label placement algorithms are fully deterministic
+    with defined initialization and convergence
+  weight: 0.1
+- name: convention_compliance
+  description: Spec follows project conventions including .mts extension English comments
+    justified any and no context-description fallback
+  weight: 0.1
+exit_conditions:
+- name: pipeline_complete
+  description: All 6 steps of the pipeline are specified with TS types prompts and
+    degradation
+  criteria: Each step has explicit TypeScript input-output types and LLM steps have
+    .system.md plus .user.md prompt pairs and degradation paths
+- name: seed_executable
+  description: The Seed Ouroboros document is structurally valid and references the
+    markdown companion
+  criteria: Seed follows Ouroboros format and correctly references companion markdown
+    for types prompts and degradation details
+- name: companion_complete
+  description: Markdown companion contains all paste-ready TS types prompt templates
+    and degradation paths
+  criteria: All TypeScript interfaces and type aliases are present along with all
+    prompt pair templates and degradation handling specifications
+- name: owm_contract_defined
+  description: Output contract is defined as extension of generateOwmSyntax with multi-component
+    and needs links
+  criteria: Spec explicitly defines how generateOwmSyntax is extended to handle multiple
+    components and A->B dependency links in OWM syntax
+metadata:
+  seed_id: seed_273723c45a74
+  version: 1.0.0
+  created_at: '2026-04-23T18:51:02.387549Z'
+  ambiguity_score: 0.1845
+  interview_id: interview_20260423_165643
+  parent_seed_id: null
