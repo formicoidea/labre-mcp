@@ -66,10 +66,10 @@ src/
 │   ├── owm/                     ── Catalogue OWM DSL + couche d'isolation moteur de rendu
 │   │   ├── owm-dsl.mts                emit{Title,Anchor,Component,Link,Size,…} + OWM_DSL_REFERENCE
 │   │   ├── render-adapter.mts         Interface OwmRenderAdapter (DSL → SVG)
-│   │   ├── cli-owm-adapter.mts        Impl concrète backed by src/lib/vendor/cli-owm
+│   │   ├── cli-owm-adapter.mts        Impl concrète backed by src/lib/vendor/cli-owm ; honore size [w,h] du DSL via map.presentation.size
 │   │   ├── render-registry.mts        Singleton getRenderAdapter() + helpers tests
-│   │   ├── svg-bbox-parser.mts        SVG → GeometryReport (component/label/anchor bboxes)
-│   │   ├── overlap-detector.mts       Détection collisions axis-aligned (pure)
+│   │   ├── svg-bbox-parser.mts        SVG → SvgGeometry { items, edges, canvas } ; bboxes composants/labels/ancres + segments dépendances + dimensions canvas
+│   │   ├── overlap-detector.mts       detectAllOverlaps : rect-rect (label↔label, label↔component) + label↔canvas-overflow + label↔edge ; segmentRectIntersects, segmentInRectLength
 │   │   └── candidate-offsets.mts      8 offsets candidats pour la boucle verify-layout
 │   ├── vendor/                  ── Code tiers vendoré (verbatim sauf adaptations ESM)
 │   │   └── cli-owm/             cli-owm@4950f330 (GPL-2.0) — moteur de rendu OWM côté Node
@@ -162,7 +162,7 @@ src/
 │           ├── compute-visibility.mts                 Étape 4 — Y déterministe par-branche, multi-ancres, mapHeight
 │           ├── adjust-x.mts                           Étape 5 — X déterministe autour de xHint, mapWidth
 │           ├── place-labels.mts                       Étape 6 — placement labels initial (règles topologiques)
-│           ├── verify-layout.mts                      Étape 7 — boucle de correction labels via OwmRenderAdapter (cli-owm)
+│           ├── verify-layout.mts                      Étape 7 — boucle de correction labels via OwmRenderAdapter (cli-owm) ; score pondéré HARD (label↔label, label↔component, label↔canvas) + SOFT (label↔edge)
 │           ├── emit-owm.mts                           Étape 8 — émission OWM DSL via src/lib/owm/
 │           └── *.test.mts
 │

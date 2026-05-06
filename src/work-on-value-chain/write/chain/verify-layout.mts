@@ -1,16 +1,20 @@
 // Step 7 of the write:chain:* pipeline — collision-aware label
-// correction loop.
+// correction loop driven by a weighted score.
 //
 // Slots between place-labels (step 6) and emit-owm (step 8). For each
 // iteration:
 //   1. Re-emit the OWM DSL with the current label offsets.
 //   2. Render via the OwmRenderAdapter (cli-owm by default).
-//   3. Parse the SVG into bboxes filtered by known component names.
-//   4. Detect rectangle overlaps.
+//   3. Parse the SVG into bboxes, edges and canvas dimensions.
+//   4. Detect all overlap classes:
+//        - hard : label↔label, label↔component, label↔canvas-overflow
+//        - soft : label↔third-party-edge crossings
 //   5. If clean → done. Otherwise pick the LABEL with the highest
-//      total overlap area, score the eight candidate offsets, apply
-//      the candidate that minimises the post-move overlap count, and
-//      loop.
+//      total weighted score, score the eight candidate offsets,
+//      apply the candidate that minimises the post-move score.
+//
+// Score = HARD_PENALTY × (label-label + label-component + label-canvas)
+//       + SOFT_PENALTY × edge-crossings
 //
 // Only LABEL offsets are correctable here. Component circle positions
 // (X, Y) and anchor positions are upstream concerns of compute-
@@ -31,11 +35,11 @@ import type {
 import type { OwmRenderAdapter } from '../../../lib/owm/render-adapter.mjs';
 import { LABEL_OFFSET_CANDIDATES } from '../../../lib/owm/candidate-offsets.mjs';
 import {
-  parseSvgToBboxes,
-  type GeometryItem,
+  parseSvgGeometry,
+  type SvgGeometry,
 } from '../../../lib/owm/svg-bbox-parser.mjs';
 import {
-  detectOverlaps,
+  detectAllOverlaps,
   type Overlap,
 } from '../../../lib/owm/overlap-detector.mjs';
 import { getCurrentCollector } from '../../../lib/degradation/index.mjs';
@@ -46,6 +50,25 @@ import { getCurrentCollector } from '../../../lib/degradation/index.mjs';
  *  on chains up to ~25 components without runaway oscillation. */
 export const MAX_VERIFY_ITERATIONS = 5;
 
+/** Weight applied to each unit of severity for HARD overlap kinds
+ *  (label-label, label-component, label-canvas). One unit of HARD
+ *  violation outweighs every reasonable count of SOFT crossings. */
+export const HARD_PENALTY = 1000;
+
+/** Weight applied to each unit of severity for SOFT overlap kinds
+ *  (label-edge). The score is HARD × hard_severity_total +
+ *  SOFT × soft_severity_total. */
+export const SOFT_PENALTY = 1;
+
+const HARD_KINDS: ReadonlySet<Overlap['kind']> = new Set([
+  'label-label',
+  'component-label',
+  'label-canvas',
+]);
+const SOFT_KINDS: ReadonlySet<Overlap['kind']> = new Set([
+  'label-edge',
+]);
+
 // ─── Types ──────────────────────────────────────────────────────────────
 
 export interface VerifyReport {
@@ -53,8 +76,12 @@ export interface VerifyReport {
   iterations: number;
   /** Names of components whose label offset was moved by the loop. */
   modifiedLabels: string[];
-  /** Overlap count after the loop terminates. 0 is the happy path. */
-  unresolvedOverlaps: number;
+  /** Hard violations remaining at end of loop. 0 is the happy path. */
+  unresolvedHard: number;
+  /** Soft edge crossings remaining at end of loop. May be > 0 even on
+   *  a successful run — the loop minimises this but does not require
+   *  it to reach zero. */
+  unresolvedSoft: number;
   /** True iff the renderer was unavailable and the loop was skipped. */
   skipped: boolean;
 }
@@ -96,12 +123,31 @@ function withLabel(
 
 interface RenderProbe {
   overlaps: Overlap[];
-  geometry: GeometryItem[];
+  geometry: SvgGeometry;
+  hardCount: number;
+  softCount: number;
+  totalScore: number;
 }
 
-/** Render the chain, parse bboxes, detect overlaps. Returns null if
- *  the adapter throws — the caller decides whether to skip the loop
- *  or score the candidate as worse-than-current. */
+function summarise(overlaps: readonly Overlap[]): { hardCount: number; softCount: number; totalScore: number } {
+  let hardCount = 0;
+  let softCount = 0;
+  let totalScore = 0;
+  for (const ov of overlaps) {
+    if (HARD_KINDS.has(ov.kind)) {
+      hardCount++;
+      totalScore += HARD_PENALTY * ov.severity;
+    } else if (SOFT_KINDS.has(ov.kind)) {
+      softCount++;
+      totalScore += SOFT_PENALTY * ov.severity;
+    }
+  }
+  return { hardCount, softCount, totalScore };
+}
+
+/** Render the chain, parse geometry, detect overlaps, summarise score.
+ *  Returns null if the adapter throws — the caller decides whether to
+ *  skip the loop or score the candidate as worse-than-current. */
 function probe(
   chain: PositionedValueChain,
   emitOpts: EmitOwmOptions,
@@ -116,23 +162,27 @@ function probe(
   } catch {
     return null;
   }
-  const geometry = parseSvgToBboxes(svg, names);
-  const overlaps = detectOverlaps(geometry);
-  return { geometry, overlaps };
+  const geometry = parseSvgGeometry(svg, names);
+  const overlaps = detectAllOverlaps(geometry);
+  const { hardCount, softCount, totalScore } = summarise(overlaps);
+  return { geometry, overlaps, hardCount, softCount, totalScore };
 }
 
-/** Pick the label-bearing component most implicated in the current
- *  overlaps, ranked by total overlap area. Returns null when the only
- *  remaining overlaps are between components/anchors (which this loop
- *  cannot correct). */
+/** Pick the label whose label-bearing overlaps weigh the most in the
+ *  current score. Returns null when no overlap involves a label
+ *  (typical when only out-of-scope component-component pairs remain). */
 function worstOffendingLabel(overlaps: readonly Overlap[]): string | null {
   const scoreByName = new Map<string, number>();
   for (const ov of overlaps) {
+    const weight = HARD_KINDS.has(ov.kind) ? HARD_PENALTY
+                 : SOFT_KINDS.has(ov.kind) ? SOFT_PENALTY
+                 : 0;
+    if (weight === 0) continue;
     if (ov.a.kind === 'label') {
-      scoreByName.set(ov.a.name, (scoreByName.get(ov.a.name) ?? 0) + ov.area);
+      scoreByName.set(ov.a.name, (scoreByName.get(ov.a.name) ?? 0) + weight * ov.severity);
     }
     if (ov.b.kind === 'label') {
-      scoreByName.set(ov.b.name, (scoreByName.get(ov.b.name) ?? 0) + ov.area);
+      scoreByName.set(ov.b.name, (scoreByName.get(ov.b.name) ?? 0) + weight * ov.severity);
     }
   }
   if (scoreByName.size === 0) return null;
@@ -149,12 +199,12 @@ function worstOffendingLabel(overlaps: readonly Overlap[]): string | null {
 
 interface CandidateScore {
   offset: LabelOffset;
-  totalOverlapArea: number;
+  totalScore: number;
 }
 
 /** Try every candidate offset for a single component, render, score
- *  by total overlap area. Returns the best candidate (which may be
- *  the current one if no improvement is found). */
+ *  by HARD/SOFT-weighted total. Returns the best candidate (which may
+ *  be the current one if no improvement is found). */
 function bestCandidateFor(
   componentName: string,
   chain: PositionedValueChain,
@@ -167,9 +217,8 @@ function bestCandidateFor(
     const trial = withLabel(chain, componentName, candidate);
     const result = probe(trial, emitOpts, adapter, names);
     if (result === null) continue;
-    const total = result.overlaps.reduce((s, ov) => s + ov.area, 0);
-    if (best === null || total < best.totalOverlapArea) {
-      best = { offset: candidate, totalOverlapArea: total };
+    if (best === null || result.totalScore < best.totalScore) {
+      best = { offset: candidate, totalScore: result.totalScore };
     }
   }
   return best;
@@ -182,7 +231,8 @@ function sameOffset(a: LabelOffset, b: LabelOffset): boolean {
 // ─── Public API ─────────────────────────────────────────────────────────
 
 /**
- * Iteratively correct label offsets to minimise overlap area in the
+ * Iteratively correct label offsets to minimise the weighted overlap
+ * score (hard violations first, then soft edge crossings) in the
  * cli-owm render. Returns a new chain with adjusted labels and a
  * report describing what happened.
  *
@@ -198,7 +248,8 @@ export function verifyLayout(
   const names = knownNames(chain);
   const modified: string[] = [];
   let current = chain;
-  let lastOverlapCount = 0;
+  let lastHard = 0;
+  let lastSoft = 0;
   let iterations = 0;
 
   for (let iter = 0; iter < MAX_VERIFY_ITERATIONS; iter++) {
@@ -210,19 +261,23 @@ export function verifyLayout(
         report: {
           iterations,
           modifiedLabels: modified,
-          unresolvedOverlaps: 0,
+          unresolvedHard: 0,
+          unresolvedSoft: 0,
           skipped: true,
         },
       };
     }
-    lastOverlapCount = baseline.overlaps.length;
+    lastHard = baseline.hardCount;
+    lastSoft = baseline.softCount;
+
     if (baseline.overlaps.length === 0) {
       return {
         chain: current,
         report: {
           iterations,
           modifiedLabels: modified,
-          unresolvedOverlaps: 0,
+          unresolvedHard: 0,
+          unresolvedSoft: 0,
           skipped: false,
         },
       };
@@ -243,8 +298,7 @@ export function verifyLayout(
       break;
     }
 
-    const baselineArea = baseline.overlaps.reduce((s, ov) => s + ov.area, 0);
-    if (best.totalOverlapArea >= baselineArea) {
+    if (best.totalScore >= baseline.totalScore) {
       // No candidate strictly improved (all-eight tied or worse).
       break;
     }
@@ -260,11 +314,12 @@ export function verifyLayout(
     }
   }
 
-  // Final probe to report the residual overlap count after the loop.
-  const final = probe(current, emitOpts, adapter, names);
-  const unresolved = final?.overlaps.length ?? lastOverlapCount;
-  if (unresolved > 0) {
-    warn(`verify-layout left ${unresolved} unresolved overlap(s) after ${iterations} iteration(s)`);
+  // Final probe to report the residual breakdown after the loop.
+  const finalProbe = probe(current, emitOpts, adapter, names);
+  const unresolvedHard = finalProbe?.hardCount ?? lastHard;
+  const unresolvedSoft = finalProbe?.softCount ?? lastSoft;
+  if (unresolvedHard > 0) {
+    warn(`verify-layout left ${unresolvedHard} unresolved hard violation(s) after ${iterations} iteration(s)`);
   }
 
   return {
@@ -272,7 +327,8 @@ export function verifyLayout(
     report: {
       iterations,
       modifiedLabels: modified,
-      unresolvedOverlaps: unresolved,
+      unresolvedHard,
+      unresolvedSoft,
       skipped: false,
     },
   };

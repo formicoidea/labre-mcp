@@ -6,12 +6,13 @@
 // cli-owm emits today (verified by inspection 2026-05-06). It does NOT
 // aim for general SVG support — that is a non-goal. The contract is:
 // "given a cli-owm SVG and the set of known component names, return
-// bboxes for every component, label and anchor we recognise". Any
-// decoration (axes, title, gradient stops, dash patterns) is filtered
-// out by name matching: anything whose `<text>` content is not in
-// `knownNames` is ignored. This is more robust than heuristic
-// geometry filtering because chain titles or future axis labels
-// cannot accidentally creep in.
+// bboxes for every component, label and anchor we recognise; plus the
+// dependency edges and the canvas dimensions". Any decoration (axes,
+// title, gradient stops, dash patterns) is filtered out by name
+// matching: anything whose `<text>` content is not in `knownNames` is
+// ignored. This is more robust than heuristic geometry filtering
+// because chain titles or future axis labels cannot accidentally creep
+// in.
 //
 // Text bbox estimation uses a constant char-width approximation
 // (`LABEL_CHAR_WIDTH = 7px` at the cli-owm default 14px font), which
@@ -41,6 +42,33 @@ export interface GeometryItem {
 
 export type GeometryReport = GeometryItem[];
 
+/** A dependency line `from`→`to` rendered as a `<line>` between the
+ *  centres of the two components. Endpoints are matched by coordinate
+ *  to known component circles (or anchor text positions). */
+export interface EdgeSegment {
+  from: string;
+  to: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+/** Outer canvas dimensions of the SVG (root `<svg width height>`). When
+ *  the renderer omits these attributes, both fields are 0 and callers
+ *  should treat canvas-overflow as undecidable. */
+export interface Canvas {
+  width: number;
+  height: number;
+}
+
+/** Aggregate geometry returned by `parseSvgGeometry`. */
+export interface SvgGeometry {
+  items: GeometryReport;
+  edges: EdgeSegment[];
+  canvas: Canvas;
+}
+
 // ─── Constants ──────────────────────────────────────────────────────────
 
 /** Approximate pixel width of one character at the cli-owm default 14px
@@ -50,6 +78,11 @@ export const LABEL_CHAR_WIDTH = 7;
 export const LABEL_HEIGHT = 16;
 /** Default `r` attribute used by cli-owm for component circles. */
 export const COMPONENT_RADIUS = 5;
+/** Tolerance (px) used when matching `<line>` endpoints to known
+ *  component centres. cli-owm emits coordinates with floating-point
+ *  rounding noise (e.g. `30.00000000000003`), so an exact match would
+ *  miss legitimate edges. */
+export const ENDPOINT_MATCH_TOLERANCE = 0.5;
 
 // ─── SVG slicing ────────────────────────────────────────────────────────
 
@@ -69,6 +102,7 @@ function stripDecorationGroups(svg: string): string {
 
 const CIRCLE_RX = /<circle\s+([^>/]+)\/?>/g;
 const TEXT_RX = /<text\s+([^>]+)>([\s\S]*?)<\/text>/g;
+const LINE_RX = /<line\s+([^>/]+)\/?>/g;
 const ATTR_RX = /(\w[\w-]*)\s*=\s*"([^"]*)"/g;
 
 function readAttrs(s: string): Record<string, string> {
@@ -115,41 +149,56 @@ function textBbox(x: number, y: number, anchor: string, content: string): Bbox {
   return { x: left, y: top, width, height: LABEL_HEIGHT };
 }
 
-// ─── Public API ─────────────────────────────────────────────────────────
+// ─── Canvas + edges + items extraction ─────────────────────────────────
 
-/**
- * Parse a cli-owm SVG into a flat geometry report. Only elements whose
- * text content is in `knownNames` survive the filter — this is by
- * design (see file-level comment).
- *
- * Algorithm: top-level scan. A `<circle>` is buffered as the
- * "currently pending" component slot. The next `<text>` whose content
- * is in `knownNames` is associated with that pending circle; together
- * they emit a `component` bbox (from the circle) and a `label` bbox
- * (from the text). A `<text>` with `text-anchor="middle"` is emitted
- * as an `anchor` regardless of any pending circle (cli-owm renders
- * anchors as text-only nodes).
- *
- * Any unmatched circle is silently dropped (cli-owm does occasionally
- * emit decorative circles that have no labelled meaning, such as the
- * accelerator marker dots).
- */
-export function parseSvgToBboxes(
+function extractCanvas(svg: string): Canvas {
+  // Read width/height from the root `<svg ...>` opening tag only —
+  // any nested `<svg>` (rare, but safe to ignore) wouldn't be the
+  // canvas reference.
+  const closeIdx = svg.indexOf('>');
+  if (closeIdx < 0) return { width: 0, height: 0 };
+  const head = svg.slice(0, closeIdx + 1);
+  const w = head.match(/\bwidth="([^"]+)"/);
+  const h = head.match(/\bheight="([^"]+)"/);
+  return {
+    width:  w ? Math.max(0, num(w[1]) || 0) : 0,
+    height: h ? Math.max(0, num(h[1]) || 0) : 0,
+  };
+}
+
+interface PositionedName {
+  name: string;
+  x: number;
+  y: number;
+}
+
+interface ItemsAndPositions {
+  items: GeometryReport;
+  /** Endpoint-matching index : every component's circle centre and
+   *  every anchor's text position, keyed by name. Used to resolve
+   *  `<line>` endpoints back to component names. */
+  positions: PositionedName[];
+}
+
+/** Walk `<circle>` and `<text>` tokens in document order and pair each
+ *  circle with its following matching label. Anchors are emitted
+ *  directly from middle-anchored `<text>` tokens. Also records the
+ *  endpoint position for each named component/anchor so edges can be
+ *  resolved later. */
+function parseItemsAndPositions(
   svg: string,
   knownNames: ReadonlySet<string>,
-): GeometryReport {
+): ItemsAndPositions {
   const stripped = stripDecorationGroups(svg);
-  const out: GeometryReport = [];
+  const items: GeometryReport = [];
+  const positions: PositionedName[] = [];
 
-  // Walk both regexes in document order using their lastIndex.
   CIRCLE_RX.lastIndex = 0;
   TEXT_RX.lastIndex = 0;
   let circleMatch = CIRCLE_RX.exec(stripped);
   let textMatch = TEXT_RX.exec(stripped);
   let pendingCircle: { cx: number; cy: number; r: number; index: number } | null = null;
 
-  // Fold-merge the two streams by their lastIndex so we visit elements
-  // in document order.
   while (circleMatch !== null || textMatch !== null) {
     const useCircle =
       textMatch === null ||
@@ -174,11 +223,13 @@ export function parseSvgToBboxes(
       if (knownNames.has(name) && Number.isFinite(x) && Number.isFinite(y)) {
         const lbl = textBbox(x, y, anchor, name);
         if (anchor === 'middle') {
-          out.push({ name, kind: 'anchor', bbox: lbl });
+          items.push({ name, kind: 'anchor', bbox: lbl });
+          positions.push({ name, x, y });
           pendingCircle = null;
         } else if (pendingCircle !== null) {
-          out.push({ name, kind: 'component', bbox: circleBbox(pendingCircle.cx, pendingCircle.cy, pendingCircle.r) });
-          out.push({ name, kind: 'label', bbox: lbl });
+          items.push({ name, kind: 'component', bbox: circleBbox(pendingCircle.cx, pendingCircle.cy, pendingCircle.r) });
+          items.push({ name, kind: 'label', bbox: lbl });
+          positions.push({ name, x: pendingCircle.cx, y: pendingCircle.cy });
           pendingCircle = null;
         }
         // else: orphan text — silently drop (decoration we don't recognise)
@@ -187,5 +238,70 @@ export function parseSvgToBboxes(
     }
   }
 
+  return { items, positions };
+}
+
+function matchEndpoint(x: number, y: number, positions: readonly PositionedName[]): string | null {
+  for (const p of positions) {
+    if (Math.abs(p.x - x) < ENDPOINT_MATCH_TOLERANCE
+     && Math.abs(p.y - y) < ENDPOINT_MATCH_TOLERANCE) {
+      return p.name;
+    }
+  }
+  return null;
+}
+
+/** Extract `<line>` elements at the top level (decoration groups are
+ *  already stripped) and resolve each endpoint to a component name via
+ *  `positions`. Lines whose endpoints don't match any known
+ *  component are silently dropped — cli-owm sometimes emits ancillary
+ *  lines (accelerator markers, baselines) that look like edges but
+ *  don't connect named nodes. */
+function extractEdges(svg: string, positions: readonly PositionedName[]): EdgeSegment[] {
+  const stripped = stripDecorationGroups(svg);
+  const out: EdgeSegment[] = [];
+
+  LINE_RX.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = LINE_RX.exec(stripped)) !== null) {
+    const a = readAttrs(m[1]);
+    const x1 = num(a.x1), y1 = num(a.y1), x2 = num(a.x2), y2 = num(a.y2);
+    if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
+    const from = matchEndpoint(x1, y1, positions);
+    const to   = matchEndpoint(x2, y2, positions);
+    if (from !== null && to !== null && from !== to) {
+      out.push({ from, to, x1, y1, x2, y2 });
+    }
+  }
   return out;
+}
+
+// ─── Public API ─────────────────────────────────────────────────────────
+
+/**
+ * Parse a cli-owm SVG into a flat geometry report plus its edges and
+ * canvas dimensions. Only elements whose text content is in
+ * `knownNames` survive the filter — this is by design (see file-level
+ * comment).
+ */
+export function parseSvgGeometry(
+  svg: string,
+  knownNames: ReadonlySet<string>,
+): SvgGeometry {
+  const canvas = extractCanvas(svg);
+  const { items, positions } = parseItemsAndPositions(svg, knownNames);
+  const edges = extractEdges(svg, positions);
+  return { items, edges, canvas };
+}
+
+/**
+ * Backward-compatible alias for the V2 API. Equivalent to
+ * `parseSvgGeometry(...).items`. Existing callers that only need
+ * rect-rect collision detection keep working unchanged.
+ */
+export function parseSvgToBboxes(
+  svg: string,
+  knownNames: ReadonlySet<string>,
+): GeometryReport {
+  return parseSvgGeometry(svg, knownNames).items;
 }

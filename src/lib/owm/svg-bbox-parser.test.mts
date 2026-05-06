@@ -12,6 +12,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseSvgToBboxes,
+  parseSvgGeometry,
   LABEL_CHAR_WIDTH,
   LABEL_HEIGHT,
   COMPONENT_RADIUS,
@@ -111,6 +112,93 @@ describe('parseSvgToBboxes — synthetic fixtures', () => {
   });
 });
 
+describe('parseSvgGeometry — canvas extraction', () => {
+  it('reads width and height from the root <svg> tag', () => {
+    const svg = '<svg width="800" height="1000" viewBox="0 0 800 1000"></svg>';
+    const out = parseSvgGeometry(svg, new Set());
+    assert.deepEqual(out.canvas, { width: 800, height: 1000 });
+  });
+
+  it('returns {0, 0} when the root <svg> lacks size attributes', () => {
+    const svg = '<svg viewBox="0 0 800 1000"></svg>';
+    const out = parseSvgGeometry(svg, new Set());
+    assert.deepEqual(out.canvas, { width: 0, height: 0 });
+  });
+
+  it('handles fractional / scientific dimension values defensively', () => {
+    const svg = '<svg width="500.5" height="600"></svg>';
+    const out = parseSvgGeometry(svg, new Set());
+    assert.equal(out.canvas.width, 500.5);
+    assert.equal(out.canvas.height, 600);
+  });
+});
+
+describe('parseSvgGeometry — edge extraction', () => {
+  it('emits an edge between two known components', () => {
+    const svg = `<svg>
+      <line x1="100" y1="100" x2="200" y2="200" stroke="grey"/>
+      <circle cx="100" cy="100" r="5"/>
+      <text x="105" y="100">Alpha</text>
+      <circle cx="200" cy="200" r="5"/>
+      <text x="205" y="200">Beta</text>
+    </svg>`;
+    const out = parseSvgGeometry(svg, new Set(['Alpha', 'Beta']));
+    assert.equal(out.edges.length, 1);
+    assert.equal(out.edges[0].from, 'Alpha');
+    assert.equal(out.edges[0].to, 'Beta');
+  });
+
+  it('emits an edge from an anchor to a component', () => {
+    const svg = `<svg>
+      <line x1="50" y1="10" x2="100" y2="100"/>
+      <text x="50" y="10" text-anchor="middle">User</text>
+      <circle cx="100" cy="100" r="5"/>
+      <text x="105" y="100">Need</text>
+    </svg>`;
+    const out = parseSvgGeometry(svg, new Set(['User', 'Need']));
+    assert.equal(out.edges.length, 1);
+    assert.equal(out.edges[0].from, 'User');
+    assert.equal(out.edges[0].to, 'Need');
+  });
+
+  it('drops lines whose endpoints do not match any known component', () => {
+    const svg = `<svg>
+      <line x1="0" y1="0" x2="999" y2="999"/>
+      <circle cx="100" cy="100" r="5"/>
+      <text x="105" y="100">Alpha</text>
+    </svg>`;
+    const out = parseSvgGeometry(svg, new Set(['Alpha']));
+    assert.deepEqual(out.edges, []);
+  });
+
+  it('absorbs floating-point rounding noise in line endpoints', () => {
+    const svg = `<svg>
+      <line x1="100.00000000000003" y1="100" x2="200" y2="200.0000000000001"/>
+      <circle cx="100" cy="100" r="5"/>
+      <text x="105" y="100">Alpha</text>
+      <circle cx="200" cy="200" r="5"/>
+      <text x="205" y="200">Beta</text>
+    </svg>`;
+    const out = parseSvgGeometry(svg, new Set(['Alpha', 'Beta']));
+    assert.equal(out.edges.length, 1);
+  });
+
+  it('does not emit edges for lines inside <g id="valueChain"> or <g id="Evolution">', () => {
+    const svg = `<svg>
+      <g id="valueChain">
+        <line x1="0" y1="0" x2="600" y2="0"/>
+      </g>
+      <g id="Evolution">
+        <line x1="0" y1="0" x2="498" y2="0"/>
+      </g>
+      <circle cx="100" cy="100" r="5"/>
+      <text x="105" y="100">A</text>
+    </svg>`;
+    const out = parseSvgGeometry(svg, new Set(['A']));
+    assert.deepEqual(out.edges, []);
+  });
+});
+
 describe('parseSvgToBboxes — round-trip via CliOwmAdapter', () => {
   it('extracts every component and the anchor from a real cli-owm render', () => {
     const dsl = [
@@ -145,5 +233,32 @@ describe('parseSvgToBboxes — round-trip via CliOwmAdapter', () => {
       assert.ok(g.bbox.width > 0,  `${g.name} ${g.kind} width <= 0`);
       assert.ok(g.bbox.height > 0, `${g.name} ${g.kind} height <= 0`);
     }
+  });
+
+  it('extracts edges and canvas from a real cli-owm render', () => {
+    const dsl = [
+      'title round-trip',
+      'style plain',
+      'size [800, 1000]',
+      'anchor User [0.95, 0.5]',
+      'component Need A [0.7, 0.3]',
+      'component Capability X [0.4, 0.6]',
+      'User->Need A',
+      'Need A->Capability X',
+    ].join('\n');
+    const svg = new CliOwmAdapter().render(dsl);
+    const out = parseSvgGeometry(
+      svg,
+      new Set(['User', 'Need A', 'Capability X']),
+    );
+
+    // Two declared dependencies → two extracted edges.
+    assert.equal(out.edges.length, 2, 'expected 2 edges');
+    const fromTo = out.edges.map(e => `${e.from}->${e.to}`).sort();
+    assert.deepEqual(fromTo, ['Need A->Capability X', 'User->Need A']);
+
+    // Canvas honours the DSL `size [800, 1000]` (plus cli-owm padding).
+    assert.ok(out.canvas.width  >= 800,  `canvas.width  ${out.canvas.width} should reflect 800`);
+    assert.ok(out.canvas.height >= 1000, `canvas.height ${out.canvas.height} should reflect 1000`);
   });
 });
