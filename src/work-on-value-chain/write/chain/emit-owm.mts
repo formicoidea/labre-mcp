@@ -1,4 +1,4 @@
-// Step 6 of the write:chain:* pipeline — OWM DSL emission.
+// Step 7 of the write:chain:* pipeline — OWM DSL emission.
 //
 // Produces a complete OWM document by composing primitives from the shared
 // OWM DSL catalog (src/lib/owm/owm-dsl.mts):

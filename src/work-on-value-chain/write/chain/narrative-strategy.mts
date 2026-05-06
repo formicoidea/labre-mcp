@@ -1,17 +1,22 @@
 // write:chain:narrative — the first concrete value-chain write strategy.
 //
-// Composes the eight pipeline modules (extract-metadata, generate-chain,
-// propose-x-rough, compute-visibility, adjust-x, place-labels,
-// verify-layout, emit-owm) into a single-shot flow that turns a
-// natural-language command into an OWM DSL document.
+// Composes the seven pipeline modules (extract-metadata, generate-chain,
+// compute-visibility, adjust-x, place-labels, verify-layout, emit-owm)
+// into a single-shot flow that turns a natural-language command into an
+// OWM DSL document.
 //
-// propose-x-rough (LLM #3) and compute-visibility are independent (X vs Y)
-// and run in parallel via Promise.all to halve the latency of this stage.
+// Two LLM calls only:
+//   1. extract-metadata — angle/scope/objective/imperatives/temporality.
+//   2. generate-chain   — chain shape (anchors, components, links, phases)
+//                         plus an inline `xHint` per component for visual
+//                         clarity.
+// All later stages (compute-visibility, adjust-x, place-labels,
+// verify-layout, emit-owm) are pure deterministic JS.
 //
-// verify-layout closes the loop on label placement: it renders the chain
-// via the OwmRenderAdapter (cli-owm by default), parses the SVG into
-// bboxes, detects overlaps, and reassigns label offsets until the
-// rendering is clean or the iteration cap is reached.
+// verify-layout closes the loop on label placement: it computes the chain
+// geometry analytically, detects overlaps, and reassigns label offsets via
+// force-directed simulation + canonical snap until the rendering is clean
+// or the iteration cap is reached.
 //
 // The pipeline modules are kept in sibling files (not inlined here) so
 // that future `write:chain:*` strategies can recompose them — e.g. a
@@ -22,17 +27,12 @@
 import { BaseChainWriteStrategy } from './base-strategy.mjs';
 import { extractMetadata } from './extract-metadata.mjs';
 import { generateChain } from './generate-chain.mjs';
-import { proposeXRough } from './propose-x-rough.mjs';
 import { computeVisibility } from './compute-visibility.mjs';
 import { adjustX } from './adjust-x.mjs';
 import { placeLabels } from './place-labels.mjs';
 import { verifyLayout } from './verify-layout.mjs';
 import { generateChainOwmSyntax, type EmitOwmOptions } from './emit-owm.mjs';
-import type {
-  ChainMetadata,
-  PositionedComponent,
-  PositionedValueChain,
-} from '../../../types/value-chain.mjs';
+import type { ChainMetadata } from '../../../types/value-chain.mjs';
 
 // any: llmCall closure shape is provider-dependent (see src/lib/llm)
 type LlmCall = any;
@@ -75,29 +75,15 @@ export class NarrativeChainStrategy extends BaseChainWriteStrategy {
     }
 
     const metadata = await extractMetadata(input.nlCommand, this._llmCall);
+    // LLM #2 returns the chain plus each component's xHint inline.
     const raw      = await generateChain(metadata, this._llmCall);
 
-    // Steps 3 (LLM #3 X hint) and 4 (deterministic Y) are independent —
-    // run them in parallel.
-    const [rawWithHints, visibility] = await Promise.all([
-      proposeXRough(raw, this._llmCall),
-      Promise.resolve(computeVisibility(raw)),
-    ]);
+    // Deterministic Y assignment from the parsed chain. xHints are already
+    // on raw.components, so adjust-x reads them directly via the
+    // PositionedValueChain produced by computeVisibility.
+    const visibility = computeVisibility(raw);
 
-    // Merge xHints onto the positioned chain so adjust-x can read them.
-    const hintByName = new Map(
-      rawWithHints.components.map(c => [c.name, c.xHint] as const),
-    );
-    const hintedChain: PositionedValueChain = {
-      metadata: visibility.chain.metadata,
-      links: visibility.chain.links,
-      components: visibility.chain.components.map<PositionedComponent>(c => ({
-        ...c,
-        xHint: hintByName.get(c.name) ?? c.xHint,
-      })),
-    };
-
-    const adjusted = adjustX(hintedChain);
+    const adjusted = adjustX(visibility.chain);
     const laid     = placeLabels(adjusted.chain);
 
     // Caller-provided size always wins so MCP clients can override the
@@ -111,8 +97,7 @@ export class NarrativeChainStrategy extends BaseChainWriteStrategy {
       size: input.emit?.size ?? computedSize,
     };
 
-    // Step 7: collision-aware label correction. The render adapter is
-    // resolved once here and passed in so unit tests can inject a mock.
+    // Step 6: collision-aware label correction.
     const verified = verifyLayout(laid, emitOptions);
     const owm      = generateChainOwmSyntax(verified.chain, emitOptions);
     return { owm, metadata };

@@ -56,13 +56,13 @@
 //      readability in the renderer's default canvas. We keep the
 //      normalised Y values in [Y_MIN, ANCHOR_VISIBILITY] and instead
 //      scale the OWM canvas height proportionally so the per-step pixel
-//      gap stays roughly constant. Canvas WIDTH is computed by step 5
+//      gap stays roughly constant. Canvas WIDTH is computed by step 4
 //      (adjust-x) based on horizontal density.
 //
-//   7. Orphans (components unreachable from any anchor) keep their
-//      `evolution` from PHASE_CENTROIDS but receive Y = ORPHAN_FALLBACK_Y
-//      (mid-canvas) as a placeholder. The LLM is expected to provide
-//      coherent x/y for these in a future schema bump — see the V1 spec.
+//   7. Orphans (components unreachable from any anchor) receive
+//      Y = ORPHAN_FALLBACK_Y (mid-canvas) and X = INITIAL_EVOLUTION_PLACEHOLDER
+//      (overwritten by step 4 — adjust-x — using the LLM xHint or a
+//      uniform per-Y-level fallback).
 
 import type {
   DependencyLink,
@@ -71,9 +71,7 @@ import type {
   PositionedValueChain,
   RawValueChain,
   ValueChainComponent,
-  WardleyPhaseKey,
 } from '../../../types/value-chain.mjs';
-import { PHASE_CENTROIDS } from '../../../schemas/inputs.schema.mjs';
 
 // ─── Constants ──────────────────────────────────────────────────────────
 
@@ -92,6 +90,10 @@ export const EDGE_MIN_GAP = 0.01;
 export const SECONDARY_ANCHOR_OFFSET = 0.3;
 /** Y placeholder for components unreachable from any anchor. */
 export const ORPHAN_FALLBACK_Y = 0.50;
+/** X placeholder seeded by this step for every non-anchor component. The
+ *  value is overwritten by step 4 (adjust-x) using `xHint` or a uniform
+ *  per-Y-level fallback, so it carries no semantic meaning. */
+export const INITIAL_EVOLUTION_PLACEHOLDER = 0.5;
 
 // ─── Canvas sizing ──────────────────────────────────────────────────────
 
@@ -204,7 +206,7 @@ function longestToLeaf(
 
 /** Compute the OWM canvas height for the given longest-chain length.
  *  Height is scaled when L > DENSITY_LIMIT_L so the per-step pixel gap
- *  remains readable. Width is the responsibility of step 5 (adjust-x). */
+ *  remains readable. Width is the responsibility of step 4 (adjust-x). */
 export function computeMapHeight(L: number): number {
   if (L <= DENSITY_LIMIT_L) return BASE_CANVAS_HEIGHT;
   return Math.ceil((BASE_CANVAS_HEIGHT * L) / DENSITY_REFERENCE_L);
@@ -216,10 +218,6 @@ function clamp(x: number, lo: number, hi: number): number {
   if (x < lo) return lo;
   if (x > hi) return hi;
   return x;
-}
-
-function initialEvolution(phase: WardleyPhaseKey): number {
-  return PHASE_CENTROIDS[phase];
 }
 
 function emptyLabel(): LabelOffset {
@@ -238,8 +236,8 @@ export interface ComputeVisibilityResult {
  *
  * Returns a `PositionedValueChain` where:
  *   - `visibility` respects the strict edge-direction rule,
- *   - `evolution` is seeded from `PHASE_CENTROIDS` (refined by step 4),
- *   - `label` is the placeholder `{ dx: 0, dy: 0 }` (filled by step 5).
+ *   - `evolution` is seeded with `INITIAL_EVOLUTION_PLACEHOLDER` (overwritten by step 4 — adjust-x),
+ *   - `label` is the placeholder `{ dx: 0, dy: 0 }` (filled by step 5 — place-labels).
  *
  * Throws when no anchor (`role === 'anchor'`) is present.
  */
@@ -319,7 +317,7 @@ export function computeVisibility(raw: RawValueChain): ComputeVisibilityResult {
       return {
         ...c,
         visibility: y,
-        evolution: c.role === 'anchor' ? 0.5 : initialEvolution(c.phase),
+        evolution: INITIAL_EVOLUTION_PLACEHOLDER,
         label: emptyLabel(),
       };
     }
@@ -327,7 +325,7 @@ export function computeVisibility(raw: RawValueChain): ComputeVisibilityResult {
     return {
       ...c,
       visibility: ORPHAN_FALLBACK_Y,
-      evolution: initialEvolution(c.phase),
+      evolution: INITIAL_EVOLUTION_PLACEHOLDER,
       label: emptyLabel(),
     };
   });

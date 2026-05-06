@@ -185,15 +185,6 @@
       },
       "variables": ["metadata", "date"],
       "parser": { "kind": "custom", "id": "parseRawValueChain" }
-    },
-    "propose-x-rough": {
-      "kind": "template",
-      "templateFile": {
-        "system": "prompts/write-chain.propose-x-rough.system.md",
-        "user": "prompts/write-chain.propose-x-rough.user.md"
-      },
-      "variables": ["components", "links", "anchorContext"],
-      "parser": { "kind": "custom", "id": "proposeXRough" }
     }
   }
 }

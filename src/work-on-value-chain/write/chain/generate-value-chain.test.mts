@@ -34,22 +34,13 @@ function makeMockLlm() {
     if (sys.includes('Top-down algorithm')) {
       return JSON.stringify({
         components: [
-          { name: 'Merchant',       type: 'anchor',    role: 'anchor',     phase: 'phase4' },
-          { name: 'Accept Payment', type: 'component', role: 'need',       phase: 'phase3' },
-          { name: 'Fraud',          type: 'component', role: 'capability', phase: 'phase2' },
+          { name: 'Merchant',       type: 'anchor',    role: 'anchor', xHint: 0.75 },
+          { name: 'Accept Payment', type: 'component', role: 'need', xHint: 0.60 },
+          { name: 'Fraud',          type: 'component', role: 'capability', xHint: 0.30 },
         ],
         links: [
           { from: 'Merchant',       to: 'Accept Payment' },
           { from: 'Accept Payment', to: 'Fraud' },
-        ],
-      });
-    }
-    if (sys.includes('layout assistant')) {
-      return JSON.stringify({
-        positions: [
-          { name: 'Merchant',       xHint: 0.45 },
-          { name: 'Accept Payment', xHint: 0.60 },
-          { name: 'Fraud',          xHint: 0.30 },
         ],
       });
     }

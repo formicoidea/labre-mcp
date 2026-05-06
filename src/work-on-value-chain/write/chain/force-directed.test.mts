@@ -40,7 +40,7 @@ function chain(seeds: Seed[], links: Array<{ from: string; to: string }> = []): 
       name: s.name,
       type: s.role === 'anchor' ? 'anchor' : 'component',
       role: s.role,
-      phase: 'phase3',
+      
       evolution: s.evolution,
       visibility: s.visibility,
       label: { dx: s.dx ?? 0, dy: s.dy ?? 25 },

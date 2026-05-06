@@ -1,4 +1,4 @@
-// Step 7 of the write:chain:* pipeline — collision-aware label
+// Step 6 of the write:chain:* pipeline — collision-aware label
 // correction loop, V6 (full force-directed on analytical geometry).
 //
 // V6 replaces the V5 greedy-discrete + refinement + nudge stack with

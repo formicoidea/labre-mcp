@@ -48,8 +48,7 @@ export interface ValueChainComponent {
   description?: string;
   context?: string;
   role: ChainRole;
-  phase: WardleyPhaseKey;
-  // Rough X coordinate proposed by LLM #3 (propose-x-rough) for VISUAL
+  // Rough X coordinate proposed by LLM #2 (generate-chain) for VISUAL
   // CLARITY of the chain. NOT an evolution-maturity estimate — the
   // evolution axis is hidden at write:chain:* stage and only revealed in
   // phase 3 by estimateEvolution. The deterministic adjust-x step keeps

@@ -51,7 +51,7 @@ function seed(
       name: c.name,
       type: c.role === 'anchor' ? 'anchor' : 'component',
       role: c.role,
-      phase: 'phase3',
+      
       xHint: c.xHint,
       visibility: c.visibility,
       evolution: 0,

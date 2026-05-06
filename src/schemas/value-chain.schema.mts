@@ -38,10 +38,9 @@ export const ValueChainComponentSchema = z.object({
   description: z.string().optional(),
   context: z.string().optional(),
   role: ChainRoleSchema,
-  phase: WardleyPhaseKeySchema,
-  // Rough X for visual clarity, set by propose-x-rough (LLM #3). Not
-  // evolution maturity. Deterministic adjust-x keeps final X within ±0.10
-  // of this hint.
+  // Rough X for visual clarity, set by generate-chain (LLM #2) inline with
+  // the rest of the component fields. NOT evolution maturity. Deterministic
+  // adjust-x keeps the final X within ±0.10 of this hint.
   xHint: z.number().min(0).max(1).optional(),
 }).strict();
 

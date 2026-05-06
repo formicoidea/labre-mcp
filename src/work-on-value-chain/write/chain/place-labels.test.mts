@@ -30,7 +30,7 @@ function comp(
     name,
     type: role === 'anchor' ? 'anchor' : 'component',
     role,
-    phase: 'phase3',
+    
     visibility,
     evolution,
     label: { dx: 0, dy: 0 },

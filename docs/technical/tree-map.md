@@ -154,17 +154,16 @@ src/
 │       └── chain/                                     Tool generateValueChain — pipeline 8 étapes "narrative"
 │           ├── base-strategy.mts, registry.mts
 │           ├── generate-value-chain.mts               Tool MCP generateValueChain (handler + schéma)
-│           ├── narrative-strategy.mts                 Orchestrateur (method = write:chain:narrative ; étapes 3+4 en parallèle)
+│           ├── narrative-strategy.mts                 Orchestrateur (method = write:chain:narrative ; 2 LLM seulement, xHint inline dans LLM #2)
 │           ├── extract-metadata.mts                   Étape 1 — LLM angle/scope/objective/imperatives/temporality
-│           ├── generate-chain.mts                     Étape 2 — LLM ancres + composants + liens A→B
-│           ├── propose-x-rough.mts                    Étape 3 — LLM xHint grossier (clarté, pas évolution)
-│           ├── compute-visibility.mts                 Étape 4 — Y déterministe par-branche, multi-ancres, mapHeight
-│           ├── adjust-x.mts                           Étape 5 — X déterministe autour de xHint, mapWidth
-│           ├── place-labels.mts                       Étape 6 — placement labels initial (règles topologiques)
-│           ├── verify-layout.mts                      Étape 7 — placement labels V6 force-directed + V7 canonical snap (analytical geometry, pas de cli-owm en hot path)
+│           ├── generate-chain.mts                     Étape 2 — LLM ancres + composants + liens A→B + xHint (clarté, pas évolution)
+│           ├── compute-visibility.mts                 Étape 3 — Y déterministe par-branche, multi-ancres, mapHeight
+│           ├── adjust-x.mts                           Étape 4 — X déterministe autour de xHint, mapWidth
+│           ├── place-labels.mts                       Étape 5 — placement labels initial (règles topologiques)
+│           ├── verify-layout.mts                      Étape 6 — placement labels V6 force-directed + V7 canonical snap (analytical geometry, pas de cli-owm en hot path)
 │           ├── force-directed.mts                     simulateLabels + simulateComponents + projectHardConstraints (physics + DSL invariant clamps + strict projection)
 │           ├── canonical-snap.mts                     V7 — snap les offsets continus V6 vers les canoniques V5 (BELOW/RIGHT/LEFT proportional/diagonales) quand ça ne dégrade pas hard
-│           ├── emit-owm.mts                           Étape 8 — émission OWM DSL via src/lib/owm/
+│           ├── emit-owm.mts                           Étape 7 — émission OWM DSL via src/lib/owm/
 │           └── *.test.mts
 │
 └── work-on-evolution/           ── Cœur : pipeline d'évaluation d'évolution

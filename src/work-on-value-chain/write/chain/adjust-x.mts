@@ -1,7 +1,7 @@
-// Step 5 of the write:chain:* pipeline — deterministic X adjustment for
+// Step 4 of the write:chain:* pipeline — deterministic X adjustment for
 // READABILITY around the LLM-proposed `xHint`.
 //
-// Contract: the LLM (step 3, propose-x-rough) proposes a rough X per
+// Contract: the LLM (step 2, generate-chain) emits an inline `xHint` per
 // component for visual clarity (NOT evolution maturity — that is a phase 3
 // concern, hidden here). This step preserves the LLM's intent within a
 // tolerance band of ±BAND_HALF, while enforcing four readability invariants:
@@ -37,7 +37,8 @@
 //
 // Anchors traverse this pipeline like any other component (rule D2):
 // the legacy 0.5 pinning is gone. Multi-anchor X collisions are resolved
-// by step 3.
+// by the LLM xHint heuristic in step 2 (generate-chain), which assigns
+// distinct buckets per anchor.
 
 import type {
   PositionedComponent,

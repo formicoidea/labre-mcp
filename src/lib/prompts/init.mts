@@ -34,7 +34,6 @@ import {
 } from '../../work-on-evolution/write/strategies/solution/properties-strategy.mjs';
 import { parseChainMetadataResponse } from '../../work-on-value-chain/write/chain/extract-metadata.mjs';
 import { parseRawValueChainResponse } from '../../work-on-value-chain/write/chain/generate-chain.mjs';
-import { parseProposeXRoughResponse } from '../../work-on-value-chain/write/chain/propose-x-rough.mjs';
 
 registerParser('cpcSotExtraction',      parseCpcSotExtraction);
 registerParser('identifyCapability',    parseCapabilityResponse);
@@ -53,4 +52,3 @@ registerParser('propertiesAuto',        parseAutoResponse);
 registerParser('propertiesSingle',      parseSinglePropertyResponse);
 registerParser('extractChainMetadata',  parseChainMetadataResponse);
 registerParser('parseRawValueChain',    parseRawValueChainResponse);
-registerParser('proposeXRough',         parseProposeXRoughResponse);

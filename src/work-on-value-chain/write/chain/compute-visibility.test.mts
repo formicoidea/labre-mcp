@@ -25,13 +25,13 @@ import {
   ANCHOR_VISIBILITY,
   Y_MIN,
   ORPHAN_FALLBACK_Y,
+  INITIAL_EVOLUTION_PLACEHOLDER,
   BAND_MAX,
   EDGE_MIN_GAP,
   SECONDARY_ANCHOR_OFFSET,
   MIN_EFFECTIVE_L,
   BASE_CANVAS_HEIGHT,
 } from './compute-visibility.mjs';
-import { PHASE_CENTROIDS } from '../../../schemas/inputs.schema.mjs';
 import type { RawValueChain } from '../../../types/value-chain.mjs';
 
 // ─── helpers ─────────────────────────────────────────────────────────────
@@ -72,8 +72,8 @@ describe('computeVisibility — basic invariants', () => {
   it('pins a single anchor at ANCHOR_VISIBILITY with evolution 0.5', () => {
     const result = computeVisibility(chain({
       components: [
-        { name: 'Customer', type: 'anchor',    role: 'anchor', phase: 'phase4' },
-        { name: 'Payment',  type: 'component', role: 'need',   phase: 'phase3' },
+        { name: 'Customer', type: 'anchor',    role: 'anchor' },
+        { name: 'Payment',  type: 'component', role: 'need' },
       ],
       links: [{ from: 'Customer', to: 'Payment' }],
     }));
@@ -86,40 +86,40 @@ describe('computeVisibility — basic invariants', () => {
     assert.throws(
       () => computeVisibility(chain({
         components: [
-          { name: 'Only', type: 'component', role: 'capability', phase: 'phase3' },
+          { name: 'Only', type: 'component', role: 'capability' },
         ],
       })),
       /no anchor component found/,
     );
   });
 
-  it('seeds non-anchor evolution from PHASE_CENTROIDS', () => {
+  it('seeds every non-anchor evolution with INITIAL_EVOLUTION_PLACEHOLDER', () => {
     const result = computeVisibility(chain({
       components: [
-        { name: 'Customer',  type: 'anchor',    role: 'anchor', phase: 'phase4' },
-        { name: 'Genesis',   type: 'component', role: 'need',   phase: 'phase1' },
-        { name: 'Custom',    type: 'component', role: 'need',   phase: 'phase2' },
-        { name: 'Product',   type: 'component', role: 'need',   phase: 'phase3' },
-        { name: 'Commodity', type: 'component', role: 'need',   phase: 'phase4' },
+        { name: 'Customer', type: 'anchor',    role: 'anchor' },
+        { name: 'A',        type: 'component', role: 'need' },
+        { name: 'B',        type: 'component', role: 'need' },
+        { name: 'C',        type: 'component', role: 'need' },
+        { name: 'D',        type: 'component', role: 'need' },
       ],
       links: [
-        { from: 'Customer', to: 'Genesis' },
-        { from: 'Customer', to: 'Custom' },
-        { from: 'Customer', to: 'Product' },
-        { from: 'Customer', to: 'Commodity' },
+        { from: 'Customer', to: 'A' },
+        { from: 'Customer', to: 'B' },
+        { from: 'Customer', to: 'C' },
+        { from: 'Customer', to: 'D' },
       ],
     }));
-    assert.equal(findEvolution(result, 'Genesis'),   PHASE_CENTROIDS.phase1);
-    assert.equal(findEvolution(result, 'Custom'),    PHASE_CENTROIDS.phase2);
-    assert.equal(findEvolution(result, 'Product'),   PHASE_CENTROIDS.phase3);
-    assert.equal(findEvolution(result, 'Commodity'), PHASE_CENTROIDS.phase4);
+    assert.equal(findEvolution(result, 'A'), INITIAL_EVOLUTION_PLACEHOLDER);
+    assert.equal(findEvolution(result, 'B'), INITIAL_EVOLUTION_PLACEHOLDER);
+    assert.equal(findEvolution(result, 'C'), INITIAL_EVOLUTION_PLACEHOLDER);
+    assert.equal(findEvolution(result, 'D'), INITIAL_EVOLUTION_PLACEHOLDER);
   });
 
   it('assigns a placeholder { 0, 0 } label to every component', () => {
     const result = computeVisibility(chain({
       components: [
-        { name: 'Customer', type: 'anchor',    role: 'anchor', phase: 'phase4' },
-        { name: 'Payment',  type: 'component', role: 'need',   phase: 'phase3' },
+        { name: 'Customer', type: 'anchor',    role: 'anchor' },
+        { name: 'Payment',  type: 'component', role: 'need' },
       ],
       links: [{ from: 'Customer', to: 'Payment' }],
     }));
@@ -141,8 +141,8 @@ describe('computeVisibility — effective L floor for short chains', () => {
     // around Y = 0.95 - 0.283 = 0.667 (± jitter). Not at Y_MIN.
     const result = computeVisibility(chain({
       components: [
-        { name: 'Customer', type: 'anchor',    role: 'anchor', phase: 'phase4' },
-        { name: 'Payment',  type: 'component', role: 'need',   phase: 'phase3' },
+        { name: 'Customer', type: 'anchor',    role: 'anchor' },
+        { name: 'Payment',  type: 'component', role: 'need' },
       ],
       links: [{ from: 'Customer', to: 'Payment' }],
     }));
@@ -154,9 +154,9 @@ describe('computeVisibility — effective L floor for short chains', () => {
   it('L=2 keeps the deepest leaf above 0.35 (not yet at Y_MIN)', () => {
     const result = computeVisibility(chain({
       components: [
-        { name: 'Customer', type: 'anchor',    role: 'anchor',     phase: 'phase4' },
-        { name: 'Payment',  type: 'component', role: 'need',       phase: 'phase3' },
-        { name: 'Fraud',    type: 'component', role: 'capability', phase: 'phase2' },
+        { name: 'Customer', type: 'anchor',    role: 'anchor' },
+        { name: 'Payment',  type: 'component', role: 'need' },
+        { name: 'Fraud',    type: 'component', role: 'capability' },
       ],
       links: [
         { from: 'Customer', to: 'Payment' },
@@ -175,10 +175,10 @@ describe('computeVisibility — full-range usage from L=3', () => {
   it('L=3 places the leaf of the longest chain near Y_MIN', () => {
     const result = computeVisibility(chain({
       components: [
-        { name: 'A', type: 'anchor',    role: 'anchor',     phase: 'phase4' },
-        { name: 'B', type: 'component', role: 'need',       phase: 'phase3' },
-        { name: 'C', type: 'component', role: 'capability', phase: 'phase2' },
-        { name: 'D', type: 'component', role: 'capability', phase: 'phase1' },
+        { name: 'A', type: 'anchor',    role: 'anchor' },
+        { name: 'B', type: 'component', role: 'need' },
+        { name: 'C', type: 'component', role: 'capability' },
+        { name: 'D', type: 'component', role: 'capability' },
       ],
       links: [
         { from: 'A', to: 'B' },
@@ -196,11 +196,11 @@ describe('computeVisibility — full-range usage from L=3', () => {
 
   it('long chain (L=10) uses the full vertical range', () => {
     const components = [
-      { name: 'R',  type: 'anchor' as const,    role: 'anchor' as const,     phase: 'phase4' as const },
+      { name: 'R',  type: 'anchor' as const,    role: 'anchor' as const },
     ];
     for (let i = 1; i <= 10; i++) {
       components.push({
-        name: `N${i}`, type: 'component' as const, role: 'capability' as const, phase: 'phase3' as const,
+        name: `N${i}`, type: 'component' as const, role: 'capability' as const,
       });
     }
     const links = [
@@ -225,19 +225,19 @@ describe('computeVisibility — multi-anchor placement', () => {
     // R2 → E → J → K                          (J at depth 6, K at depth 7)
     const result = computeVisibility(chain({
       components: [
-        { name: 'R1', type: 'anchor',    role: 'anchor',     phase: 'phase4' },
-        { name: 'R2', type: 'anchor',    role: 'anchor',     phase: 'phase4' },
-        { name: 'A',  type: 'component', role: 'need',       phase: 'phase3' },
-        { name: 'B',  type: 'component', role: 'capability', phase: 'phase3' },
-        { name: 'C',  type: 'component', role: 'capability', phase: 'phase3' },
-        { name: 'D',  type: 'component', role: 'capability', phase: 'phase2' },
-        { name: 'E',  type: 'component', role: 'capability', phase: 'phase2' },
-        { name: 'F',  type: 'component', role: 'capability', phase: 'phase2' },
-        { name: 'G',  type: 'component', role: 'capability', phase: 'phase1' },
-        { name: 'H',  type: 'component', role: 'capability', phase: 'phase1' },
-        { name: 'I',  type: 'component', role: 'capability', phase: 'phase1' },
-        { name: 'J',  type: 'component', role: 'capability', phase: 'phase2' },
-        { name: 'K',  type: 'component', role: 'capability', phase: 'phase1' },
+        { name: 'R1', type: 'anchor',    role: 'anchor' },
+        { name: 'R2', type: 'anchor',    role: 'anchor' },
+        { name: 'A',  type: 'component', role: 'need' },
+        { name: 'B',  type: 'component', role: 'capability' },
+        { name: 'C',  type: 'component', role: 'capability' },
+        { name: 'D',  type: 'component', role: 'capability' },
+        { name: 'E',  type: 'component', role: 'capability' },
+        { name: 'F',  type: 'component', role: 'capability' },
+        { name: 'G',  type: 'component', role: 'capability' },
+        { name: 'H',  type: 'component', role: 'capability' },
+        { name: 'I',  type: 'component', role: 'capability' },
+        { name: 'J',  type: 'component', role: 'capability' },
+        { name: 'K',  type: 'component', role: 'capability' },
       ],
       links: [
         { from: 'R1', to: 'A' },
@@ -272,9 +272,9 @@ describe('computeVisibility — multi-anchor placement', () => {
   it('parallel anchors (same converged child at depth 1) both stay at the top', () => {
     const result = computeVisibility(chain({
       components: [
-        { name: 'R1',     type: 'anchor',    role: 'anchor', phase: 'phase4' },
-        { name: 'R2',     type: 'anchor',    role: 'anchor', phase: 'phase4' },
-        { name: 'Shared', type: 'component', role: 'need',   phase: 'phase3' },
+        { name: 'R1',     type: 'anchor',    role: 'anchor' },
+        { name: 'R2',     type: 'anchor',    role: 'anchor' },
+        { name: 'Shared', type: 'component', role: 'need' },
       ],
       links: [
         { from: 'R1', to: 'Shared' },
@@ -289,9 +289,9 @@ describe('computeVisibility — multi-anchor placement', () => {
   it('childless anchor remains at ANCHOR_VISIBILITY', () => {
     const result = computeVisibility(chain({
       components: [
-        { name: 'R',     type: 'anchor',    role: 'anchor', phase: 'phase4' },
-        { name: 'Lone',  type: 'anchor',    role: 'anchor', phase: 'phase4' },
-        { name: 'Need',  type: 'component', role: 'need',   phase: 'phase3' },
+        { name: 'R',     type: 'anchor',    role: 'anchor' },
+        { name: 'Lone',  type: 'anchor',    role: 'anchor' },
+        { name: 'Need',  type: 'component', role: 'need' },
       ],
       links: [{ from: 'R', to: 'Need' }],
     }));
@@ -305,10 +305,10 @@ describe('computeVisibility — strict edge direction', () => {
   it('linear chain', () => {
     const result = computeVisibility(chain({
       components: [
-        { name: 'A', type: 'anchor',    role: 'anchor',     phase: 'phase4' },
-        { name: 'B', type: 'component', role: 'need',       phase: 'phase3' },
-        { name: 'C', type: 'component', role: 'capability', phase: 'phase2' },
-        { name: 'D', type: 'component', role: 'capability', phase: 'phase1' },
+        { name: 'A', type: 'anchor',    role: 'anchor' },
+        { name: 'B', type: 'component', role: 'need' },
+        { name: 'C', type: 'component', role: 'capability' },
+        { name: 'D', type: 'component', role: 'capability' },
       ],
       links: [
         { from: 'A', to: 'B' },
@@ -322,10 +322,10 @@ describe('computeVisibility — strict edge direction', () => {
   it('diamond — two parents converge on one child', () => {
     const result = computeVisibility(chain({
       components: [
-        { name: 'Anchor', type: 'anchor',    role: 'anchor',     phase: 'phase4' },
-        { name: 'Left',   type: 'component', role: 'need',       phase: 'phase3' },
-        { name: 'Right',  type: 'component', role: 'need',       phase: 'phase3' },
-        { name: 'Joint',  type: 'component', role: 'capability', phase: 'phase2' },
+        { name: 'Anchor', type: 'anchor',    role: 'anchor' },
+        { name: 'Left',   type: 'component', role: 'need' },
+        { name: 'Right',  type: 'component', role: 'need' },
+        { name: 'Joint',  type: 'component', role: 'capability' },
       ],
       links: [
         { from: 'Anchor', to: 'Left' },
@@ -342,9 +342,9 @@ describe('computeVisibility — strict edge direction', () => {
     // B strictly below A (depth(B) = 2 via A, beats the shortcut's 1).
     const result = computeVisibility(chain({
       components: [
-        { name: 'Anchor', type: 'anchor',    role: 'anchor',     phase: 'phase4' },
-        { name: 'A',      type: 'component', role: 'need',       phase: 'phase3' },
-        { name: 'B',      type: 'component', role: 'capability', phase: 'phase2' },
+        { name: 'Anchor', type: 'anchor',    role: 'anchor' },
+        { name: 'A',      type: 'component', role: 'need' },
+        { name: 'B',      type: 'component', role: 'capability' },
       ],
       links: [
         { from: 'Anchor', to: 'A' },
@@ -361,12 +361,12 @@ describe('computeVisibility — strict edge direction', () => {
   it('mixed depths — short branch and long branch coexist', () => {
     const result = computeVisibility(chain({
       components: [
-        { name: 'Anchor', type: 'anchor',    role: 'anchor',     phase: 'phase4' },
-        { name: 'S',      type: 'component', role: 'need',       phase: 'phase3' },
-        { name: 'L1',     type: 'component', role: 'need',       phase: 'phase3' },
-        { name: 'L2',     type: 'component', role: 'capability', phase: 'phase2' },
-        { name: 'L3',     type: 'component', role: 'capability', phase: 'phase2' },
-        { name: 'L4',     type: 'component', role: 'capability', phase: 'phase1' },
+        { name: 'Anchor', type: 'anchor',    role: 'anchor' },
+        { name: 'S',      type: 'component', role: 'need' },
+        { name: 'L1',     type: 'component', role: 'need' },
+        { name: 'L2',     type: 'component', role: 'capability' },
+        { name: 'L3',     type: 'component', role: 'capability' },
+        { name: 'L4',     type: 'component', role: 'capability' },
       ],
       links: [
         { from: 'Anchor', to: 'S' },
@@ -388,12 +388,12 @@ describe('computeVisibility — semantic jitter', () => {
     // L, so every offset is +band_half.
     const result = computeVisibility(chain({
       components: [
-        { name: 'A', type: 'anchor',    role: 'anchor',     phase: 'phase4' },
-        { name: 'B', type: 'component', role: 'need',       phase: 'phase3' },
-        { name: 'C', type: 'component', role: 'capability', phase: 'phase2' },
-        { name: 'D', type: 'component', role: 'capability', phase: 'phase2' },
-        { name: 'E', type: 'component', role: 'capability', phase: 'phase1' },
-        { name: 'F', type: 'component', role: 'capability', phase: 'phase1' },
+        { name: 'A', type: 'anchor',    role: 'anchor' },
+        { name: 'B', type: 'component', role: 'need' },
+        { name: 'C', type: 'component', role: 'capability' },
+        { name: 'D', type: 'component', role: 'capability' },
+        { name: 'E', type: 'component', role: 'capability' },
+        { name: 'F', type: 'component', role: 'capability' },
       ],
       links: [
         { from: 'A', to: 'B' },
@@ -418,12 +418,12 @@ describe('computeVisibility — semantic jitter', () => {
     // chain_through = 4. ratio(S)=0.25 → offset(S) < 0.
     const result = computeVisibility(chain({
       components: [
-        { name: 'Anchor', type: 'anchor',    role: 'anchor',     phase: 'phase4' },
-        { name: 'S',      type: 'component', role: 'need',       phase: 'phase3' },
-        { name: 'L1',     type: 'component', role: 'need',       phase: 'phase3' },
-        { name: 'L2',     type: 'component', role: 'capability', phase: 'phase2' },
-        { name: 'L3',     type: 'component', role: 'capability', phase: 'phase2' },
-        { name: 'L4',     type: 'component', role: 'capability', phase: 'phase1' },
+        { name: 'Anchor', type: 'anchor',    role: 'anchor' },
+        { name: 'S',      type: 'component', role: 'need' },
+        { name: 'L1',     type: 'component', role: 'need' },
+        { name: 'L2',     type: 'component', role: 'capability' },
+        { name: 'L3',     type: 'component', role: 'capability' },
+        { name: 'L4',     type: 'component', role: 'capability' },
       ],
       links: [
         { from: 'Anchor', to: 'S' },
@@ -451,17 +451,16 @@ describe('computeVisibility — orphans', () => {
   it('orphan components land at ORPHAN_FALLBACK_Y', () => {
     const result = computeVisibility(chain({
       components: [
-        { name: 'Customer', type: 'anchor',    role: 'anchor',     phase: 'phase4' },
-        { name: 'Need',     type: 'component', role: 'need',       phase: 'phase3' },
-        { name: 'Orphan',   type: 'component', role: 'capability', phase: 'phase1' },
+        { name: 'Customer', type: 'anchor',    role: 'anchor' },
+        { name: 'Need',     type: 'component', role: 'need' },
+        { name: 'Orphan',   type: 'component', role: 'capability' },
       ],
       links: [
         { from: 'Customer', to: 'Need' },
       ],
     }));
     assert.equal(findY(result, 'Orphan'), ORPHAN_FALLBACK_Y);
-    // Orphan keeps its phase-derived evolution.
-    assert.equal(findEvolution(result, 'Orphan'), PHASE_CENTROIDS.phase1);
+    assert.equal(findEvolution(result, 'Orphan'), INITIAL_EVOLUTION_PLACEHOLDER);
   });
 });
 
@@ -487,8 +486,8 @@ describe('computeMapHeight', () => {
   it('exposes mapSize.height on the computeVisibility result', () => {
     const result = computeVisibility(chain({
       components: [
-        { name: 'A', type: 'anchor',    role: 'anchor',     phase: 'phase4' },
-        { name: 'B', type: 'component', role: 'need',       phase: 'phase3' },
+        { name: 'A', type: 'anchor',    role: 'anchor' },
+        { name: 'B', type: 'component', role: 'need' },
       ],
       links: [{ from: 'A', to: 'B' }],
     }));

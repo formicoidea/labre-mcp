@@ -27,9 +27,9 @@ function sampleChain(): PositionedValueChain {
       contextSummary: 'Online payment provider.',
     },
     components: [
-      { name: 'Merchant',       type: 'anchor',    role: 'anchor',     phase: 'phase4', visibility: 0.95, evolution: 0.5, label: { dx: -85, dy: -20 } },
-      { name: 'Accept Payment', type: 'component', role: 'need',       phase: 'phase3', visibility: 0.80, evolution: 0.60, label: { dx: -40, dy: 5 } },
-      { name: 'Fraud',          type: 'component', role: 'capability', phase: 'phase2', visibility: 0.60, evolution: 0.40, label: { dx: 10, dy: 25 } },
+      { name: 'Merchant',       type: 'anchor',    role: 'anchor', visibility: 0.95, evolution: 0.5, label: { dx: -85, dy: -20 } },
+      { name: 'Accept Payment', type: 'component', role: 'need', visibility: 0.80, evolution: 0.60, label: { dx: -40, dy: 5 } },
+      { name: 'Fraud',          type: 'component', role: 'capability', visibility: 0.60, evolution: 0.40, label: { dx: 10, dy: 25 } },
     ],
     links: [
       { from: 'Merchant',       to: 'Accept Payment' },
