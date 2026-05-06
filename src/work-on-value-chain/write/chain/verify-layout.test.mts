@@ -3,7 +3,14 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { verifyLayout, MAX_VERIFY_ITERATIONS } from './verify-layout.mjs';
+import {
+  verifyLayout,
+  MAX_VERIFY_ITERATIONS,
+  MAX_REFINE_LABELS,
+  MAX_COMPONENT_NUDGES,
+  COMP_NUDGE_X_STEP,
+  COMP_NUDGE_Y_STEP,
+} from './verify-layout.mjs';
 import type { OwmRenderAdapter } from '../../../lib/owm/render-adapter.mjs';
 import type {
   LabelOffset,
@@ -253,6 +260,25 @@ describe('verifyLayout — V3 hard rules', () => {
     assert.ok(finalLabel.dx < 0, `expected leftward dx, got ${finalLabel.dx}`);
   });
 
+  it('does NOT crash on a chain whose initial layout is already clean (no refinement needed)', () => {
+    // Two well-separated components — refinement loop runs but should
+    // not modify any label.
+    const c = chain([
+      { name: 'A', role: 'capability', visibility: 0.5, label: { dx: 20, dy: 0 } },
+      { name: 'B', role: 'capability', visibility: 0.3, label: { dx: 20, dy: 0 } },
+    ]);
+    const adapter = makeAdapter(
+      [
+        { name: 'A', cx: 100, cy: 100 },
+        { name: 'B', cx: 300, cy: 300 },
+      ],
+      { canvas: { width: 500, height: 500 } },
+    );
+    const out = verifyLayout(c, emitOpts, adapter);
+    assert.equal(out.report.unresolvedHard, 0);
+    assert.equal(out.report.unresolvedSpacing, 0);
+  });
+
   it('does NOT report a label crossing its own incident edge', () => {
     // A→B exists; A's label sits next to A's circle. The line from
     // A starts at A's circle and naturally passes near A's label.
@@ -271,5 +297,78 @@ describe('verifyLayout — V3 hard rules', () => {
     const out = verifyLayout(c, emitOpts, adapter);
     assert.equal(out.report.unresolvedEdge, 0,
       'A→B line passes near A and B labels but those are own-edge incidents');
+  });
+});
+
+describe('verifyLayout — Phase 5f component nudge', () => {
+  it('exposes a sane MAX_COMPONENT_NUDGES cap', () => {
+    assert.ok(MAX_COMPONENT_NUDGES >= 1 && MAX_COMPONENT_NUDGES <= 10);
+  });
+
+  it('exposes positive nudge step constants', () => {
+    assert.ok(COMP_NUDGE_X_STEP > 0);
+    assert.ok(COMP_NUDGE_Y_STEP > 0);
+  });
+
+  it('does not nudge an anchor (anchors are immobile)', () => {
+    // Single-anchor chain. Even if the renderer reported a hard
+    // violation involving the anchor's label, the nudge pass must
+    // refuse to move the anchor.
+    const c = chain([
+      { name: 'R', role: 'anchor', visibility: 0.95, label: { dx: 0, dy: 25 } },
+    ]);
+    const adapter: { render: () => string } = {
+      render: () => '<svg width="200" height="200"><text x="50" y="50" text-anchor="middle">R</text></svg>',
+    };
+    const out = verifyLayout(c, emitOpts, adapter);
+    assert.deepEqual(out.report.movedComponents, []);
+  });
+
+  it('reports movedComponents as an empty array when label loop suffices', () => {
+    // Chain that the label loop can resolve without any nudge.
+    const c = chain([
+      { name: 'A', role: 'capability', visibility: 0.5, label: { dx: 20, dy: 0 } },
+      { name: 'B', role: 'capability', visibility: 0.3, label: { dx: 20, dy: 0 } },
+    ]);
+    const adapter = makeAdapter(
+      [
+        { name: 'A', cx: 100, cy: 100 },
+        { name: 'B', cx: 300, cy: 300 },
+      ],
+      { canvas: { width: 500, height: 500 } },
+    );
+    const out = verifyLayout(c, emitOpts, adapter);
+    assert.deepEqual(out.report.movedComponents, []);
+  });
+});
+
+describe('verifyLayout — Phase 5e local refinement', () => {
+  it('exposes a sane MAX_REFINE_LABELS cap', () => {
+    assert.ok(MAX_REFINE_LABELS >= 1 && MAX_REFINE_LABELS <= 10);
+  });
+
+  it('declares a movedComponents field, empty when no nudge happens', () => {
+    // movedComponents is wired for Phase 5f but must already be a
+    // field on every report (consumers rely on the shape stable).
+    const c = chain([
+      { name: 'X', role: 'capability', visibility: 0.5, label: { dx: 20, dy: 0 } },
+    ]);
+    const adapter = makeAdapter([{ name: 'X', cx: 100, cy: 100 }]);
+    const out = verifyLayout(c, emitOpts, adapter);
+    assert.deepEqual(out.report.movedComponents, []);
+  });
+
+  it('does not crash when the initial layout has no labels at all', () => {
+    // Pure-anchor chain (no labels to refine). The refinement pass
+    // must short-circuit gracefully.
+    const c = chain([
+      { name: 'R', role: 'anchor', visibility: 0.95, label: { dx: 0, dy: 25 } },
+    ]);
+    const adapter: { render: () => string } = {
+      render: () => '<svg width="500" height="600"><text x="50" y="50" text-anchor="middle">R</text></svg>',
+    };
+    const out = verifyLayout(c, emitOpts, adapter);
+    assert.equal(out.report.skipped, false);
+    assert.equal(out.report.unresolvedHard, 0);
   });
 });
