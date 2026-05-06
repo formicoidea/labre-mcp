@@ -89,4 +89,28 @@ export function registerDefaultHealthChecks(): void {
       };
     }
   });
+
+  // ── OWM render adapter (vendored cli-owm) ─────────────────────────────
+  // verify-layout (write:chain pipeline step 7) renders the in-progress
+  // OWM DSL via a render adapter to detect label/component overlaps. A
+  // broken vendoring or a renderer crash surfaces here rather than on
+  // the first generateValueChain call.
+  registerHealthCheck('owm:render', async () => {
+    try {
+      const { CliOwmAdapter } = await import('../lib/owm/cli-owm-adapter.mjs');
+      const svg = new CliOwmAdapter().render(
+        'title boot-check\nstyle plain\nanchor A [0.5, 0.5]',
+      );
+      if (typeof svg !== 'string' || svg.length === 0) {
+        throw new Error('cli-owm returned an empty SVG');
+      }
+      return { ready: true };
+    } catch (err) {
+      return {
+        ready: false,
+        reason: 'cli-owm renderer not loadable',
+        detail: { error: String(err) },
+      };
+    }
+  });
 }
