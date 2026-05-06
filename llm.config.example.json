@@ -23,6 +23,7 @@
     "anchor-evolution":     { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
     "identify-capability":  { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
     "dual-verification":    { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
-    "pipeline-enrichment":  { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" }
+    "pipeline-enrichment":  { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
+    "write-chain":          { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "medium" }
   }
 }
