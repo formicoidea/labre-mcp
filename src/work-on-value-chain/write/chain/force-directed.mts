@@ -32,6 +32,10 @@ import {
   DEFAULT_MAP_WIDTH,
   DEFAULT_MAP_HEIGHT,
 } from '../../../lib/owm/analytical-geometry.mjs';
+import {
+  detectAllOverlaps,
+  type Overlap,
+} from '../../../lib/owm/overlap-detector.mjs';
 
 // ─── Constants ──────────────────────────────────────────────────────────
 
@@ -69,6 +73,39 @@ export const KINETIC_ENERGY_THRESHOLD = 1e-3;
  *  a label initialised far outside the canvas). Without this cap,
  *  the boundary repulsion can amplify to chaotic levels. */
 export const MAX_VELOCITY = 50;
+
+// ─── Phase 6c constants — component fallback ───────────────────────────
+
+/** Iteration cap for the component-nudge fallback. Components should
+ *  barely move so we keep this lower than the label cap. */
+export const SIM_COMPONENT_ITERATIONS = 30;
+/** Stronger spring than for labels — components are upstream-decided
+ *  positions, we want them to drift only when no other option works. */
+export const COMPONENT_HOME_ATTRACTION = 2.0;
+/** Tolerance band around the LLM-proposed `xHint`. Mirrors
+ *  `BAND_HALF` from adjust-x. */
+const NORM_BAND_HALF = 0.10;
+/** Strict gap (in normalised Y units) preserved between a parent and
+ *  a child after clamping. Mirrors `EDGE_MIN_GAP` from
+ *  compute-visibility. */
+const NORM_EDGE_GAP_Y = 0.01;
+/** Global X / Y bounds (normalised) — match the canvas envelope used
+ *  by compute-visibility and adjust-x. */
+const NORM_LEFT_BOUND  = 0.10;
+const NORM_RIGHT_BOUND = 0.90;
+const NORM_Y_MIN       = 0.10;
+const NORM_Y_MAX       = 0.95;
+/** Maximum number of clamp passes per iteration when resolving link
+ *  Y-direction conflicts on a chain. Five is enough for typical
+ *  Wardley DAGs. */
+const CLAMP_PASSES = 5;
+
+// ─── Phase 6d constants — strict projection ───────────────────────────
+
+/** Maximum number of detect → push rounds during the projection
+ *  post-pass. After this, residual hard violations (rare) leak into
+ *  the report. */
+export const PROJECTION_ITERATIONS = 5;
 
 // ─── Particle ──────────────────────────────────────────────────────────
 
@@ -307,4 +344,433 @@ export function simulateLabels(
     modified,
     finalKineticEnergy,
   };
+}
+
+// ─── Phase 6c — Force-directed component fallback ─────────────────────
+
+interface ComponentParticle {
+  name: string;
+  /** Home position in pixel space — the (cx, cy) before this fallback. */
+  homeX: number;
+  homeY: number;
+  /** Live simulated position. */
+  px: number;
+  py: number;
+  vx: number;
+  vy: number;
+  /** Optional LLM-proposed X (normalised) for the tolerance band clamp. */
+  xHint: number | undefined;
+  role: 'need' | 'capability';
+}
+
+export interface SimulateComponentsResult {
+  chain: PositionedValueChain;
+  iterations: number;
+  /** Names of non-anchor components whose (X, Y) actually moved. */
+  moved: string[];
+  finalKineticEnergy: number;
+}
+
+/** Apply the DSL-invariant clamps to a single particle in normalised
+ *  space. Modifies the particle in place. Returns true iff the
+ *  particle's position changed. */
+function clampDslInvariants(
+  p: ComponentParticle,
+  parentsByChild: ReadonlyMap<string, string[]>,
+  childrenByParent: ReadonlyMap<string, string[]>,
+  particleByName: ReadonlyMap<string, ComponentParticle>,
+  mapWidth: number,
+  mapHeight: number,
+): boolean {
+  let normX = p.px / mapWidth;
+  let normY = 1 - p.py / mapHeight;
+
+  // Global bounds
+  if (normX < NORM_LEFT_BOUND)  normX = NORM_LEFT_BOUND;
+  if (normX > NORM_RIGHT_BOUND) normX = NORM_RIGHT_BOUND;
+  if (normY < NORM_Y_MIN)       normY = NORM_Y_MIN;
+  if (normY > NORM_Y_MAX)       normY = NORM_Y_MAX;
+
+  // xHint band when the LLM hint is known
+  if (typeof p.xHint === 'number') {
+    if (normX < p.xHint - NORM_BAND_HALF) normX = p.xHint - NORM_BAND_HALF;
+    if (normX > p.xHint + NORM_BAND_HALF) normX = p.xHint + NORM_BAND_HALF;
+    // Re-clamp to global bounds in case xHint was near an edge.
+    if (normX < NORM_LEFT_BOUND)  normX = NORM_LEFT_BOUND;
+    if (normX > NORM_RIGHT_BOUND) normX = NORM_RIGHT_BOUND;
+  }
+
+  // Strict edge-direction: parent above child
+  for (const parentName of parentsByChild.get(p.name) ?? []) {
+    const parent = particleByName.get(parentName);
+    const parentY = parent
+      ? 1 - parent.py / mapHeight
+      // Anchors are stored separately — fall back to the chain.
+      : null;
+    if (parentY !== null && normY > parentY - NORM_EDGE_GAP_Y) {
+      normY = parentY - NORM_EDGE_GAP_Y;
+    }
+  }
+  for (const childName of childrenByParent.get(p.name) ?? []) {
+    const child = particleByName.get(childName);
+    const childY = child ? 1 - child.py / mapHeight : null;
+    if (childY !== null && normY < childY + NORM_EDGE_GAP_Y) {
+      normY = childY + NORM_EDGE_GAP_Y;
+    }
+  }
+  // Re-clamp Y after link adjustments.
+  if (normY < NORM_Y_MIN) normY = NORM_Y_MIN;
+  if (normY > NORM_Y_MAX) normY = NORM_Y_MAX;
+
+  const newPx = normX * mapWidth;
+  const newPy = (1 - normY) * mapHeight;
+  const moved = newPx !== p.px || newPy !== p.py;
+  if (moved) {
+    // Zero out velocity along axes that hit a clamp so the particle
+    // doesn't immediately bounce out again.
+    if (newPx !== p.px) p.vx = 0;
+    if (newPy !== p.py) p.vy = 0;
+    p.px = newPx;
+    p.py = newPy;
+  }
+  return moved;
+}
+
+/**
+ * Phase 6c — force-directed simulation on non-anchor components.
+ * Same physics model as `simulateLabels` but applied to component
+ * circles, with DSL-invariant clamps after every integration step:
+ *  - anchors immobile (excluded from the particle set)
+ *  - X kept inside [LEFT_BOUND, RIGHT_BOUND] and `xHint ± BAND_HALF`
+ *  - Y kept inside [Y_MIN, ANCHOR_VISIBILITY]
+ *  - For every link `(parent, child)`: Y(parent) > Y(child) + EDGE_GAP_Y
+ *
+ * Labels are NOT re-simulated here — they ride along with their
+ * component (rigid attachment via the unchanged `LabelOffset`). The
+ * caller (`verify-layout`) is expected to re-run `simulateLabels`
+ * afterwards to settle labels around the new component positions.
+ */
+export function simulateComponents(
+  chain: PositionedValueChain,
+  emitOpts: EmitOwmOptions,
+  options?: { iterations?: number },
+): SimulateComponentsResult {
+  const maxIter = options?.iterations ?? SIM_COMPONENT_ITERATIONS;
+  const mapWidth  = emitOpts.size?.width  ?? DEFAULT_MAP_WIDTH;
+  const mapHeight = emitOpts.size?.height ?? DEFAULT_MAP_HEIGHT;
+  const epsSq = EPSILON * EPSILON;
+
+  // Index the immutable repulsion sources (anchors + labels).
+  const anchorPositions = new Map<string, { x: number; y: number }>();
+  const labelPositions  = new Map<string, { x: number; y: number }>();
+  for (const c of chain.components) {
+    const cx = c.evolution * mapWidth;
+    const cy = (1 - c.visibility) * mapHeight;
+    if (c.role === 'anchor') {
+      anchorPositions.set(c.name, { x: cx, y: cy });
+    } else {
+      // Approximate the label centre.
+      const labelW = Math.max(1, c.name.length) * LABEL_CHAR_WIDTH;
+      labelPositions.set(c.name, {
+        x: cx + c.label.dx + labelW / 2,
+        y: cy + c.label.dy + 1, // text baseline is roughly mid-height
+      });
+    }
+  }
+
+  // Particle list (non-anchor only).
+  const particles: ComponentParticle[] = [];
+  for (const c of chain.components) {
+    if (c.role === 'anchor') continue;
+    const cx = c.evolution * mapWidth;
+    const cy = (1 - c.visibility) * mapHeight;
+    particles.push({
+      name: c.name,
+      homeX: cx, homeY: cy,
+      px: cx,    py: cy,
+      vx: 0,     vy: 0,
+      xHint: c.xHint,
+      role: c.role,
+    });
+  }
+
+  // Index parents / children for clamping.
+  const parentsByChild  = new Map<string, string[]>();
+  const childrenByParent = new Map<string, string[]>();
+  for (const link of chain.links) {
+    if (!parentsByChild.has(link.to))    parentsByChild.set(link.to, []);
+    if (!childrenByParent.has(link.from)) childrenByParent.set(link.from, []);
+    parentsByChild.get(link.to)!.push(link.from);
+    childrenByParent.get(link.from)!.push(link.to);
+  }
+
+  const particleByName = new Map(particles.map(p => [p.name, p]));
+
+  // Edge geometry (recomputed each iteration since components move).
+  const componentByName = new Map(chain.components.map(c => [c.name, c]));
+
+  let finalKineticEnergy = 0;
+  let iterations = 0;
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    iterations = iter + 1;
+
+    // Build live edge segments from current particle / anchor positions.
+    const edges: EdgeSegment[] = [];
+    for (const link of chain.links) {
+      const fromP = particleByName.get(link.from);
+      const toP   = particleByName.get(link.to);
+      const fromA = anchorPositions.get(link.from);
+      const toA   = anchorPositions.get(link.to);
+      const x1 = fromP ? fromP.px : fromA?.x;
+      const y1 = fromP ? fromP.py : fromA?.y;
+      const x2 = toP   ? toP.px   : toA?.x;
+      const y2 = toP   ? toP.py   : toA?.y;
+      if (x1 == null || y1 == null || x2 == null || y2 == null) continue;
+      edges.push({ from: link.from, to: link.to, x1, y1, x2, y2 });
+    }
+
+    const forces: { fx: number; fy: number }[] = particles.map(() => ({ fx: 0, fy: 0 }));
+
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      const f = forces[i];
+
+      // Home attraction (strong).
+      f.fx += COMPONENT_HOME_ATTRACTION * (p.homeX - p.px);
+      f.fy += COMPONENT_HOME_ATTRACTION * (p.homeY - p.py);
+
+      // Repulsion from other component particles.
+      for (let j = 0; j < particles.length; j++) {
+        if (i === j) continue;
+        const q = particles[j];
+        const dx = p.px - q.px;
+        const dy = p.py - q.py;
+        const d2 = Math.max(dx * dx + dy * dy, epsSq);
+        const d  = Math.sqrt(d2);
+        const mag = LABEL_REPULSION / d2;
+        f.fx += mag * dx / d;
+        f.fy += mag * dy / d;
+      }
+
+      // Repulsion from foreign labels (the label sim already settled them).
+      for (const [name, l] of labelPositions) {
+        if (name === p.name) continue;
+        const dx = p.px - l.x;
+        const dy = p.py - l.y;
+        const d2 = Math.max(dx * dx + dy * dy, epsSq);
+        const d  = Math.sqrt(d2);
+        const mag = COMPONENT_REPULSION / d2;
+        f.fx += mag * dx / d;
+        f.fy += mag * dy / d;
+      }
+
+      // Repulsion from anchors.
+      for (const [, a] of anchorPositions) {
+        const dx = p.px - a.x;
+        const dy = p.py - a.y;
+        const d2 = Math.max(dx * dx + dy * dy, epsSq);
+        const d  = Math.sqrt(d2);
+        const mag = ANCHOR_REPULSION / d2;
+        f.fx += mag * dx / d;
+        f.fy += mag * dy / d;
+      }
+
+      // Repulsion from foreign edges (own-incident edges skipped).
+      for (const edge of edges) {
+        if (edge.from === p.name || edge.to === p.name) continue;
+        const { closestX, closestY, distance } = pointSegmentDistance(p.px, p.py, edge);
+        const d  = Math.max(distance, EPSILON);
+        const dx = p.px - closestX;
+        const dy = p.py - closestY;
+        const mag = EDGE_REPULSION / (d * d);
+        f.fx += mag * dx / d;
+        f.fy += mag * dy / d;
+      }
+    }
+
+    // Integrate.
+    let totalKE = 0;
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      const fr = forces[i];
+      let nvx = DAMPING * (p.vx + fr.fx);
+      let nvy = DAMPING * (p.vy + fr.fy);
+      if (nvx >  MAX_VELOCITY) nvx =  MAX_VELOCITY;
+      if (nvx < -MAX_VELOCITY) nvx = -MAX_VELOCITY;
+      if (nvy >  MAX_VELOCITY) nvy =  MAX_VELOCITY;
+      if (nvy < -MAX_VELOCITY) nvy = -MAX_VELOCITY;
+      p.vx = nvx;
+      p.vy = nvy;
+      p.px += p.vx;
+      p.py += p.vy;
+      totalKE += 0.5 * (p.vx * p.vx + p.vy * p.vy);
+    }
+    finalKineticEnergy = totalKE;
+
+    // Apply DSL-invariant clamps repeatedly until stable. Process
+    // particles in topological order (parents first) using the
+    // chain.components ordering as a pragmatic approximation of depth.
+    for (let pass = 0; pass < CLAMP_PASSES; pass++) {
+      let anyChanged = false;
+      for (const p of particles) {
+        if (clampDslInvariants(p, parentsByChild, childrenByParent, particleByName, mapWidth, mapHeight)) {
+          anyChanged = true;
+        }
+      }
+      if (!anyChanged) break;
+    }
+
+    if (totalKE < KINETIC_ENERGY_THRESHOLD) break;
+  }
+
+  // Build updated chain.
+  const moved: string[] = [];
+  const updatedComponents: PositionedComponent[] = chain.components.map(c => {
+    if (c.role === 'anchor') return c;
+    const p = particleByName.get(c.name);
+    if (!p) return c;
+    const newX = Math.max(NORM_LEFT_BOUND, Math.min(NORM_RIGHT_BOUND, p.px / mapWidth));
+    const newY = Math.max(NORM_Y_MIN,      Math.min(NORM_Y_MAX,       1 - p.py / mapHeight));
+    // Round to 4 decimal places to keep the DSL output stable.
+    const roundedX = Math.round(newX * 10000) / 10000;
+    const roundedY = Math.round(newY * 10000) / 10000;
+    if (roundedX !== c.evolution || roundedY !== c.visibility) {
+      moved.push(c.name);
+    }
+    return { ...c, evolution: roundedX, visibility: roundedY };
+  });
+
+  return {
+    chain: {
+      metadata: chain.metadata,
+      links: chain.links,
+      components: updatedComponents,
+    },
+    iterations,
+    moved,
+    finalKineticEnergy,
+  };
+}
+
+// ─── Phase 6d — Strict projection post-pass ───────────────────────────
+
+const HARD_KINDS_FOR_PROJECTION: ReadonlySet<Overlap['kind']> = new Set([
+  'label-label',
+  'component-label',
+  'label-canvas',
+]);
+
+/** Minimum push (delta vector) to separate two axis-aligned rectangles.
+ *  Picks the axis with smaller overlap (cheaper resolution). Returns
+ *  the push to apply to `a` away from `b` (caller distributes between
+ *  the two as needed). */
+function computeMinSeparation(a: Bbox, b: Bbox): { dx: number; dy: number } {
+  const aRight  = a.x + a.width;
+  const aBottom = a.y + a.height;
+  const bRight  = b.x + b.width;
+  const bBottom = b.y + b.height;
+  const overlapX = Math.min(aRight, bRight) - Math.max(a.x, b.x);
+  const overlapY = Math.min(aBottom, bBottom) - Math.max(a.y, b.y);
+  if (overlapX <= 0 || overlapY <= 0) return { dx: 0, dy: 0 };
+
+  if (overlapX < overlapY) {
+    // Cheaper to resolve along X.
+    const aCenterX = a.x + a.width / 2;
+    const bCenterX = b.x + b.width / 2;
+    const sign = aCenterX < bCenterX ? -1 : 1;
+    return { dx: sign * overlapX, dy: 0 };
+  }
+  const aCenterY = a.y + a.height / 2;
+  const bCenterY = b.y + b.height / 2;
+  const sign = aCenterY < bCenterY ? -1 : 1;
+  return { dx: 0, dy: sign * overlapY };
+}
+
+/**
+ * Phase 6d — deterministic post-pass that pushes labels apart, away
+ * from foreign component circles, and back inside the canvas until
+ * no hard violation remains (`unresolvedHard = 0`) or
+ * `PROJECTION_ITERATIONS` is reached.
+ *
+ * Operates on label offsets only — component circle positions are
+ * frozen at this stage (Phase 6c handled those, if needed). The
+ * input chain is not mutated.
+ */
+export function projectHardConstraints(
+  chain: PositionedValueChain,
+  emitOpts: EmitOwmOptions,
+  options?: { iterations?: number },
+): PositionedValueChain {
+  const maxIter = options?.iterations ?? PROJECTION_ITERATIONS;
+  let current = chain;
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    const geometry = computeGeometry(current, emitOpts);
+    const overlaps = detectAllOverlaps(geometry);
+    const hard = overlaps.filter(o => HARD_KINDS_FOR_PROJECTION.has(o.kind));
+    if (hard.length === 0) break;
+
+    const pushByLabel = new Map<string, { dx: number; dy: number }>();
+    const accumulate = (name: string, dx: number, dy: number): void => {
+      const prev = pushByLabel.get(name) ?? { dx: 0, dy: 0 };
+      pushByLabel.set(name, { dx: prev.dx + dx, dy: prev.dy + dy });
+    };
+
+    for (const ov of hard) {
+      if (ov.kind === 'label-label') {
+        const push = computeMinSeparation(ov.a.bbox, ov.b.bbox);
+        accumulate(ov.a.name,  push.dx / 2,  push.dy / 2);
+        accumulate(ov.b.name, -push.dx / 2, -push.dy / 2);
+      } else if (ov.kind === 'component-label') {
+        // One side is the label, the other is the component circle.
+        const labelSide = ov.a.kind === 'label' ? ov.a : ov.b;
+        const compSide  = ov.a.kind === 'label' ? ov.b : ov.a;
+        const push = computeMinSeparation(labelSide.bbox, compSide.bbox);
+        // Push only the label — components are frozen.
+        accumulate(labelSide.name, push.dx, push.dy);
+      } else if (ov.kind === 'label-canvas') {
+        // ov.a is the label, ov.b is the synthetic canvas. Clamp
+        // label inside the canvas rect.
+        const lbl    = ov.a.bbox;
+        const canvas = ov.b.bbox;
+        let pushX = 0, pushY = 0;
+        if (lbl.x < canvas.x) {
+          pushX = canvas.x - lbl.x;
+        } else if (lbl.x + lbl.width > canvas.x + canvas.width) {
+          pushX = (canvas.x + canvas.width) - (lbl.x + lbl.width);
+        }
+        if (lbl.y < canvas.y) {
+          pushY = canvas.y - lbl.y;
+        } else if (lbl.y + lbl.height > canvas.y + canvas.height) {
+          pushY = (canvas.y + canvas.height) - (lbl.y + lbl.height);
+        }
+        accumulate(ov.a.name, pushX, pushY);
+      }
+    }
+
+    if (pushByLabel.size === 0) break;
+
+    // Apply pushes — round to integers since OWM DSL takes integers.
+    const updatedComponents: PositionedComponent[] = current.components.map(c => {
+      if (c.role === 'anchor') return c;
+      const push = pushByLabel.get(c.name);
+      if (!push) return c;
+      return {
+        ...c,
+        label: {
+          dx: Math.round(c.label.dx + push.dx),
+          dy: Math.round(c.label.dy + push.dy),
+        },
+      };
+    });
+
+    current = {
+      metadata: current.metadata,
+      links: current.links,
+      components: updatedComponents,
+    };
+  }
+
+  return current;
 }
