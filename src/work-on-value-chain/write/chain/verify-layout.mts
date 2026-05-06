@@ -33,7 +33,7 @@ import type {
   PositionedValueChain,
 } from '../../../types/value-chain.mjs';
 import type { OwmRenderAdapter } from '../../../lib/owm/render-adapter.mjs';
-import { LABEL_OFFSET_CANDIDATES } from '../../../lib/owm/candidate-offsets.mjs';
+import { candidatesFor } from '../../../lib/owm/candidate-offsets.mjs';
 import {
   parseSvgGeometry,
   type SvgGeometry,
@@ -50,23 +50,45 @@ import { getCurrentCollector } from '../../../lib/degradation/index.mjs';
  *  on chains up to ~25 components without runaway oscillation. */
 export const MAX_VERIFY_ITERATIONS = 5;
 
-/** Weight applied to each unit of severity for HARD overlap kinds
- *  (label-label, label-component, label-canvas). One unit of HARD
- *  violation outweighs every reasonable count of SOFT crossings. */
+/** Weight applied per unit of severity for hard overlap kinds. */
 export const HARD_PENALTY = 1000;
+/** Weight for the soft "labels too close" violation — must outrank
+ *  edge crossings and axis crossings because visual readability of
+ *  the labels themselves comes first. */
+export const SOFT_SPACING_PENALTY = 100;
+/** Weight for the soft "label crossed by a third-party edge"
+ *  violation. */
+export const SOFT_EDGE_PENALTY = 10;
+/** Weight for the soft "label sits on a phase-boundary axis line"
+ *  violation. Lowest priority among soft kinds. */
+export const SOFT_AXIS_PENALTY = 1;
 
-/** Weight applied to each unit of severity for SOFT overlap kinds
- *  (label-edge). The score is HARD × hard_severity_total +
- *  SOFT × soft_severity_total. */
-export const SOFT_PENALTY = 1;
+/** Per-kind penalty table. Order in the score :
+ *    HARD (label-label, component-label, label-canvas)
+ *  > SOFT_SPACING
+ *  > SOFT_EDGE
+ *  > SOFT_AXIS
+ *
+ *  Pair kinds we don't handle (anchor-* / component-component) are
+ *  weighted at 0 — they exist in the OverlapKind union for upstream
+ *  detector reasons but verify-layout treats them as zero-cost. */
+const PENALTIES: Record<Overlap['kind'], number> = {
+  'label-label':         HARD_PENALTY,
+  'component-label':     HARD_PENALTY,
+  'label-canvas':        HARD_PENALTY,
+  'label-spacing':       SOFT_SPACING_PENALTY,
+  'label-edge':          SOFT_EDGE_PENALTY,
+  'label-axis':          SOFT_AXIS_PENALTY,
+  'anchor-anchor':       0,
+  'anchor-component':    0,
+  'anchor-label':        0,
+  'component-component': 0,
+};
 
 const HARD_KINDS: ReadonlySet<Overlap['kind']> = new Set([
   'label-label',
   'component-label',
   'label-canvas',
-]);
-const SOFT_KINDS: ReadonlySet<Overlap['kind']> = new Set([
-  'label-edge',
 ]);
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -76,12 +98,17 @@ export interface VerifyReport {
   iterations: number;
   /** Names of components whose label offset was moved by the loop. */
   modifiedLabels: string[];
+  /** Names of components whose position was nudged by the loop's
+   *  fallback pass (Phase 5f). Empty until that pass is implemented. */
+  movedComponents: string[];
   /** Hard violations remaining at end of loop. 0 is the happy path. */
   unresolvedHard: number;
-  /** Soft edge crossings remaining at end of loop. May be > 0 even on
-   *  a successful run — the loop minimises this but does not require
-   *  it to reach zero. */
-  unresolvedSoft: number;
+  /** Label-spacing soft violations remaining (labels < 16 px apart). */
+  unresolvedSpacing: number;
+  /** Label-edge soft violations remaining (third-party edge crossing). */
+  unresolvedEdge: number;
+  /** Label-axis soft violations remaining (label on a phase boundary). */
+  unresolvedAxis: number;
   /** True iff the renderer was unavailable and the loop was skipped. */
   skipped: boolean;
 }
@@ -121,28 +148,33 @@ function withLabel(
   };
 }
 
+interface BreakdownCounts {
+  hard: number;
+  spacing: number;
+  edge: number;
+  axis: number;
+}
+
 interface RenderProbe {
   overlaps: Overlap[];
   geometry: SvgGeometry;
-  hardCount: number;
-  softCount: number;
   totalScore: number;
+  counts: BreakdownCounts;
 }
 
-function summarise(overlaps: readonly Overlap[]): { hardCount: number; softCount: number; totalScore: number } {
-  let hardCount = 0;
-  let softCount = 0;
+function summarise(overlaps: readonly Overlap[]): { totalScore: number; counts: BreakdownCounts } {
+  const counts: BreakdownCounts = { hard: 0, spacing: 0, edge: 0, axis: 0 };
   let totalScore = 0;
   for (const ov of overlaps) {
-    if (HARD_KINDS.has(ov.kind)) {
-      hardCount++;
-      totalScore += HARD_PENALTY * ov.severity;
-    } else if (SOFT_KINDS.has(ov.kind)) {
-      softCount++;
-      totalScore += SOFT_PENALTY * ov.severity;
-    }
+    const w = PENALTIES[ov.kind] ?? 0;
+    if (w === 0) continue;
+    totalScore += w * ov.severity;
+    if (HARD_KINDS.has(ov.kind))         counts.hard++;
+    else if (ov.kind === 'label-spacing') counts.spacing++;
+    else if (ov.kind === 'label-edge')    counts.edge++;
+    else if (ov.kind === 'label-axis')    counts.axis++;
   }
-  return { hardCount, softCount, totalScore };
+  return { totalScore, counts };
 }
 
 /** Render the chain, parse geometry, detect overlaps, summarise score.
@@ -164,8 +196,8 @@ function probe(
   }
   const geometry = parseSvgGeometry(svg, names);
   const overlaps = detectAllOverlaps(geometry);
-  const { hardCount, softCount, totalScore } = summarise(overlaps);
-  return { geometry, overlaps, hardCount, softCount, totalScore };
+  const { totalScore, counts } = summarise(overlaps);
+  return { geometry, overlaps, totalScore, counts };
 }
 
 /** Pick the label whose label-bearing overlaps weigh the most in the
@@ -174,9 +206,7 @@ function probe(
 function worstOffendingLabel(overlaps: readonly Overlap[]): string | null {
   const scoreByName = new Map<string, number>();
   for (const ov of overlaps) {
-    const weight = HARD_KINDS.has(ov.kind) ? HARD_PENALTY
-                 : SOFT_KINDS.has(ov.kind) ? SOFT_PENALTY
-                 : 0;
+    const weight = PENALTIES[ov.kind] ?? 0;
     if (weight === 0) continue;
     if (ov.a.kind === 'label') {
       scoreByName.set(ov.a.name, (scoreByName.get(ov.a.name) ?? 0) + weight * ov.severity);
@@ -213,7 +243,7 @@ function bestCandidateFor(
   names: ReadonlySet<string>,
 ): CandidateScore | null {
   let best: CandidateScore | null = null;
-  for (const candidate of LABEL_OFFSET_CANDIDATES) {
+  for (const candidate of candidatesFor(componentName)) {
     const trial = withLabel(chain, componentName, candidate);
     const result = probe(trial, emitOpts, adapter, names);
     if (result === null) continue;
@@ -247,9 +277,9 @@ export function verifyLayout(
 ): VerifyLayoutResult {
   const names = knownNames(chain);
   const modified: string[] = [];
+  const moved: string[] = []; // Phase 5f will populate this
   let current = chain;
-  let lastHard = 0;
-  let lastSoft = 0;
+  let lastCounts: BreakdownCounts = { hard: 0, spacing: 0, edge: 0, axis: 0 };
   let iterations = 0;
 
   for (let iter = 0; iter < MAX_VERIFY_ITERATIONS; iter++) {
@@ -261,14 +291,16 @@ export function verifyLayout(
         report: {
           iterations,
           modifiedLabels: modified,
-          unresolvedHard: 0,
-          unresolvedSoft: 0,
+          movedComponents: moved,
+          unresolvedHard:    0,
+          unresolvedSpacing: 0,
+          unresolvedEdge:    0,
+          unresolvedAxis:    0,
           skipped: true,
         },
       };
     }
-    lastHard = baseline.hardCount;
-    lastSoft = baseline.softCount;
+    lastCounts = baseline.counts;
 
     if (baseline.overlaps.length === 0) {
       return {
@@ -276,8 +308,11 @@ export function verifyLayout(
         report: {
           iterations,
           modifiedLabels: modified,
-          unresolvedHard: 0,
-          unresolvedSoft: 0,
+          movedComponents: moved,
+          unresolvedHard:    0,
+          unresolvedSpacing: 0,
+          unresolvedEdge:    0,
+          unresolvedAxis:    0,
           skipped: false,
         },
       };
@@ -316,10 +351,9 @@ export function verifyLayout(
 
   // Final probe to report the residual breakdown after the loop.
   const finalProbe = probe(current, emitOpts, adapter, names);
-  const unresolvedHard = finalProbe?.hardCount ?? lastHard;
-  const unresolvedSoft = finalProbe?.softCount ?? lastSoft;
-  if (unresolvedHard > 0) {
-    warn(`verify-layout left ${unresolvedHard} unresolved hard violation(s) after ${iterations} iteration(s)`);
+  const counts = finalProbe?.counts ?? lastCounts;
+  if (counts.hard > 0) {
+    warn(`verify-layout left ${counts.hard} unresolved hard violation(s) after ${iterations} iteration(s)`);
   }
 
   return {
@@ -327,8 +361,11 @@ export function verifyLayout(
     report: {
       iterations,
       modifiedLabels: modified,
-      unresolvedHard,
-      unresolvedSoft,
+      movedComponents: moved,
+      unresolvedHard:    counts.hard,
+      unresolvedSpacing: counts.spacing,
+      unresolvedEdge:    counts.edge,
+      unresolvedAxis:    counts.axis,
       skipped: false,
     },
   };

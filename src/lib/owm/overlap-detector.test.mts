@@ -8,8 +8,11 @@ import {
   segmentRectIntersects,
   segmentInRectLength,
   bboxOutsideCanvasArea,
+  rectGap,
+  bboxAxisCrossingWidth,
   OVERLAP_THRESHOLD_PX,
   EDGE_CROSSING_THRESHOLD_PX,
+  MIN_LABEL_SPACING_PX,
 } from './overlap-detector.mjs';
 import type {
   Bbox,
@@ -156,9 +159,48 @@ describe('segmentInRectLength', () => {
   });
 });
 
+describe('rectGap (Chebyshev between rects)', () => {
+  it('returns 0 when rects overlap', () => {
+    assert.equal(rectGap(bbox(0, 0, 10, 10), bbox(5, 5, 10, 10)), 0);
+  });
+  it('returns horizontal gap when only X separated', () => {
+    assert.equal(rectGap(bbox(0, 0, 10, 10), bbox(20, 0, 10, 10)), 10);
+  });
+  it('returns vertical gap when only Y separated', () => {
+    assert.equal(rectGap(bbox(0, 0, 10, 10), bbox(0, 20, 10, 10)), 10);
+  });
+  it('returns max(dx, dy) for diagonal separation', () => {
+    // dx = 20-10 = 10, dy = 30-10 = 20 → max = 20
+    assert.equal(rectGap(bbox(0, 0, 10, 10), bbox(20, 30, 10, 10)), 20);
+  });
+});
+
+describe('bboxAxisCrossingWidth', () => {
+  it('returns 0 when the axis is to the left of the bbox', () => {
+    assert.equal(bboxAxisCrossingWidth(bbox(50, 0, 30, 10), 40), 0);
+  });
+  it('returns 0 when the axis is to the right of the bbox', () => {
+    assert.equal(bboxAxisCrossingWidth(bbox(50, 0, 30, 10), 90), 0);
+  });
+  it('returns full bbox width when the axis is centered', () => {
+    // bbox 50..80, center=65. Axis at 65 → min(15, 15) × 2 = 30 = full width.
+    assert.equal(bboxAxisCrossingWidth(bbox(50, 0, 30, 10), 65), 30);
+  });
+  it('returns smaller value when the axis is near an edge', () => {
+    // bbox 50..80. Axis at 55 → min(5, 25) × 2 = 10.
+    assert.equal(bboxAxisCrossingWidth(bbox(50, 0, 30, 10), 55), 10);
+  });
+});
+
 describe('detectAllOverlaps — combined V3 detection', () => {
-  function geom(items: GeometryItem[], edges: EdgeSegment[] = [], canvas: Canvas = { width: 0, height: 0 }): SvgGeometry {
-    return { items, edges, canvas };
+  function geom(
+    items: GeometryItem[],
+    edges: EdgeSegment[] = [],
+    canvas: Canvas = { width: 0, height: 0 },
+    phaseAxes: number[] = [],
+    mapArea: Bbox = { x: 0, y: 0, width: canvas.width, height: canvas.height },
+  ): SvgGeometry {
+    return { items, edges, canvas, mapArea, phaseAxes };
   }
 
   it('forwards rect-rect overlaps from detectOverlaps', () => {
@@ -226,6 +268,80 @@ describe('detectAllOverlaps — combined V3 detection', () => {
     const kinds = new Set(out.map(o => o.kind));
     assert.ok(kinds.has('label-label'));
     assert.ok(kinds.has('label-edge'));
+  });
+
+  it('reports label-spacing when two labels are within MIN_LABEL_SPACING_PX', () => {
+    // Two labels 10 px apart (< MIN_LABEL_SPACING_PX = 16) but not
+    // overlapping. Should emit a label-spacing soft violation.
+    const out = detectAllOverlaps(geom(
+      [
+        rect('A', 'label', 0,  0, 20, 14),
+        rect('B', 'label', 30, 0, 20, 14),  // 10 px to the right of A
+      ],
+      [],
+      { width: 200, height: 200 },
+    ));
+    const spacing = out.filter(o => o.kind === 'label-spacing');
+    assert.equal(spacing.length, 1);
+    assert.equal(spacing[0].severity, MIN_LABEL_SPACING_PX - 10);
+  });
+
+  it('does NOT report label-spacing when the gap is >= MIN_LABEL_SPACING_PX', () => {
+    const out = detectAllOverlaps(geom(
+      [
+        rect('A', 'label',   0, 0, 20, 14),
+        rect('B', 'label', 100, 0, 20, 14),  // 80 px gap
+      ],
+      [],
+      { width: 200, height: 200 },
+    ));
+    assert.equal(out.filter(o => o.kind === 'label-spacing').length, 0);
+  });
+
+  it('does NOT report label-spacing when labels overlap (covered as label-label)', () => {
+    // Overlapping pair → counted only once as 'label-label'.
+    const out = detectAllOverlaps(geom(
+      [
+        rect('A', 'label', 0, 0, 20, 14),
+        rect('B', 'label', 5, 5, 20, 14),
+      ],
+      [],
+      { width: 200, height: 200 },
+    ));
+    assert.equal(out.filter(o => o.kind === 'label-label').length, 1);
+    assert.equal(out.filter(o => o.kind === 'label-spacing').length, 0);
+  });
+
+  it('reports label-axis when a label straddles a phase axis line', () => {
+    const out = detectAllOverlaps(geom(
+      [rect('Z', 'label', 80, 50, 30, 14)],   // 80..110 in X
+      [],
+      { width: 200, height: 200 },
+      [95, 200, 350],                          // axis at 95 (middle of label X)
+    ));
+    const axisOv = out.filter(o => o.kind === 'label-axis');
+    assert.equal(axisOv.length, 1);
+    assert.ok(axisOv[0].severity > 0);
+  });
+
+  it('does NOT report label-axis when the label sits clear of every axis', () => {
+    const out = detectAllOverlaps(geom(
+      [rect('Z', 'label', 50, 50, 30, 14)],   // 50..80
+      [],
+      { width: 200, height: 200 },
+      [10, 100, 150],                          // none inside 50..80
+    ));
+    assert.equal(out.filter(o => o.kind === 'label-axis').length, 0);
+  });
+
+  it('skips label-axis when phaseAxes is empty (canvas info missing)', () => {
+    const out = detectAllOverlaps(geom(
+      [rect('Z', 'label', 80, 50, 30, 14)],
+      [],
+      { width: 200, height: 200 },
+      [],
+    ));
+    assert.equal(out.filter(o => o.kind === 'label-axis').length, 0);
   });
 });
 

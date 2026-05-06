@@ -39,6 +39,13 @@ export const OVERLAP_THRESHOLD_PX = 1;
  *  as zero (segment grazes the label corner). */
 export const EDGE_CROSSING_THRESHOLD_PX = 1;
 
+/** Minimum visual gap between two label rectangles. Below this, even
+ *  without overlap, the labels feel visually merged and the
+ *  detector emits a `label-spacing` soft violation. Empirical, set
+ *  to one full LABEL_HEIGHT (16 px) per user calibration on
+ *  2026-05-06. */
+export const MIN_LABEL_SPACING_PX = 16;
+
 export type OverlapKind =
   | 'anchor-anchor'
   | 'anchor-component'
@@ -47,20 +54,30 @@ export type OverlapKind =
   | 'component-label'
   | 'label-label'
   | 'label-canvas'
-  | 'label-edge';
+  | 'label-edge'
+  | 'label-spacing'
+  | 'label-axis';
+
+/** Synthetic geometry item used for non-rect targets in overlap
+ *  reports (canvas, edges, phase axes). Has the same shape as
+ *  `GeometryItem` so consumers can treat the `b` side uniformly. */
+export interface SyntheticGeometry {
+  name: string;
+  kind: 'canvas' | 'edge' | 'axis';
+  bbox: Bbox;
+}
 
 export interface Overlap {
   /** Always a parsed GeometryItem (component / label / anchor). */
   a: GeometryItem;
   /** Either another GeometryItem (rect-rect overlap) or a synthetic
-   *  item with kind `'canvas'` / `'edge'` for canvas-overflow and
-   *  edge-crossing reports. The synthetic bbox is the offending
-   *  region (canvas rect for canvas-overflow, segment bounding rect
-   *  for edge crossings). */
-  b: { name: string; kind: OverlapKind extends `${string}-${infer R}` ? R : string; bbox: Bbox } | GeometryItem;
+   *  item for canvas-overflow, edge-crossing, or phase-axis-crossing
+   *  reports. The synthetic bbox is the offending region. */
+  b: GeometryItem | SyntheticGeometry;
   kind: OverlapKind;
   /** Pixel² for rect-rect, pixel² of overflow for canvas, pixel
-   *  length for edge crossings. */
+   *  length for edge crossings, slack-to-min for label-spacing,
+   *  bbox-axis crossing width for label-axis. */
   severity: number;
 }
 
@@ -73,6 +90,30 @@ function intersectionArea(a: Bbox, b: Bbox): number {
   const y2 = Math.min(a.y + a.height, b.y + b.height);
   if (x2 <= x1 || y2 <= y1) return 0;
   return (x2 - x1) * (y2 - y1);
+}
+
+/**
+ * Chebyshev gap between two axis-aligned rectangles : the larger of
+ * the horizontal and vertical separations. Returns 0 when the
+ * rectangles overlap. This metric matches the way labels feel
+ * visually distinct: two labels diagonally offset by (5, 5) are as
+ * visually merged as two side-by-side at (5, 0).
+ */
+export function rectGap(a: Bbox, b: Bbox): number {
+  const dx = Math.max(0, Math.max(a.x - (b.x + b.width), b.x - (a.x + a.width)));
+  const dy = Math.max(0, Math.max(a.y - (b.y + b.height), b.y - (a.y + a.height)));
+  return Math.max(dx, dy);
+}
+
+/**
+ * How much of `bbox` is on each side of the vertical line `axisX`,
+ * doubled. A label centered exactly on the axis returns its full
+ * width ; a label barely grazing the axis returns near-0. Returns
+ * 0 when the axis does not pierce the bbox.
+ */
+export function bboxAxisCrossingWidth(bbox: Bbox, axisX: number): number {
+  if (axisX <= bbox.x || axisX >= bbox.x + bbox.width) return 0;
+  return Math.min(axisX - bbox.x, bbox.x + bbox.width - axisX) * 2;
 }
 
 function pairKind(a: GeometryItem['kind'], b: GeometryItem['kind']): OverlapKind {
@@ -199,6 +240,14 @@ function edgeItem(edge: EdgeSegment): { name: string; kind: 'edge'; bbox: Bbox }
   };
 }
 
+function axisItem(axisX: number, height: number): { name: string; kind: 'axis'; bbox: Bbox } {
+  return {
+    name: `__axis__@${axisX.toFixed(1)}`,
+    kind: 'axis',
+    bbox: { x: axisX, y: 0, width: 0, height },
+  };
+}
+
 // ─── Public API ────────────────────────────────────────────────────────
 
 /**
@@ -265,6 +314,45 @@ export function detectAllOverlaps(geometry: SvgGeometry): Overlap[] {
       const length = segmentInRectLength(edge, item.bbox);
       if (length <= EDGE_CROSSING_THRESHOLD_PX) continue;
       out.push({ a: item, b: edgeItem(edge), kind: 'label-edge', severity: length });
+    }
+  }
+
+  // Label↔label spacing: labels that don't strictly overlap but are
+  // closer than MIN_LABEL_SPACING_PX feel visually merged. Sevirity
+  // is the missing slack to reach the minimum gap.
+  const labels = geometry.items.filter(it => it.kind === 'label');
+  for (let i = 0; i < labels.length; i++) {
+    for (let j = i + 1; j < labels.length; j++) {
+      const a = labels[i], b = labels[j];
+      // If they already overlap, the rect-rect pass above caught it
+      // with kind 'label-label'. Spacing only applies to non-overlapping
+      // pairs.
+      if (intersectionArea(a.bbox, b.bbox) > 0) continue;
+      const gap = rectGap(a.bbox, b.bbox);
+      if (gap >= MIN_LABEL_SPACING_PX) continue;
+      out.push({
+        a, b,
+        kind: 'label-spacing',
+        severity: MIN_LABEL_SPACING_PX - gap,
+      });
+    }
+  }
+
+  // Label↔phase-axis: visually distracting when a label straddles a
+  // phase boundary line. Severity is bboxAxisCrossingWidth.
+  if (geometry.phaseAxes.length > 0 && geometry.canvas.height > 0) {
+    for (const item of geometry.items) {
+      if (item.kind !== 'label') continue;
+      for (const axisX of geometry.phaseAxes) {
+        const w = bboxAxisCrossingWidth(item.bbox, axisX);
+        if (w <= 0) continue;
+        out.push({
+          a: item,
+          b: axisItem(axisX, geometry.canvas.height),
+          kind: 'label-axis',
+          severity: w,
+        });
+      }
     }
   }
 

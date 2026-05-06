@@ -116,7 +116,10 @@ describe('verifyLayout — clean baseline', () => {
     assert.equal(out.report.iterations, 0);
     assert.deepEqual(out.report.modifiedLabels, []);
     assert.equal(out.report.unresolvedHard, 0);
-    assert.equal(out.report.unresolvedSoft, 0);
+    assert.equal(out.report.unresolvedSpacing, 0);
+    assert.equal(out.report.unresolvedEdge, 0);
+    assert.equal(out.report.unresolvedAxis, 0);
+    assert.deepEqual(out.report.movedComponents, []);
     assert.equal(out.report.skipped, false);
     assert.deepEqual(out.chain.components.map(c => c.label), c.components.map(c => c.label));
   });
@@ -184,7 +187,9 @@ describe('verifyLayout — convergence cap', () => {
     // Always returns; never throws. Loop terminates even on insoluble
     // adapters.
     assert.equal(typeof out.report.unresolvedHard, 'number');
-    assert.equal(typeof out.report.unresolvedSoft, 'number');
+    assert.equal(typeof out.report.unresolvedSpacing, 'number');
+    assert.equal(typeof out.report.unresolvedEdge, 'number');
+    assert.equal(typeof out.report.unresolvedAxis, 'number');
   });
 });
 
@@ -264,7 +269,7 @@ describe('verifyLayout — V3 hard rules', () => {
       { edges: [{ from: 'A', to: 'B' }], canvas: { width: 500, height: 500 } },
     );
     const out = verifyLayout(c, emitOpts, adapter);
-    assert.equal(out.report.unresolvedSoft, 0,
+    assert.equal(out.report.unresolvedEdge, 0,
       'A→B line passes near A and B labels but those are own-edge incidents');
   });
 });

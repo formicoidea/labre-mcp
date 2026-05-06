@@ -67,6 +67,15 @@ export interface SvgGeometry {
   items: GeometryReport;
   edges: EdgeSegment[];
   canvas: Canvas;
+  /** The visible map drawing area inside the SVG, captured from
+   *  `<rect id="fillArea">`. Falls back to `(0, 0, canvas.width,
+   *  canvas.height)` if cli-owm omits the rect. Used by the phase-axis
+   *  computation. */
+  mapArea: Bbox;
+  /** Pixel X coordinates of the OWM phase boundaries (Genesis|Custom,
+   *  Custom|Product, Product|Commodity) inside `mapArea`. Three
+   *  entries when the map area is known, empty array otherwise. */
+  phaseAxes: number[];
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────
@@ -83,6 +92,11 @@ export const COMPONENT_RADIUS = 5;
  *  rounding noise (e.g. `30.00000000000003`), so an exact match would
  *  miss legitimate edges. */
 export const ENDPOINT_MATCH_TOLERANCE = 0.5;
+
+/** Phase boundary ratios inside the visible map area, matching the
+ *  OWM canonical Genesis|Custom-Built|Product|Commodity divisions
+ *  (verified by inspection of cli-owm's `<g id="valueChain">` 2026-05-06). */
+export const PHASE_AXIS_RATIOS: ReadonlyArray<number> = [0.175, 0.40, 0.70];
 
 // ─── SVG slicing ────────────────────────────────────────────────────────
 
@@ -164,6 +178,35 @@ function extractCanvas(svg: string): Canvas {
     width:  w ? Math.max(0, num(w[1]) || 0) : 0,
     height: h ? Math.max(0, num(h[1]) || 0) : 0,
   };
+}
+
+/** Locate the `<rect id="fillArea">` and return its bbox. cli-owm
+ *  emits this rect with the visible map dimensions (typically the same
+ *  as the DSL `size [w, h]` directive when forwarded by our adapter).
+ *  Falls back to `(0, 0, canvas.width, canvas.height)` if the rect
+ *  isn't present in the SVG (defensive — older cli-owm versions or
+ *  custom themes might omit it). */
+function extractMapArea(svg: string, canvas: Canvas): Bbox {
+  const rectMatch = svg.match(/<rect\b[^>]*\bid="fillArea"[^>]*\/?>/);
+  if (rectMatch) {
+    const attrs = readAttrs(rectMatch[0].slice(0, -1)); // strip trailing >
+    const x = num(attrs.x), y = num(attrs.y);
+    const width = num(attrs.width), height = num(attrs.height);
+    if (Number.isFinite(x) && Number.isFinite(y)
+     && Number.isFinite(width) && Number.isFinite(height)
+     && width > 0 && height > 0) {
+      return { x, y, width, height };
+    }
+  }
+  return { x: 0, y: 0, width: canvas.width, height: canvas.height };
+}
+
+/** Pixel X coordinates of the three OWM phase boundaries inside the
+ *  map area. Returns an empty array when the map area is undefined
+ *  (width <= 0). */
+function computePhaseAxes(mapArea: Bbox): number[] {
+  if (mapArea.width <= 0) return [];
+  return PHASE_AXIS_RATIOS.map(r => mapArea.x + r * mapArea.width);
 }
 
 interface PositionedName {
@@ -289,9 +332,11 @@ export function parseSvgGeometry(
   knownNames: ReadonlySet<string>,
 ): SvgGeometry {
   const canvas = extractCanvas(svg);
+  const mapArea = extractMapArea(svg, canvas);
+  const phaseAxes = computePhaseAxes(mapArea);
   const { items, positions } = parseItemsAndPositions(svg, knownNames);
   const edges = extractEdges(svg, positions);
-  return { items, edges, canvas };
+  return { items, edges, canvas, mapArea, phaseAxes };
 }
 
 /**

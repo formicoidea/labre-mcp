@@ -133,6 +133,46 @@ describe('parseSvgGeometry — canvas extraction', () => {
   });
 });
 
+describe('parseSvgGeometry — map area + phase axes', () => {
+  it('extracts mapArea from <rect id="fillArea">', () => {
+    const svg = '<svg width="605" height="737"><rect x="0" y="0" width="500" height="600" fill="white" id="fillArea"/></svg>';
+    const out = parseSvgGeometry(svg, new Set());
+    assert.deepEqual(out.mapArea, { x: 0, y: 0, width: 500, height: 600 });
+  });
+
+  it('falls back to canvas dimensions when fillArea is missing', () => {
+    const svg = '<svg width="605" height="737"></svg>';
+    const out = parseSvgGeometry(svg, new Set());
+    assert.deepEqual(out.mapArea, { x: 0, y: 0, width: 605, height: 737 });
+  });
+
+  it('computes 3 phase axes scaled to the map area at default 500-wide map', () => {
+    const svg = '<svg width="605" height="737"><rect x="0" y="0" width="500" height="600" id="fillArea"/></svg>';
+    const out = parseSvgGeometry(svg, new Set());
+    // 0.175 × 500, 0.40 × 500, 0.70 × 500 = 87.5, 200, 350
+    assert.equal(out.phaseAxes.length, 3);
+    assert.equal(out.phaseAxes[0], 87.5);
+    assert.equal(out.phaseAxes[1], 200);
+    assert.equal(out.phaseAxes[2], 350);
+  });
+
+  it('computes 3 phase axes scaled to a custom 1216-wide map', () => {
+    const svg = '<svg width="1286" height="787"><rect x="0" y="0" width="1216" height="650" id="fillArea"/></svg>';
+    const out = parseSvgGeometry(svg, new Set());
+    // 0.175 × 1216, 0.40 × 1216, 0.70 × 1216 = 212.8, 486.4, 851.2
+    assert.equal(out.phaseAxes.length, 3);
+    assert.ok(Math.abs(out.phaseAxes[0] - 212.8) < 1e-9);
+    assert.ok(Math.abs(out.phaseAxes[1] - 486.4) < 1e-9);
+    assert.ok(Math.abs(out.phaseAxes[2] - 851.2) < 1e-9);
+  });
+
+  it('returns empty phaseAxes when the map area has zero width', () => {
+    const svg = '<svg></svg>';
+    const out = parseSvgGeometry(svg, new Set());
+    assert.deepEqual(out.phaseAxes, []);
+  });
+});
+
 describe('parseSvgGeometry — edge extraction', () => {
   it('emits an edge between two known components', () => {
     const svg = `<svg>
