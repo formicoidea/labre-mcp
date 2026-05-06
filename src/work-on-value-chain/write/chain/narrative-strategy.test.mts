@@ -7,23 +7,11 @@
 // Verifies the strategy is registered via the chain registry and that the
 // build() method produces a well-formed OWM DSL string.
 
-import { describe, it, before, after } from 'node:test';
+import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import '../../../lib/prompts/init.mjs';
 import { NarrativeChainStrategy } from './narrative-strategy.mjs';
 import { listStrategies, getStrategy, clearCache } from './registry.mjs';
-import {
-  setRenderAdapterForTesting,
-  resetRenderAdapterCache,
-} from '../../../lib/owm/render-registry.mjs';
-
-// Mock OwmRenderAdapter — returns a minimal SVG so verify-layout
-// detects zero overlaps and becomes a no-op for these tests. The
-// real cli-owm path is exercised in the dedicated cli-owm-adapter
-// and svg-bbox-parser test files.
-const mockRenderAdapter = {
-  render: (): string => '<svg></svg>',
-};
 
 function makeMockLlm() {
   // any: mimics the provider-agnostic llmCall signature used by strategies
@@ -69,11 +57,6 @@ function makeMockLlm() {
 describe('NarrativeChainStrategy', () => {
   before(() => {
     clearCache(); // force re-discovery
-    setRenderAdapterForTesting(mockRenderAdapter);
-  });
-
-  after(() => {
-    resetRenderAdapterCache();
   });
 
   it('registers under write:chain:narrative', async () => {

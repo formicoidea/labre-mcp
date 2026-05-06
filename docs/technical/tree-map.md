@@ -65,9 +65,8 @@ src/
 │   ├── mcp-notifications.test.mts
 │   ├── owm/                     ── Catalogue OWM DSL + couche d'isolation moteur de rendu
 │   │   ├── owm-dsl.mts                emit{Title,Anchor,Component,Link,Size,…} + OWM_DSL_REFERENCE
-│   │   ├── render-adapter.mts         Interface OwmRenderAdapter (DSL → SVG)
-│   │   ├── cli-owm-adapter.mts        Impl concrète backed by src/lib/vendor/cli-owm ; honore size [w,h] du DSL via map.presentation.size
-│   │   ├── render-registry.mts        Singleton getRenderAdapter() + helpers tests
+│   │   ├── render-adapter.mts         Interface OwmRenderAdapter (DSL → SVG) — utilisée par cli-owm-adapter et le boot health check
+│   │   ├── cli-owm-adapter.mts        Impl concrète backed by src/lib/vendor/cli-owm ; honore size [w,h] du DSL via map.presentation.size ; sert d'oracle aux tests régression analytical-geometry
 │   │   ├── svg-bbox-parser.mts        SVG → SvgGeometry { items, edges, canvas, mapArea, phaseAxes } (kept for snapshot tests / future Playwright fallback)
 │   │   ├── analytical-geometry.mts    computeGeometry — pure-JS replacement, no cli-owm calls during placement (V6)
 │   │   └── overlap-detector.mts       detectAllOverlaps : rect-rect + label↔canvas + label↔edge + label-spacing + label-axis ; rectGap, bboxAxisCrossingWidth, segmentRectIntersects, segmentInRectLength

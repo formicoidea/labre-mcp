@@ -27,7 +27,6 @@ import type {
   PositionedValueChain,
 } from '../../../types/value-chain.mjs';
 import type { EmitOwmOptions } from './emit-owm.mjs';
-import type { OwmRenderAdapter } from '../../../lib/owm/render-adapter.mjs';
 import {
   detectAllOverlaps,
   type Overlap,
@@ -115,16 +114,14 @@ function mergeUnique(target: string[], additions: readonly string[]): void {
 // ─── Public API ─────────────────────────────────────────────────────────
 
 /**
- * V6 — three-stage force-directed placement plus a deterministic
- * projection. The `adapter` parameter is kept on the public API for
- * backward compatibility but is no longer invoked during placement;
- * geometry is computed analytically from the chain.
+ * V7 — four-stage placement: force-directed labels, optional
+ * component nudge, canonical snap refinement, strict projection.
+ * Geometry is computed analytically from the chain (no cli-owm
+ * invocation in the hot path).
  */
 export function verifyLayout(
   chain: PositionedValueChain,
   emitOpts: EmitOwmOptions,
-  // any: signature compat with V5 callers — adapter unused in V6
-  _adapter: OwmRenderAdapter,
 ): VerifyLayoutResult {
   const modifiedLabels: string[] = [];
   const movedComponents: string[] = [];

@@ -15,10 +15,6 @@ import {
   setLLMCallForTesting,
   resetLLMRegistryCache,
 } from '../../../lib/llm/registry.mjs';
-import {
-  setRenderAdapterForTesting,
-  resetRenderAdapterCache,
-} from '../../../lib/owm/render-registry.mjs';
 
 // any: mimics the provider-agnostic llmCall signature
 function makeMockLlm() {
@@ -82,12 +78,10 @@ describe('handleGenerateValueChain', () => {
   before(() => {
     resetLLMRegistryCache();
     setLLMCallForTesting('write-chain', 'text', makeMockLlm());
-    setRenderAdapterForTesting({ render: () => '<svg></svg>' });
   });
 
   after(() => {
     resetLLMRegistryCache();
-    resetRenderAdapterCache();
   });
 
   it('returns owm, metadata and method', async () => {

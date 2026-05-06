@@ -1,9 +1,9 @@
-// Tests for verify-layout.mts (V6 — full force-directed).
+// Tests for verify-layout.mts (V7 — force-directed + canonical snap).
 //
-// V6 doesn't invoke the OwmRenderAdapter during placement, so the
-// elaborate mock-SVG infrastructure of V5 is gone. Tests construct a
-// `PositionedValueChain` directly and assert the V6 invariants:
-//   - public API (signature + report shape) preserved
+// V7 doesn't invoke any external renderer during placement, so tests
+// construct a `PositionedValueChain` directly and assert the
+// invariants:
+//   - public API report shape preserved
 //   - hard violations are always 0 in the output (Phase 6d guarantee)
 //   - anchors are immobile
 //   - labels seeded by place-labels become the simulation home; small
@@ -13,7 +13,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { verifyLayout } from './verify-layout.mjs';
-import type { OwmRenderAdapter } from '../../../lib/owm/render-adapter.mjs';
 import type {
   LabelOffset,
   PositionedComponent,
@@ -55,13 +54,6 @@ function chain(components: Seed[], links: Array<{ from: string; to: string }> = 
 
 const emitOpts = { style: 'plain' as const };
 
-/** Stub adapter — V6 doesn't call it but the public signature still
- *  takes one. Returns an empty string so any accidental invocation
- *  is non-fatal. */
-const noopAdapter: OwmRenderAdapter = {
-  render: () => '',
-};
-
 const HARD_KINDS = new Set(['label-label', 'component-label', 'label-canvas']);
 
 function countHardOverlaps(c: PositionedValueChain): number {
@@ -77,7 +69,7 @@ describe('verifyLayout — public contract', () => {
       { name: 'A', role: 'anchor',     visibility: 0.95, evolution: 0.5, label: { dx: -100, dy: 0 } },
       { name: 'B', role: 'capability', visibility: 0.5,  evolution: 0.5 },
     ], [{ from: 'A', to: 'B' }]);
-    const out = verifyLayout(c, emitOpts, noopAdapter);
+    const out = verifyLayout(c, emitOpts);
     assert.ok(out.chain);
     assert.equal(typeof out.report.iterations, 'number');
     assert.ok(Array.isArray(out.report.modifiedLabels));
@@ -89,17 +81,6 @@ describe('verifyLayout — public contract', () => {
     assert.equal(out.report.skipped, false);
   });
 
-  it('does not invoke the OwmRenderAdapter', () => {
-    let calls = 0;
-    const watchAdapter: OwmRenderAdapter = {
-      render: () => { calls++; return ''; },
-    };
-    const c = chain([
-      { name: 'A', role: 'anchor', visibility: 0.95, evolution: 0.5 },
-    ]);
-    verifyLayout(c, emitOpts, watchAdapter);
-    assert.equal(calls, 0, 'V6 must not call adapter.render');
-  });
 });
 
 describe('verifyLayout — hard-violation guarantee', () => {
@@ -118,7 +99,7 @@ describe('verifyLayout — hard-violation guarantee', () => {
         { from: 'C', to: 'D' },
       ],
     );
-    const out = verifyLayout(c, emitOpts, noopAdapter);
+    const out = verifyLayout(c, emitOpts);
     assert.equal(out.report.unresolvedHard, 0);
   });
 
@@ -129,7 +110,7 @@ describe('verifyLayout — hard-violation guarantee', () => {
       { name: 'B', role: 'capability', visibility: 0.5, evolution: 0.5, label: { dx: 0, dy: 25 } },
     ]);
     assert.ok(countHardOverlaps(c) > 0, 'precondition: input has hard violations');
-    const out = verifyLayout(c, emitOpts, noopAdapter);
+    const out = verifyLayout(c, emitOpts);
     assert.equal(out.report.unresolvedHard, 0,
       'V6 must always produce a chain with zero hard violations');
   });
@@ -141,7 +122,7 @@ describe('verifyLayout — anchor immobility', () => {
       { name: 'A', role: 'anchor',     visibility: 0.95, evolution: 0.95, label: { dx: -100, dy: 0 } },
       { name: 'B', role: 'capability', visibility: 0.5,  evolution: 0.5 },
     ]);
-    const out = verifyLayout(c, emitOpts, noopAdapter);
+    const out = verifyLayout(c, emitOpts);
     const a = out.chain.components.find(x => x.name === 'A')!;
     assert.equal(a.evolution,   0.95);
     assert.equal(a.visibility,  0.95);
@@ -163,7 +144,7 @@ describe('verifyLayout — DSL invariants on output chain', () => {
       ],
       [{ from: 'P', to: 'C' }],
     );
-    const out = verifyLayout(c, emitOpts, noopAdapter);
+    const out = verifyLayout(c, emitOpts);
     const p = out.chain.components.find(x => x.name === 'P')!;
     const ch = out.chain.components.find(x => x.name === 'C')!;
     assert.ok(p.visibility > ch.visibility,
@@ -175,7 +156,7 @@ describe('verifyLayout — DSL invariants on output chain', () => {
       { name: 'A', role: 'capability', visibility: 0.5, evolution: 0.5 },
       { name: 'B', role: 'capability', visibility: 0.5, evolution: 0.5 },
     ]);
-    const out = verifyLayout(c, emitOpts, noopAdapter);
+    const out = verifyLayout(c, emitOpts);
     for (const comp of out.chain.components) {
       assert.ok(comp.evolution  >= 0.10 - 1e-9, `${comp.name} X < 0.10: ${comp.evolution}`);
       assert.ok(comp.evolution  <= 0.90 + 1e-9, `${comp.name} X > 0.90: ${comp.evolution}`);
@@ -193,7 +174,7 @@ describe('verifyLayout — output integrity', () => {
     ]);
     const beforeA = c.components[0];
     const beforeLabel = c.components[0].label;
-    verifyLayout(c, emitOpts, noopAdapter);
+    verifyLayout(c, emitOpts);
     assert.equal(c.components[0], beforeA);
     assert.equal(c.components[0].label, beforeLabel);
   });
@@ -203,7 +184,7 @@ describe('verifyLayout — output integrity', () => {
       { name: 'A', role: 'capability', visibility: 0.5, evolution: 0.5 },
       { name: 'B', role: 'capability', visibility: 0.5, evolution: 0.5 },
     ]);
-    const out = verifyLayout(c, emitOpts, noopAdapter);
+    const out = verifyLayout(c, emitOpts);
     for (const comp of out.chain.components) {
       assert.equal(comp.label.dx, Math.round(comp.label.dx),
         `${comp.name}.dx is not integer: ${comp.label.dx}`);
@@ -219,7 +200,7 @@ describe('verifyLayout — modifiedLabels tracking', () => {
       { name: 'A', role: 'capability', visibility: 0.5, evolution: 0.5, label: { dx: 0, dy: 25 } },
       { name: 'B', role: 'capability', visibility: 0.5, evolution: 0.5, label: { dx: 0, dy: 25 } },
     ]);
-    const out = verifyLayout(c, emitOpts, noopAdapter);
+    const out = verifyLayout(c, emitOpts);
     // At least one of the two labels must have moved to resolve the
     // collision.
     assert.ok(out.report.modifiedLabels.length >= 1,
@@ -231,7 +212,7 @@ describe('verifyLayout — modifiedLabels tracking', () => {
     const c = chain([
       { name: 'A', role: 'anchor', visibility: 0.95, evolution: 0.5, label: { dx: -100, dy: 0 } },
     ]);
-    const out = verifyLayout(c, emitOpts, noopAdapter);
+    const out = verifyLayout(c, emitOpts);
     assert.deepEqual(out.report.modifiedLabels, []);
     assert.deepEqual(out.report.movedComponents, []);
   });

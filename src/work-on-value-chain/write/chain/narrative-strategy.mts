@@ -28,7 +28,6 @@ import { adjustX } from './adjust-x.mjs';
 import { placeLabels } from './place-labels.mjs';
 import { verifyLayout } from './verify-layout.mjs';
 import { generateChainOwmSyntax, type EmitOwmOptions } from './emit-owm.mjs';
-import { getRenderAdapter } from '../../../lib/owm/render-registry.mjs';
 import type {
   ChainMetadata,
   PositionedComponent,
@@ -114,7 +113,7 @@ export class NarrativeChainStrategy extends BaseChainWriteStrategy {
 
     // Step 7: collision-aware label correction. The render adapter is
     // resolved once here and passed in so unit tests can inject a mock.
-    const verified = verifyLayout(laid, emitOptions, getRenderAdapter());
+    const verified = verifyLayout(laid, emitOptions);
     const owm      = generateChainOwmSyntax(verified.chain, emitOptions);
     return { owm, metadata };
   }
