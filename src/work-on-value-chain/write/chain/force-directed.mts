@@ -103,9 +103,10 @@ const CLAMP_PASSES = 5;
 // ─── Phase 6d constants — strict projection ───────────────────────────
 
 /** Maximum number of detect → push rounds during the projection
- *  post-pass. After this, residual hard violations (rare) leak into
- *  the report. */
-export const PROJECTION_ITERATIONS = 5;
+ *  post-pass. Bumped from 5 → 10 after a smoke test on a 14-component
+ *  Spotify chain showed 2 residual hard violations remaining when the
+ *  cascade required ≥ 6 passes to settle. */
+export const PROJECTION_ITERATIONS = 10;
 
 // ─── Particle ──────────────────────────────────────────────────────────
 
@@ -694,8 +695,12 @@ function computeMinSeparation(a: Bbox, b: Bbox): { dx: number; dy: number } {
  * `PROJECTION_ITERATIONS` is reached.
  *
  * Operates on label offsets only — component circle positions are
- * frozen at this stage (Phase 6c handled those, if needed). The
- * input chain is not mutated.
+ * frozen at this stage (Phase 6c handled those, if needed).
+ *
+ * Internal state is kept in floating-point to avoid the rounding
+ * pitfall: a sub-pixel push (e.g. 0.4 px) rounds to 0 and the
+ * iteration makes no progress. We integrate continuously and round
+ * only at the final emission. The input chain is not mutated.
  */
 export function projectHardConstraints(
   chain: PositionedValueChain,
@@ -703,10 +708,31 @@ export function projectHardConstraints(
   options?: { iterations?: number },
 ): PositionedValueChain {
   const maxIter = options?.iterations ?? PROJECTION_ITERATIONS;
-  let current = chain;
+
+  // Internal float labels by component name.
+  const floatLabels = new Map<string, { dx: number; dy: number }>();
+  for (const c of chain.components) {
+    if (c.role === 'anchor') continue;
+    floatLabels.set(c.name, { dx: c.label.dx, dy: c.label.dy });
+  }
+
+  // Build a snapshot chain with the current float labels for
+  // geometry computation. Anchors pass through unchanged.
+  function snapshotChain(): PositionedValueChain {
+    return {
+      metadata: chain.metadata,
+      links: chain.links,
+      components: chain.components.map(c => {
+        if (c.role === 'anchor') return c;
+        const lbl = floatLabels.get(c.name);
+        if (!lbl) return c;
+        return { ...c, label: { dx: lbl.dx, dy: lbl.dy } };
+      }),
+    };
+  }
 
   for (let iter = 0; iter < maxIter; iter++) {
-    const geometry = computeGeometry(current, emitOpts);
+    const geometry = computeGeometry(snapshotChain(), emitOpts);
     const overlaps = detectAllOverlaps(geometry);
     const hard = overlaps.filter(o => HARD_KINDS_FOR_PROJECTION.has(o.kind));
     if (hard.length === 0) break;
@@ -751,26 +777,30 @@ export function projectHardConstraints(
 
     if (pushByLabel.size === 0) break;
 
-    // Apply pushes — round to integers since OWM DSL takes integers.
-    const updatedComponents: PositionedComponent[] = current.components.map(c => {
+    // Apply pushes in float — round only at the end of the function.
+    for (const [name, push] of pushByLabel) {
+      const lbl = floatLabels.get(name);
+      if (!lbl) continue;
+      lbl.dx += push.dx;
+      lbl.dy += push.dy;
+    }
+  }
+
+  // Emit — round float labels to integers.
+  return {
+    metadata: chain.metadata,
+    links: chain.links,
+    components: chain.components.map(c => {
       if (c.role === 'anchor') return c;
-      const push = pushByLabel.get(c.name);
-      if (!push) return c;
+      const lbl = floatLabels.get(c.name);
+      if (!lbl) return c;
       return {
         ...c,
         label: {
-          dx: Math.round(c.label.dx + push.dx),
-          dy: Math.round(c.label.dy + push.dy),
+          dx: Math.round(lbl.dx),
+          dy: Math.round(lbl.dy),
         },
       };
-    });
-
-    current = {
-      metadata: current.metadata,
-      links: current.links,
-      components: updatedComponents,
-    };
-  }
-
-  return current;
+    }),
+  };
 }
