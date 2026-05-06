@@ -166,5 +166,25 @@
       "variables": ["solution_name", "property_name", "context_line", "phase1", "phase2", "phase3", "phase4"],
       "parser": { "kind": "custom", "id": "propertiesSingle" }
     }
+  },
+  "write-chain": {
+    "extract-metadata": {
+      "kind": "template",
+      "templateFile": {
+        "system": "prompts/write-chain.extract-metadata.system.md",
+        "user": "prompts/write-chain.extract-metadata.user.md"
+      },
+      "variables": ["nlCommand"],
+      "parser": { "kind": "custom", "id": "extractChainMetadata" }
+    },
+    "generate-chain": {
+      "kind": "template",
+      "templateFile": {
+        "system": "prompts/write-chain.generate-chain.system.md",
+        "user": "prompts/write-chain.generate-chain.user.md"
+      },
+      "variables": ["metadata", "date"],
+      "parser": { "kind": "custom", "id": "parseRawValueChain" }
+    }
   }
 }

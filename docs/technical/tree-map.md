@@ -5,7 +5,7 @@
 
 ## 1. Vue d'ensemble
 
-`WardleyAssistant` est un serveur **MCP** (Model Context Protocol) qui expose 4 outils autour des cartes Wardley :
+`WardleyAssistant` est un serveur **MCP** (Model Context Protocol) qui expose 5 outils autour des cartes Wardley :
 
 | Outil MCP | Rôle | Entrée principale |
 |---|---|---|
@@ -13,6 +13,7 @@
 | `evaluateMap` | Évalue qualitativement une carte OWM | `src/work-on-evolution/write/evaluate-map/evaluate-map.mts` |
 | `identifyCapability` | Identifie capabilities / solutions dans un texte | `src/work-on-value-chain/write/component/identify-capability.mts` |
 | `estimateAnchorEvolution` | Évolution du composant ancre (user need) | `src/work-on-evolution/write/strategies/anchor/estimate-anchor-evolution.mts` |
+| `generateValueChain` | Construit une chaîne de valeur Wardley complète (OWM DSL) à partir d'un prompt langage naturel | `src/work-on-value-chain/write/chain/generate-value-chain.mts` |
 
 ## 2. Points d'entrée
 
@@ -41,15 +42,18 @@ src/
 │   ├── evaluate-map.schema.mts            Entrée de evaluateMap
 │   ├── identify-capability.schema.mts     Entrée de identifyCapability
 │   ├── estimate-anchor-evolution.schema.mts  Entrée de estimateAnchorEvolution
+│   ├── generate-value-chain.schema.mts    Entrée de generateValueChain
+│   ├── value-chain.schema.mts             Schémas internes du pipeline write:chain (Raw/PositionedValueChain, ChainMetadata)
 │   ├── inputs.schema.mts                  Primitives + ComponentInput, SolutionInput, PhaseDistribution
 │   ├── results.schema.mts                 EvolutionResult, PropertyEvaluation, SolutionEvolutionResult
 │   ├── patent.schema.mts                  PatentDataSchema + 8 sous-shapes (BigQuery/mock)
 │   ├── parsed-llm.schema.mts              Schémas des parsers LLM
 │   └── …
-│   Les 4 schémas d'entrée MCP génèrent le JSON Schema exposé au client via
+│   Les 5 schémas d'entrée MCP génèrent le JSON Schema exposé au client via
 │   `z.toJSONSchema(Schema, { io: 'input' })` et les types TS via `z.infer<…>`.
 │
 ├── types/                       ── Re-exports typés (pour imports plus courts)
+│   └── value-chain.mts                    Types du pipeline write:chain (RawValueChain, PositionedValueChain, …)
 │
 
 ├── lib/                         ── Code réutilisable inter-domaines (cross work-on-*)
@@ -59,6 +63,8 @@ src/
 │   ├── language-detect.test.mts
 │   ├── mcp-notifications.mts    Émetteur de notifications <channel>
 │   ├── mcp-notifications.test.mts
+│   ├── owm/                     ── Catalogue partagé OWM DSL (source de vérité unique)
+│   │   └── owm-dsl.mts          emit{Title,Anchor,Component,Link,Size,…} + OWM_DSL_REFERENCE
 │   ├── phase-distribution.mts   centroidEvolution / entropyConfidence / concentrationConfidence
 │   ├── phase-distribution.test.mts
 │   ├── progress-messages.mts    Messages de progression standards
@@ -135,7 +141,17 @@ src/
 │       │   ├── signal-combiner.mts                    Fusion des signaux → verdict
 │       │   ├── web-search-verification.mts            Tier 3 via Agent SDK (web search)
 │       │   └── wardley-type-classification.mts        Classification activity/practice/data/knowledge
-│       └── chain/       { base-strategy.mts, registry.mts }
+│       └── chain/                                     Tool generateValueChain — pipeline 6 étapes "narrative"
+│           ├── base-strategy.mts, registry.mts
+│           ├── generate-value-chain.mts               Tool MCP generateValueChain (handler + schéma)
+│           ├── narrative-strategy.mts                 Orchestrateur (method = write:chain:narrative)
+│           ├── extract-metadata.mts                   Étape 1 — LLM angle/scope/objective/imperatives/temporality
+│           ├── generate-chain.mts                     Étape 2 — LLM ancres + composants + liens A→B
+│           ├── compute-visibility.mts                 Étape 3 — Y déterministe par-branche, multi-ancres, mapSize
+│           ├── spread-x.mts                           Étape 4 — X déterministe (lisibilité, pas évolution réelle)
+│           ├── place-labels.mts                       Étape 5 — placement labels (anti-overlap)
+│           ├── emit-owm.mts                           Étape 6 — émission OWM DSL via src/lib/owm/
+│           └── *.test.mts
 │
 └── work-on-evolution/           ── Cœur : pipeline d'évaluation d'évolution
     │
@@ -316,7 +332,7 @@ Utiliser cette table pour réparer les imports. Les chemins sont **relatifs à `
 | `llm.config.json` | Config des providers + strategies LLM (voir `src/lib/llm/`) — **gitignore, par-utilisateur** |
 | `llm.config.example.json` | Gabarit de depart (3 profils documentes dans `docs/technical/configuration.md`) |
 | `prompts.config.json` | Registre des prompts par stratégie (kind template/function, parser custom/delimited/keyValue) |
-| `prompts/*.system.md` / `prompts/*.user.md` | 16 prompts splités en paires (rôle/règles/format statiques dans `.system.md`, variables uniquement dans `.user.md`) — référencés par `templateFile: { system, user }` dans `prompts.config.json`. Règle dure : aucun `{{...}}` dans un fichier `.system.md` (vérifié par le loader). |
+| `prompts/*.system.md` / `prompts/*.user.md` | Prompts splités en paires (rôle/règles/format statiques dans `.system.md`, variables uniquement dans `.user.md`) — référencés par `templateFile: { system, user }` dans `prompts.config.json`. Règle dure : aucun `{{...}}` dans un fichier `.system.md` (vérifié par le loader). |
 | `.env.example` | Documentation des variables d'environnement (OPENCODE_API_KEY, WARDLEY_LLM_CONFIG, WARDLEY_PROMPTS_CONFIG, …) |
 | `.mcp.json` | Enregistrement du serveur MCP auprès de Claude Code |
 

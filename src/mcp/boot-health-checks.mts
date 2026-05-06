@@ -70,4 +70,23 @@ export function registerDefaultHealthChecks(): void {
       };
     }
   });
+
+  // ── write-chain LLM resolution ───────────────────────────────────────
+  // The generateValueChain tool resolves its LLM via
+  // getStrategyLLM('write-chain'). A missing entry in llm.config.json (or
+  // a provider that does not support text capability) fails here rather
+  // than on the first client call.
+  registerHealthCheck('llm:write-chain', async () => {
+    try {
+      const { getStrategyLLM } = await import('../lib/llm/registry.mjs');
+      getStrategyLLM('write-chain');
+      return { ready: true };
+    } catch (err) {
+      return {
+        ready: false,
+        reason: 'write-chain strategy cannot resolve an LLM',
+        detail: { error: String(err) },
+      };
+    }
+  });
 }
