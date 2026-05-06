@@ -141,16 +141,17 @@ src/
 │       │   ├── signal-combiner.mts                    Fusion des signaux → verdict
 │       │   ├── web-search-verification.mts            Tier 3 via Agent SDK (web search)
 │       │   └── wardley-type-classification.mts        Classification activity/practice/data/knowledge
-│       └── chain/                                     Tool generateValueChain — pipeline 6 étapes "narrative"
+│       └── chain/                                     Tool generateValueChain — pipeline 7 étapes "narrative"
 │           ├── base-strategy.mts, registry.mts
 │           ├── generate-value-chain.mts               Tool MCP generateValueChain (handler + schéma)
-│           ├── narrative-strategy.mts                 Orchestrateur (method = write:chain:narrative)
+│           ├── narrative-strategy.mts                 Orchestrateur (method = write:chain:narrative ; étapes 3+4 en parallèle)
 │           ├── extract-metadata.mts                   Étape 1 — LLM angle/scope/objective/imperatives/temporality
 │           ├── generate-chain.mts                     Étape 2 — LLM ancres + composants + liens A→B
-│           ├── compute-visibility.mts                 Étape 3 — Y déterministe par-branche, multi-ancres, mapSize
-│           ├── spread-x.mts                           Étape 4 — X déterministe (lisibilité, pas évolution réelle)
-│           ├── place-labels.mts                       Étape 5 — placement labels (anti-overlap)
-│           ├── emit-owm.mts                           Étape 6 — émission OWM DSL via src/lib/owm/
+│           ├── propose-x-rough.mts                    Étape 3 — LLM xHint grossier (clarté, pas évolution)
+│           ├── compute-visibility.mts                 Étape 4 — Y déterministe par-branche, multi-ancres, mapHeight
+│           ├── adjust-x.mts                           Étape 5 — X déterministe autour de xHint, mapWidth
+│           ├── place-labels.mts                       Étape 6 — placement labels (anti-overlap)
+│           ├── emit-owm.mts                           Étape 7 — émission OWM DSL via src/lib/owm/
 │           └── *.test.mts
 │
 └── work-on-evolution/           ── Cœur : pipeline d'évaluation d'évolution

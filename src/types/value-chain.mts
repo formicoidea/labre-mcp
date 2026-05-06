@@ -49,6 +49,12 @@ export interface ValueChainComponent {
   context?: string;
   role: ChainRole;
   phase: WardleyPhaseKey;
+  // Rough X coordinate proposed by LLM #3 (propose-x-rough) for VISUAL
+  // CLARITY of the chain. NOT an evolution-maturity estimate — the
+  // evolution axis is hidden at write:chain:* stage and only revealed in
+  // phase 3 by estimateEvolution. The deterministic adjust-x step keeps
+  // the final X within ±0.10 of this hint.
+  xHint?: number;
 }
 
 // Directed dependency. A consumes B (A needs B to exist). In OWM the edge is

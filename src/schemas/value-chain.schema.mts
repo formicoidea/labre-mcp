@@ -39,6 +39,10 @@ export const ValueChainComponentSchema = z.object({
   context: z.string().optional(),
   role: ChainRoleSchema,
   phase: WardleyPhaseKeySchema,
+  // Rough X for visual clarity, set by propose-x-rough (LLM #3). Not
+  // evolution maturity. Deterministic adjust-x keeps final X within ±0.10
+  // of this hint.
+  xHint: z.number().min(0).max(1).optional(),
 }).strict();
 
 export const DependencyLinkSchema = z.object({

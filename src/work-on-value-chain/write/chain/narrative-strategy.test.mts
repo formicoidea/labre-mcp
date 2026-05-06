@@ -41,6 +41,15 @@ function makeMockLlm() {
         ],
       });
     }
+    if (sys.includes('layout assistant')) {
+      return JSON.stringify({
+        positions: [
+          { name: 'Merchant',       xHint: 0.45 },
+          { name: 'Accept Payment', xHint: 0.60 },
+          { name: 'Fraud',          xHint: 0.30 },
+        ],
+      });
+    }
     throw new Error(`unexpected system prompt: ${sys.slice(0, 50)}`);
   };
 }

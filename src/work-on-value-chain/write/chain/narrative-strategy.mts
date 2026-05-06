@@ -1,23 +1,31 @@
 // write:chain:narrative — the first concrete value-chain write strategy.
 //
-// Composes the six pipeline modules (extract-metadata, generate-chain,
-// compute-visibility, minimize-evolution, place-labels, emit-owm) into a
-// single-shot flow that turns a natural-language command into an OWM DSL
-// document.
+// Composes the seven pipeline modules (extract-metadata, generate-chain,
+// propose-x-rough, compute-visibility, adjust-x, place-labels, emit-owm)
+// into a single-shot flow that turns a natural-language command into an
+// OWM DSL document.
 //
-// The pipeline modules are kept in sibling files (not inlined here) so that
-// future `write:chain:*` strategies can recompose them — e.g. a bottom-up
-// strategy could reuse compute-visibility + minimize-evolution + place-labels
-// + emit-owm while replacing extract-metadata and generate-chain.
+// propose-x-rough (LLM #3) and compute-visibility are independent (X vs Y)
+// and run in parallel via Promise.all to halve the latency of this stage.
+//
+// The pipeline modules are kept in sibling files (not inlined here) so
+// that future `write:chain:*` strategies can recompose them — e.g. a
+// bottom-up strategy could reuse compute-visibility + adjust-x + place-
+// labels + emit-owm while replacing extract-metadata and generate-chain.
 
 import { BaseChainWriteStrategy } from './base-strategy.mjs';
 import { extractMetadata } from './extract-metadata.mjs';
 import { generateChain } from './generate-chain.mjs';
+import { proposeXRough } from './propose-x-rough.mjs';
 import { computeVisibility } from './compute-visibility.mjs';
-import { spreadXForReadability } from './spread-x.mjs';
+import { adjustX } from './adjust-x.mjs';
 import { placeLabels } from './place-labels.mjs';
 import { generateChainOwmSyntax, type EmitOwmOptions } from './emit-owm.mjs';
-import type { ChainMetadata } from '../../../types/value-chain.mjs';
+import type {
+  ChainMetadata,
+  PositionedComponent,
+  PositionedValueChain,
+} from '../../../types/value-chain.mjs';
 
 // any: llmCall closure shape is provider-dependent (see src/lib/llm)
 type LlmCall = any;
@@ -59,16 +67,41 @@ export class NarrativeChainStrategy extends BaseChainWriteStrategy {
       throw new Error('NarrativeChainStrategy.build requires a non-empty nlCommand');
     }
 
-    const metadata           = await extractMetadata(input.nlCommand, this._llmCall);
-    const raw                = await generateChain(metadata, this._llmCall);
-    const { chain, mapSize } = computeVisibility(raw);
-    const withX              = spreadXForReadability(chain);
-    const laid               = placeLabels(withX);
+    const metadata = await extractMetadata(input.nlCommand, this._llmCall);
+    const raw      = await generateChain(metadata, this._llmCall);
+
+    // Steps 3 (LLM #3 X hint) and 4 (deterministic Y) are independent —
+    // run them in parallel.
+    const [rawWithHints, visibility] = await Promise.all([
+      proposeXRough(raw, this._llmCall),
+      Promise.resolve(computeVisibility(raw)),
+    ]);
+
+    // Merge xHints onto the positioned chain so adjust-x can read them.
+    const hintByName = new Map(
+      rawWithHints.components.map(c => [c.name, c.xHint] as const),
+    );
+    const hintedChain: PositionedValueChain = {
+      metadata: visibility.chain.metadata,
+      links: visibility.chain.links,
+      components: visibility.chain.components.map<PositionedComponent>(c => ({
+        ...c,
+        xHint: hintByName.get(c.name) ?? c.xHint,
+      })),
+    };
+
+    const adjusted = adjustX(hintedChain);
+    const laid     = placeLabels(adjusted.chain);
+
     // Caller-provided size always wins so MCP clients can override the
-    // density-driven canvas height computed in step 3.
+    // density-driven canvas dimensions computed in steps 3 and 5.
+    const computedSize = {
+      width: adjusted.mapSize.width,
+      height: visibility.mapSize.height,
+    };
     const emitOptions: EmitOwmOptions = {
       ...(input.emit ?? {}),
-      size: input.emit?.size ?? mapSize,
+      size: input.emit?.size ?? computedSize,
     };
     const owm = generateChainOwmSyntax(laid, emitOptions);
     return { owm, metadata };

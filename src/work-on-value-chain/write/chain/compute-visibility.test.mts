@@ -21,7 +21,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   computeVisibility,
-  computeMapSize,
+  computeMapHeight,
   ANCHOR_VISIBILITY,
   Y_MIN,
   ORPHAN_FALLBACK_Y,
@@ -29,7 +29,6 @@ import {
   EDGE_MIN_GAP,
   SECONDARY_ANCHOR_OFFSET,
   MIN_EFFECTIVE_L,
-  BASE_CANVAS_WIDTH,
   BASE_CANVAS_HEIGHT,
 } from './compute-visibility.mjs';
 import { PHASE_CENTROIDS } from '../../../schemas/inputs.schema.mjs';
@@ -468,24 +467,24 @@ describe('computeVisibility — orphans', () => {
 
 // ─── Map sizing ─────────────────────────────────────────────────────────
 
-describe('computeMapSize', () => {
-  it('keeps the base size for L ≤ DENSITY_LIMIT_L', () => {
-    assert.deepEqual(computeMapSize(0),  { width: BASE_CANVAS_WIDTH, height: BASE_CANVAS_HEIGHT });
-    assert.deepEqual(computeMapSize(1),  { width: BASE_CANVAS_WIDTH, height: BASE_CANVAS_HEIGHT });
-    assert.deepEqual(computeMapSize(MIN_EFFECTIVE_L), { width: BASE_CANVAS_WIDTH, height: BASE_CANVAS_HEIGHT });
-    assert.deepEqual(computeMapSize(24), { width: BASE_CANVAS_WIDTH, height: BASE_CANVAS_HEIGHT });
+describe('computeMapHeight', () => {
+  it('keeps the base height for L ≤ DENSITY_LIMIT_L', () => {
+    assert.equal(computeMapHeight(0),  BASE_CANVAS_HEIGHT);
+    assert.equal(computeMapHeight(1),  BASE_CANVAS_HEIGHT);
+    assert.equal(computeMapHeight(MIN_EFFECTIVE_L), BASE_CANVAS_HEIGHT);
+    assert.equal(computeMapHeight(24), BASE_CANVAS_HEIGHT);
   });
 
   it('scales the height proportionally for L > DENSITY_LIMIT_L', () => {
     // L=25 → 650*25/25 = 650 (no scaling at the boundary).
-    assert.deepEqual(computeMapSize(25), { width: BASE_CANVAS_WIDTH, height: 650 });
+    assert.equal(computeMapHeight(25), 650);
     // L=26 → ceil(650*26/25) = 676.
-    assert.deepEqual(computeMapSize(26), { width: BASE_CANVAS_WIDTH, height: 676 });
+    assert.equal(computeMapHeight(26), 676);
     // L=50 → ceil(650*50/25) = 1300.
-    assert.deepEqual(computeMapSize(50), { width: BASE_CANVAS_WIDTH, height: 1300 });
+    assert.equal(computeMapHeight(50), 1300);
   });
 
-  it('exposes mapSize on the computeVisibility result', () => {
+  it('exposes mapSize.height on the computeVisibility result', () => {
     const result = computeVisibility(chain({
       components: [
         { name: 'A', type: 'anchor',    role: 'anchor',     phase: 'phase4' },
@@ -493,7 +492,7 @@ describe('computeMapSize', () => {
       ],
       links: [{ from: 'A', to: 'B' }],
     }));
-    assert.deepEqual(result.mapSize, { width: BASE_CANVAS_WIDTH, height: BASE_CANVAS_HEIGHT });
+    assert.deepEqual(result.mapSize, { height: BASE_CANVAS_HEIGHT });
   });
 });
 

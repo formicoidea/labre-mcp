@@ -51,22 +51,18 @@
 //      thanks to SECONDARY_ANCHOR_OFFSET, avoiding a Y collision with the
 //      regular components at depth(child)−1.
 //
-//   6. Canvas size — when the longest chain exceeds DENSITY_LIMIT_L, the
-//      vertical step would drop below 0.1 / 3, breaking visual readability
-//      in the renderer's default canvas. We keep the normalised Y values
-//      in [Y_MIN, ANCHOR_VISIBILITY] and instead scale the OWM canvas
-//      height proportionally so the per-step pixel gap stays roughly
-//      constant. Width is left unchanged for now (multi-anchor X spread is
-//      a separate concern handled in step 4).
+//   6. Canvas height — when the longest chain exceeds DENSITY_LIMIT_L,
+//      the vertical step would drop below 0.1 / 3, breaking visual
+//      readability in the renderer's default canvas. We keep the
+//      normalised Y values in [Y_MIN, ANCHOR_VISIBILITY] and instead
+//      scale the OWM canvas height proportionally so the per-step pixel
+//      gap stays roughly constant. Canvas WIDTH is computed by step 5
+//      (adjust-x) based on horizontal density.
 //
 //   7. Orphans (components unreachable from any anchor) keep their
 //      `evolution` from PHASE_CENTROIDS but receive Y = ORPHAN_FALLBACK_Y
 //      (mid-canvas) as a placeholder. The LLM is expected to provide
 //      coherent x/y for these in a future schema bump — see the V1 spec.
-//
-// TODO(x-spread): when multiple anchors coexist, all of them are pinned to
-// X = 0.5 by step 4 (spread-x.mts). They will overlap visually. This is a
-// known issue to address in a dedicated X-spread session.
 
 import type {
   DependencyLink,
@@ -77,7 +73,6 @@ import type {
   ValueChainComponent,
   WardleyPhaseKey,
 } from '../../../types/value-chain.mjs';
-import type { OwmSize } from '../../../lib/owm/owm-dsl.mjs';
 import { PHASE_CENTROIDS } from '../../../schemas/inputs.schema.mjs';
 
 // ─── Constants ──────────────────────────────────────────────────────────
@@ -100,7 +95,6 @@ export const ORPHAN_FALLBACK_Y = 0.50;
 
 // ─── Canvas sizing ──────────────────────────────────────────────────────
 
-export const BASE_CANVAS_WIDTH = 1216;
 export const BASE_CANVAS_HEIGHT = 650;
 /** Strict threshold on L above which the canvas height is scaled. */
 export const DENSITY_LIMIT_L = 24;
@@ -206,17 +200,14 @@ function longestToLeaf(
   return depth;
 }
 
-// ─── Canvas size ────────────────────────────────────────────────────────
+// ─── Canvas height ──────────────────────────────────────────────────────
 
-/** Compute the OWM canvas size for the given longest-chain length. Width
- *  is constant; height is scaled when L > DENSITY_LIMIT_L so the per-step
- *  pixel gap remains readable. */
-export function computeMapSize(L: number): OwmSize {
-  if (L <= DENSITY_LIMIT_L) {
-    return { width: BASE_CANVAS_WIDTH, height: BASE_CANVAS_HEIGHT };
-  }
-  const scaledHeight = Math.ceil((BASE_CANVAS_HEIGHT * L) / DENSITY_REFERENCE_L);
-  return { width: BASE_CANVAS_WIDTH, height: scaledHeight };
+/** Compute the OWM canvas height for the given longest-chain length.
+ *  Height is scaled when L > DENSITY_LIMIT_L so the per-step pixel gap
+ *  remains readable. Width is the responsibility of step 5 (adjust-x). */
+export function computeMapHeight(L: number): number {
+  if (L <= DENSITY_LIMIT_L) return BASE_CANVAS_HEIGHT;
+  return Math.ceil((BASE_CANVAS_HEIGHT * L) / DENSITY_REFERENCE_L);
 }
 
 // ─── Misc helpers ───────────────────────────────────────────────────────
@@ -239,7 +230,7 @@ function emptyLabel(): LabelOffset {
 
 export interface ComputeVisibilityResult {
   chain: PositionedValueChain;
-  mapSize: OwmSize;
+  mapSize: { height: number };
 }
 
 /**
@@ -347,6 +338,6 @@ export function computeVisibility(raw: RawValueChain): ComputeVisibilityResult {
       components: positioned,
       links: raw.links,
     },
-    mapSize: computeMapSize(L),
+    mapSize: { height: computeMapHeight(L) },
   };
 }
