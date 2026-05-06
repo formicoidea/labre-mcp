@@ -1,17 +1,23 @@
 // write:chain:narrative — the first concrete value-chain write strategy.
 //
-// Composes the seven pipeline modules (extract-metadata, generate-chain,
-// propose-x-rough, compute-visibility, adjust-x, place-labels, emit-owm)
-// into a single-shot flow that turns a natural-language command into an
-// OWM DSL document.
+// Composes the eight pipeline modules (extract-metadata, generate-chain,
+// propose-x-rough, compute-visibility, adjust-x, place-labels,
+// verify-layout, emit-owm) into a single-shot flow that turns a
+// natural-language command into an OWM DSL document.
 //
 // propose-x-rough (LLM #3) and compute-visibility are independent (X vs Y)
 // and run in parallel via Promise.all to halve the latency of this stage.
 //
+// verify-layout closes the loop on label placement: it renders the chain
+// via the OwmRenderAdapter (cli-owm by default), parses the SVG into
+// bboxes, detects overlaps, and reassigns label offsets until the
+// rendering is clean or the iteration cap is reached.
+//
 // The pipeline modules are kept in sibling files (not inlined here) so
 // that future `write:chain:*` strategies can recompose them — e.g. a
 // bottom-up strategy could reuse compute-visibility + adjust-x + place-
-// labels + emit-owm while replacing extract-metadata and generate-chain.
+// labels + verify-layout + emit-owm while replacing extract-metadata
+// and generate-chain.
 
 import { BaseChainWriteStrategy } from './base-strategy.mjs';
 import { extractMetadata } from './extract-metadata.mjs';
@@ -20,7 +26,9 @@ import { proposeXRough } from './propose-x-rough.mjs';
 import { computeVisibility } from './compute-visibility.mjs';
 import { adjustX } from './adjust-x.mjs';
 import { placeLabels } from './place-labels.mjs';
+import { verifyLayout } from './verify-layout.mjs';
 import { generateChainOwmSyntax, type EmitOwmOptions } from './emit-owm.mjs';
+import { getRenderAdapter } from '../../../lib/owm/render-registry.mjs';
 import type {
   ChainMetadata,
   PositionedComponent,
@@ -103,7 +111,11 @@ export class NarrativeChainStrategy extends BaseChainWriteStrategy {
       ...(input.emit ?? {}),
       size: input.emit?.size ?? computedSize,
     };
-    const owm = generateChainOwmSyntax(laid, emitOptions);
+
+    // Step 7: collision-aware label correction. The render adapter is
+    // resolved once here and passed in so unit tests can inject a mock.
+    const verified = verifyLayout(laid, emitOptions, getRenderAdapter());
+    const owm      = generateChainOwmSyntax(verified.chain, emitOptions);
     return { owm, metadata };
   }
 

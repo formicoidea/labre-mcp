@@ -63,8 +63,19 @@ src/
 │   ├── language-detect.test.mts
 │   ├── mcp-notifications.mts    Émetteur de notifications <channel>
 │   ├── mcp-notifications.test.mts
-│   ├── owm/                     ── Catalogue partagé OWM DSL (source de vérité unique)
-│   │   └── owm-dsl.mts          emit{Title,Anchor,Component,Link,Size,…} + OWM_DSL_REFERENCE
+│   ├── owm/                     ── Catalogue OWM DSL + couche d'isolation moteur de rendu
+│   │   ├── owm-dsl.mts                emit{Title,Anchor,Component,Link,Size,…} + OWM_DSL_REFERENCE
+│   │   ├── render-adapter.mts         Interface OwmRenderAdapter (DSL → SVG)
+│   │   ├── cli-owm-adapter.mts        Impl concrète backed by src/lib/vendor/cli-owm
+│   │   ├── render-registry.mts        Singleton getRenderAdapter() + helpers tests
+│   │   ├── svg-bbox-parser.mts        SVG → GeometryReport (component/label/anchor bboxes)
+│   │   ├── overlap-detector.mts       Détection collisions axis-aligned (pure)
+│   │   └── candidate-offsets.mts      8 offsets candidats pour la boucle verify-layout
+│   ├── vendor/                  ── Code tiers vendoré (verbatim sauf adaptations ESM)
+│   │   └── cli-owm/             cli-owm@4950f330 (GPL-2.0) — moteur de rendu OWM côté Node
+│   │       ├── AUDIT.md, VENDORING.md, __smoke.test.mts
+│   │       ├── index.mts, render.mts, themes.mts, version.mts
+│   │       └── parser/          UnifiedConverter + 15 strategies + types/
 │   ├── phase-distribution.mts   centroidEvolution / entropyConfidence / concentrationConfidence
 │   ├── phase-distribution.test.mts
 │   ├── progress-messages.mts    Messages de progression standards
@@ -141,7 +152,7 @@ src/
 │       │   ├── signal-combiner.mts                    Fusion des signaux → verdict
 │       │   ├── web-search-verification.mts            Tier 3 via Agent SDK (web search)
 │       │   └── wardley-type-classification.mts        Classification activity/practice/data/knowledge
-│       └── chain/                                     Tool generateValueChain — pipeline 7 étapes "narrative"
+│       └── chain/                                     Tool generateValueChain — pipeline 8 étapes "narrative"
 │           ├── base-strategy.mts, registry.mts
 │           ├── generate-value-chain.mts               Tool MCP generateValueChain (handler + schéma)
 │           ├── narrative-strategy.mts                 Orchestrateur (method = write:chain:narrative ; étapes 3+4 en parallèle)
@@ -150,8 +161,9 @@ src/
 │           ├── propose-x-rough.mts                    Étape 3 — LLM xHint grossier (clarté, pas évolution)
 │           ├── compute-visibility.mts                 Étape 4 — Y déterministe par-branche, multi-ancres, mapHeight
 │           ├── adjust-x.mts                           Étape 5 — X déterministe autour de xHint, mapWidth
-│           ├── place-labels.mts                       Étape 6 — placement labels (anti-overlap)
-│           ├── emit-owm.mts                           Étape 7 — émission OWM DSL via src/lib/owm/
+│           ├── place-labels.mts                       Étape 6 — placement labels initial (règles topologiques)
+│           ├── verify-layout.mts                      Étape 7 — boucle de correction labels via OwmRenderAdapter (cli-owm)
+│           ├── emit-owm.mts                           Étape 8 — émission OWM DSL via src/lib/owm/
 │           └── *.test.mts
 │
 └── work-on-evolution/           ── Cœur : pipeline d'évaluation d'évolution
