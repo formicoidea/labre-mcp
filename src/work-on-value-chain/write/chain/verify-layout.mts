@@ -38,6 +38,7 @@ import {
   simulateComponents,
   projectHardConstraints,
 } from './force-directed.mjs';
+import { snapToCanonical } from './canonical-snap.mjs';
 import { getCurrentCollector } from '../../../lib/degradation/index.mjs';
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -152,8 +153,20 @@ export function verifyLayout(
     mergeUnique(modifiedLabels, labelSim2.modified);
   }
 
-  // Stage 3 — strict projection. Guarantees unresolvedHard = 0
-  // (modulo unresolvable corner cases which are surfaced in the report).
+  // Stage 3 — Phase 7 canonical snap. Force-directed found the right
+  // quadrant for each label; this pass replaces continuous offsets
+  // with V5 canonical positions (BELOW / RIGHT / proportional LEFT
+  // family) when the canonical option doesn't degrade the hard count.
+  // Restores the visual conventions OWM users expect for "finished"
+  // maps.
+  const snap = snapToCanonical(current, emitOpts);
+  current = snap.chain;
+  mergeUnique(modifiedLabels, snap.snapped);
+
+  // Stage 4 — strict projection. Defensive guarantee that
+  // unresolvedHard = 0 even if the snap accidentally introduced a
+  // micro-residual (impossible by construction of the snap filter,
+  // but cheap insurance).
   current = projectHardConstraints(current, emitOpts);
 
   // Final report.

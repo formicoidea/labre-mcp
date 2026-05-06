@@ -162,8 +162,9 @@ src/
 │           ├── compute-visibility.mts                 Étape 4 — Y déterministe par-branche, multi-ancres, mapHeight
 │           ├── adjust-x.mts                           Étape 5 — X déterministe autour de xHint, mapWidth
 │           ├── place-labels.mts                       Étape 6 — placement labels initial (règles topologiques)
-│           ├── verify-layout.mts                      Étape 7 — placement labels V6 force-directed (analytical geometry, pas de cli-owm en hot path)
+│           ├── verify-layout.mts                      Étape 7 — placement labels V6 force-directed + V7 canonical snap (analytical geometry, pas de cli-owm en hot path)
 │           ├── force-directed.mts                     simulateLabels + simulateComponents + projectHardConstraints (physics + DSL invariant clamps + strict projection)
+│           ├── canonical-snap.mts                     V7 — snap les offsets continus V6 vers les canoniques V5 (BELOW/RIGHT/LEFT proportional/diagonales) quand ça ne dégrade pas hard
 │           ├── emit-owm.mts                           Étape 8 — émission OWM DSL via src/lib/owm/
 │           └── *.test.mts
 │
