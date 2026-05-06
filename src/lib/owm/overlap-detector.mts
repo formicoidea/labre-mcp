@@ -39,12 +39,14 @@ export const OVERLAP_THRESHOLD_PX = 1;
  *  as zero (segment grazes the label corner). */
 export const EDGE_CROSSING_THRESHOLD_PX = 1;
 
-/** Minimum visual gap between two label rectangles. Below this, even
- *  without overlap, the labels feel visually merged and the
- *  detector emits a `label-spacing` soft violation. Empirical, set
- *  to one full LABEL_HEIGHT (16 px) per user calibration on
- *  2026-05-06. */
-export const MIN_LABEL_SPACING_PX = 16;
+/** Minimum visual gap between a label and any other rendered element
+ *  (another label, a foreign component circle, or a foreign anchor
+ *  text). Below this, the elements feel visually merged and the
+ *  detector emits a `label-spacing` soft violation. Set to 1.5 ×
+ *  LABEL_HEIGHT (24 px) per user calibration on 2026-05-06 — a label
+ *  17 px from a foreign circle was reported as ambiguous, so 16 px
+ *  was too lax. */
+export const MIN_LABEL_SPACING_PX = 24;
 
 export type OverlapKind =
   | 'anchor-anchor'
@@ -317,21 +319,30 @@ export function detectAllOverlaps(geometry: SvgGeometry): Overlap[] {
     }
   }
 
-  // Label↔label spacing: labels that don't strictly overlap but are
-  // closer than MIN_LABEL_SPACING_PX feel visually merged. Sevirity
-  // is the missing slack to reach the minimum gap.
-  const labels = geometry.items.filter(it => it.kind === 'label');
-  for (let i = 0; i < labels.length; i++) {
-    for (let j = i + 1; j < labels.length; j++) {
-      const a = labels[i], b = labels[j];
-      // If they already overlap, the rect-rect pass above caught it
-      // with kind 'label-label'. Spacing only applies to non-overlapping
-      // pairs.
-      if (intersectionArea(a.bbox, b.bbox) > 0) continue;
-      const gap = rectGap(a.bbox, b.bbox);
+  // Label↔anything spacing: a label sitting closer than
+  // MIN_LABEL_SPACING_PX from another rendered element creates
+  // ambiguity about which name belongs to which node. The check
+  // covers labels, foreign component circles, and foreign anchor
+  // texts. The label's own component is excluded because a label
+  // naturally sits next to its own circle by design.
+  for (let i = 0; i < geometry.items.length; i++) {
+    for (let j = i + 1; j < geometry.items.length; j++) {
+      const a = geometry.items[i];
+      const b = geometry.items[j];
+      // Spacing only applies when at least one element is a label.
+      if (a.kind !== 'label' && b.kind !== 'label') continue;
+      // Normalise: lbl is always the label, other is the neighbour.
+      const lbl   = a.kind === 'label' ? a : b;
+      const other = a.kind === 'label' ? b : a;
+      // Same-name pair is the label and its own component or anchor —
+      // expected proximity, never a violation.
+      if (lbl.name === other.name) continue;
+      // Hard overlap is already counted by the rect-rect pass above.
+      if (intersectionArea(lbl.bbox, other.bbox) > 0) continue;
+      const gap = rectGap(lbl.bbox, other.bbox);
       if (gap >= MIN_LABEL_SPACING_PX) continue;
       out.push({
-        a, b,
+        a: lbl, b: other,
         kind: 'label-spacing',
         severity: MIN_LABEL_SPACING_PX - gap,
       });

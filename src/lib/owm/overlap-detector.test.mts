@@ -271,7 +271,7 @@ describe('detectAllOverlaps — combined V3 detection', () => {
   });
 
   it('reports label-spacing when two labels are within MIN_LABEL_SPACING_PX', () => {
-    // Two labels 10 px apart (< MIN_LABEL_SPACING_PX = 16) but not
+    // Two labels 10 px apart (< MIN_LABEL_SPACING_PX = 24) but not
     // overlapping. Should emit a label-spacing soft violation.
     const out = detectAllOverlaps(geom(
       [
@@ -310,6 +310,51 @@ describe('detectAllOverlaps — combined V3 detection', () => {
     ));
     assert.equal(out.filter(o => o.kind === 'label-label').length, 1);
     assert.equal(out.filter(o => o.kind === 'label-spacing').length, 0);
+  });
+
+  it('reports label-spacing when a label is too close to a foreign component circle', () => {
+    // Reproduces the user-reported V4 case (Moteur de recommandation
+    // label 17 px from Système d'abonnement circle, on the same Y
+    // band → ambiguous).
+    const out = detectAllOverlaps(geom(
+      [
+        rect('Lbl', 'label',     0, 0, 20, 14),
+        rect('Far', 'component', 30, 0, 10, 10),  // 10 px gap, foreign
+      ],
+      [],
+      { width: 200, height: 200 },
+    ));
+    const spacing = out.filter(o => o.kind === 'label-spacing');
+    assert.equal(spacing.length, 1);
+    assert.equal(spacing[0].a.name, 'Lbl');
+    assert.equal(spacing[0].b.name, 'Far');
+  });
+
+  it('does NOT report label-spacing for the label of A vs the circle of A', () => {
+    // The label naturally sits next to its own component circle.
+    const out = detectAllOverlaps(geom(
+      [
+        rect('Foo', 'component', 100, 100, 10, 10),
+        rect('Foo', 'label',     115, 100, 50, 14),  // dx=+20 sort of
+      ],
+      [],
+      { width: 500, height: 500 },
+    ));
+    assert.equal(out.filter(o => o.kind === 'label-spacing').length, 0);
+  });
+
+  it('reports label-spacing when a label is too close to a foreign anchor text', () => {
+    const out = detectAllOverlaps(geom(
+      [
+        rect('Lbl',  'label',  0, 0, 20, 14),
+        rect('User', 'anchor', 30, 0, 30, 14),  // foreign anchor 10 px away
+      ],
+      [],
+      { width: 200, height: 200 },
+    ));
+    const spacing = out.filter(o => o.kind === 'label-spacing');
+    assert.equal(spacing.length, 1);
+    assert.equal(spacing[0].b.name, 'User');
   });
 
   it('reports label-axis when a label straddles a phase axis line', () => {
