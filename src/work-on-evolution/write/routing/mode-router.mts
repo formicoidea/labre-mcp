@@ -1,20 +1,23 @@
 // Mode router: unified entry point for estimateEvolution requests
 //
 // Provides mode selection logic that:
-//   1. Accepts an explicit mode parameter ('oneshot' | 'guided')
-//   2. Auto-detects mode from input signals when mode is not specified
-//   3. Routes to the correct handler (one-shot or conversational guided)
+//   1. Accepts an explicit mode parameter ('oneshot' | 'conversational')
+//   2. Auto-detects mode from input signals when mode is 'default' or omitted
+//   3. Routes to the correct handler (one-shot or conversational)
 //   4. Returns responses through shared formatting
 //
 // Auto-detection heuristics:
-//   → guided: sessionState present (continuing a conversation)
+//   → conversational: sessionState present (continuing a conversation)
 //   → oneshot: sufficient params for direct evaluation (name + certitude/ubiquity or pub data)
-//   → guided: minimal input (only name, or name + description without numeric params)
+//   → conversational: minimal input (only name, or name + description without numeric params)
 //
 // Both modes share the same response formatter for consistent output.
 
 import { estimateEvolutionOneShot, estimateEvolutionConversational } from '../estimate-evolution.mjs';
 import { formatResponse } from '../../../lib/response-formatter.mjs';
+import { estimateAnchorEvolution } from '../strategies/anchor/estimate-anchor-evolution.mjs';
+import { getStrategyLLM } from '../../../lib/llm/registry.mjs';
+import { evolutionToStage } from '../../../lib/response-formatter.mjs';
 import type { RoutedResponse, EstimateEvolutionResponse, GuidedTurnResponse } from '../../../types/routing.mjs';
 
 // ─── Mode Constants ────────────────────────────────────────────────────────
@@ -22,23 +25,13 @@ import type { RoutedResponse, EstimateEvolutionResponse, GuidedTurnResponse } fr
 /** Supported execution modes */
 export const MODES = {
   ONESHOT: 'oneshot',
-  GUIDED: 'guided',
+  CONVERSATIONAL: 'conversational',
 };
 
-/** Aliases mapped to canonical mode names */
-const MODE_ALIASES = {
+/** Canonical mode values. `default` triggers auto-detection (handled below). */
+const MODE_VALUES = {
   oneshot: MODES.ONESHOT,
-  'one-shot': MODES.ONESHOT,
-  'one_shot': MODES.ONESHOT,
-  single: MODES.ONESHOT,
-  direct: MODES.ONESHOT,
-  guided: MODES.GUIDED,
-  conversational: MODES.GUIDED,
-  conversation: MODES.GUIDED,
-  interactive: MODES.GUIDED,
-  multiturn: MODES.GUIDED,
-  'multi-turn': MODES.GUIDED,
-  multi_turn: MODES.GUIDED,
+  conversational: MODES.CONVERSATIONAL,
 };
 
 // ─── Mode Detection ────────────────────────────────────────────────────────
@@ -83,25 +76,25 @@ function hasEvaluationParams(input: any): boolean {
 // any: input is the raw MCP arguments bag (mode/space/sessionState/eval params auto-detected)
 export function detectMode(input: any): { mode: string; reason: string } {
   if (!input || typeof input !== 'object') {
-    return { mode: MODES.GUIDED, reason: 'no valid input — defaulting to guided mode' };
+    return { mode: MODES.CONVERSATIONAL, reason: 'no valid input — defaulting to guided mode' };
   }
 
   // 1. Explicit mode parameter
   if (input.mode != null && typeof input.mode === 'string') {
     const normalized = input.mode.trim().toLowerCase();
-    const canonical = (MODE_ALIASES as Record<string, string>)[normalized];
+    const canonical = (MODE_VALUES as Record<string, string>)[normalized];
     if (canonical) {
       return { mode: canonical, reason: `explicit mode parameter: "${input.mode}"` };
     }
-    // 'default' or unrecognized → fall through to auto-detection
-    if (normalized !== 'default' && normalized !== 'auto') {
-      return { mode: MODES.GUIDED, reason: `unrecognized mode "${input.mode}" — defaulting to guided` };
+    // 'default' → fall through to auto-detection. Anything else is rejected.
+    if (normalized !== 'default') {
+      return { mode: MODES.CONVERSATIONAL, reason: `unrecognized mode "${input.mode}" — defaulting to conversational` };
     }
   }
 
   // 2. Session state present → continuing a guided conversation
   if (input.sessionState) {
-    return { mode: MODES.GUIDED, reason: 'sessionState present — continuing guided conversation' };
+    return { mode: MODES.CONVERSATIONAL, reason: 'sessionState present — continuing guided conversation' };
   }
 
   // 3. Explicit space → user pre-classified, likely one-shot
@@ -115,7 +108,7 @@ export function detectMode(input: any): { mode: string; reason: string } {
   }
 
   // 5. Default: guided mode (gather more context)
-  return { mode: MODES.GUIDED, reason: 'insufficient parameters — using guided mode to gather context' };
+  return { mode: MODES.CONVERSATIONAL, reason: 'insufficient parameters — using guided mode to gather context' };
 }
 
 // ─── Shared Response Shape ─────────────────────────────────────────────────
@@ -149,6 +142,13 @@ export function detectMode(input: any): { mode: string; reason: string } {
  */
 // any: input is raw MCP arguments bag
 export async function routeEstimateEvolution(input: any = {}): Promise<EstimateEvolutionResponse> {
+  // Anchors short-circuit the classification gate and the capability/solution
+  // routing. Triggered only when the caller marks the component explicitly,
+  // typically from a parsed OWM DSL (`type: 'anchor'`).
+  if (input && input.type === 'anchor') {
+    return routeAnchor(input);
+  }
+
   const { mode, reason } = detectMode(input);
 
   if (mode === MODES.ONESHOT) {
@@ -156,6 +156,52 @@ export async function routeEstimateEvolution(input: any = {}): Promise<EstimateE
   }
 
   return routeGuided(input, reason);
+}
+
+// ─── Anchor Route ──────────────────────────────────────────────────────────
+
+/**
+ * Route an anchor through the consumption-culture lens (perception-based).
+ * Wraps the result in a `RoutedResponse`-compatible shape so consumers
+ * (evaluateMap, MCP UI) handle anchors uniformly.
+ */
+async function routeAnchor(input: any): Promise<RoutedResponse> {
+  const { name, context, phase } = input;
+  const llmCall = getStrategyLLM('anchor-evolution');
+  const result = await estimateAnchorEvolution({ name, context, phase }, llmCall);
+
+  // Anchors live outside the classification gate but consumers expect a
+  // classification field. Pose 'economic' so they don't reject the result.
+  const classification = {
+    space: 'economic' as const,
+    confidence: 1,
+    reason: 'anchors are evaluated through the consumption-culture lens, bypassing the gate',
+    requiresReQuestion: false,
+  };
+
+  const evaluations = {
+    'anchor-evolution': {
+      evolution: result.evolution,
+      confidence: result.confidence,
+      method: result.method,
+      perception: result.perception,
+      stage: result.stage,
+    },
+  };
+
+  return {
+    mode: MODES.ONESHOT as 'oneshot',
+    modeReason: 'anchor type — bypassing classification gate',
+    classification,
+    reQuestions: null,
+    evaluations,
+    message: `Anchor "${name}" — phase ${result.perception.phase} (${result.stage.name}).`,
+    formatted: '',
+    sessionState: null,
+    nextQuestion: null,
+    phase: null,
+    routing: { type: 'anchor' as any, confidence: 1, method: 'anchor-perception', evalMode: 'fast' },
+  };
 }
 
 // ─── One-Shot Route ────────────────────────────────────────────────────────
@@ -272,7 +318,7 @@ async function routeGuided(input: any, modeReason: string): Promise<GuidedTurnRe
   }
 
   return {
-    mode: MODES.GUIDED as 'guided',
+    mode: MODES.CONVERSATIONAL as 'conversational',
     modeReason,
     classification: result.classification,
     reQuestions: result.reQuestions,

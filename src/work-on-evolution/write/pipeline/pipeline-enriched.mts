@@ -79,7 +79,7 @@ export async function evaluateCapabilityPivot(standardResult: any, component: an
       name: capabilityName,
       description: component.description,
       context: component.context,
-      strategy: 'all',
+      strategy: 'auto',
       space: 'economic',
     });
 

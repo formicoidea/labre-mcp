@@ -23,7 +23,7 @@ assert.throws(() => validateOneShotInput({ name: '' }), /name/);
 // Accepts valid minimal input
 const minimal = validateOneShotInput({ name: 'Docker' });
 assert.strictEqual(minimal.name, 'Docker');
-assert.strictEqual(minimal.strategy, 'all');
+assert.strictEqual(minimal.strategy, 'auto');
 assert.strictEqual(minimal.space, undefined);
 
 // Validates space — accepts canonical lowercase values

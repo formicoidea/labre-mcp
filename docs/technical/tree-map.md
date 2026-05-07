@@ -118,6 +118,10 @@ src/
 │   │   ├── init.mts                Registration centrale des 14 parsers (side-effect import, importe depuis mcp-server.mts)
 │   │   ├── registry-parse-equivalence.test.mts  Suite de non-regression byte-for-byte des 13 parsers
 │   │   └── *.test.mts              Tests unitaires (interpolate, parsers, loader, registry)
+│   ├── tool-config/             ── Loader de tool.config.json (routing auto/report par type)
+│   │   ├── tool-config.schema.mts  Zod schema (estimateEvolution.auto/report par anchor/solution/capability)
+│   │   ├── loader.mts              loadToolConfig + resolveStrategyForType (singleton lazy + cache + env override WARDLEY_TOOL_CONFIG)
+│   │   └── loader.test.mts
 │   └── patent/                  Primitives brevets génériques (BigQuery + indicateurs)
 │       ├── bigquery-client.mts           Client BigQuery générique
 │       ├── bigquery-patent-source.mts    Implem BigQuery de PatentDataSource
@@ -203,9 +207,10 @@ src/
         ├── routing/                              Classification + aiguillage mode/stratégie
         │   ├── classification-gate.mts           Gate économique (skip LLM si évident)
         │   ├── detect-solution.mts               Solution vs capacity (naming+LLM, les pipelines de vérification sont dans work-on-value-chain/write/component/)
-        │   ├── mode-router.mts                   conversational vs oneshot
+        │   ├── mode-router.mts                   Conversational vs oneshot + branche anchor (court-circuit gate quand input.type === 'anchor')
+        │   ├── strategy-resolver.mts             Traduit surface 'auto'/'report'/<specific> en plan de dispatch (lit tool.config.json)
         │   ├── solution-capability-router.mts
-        │   ├── solution-dispatch.mts
+        │   ├── solution-dispatch.mts             Dispatcher des 12 propriétés (le `'all'` interne signifie "toutes les propriétés", distinct du surface)
         │   └── *.test.mts
         │
         ├── pipeline/                             Pipeline enriched (les modules d'identification ont migré vers work-on-value-chain/write/component/)
@@ -382,7 +387,8 @@ Utiliser cette table pour réparer les imports. Les chemins sont **relatifs à `
 | `llm.config.example.json` | Gabarit de depart (3 profils documentes dans `docs/technical/configuration.md`) |
 | `prompts.config.json` | Registre des prompts par stratégie (kind template/function, parser custom/delimited/keyValue) |
 | `prompts/*.system.md` / `prompts/*.user.md` | Prompts splités en paires (rôle/règles/format statiques dans `.system.md`, variables uniquement dans `.user.md`) — référencés par `templateFile: { system, user }` dans `prompts.config.json`. Règle dure : aucun `{{...}}` dans un fichier `.system.md` (vérifié par le loader). |
-| `.env.example` | Documentation des variables d'environnement (OPENCODE_API_KEY, WARDLEY_LLM_CONFIG, WARDLEY_PROMPTS_CONFIG, …) |
+| `tool.config.json` | Routing par type pour `estimateEvolution`. Sections `auto` (1 stratégie par type) et `report` (n stratégies). Lu par `src/lib/tool-config/loader.mts` ; override via `WARDLEY_TOOL_CONFIG`. |
+| `.env.example` | Documentation des variables d'environnement (OPENCODE_API_KEY, WARDLEY_LLM_CONFIG, WARDLEY_PROMPTS_CONFIG, WARDLEY_TOOL_CONFIG, …) |
 | `.mcp.json` | Enregistrement du serveur MCP auprès de Claude Code |
 
 ## 7. Zones à ignorer

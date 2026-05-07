@@ -87,12 +87,11 @@ describe('AC 12: MCP tool transparent solution + capability support', () => {
       assert.ok(desc.includes('routing') || desc.includes('Routing'), 'should mention routing');
     });
 
-    it('mode enum includes all supported modes', () => {
+    it('mode enum includes the canonical modes', () => {
       const modeEnum = ESTIMATE_EVOLUTION_TOOL.inputSchema.properties.mode.enum;
       assert.ok(modeEnum.includes('oneshot'));
-      assert.ok(modeEnum.includes('guided'));
       assert.ok(modeEnum.includes('conversational'));
-      assert.ok(modeEnum.includes('auto'));
+      assert.ok(modeEnum.includes('default'));
     });
 
     it('tool is registered in MCP server', () => {
@@ -404,7 +403,7 @@ describe('AC 12: MCP tool transparent solution + capability support', () => {
         context: 'Container orchestration',
       });
 
-      assert.equal(result.mode, 'guided');
+      assert.equal(result.mode, 'conversational');
       assert.ok(result.sessionState);
       assert.ok(result.nextQuestion);
       assert.ok(result.formatted);
@@ -416,7 +415,7 @@ describe('AC 12: MCP tool transparent solution + capability support', () => {
         name: 'data analytics',
       });
 
-      assert.equal(result.mode, 'guided');
+      assert.equal(result.mode, 'conversational');
       assert.ok(result.sessionState);
       assert.ok(result.nextQuestion);
     });
@@ -427,8 +426,8 @@ describe('AC 12: MCP tool transparent solution + capability support', () => {
 
       assertRoutedResponseShape(sol, 'Salesforce guided');
       assertRoutedResponseShape(cap, 'container-orch guided');
-      assert.equal(sol.mode, 'guided');
-      assert.equal(cap.mode, 'guided');
+      assert.equal(sol.mode, 'conversational');
+      assert.equal(cap.mode, 'conversational');
       assert.ok(sol.sessionState);
       assert.ok(cap.sessionState);
     });

@@ -34,15 +34,18 @@ export const EstimateEvolutionInputSchema = z.object({
     'If provided, bypasses the classification gate. ' +
     'If omitted, the gate auto-detects from name + context.'
   ),
-  strategy: z.string().default('all').describe(
-    'Strategy to use for evaluation. Use "all" to run all available strategies. ' +
-    'If omitted, defaults to "all". Available strategies are auto-discovered from the strategies directory.'
+  strategy: z.string().default('auto').describe(
+    'Strategy to use for evaluation. ' +
+    '"auto" (default) routes the component to one strategy per detected type (anchor / solution / capability) ' +
+    'via tool.config.json. ' +
+    '"report" fans out to several strategies per type for a multi-perspective view. ' +
+    'A specific method id (e.g. "write:capacity:s-curve") bypasses routing and runs that strategy directly. ' +
+    'Available strategies are auto-discovered from the strategies directory.'
   ),
-  mode: z.enum(['oneshot', 'guided', 'conversational', 'auto', 'default']).default('auto').describe(
+  mode: z.enum(['oneshot', 'conversational', 'default']).default('default').describe(
     'Execution mode. "oneshot" accepts all parameters in a single call. ' +
-    '"guided" (or "conversational") enables multi-turn interaction that progressively asks clarifying questions. ' +
-    '"auto" (or "default") auto-detects: uses one-shot when space or evaluation params are provided, guided otherwise. ' +
-    'If omitted, auto-detection is used.'
+    '"conversational" enables multi-turn interaction that progressively asks clarifying questions. ' +
+    '"default" auto-detects: uses one-shot when space or evaluation params are provided, conversational otherwise.'
   ),
   sessionState: z.string().optional().describe(
     'Serialized session state from a previous conversational exchange. ' +

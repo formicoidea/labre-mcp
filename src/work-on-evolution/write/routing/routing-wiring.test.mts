@@ -42,7 +42,7 @@ describe('AC 5020202: Routing wiring through mode-router and response-formatter'
       name: 'Kubernetes',
       description: 'Container orchestration platform',
       space: 'economic',
-      strategy: 'all',
+      strategy: 'auto',
     });
 
     assert.ok(result.routing, 'routing metadata must be present');
@@ -76,7 +76,7 @@ describe('AC 5020202: Routing wiring through mode-router and response-formatter'
       description: 'Container runtime platform',
     });
 
-    assert.equal(turn1.mode, 'guided', 'should detect guided mode');
+    assert.equal(turn1.mode, 'conversational', 'should detect guided mode');
     assert.ok(turn1.sessionState, 'should have session state');
     // Routing may not be set yet on intermediate turns (evaluation hasn't happened)
 
@@ -293,16 +293,16 @@ describe('AC 5020202: Routing wiring through mode-router and response-formatter'
     const r1 = detectMode({ mode: 'oneshot' });
     assert.equal(r1.mode, MODES.ONESHOT);
 
-    const r2 = detectMode({ mode: 'guided' });
-    assert.equal(r2.mode, MODES.GUIDED);
+    const r2 = detectMode({ mode: 'conversational' });
+    assert.equal(r2.mode, MODES.CONVERSATIONAL);
 
     const r3 = detectMode({ name: 'ERP', certitude: 0.9, ubiquity: 0.85 });
     assert.equal(r3.mode, MODES.ONESHOT);
 
     const r4 = detectMode({ name: 'ERP' });
-    assert.equal(r4.mode, MODES.GUIDED);
+    assert.equal(r4.mode, MODES.CONVERSATIONAL);
 
     const r5 = detectMode({ sessionState: 'some-state' });
-    assert.equal(r5.mode, MODES.GUIDED);
+    assert.equal(r5.mode, MODES.CONVERSATIONAL);
   });
 });

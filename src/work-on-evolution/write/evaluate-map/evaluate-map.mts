@@ -14,7 +14,7 @@
 import type { ParsedWardleyMap, MapItemEvaluation, EvaluateMapOptions } from '../../../types/wm-map.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { classifyComponent } from '../routing/classification-gate.mjs';
-import { estimateEvolutionOneShot } from '../estimate-evolution.mjs';
+import { routeEstimateEvolution } from '../routing/mode-router.mjs';
 import { logDebug, logInfo, logError } from '../../../lib/mcp-notifications.mjs';
 import { createMessageResolverFromArgs } from '../../../lib/progress-messages.mjs';
 import { toErrorMessage, errorCode } from '../../../lib/errors.mjs';
@@ -152,12 +152,12 @@ export function parseWardleyMap(content: string): ParsedWardleyMap {
  *
  * @param {Object} parsedMap - Output from parseWardleyMap()
  * @param {Object} [options={}]
- * @param {string} [options.strategy='all'] - Evaluation strategy
+ * @param {string} [options.strategy='auto'] - Evaluation strategy
  * @param {string} [options.context] - Additional context for evaluation
  * @returns {Promise<{evaluations: Array, summary: Object}>}
  */
 export async function evaluateMapComponents(parsedMap: ParsedWardleyMap, options: EvaluateMapOptions = {}): Promise<{ evaluations: MapItemEvaluation[]; summary: any }> {
-  const { strategy = 'all', context = parsedMap.title || '', msg } = options;
+  const { strategy = 'auto', context = parsedMap.title || '', msg } = options;
   const TOOL = 'evaluateMap';
   const evaluations: MapItemEvaluation[] = [];
 
@@ -200,8 +200,11 @@ export async function evaluateMapComponents(parsedMap: ParsedWardleyMap, options
         }));
       }
 
-      // Classification gate
-      const classification = classifyComponent(item.name, context);
+      // Classification gate. Anchors bypass it — they're routed through the
+      // consumption-culture lens by the router and never get re-questioned.
+      const classification = item.type === 'anchor'
+        ? { space: 'economic' as const, confidence: 1, reason: 'anchor (bypasses gate)', requiresReQuestion: false }
+        : classifyComponent(item.name, context);
 
       // Debug: classification result
       if (msg) {
@@ -240,11 +243,16 @@ export async function evaluateMapComponents(parsedMap: ParsedWardleyMap, options
       const subCollector = new DegradationCollector(`evaluateMap:${item.name}`);
 
       try {
-        const result = await withCollector(subCollector, () => estimateEvolutionOneShot({
+        // Delegate to the unified router so anchors hit the anchor branch and
+        // components are auto-routed to capability/solution per tool.config.json.
+        const result = await withCollector(subCollector, () => routeEstimateEvolution({
           name: item.name,
           description: context,
+          context,
           strategy,
-        }));
+          type: item.type,
+          mode: 'oneshot',
+        })) as any;
 
         const stratResults: Record<string, any> = {};
         let bestEvolution = item.maturity;
@@ -458,13 +466,13 @@ export function formatEvaluationReport(evaluations: MapItemEvaluation[], summary
  *
  * @param {string} filePath - Path to the .wm file
  * @param {Object} [options={}]
- * @param {string} [options.strategy='all']
+ * @param {string} [options.strategy='auto']
  * @param {boolean} [options.updateFile=true]
  * @returns {Promise<{evaluations, summary, report, updatedContent, filePath}>}
  */
 // any: result is a heterogeneous bag (filePath, updated, evaluations, summary, ...)
 export async function evaluateMapFile(filePath: string, options: EvaluateMapOptions = {}): Promise<any> {
-  const { strategy = 'all', updateFile = true } = options;
+  const { strategy = 'auto', updateFile = true } = options;
   const TOOL = 'evaluateMap';
 
   // ── Localized message resolver ──────────────────────────────────────

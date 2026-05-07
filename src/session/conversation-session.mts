@@ -289,7 +289,7 @@ export class ConversationSession {
       maturitySignals: null,
       marketDynamics: null,
       adoptionPattern: null,
-      strategy: 'all',
+      strategy: 'auto',
       componentType: null,
       componentTypeConfidence: null,
       componentTypeMethod: null,

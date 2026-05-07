@@ -31,6 +31,7 @@ import { verifyClassification } from '../../work-on-value-chain/write/component/
 import { runEnrichedPipeline } from './pipeline/pipeline-enriched.mjs';
 import { validateOneShotInput, resolveClassification, VALID_SPACES } from './lib/evolution-input-validation.mjs';
 import { toErrorMessage, errorCode } from '../../lib/errors.mjs';
+import { resolveStrategy } from './routing/strategy-resolver.mjs';
 
 /**
  * @typedef {Object} OneShotResult
@@ -174,62 +175,31 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
   if (routingTargets.useCapabilityStrategies) {
     logDebug(TOOL, `Dispatching "${name}" to capability strategies`);
 
-    if (strategy === 'all') {
+    if (strategy === 'auto' || strategy === 'report') {
+      // Routed strategy — resolve via tool.config.json.
+      const resolved = resolveStrategy(strategy, 'capability');
+      const methods = resolved.kind === 'multi' ? [...resolved.methods] : [resolved.method];
+      logDebug(TOOL, `Resolved "${strategy}" → ${methods.length} capability strategy(ies): ${methods.join(', ')}`);
+
       const strategies = await loadStrategies();
-      const strategyNames = [...strategies.keys()];
+      const entries: Array<readonly [string, any]> = methods
+        .map(m => [m, strategies.get(m)] as const)
+        .filter(([, cls]) => cls != null);
 
-      logDebug(TOOL, `Loaded ${strategyNames.length} capability strategies for "${name}": ${strategyNames.join(', ')}`);
-
-      // Phase A: Run all non-s-curve strategies in parallel via the shared
-      // helper. Phase B (enrichment) and Phase C (s-curve) stay sequential
-      // below because they depend on phase A outputs.
-      const phaseA = [...strategies].filter(([m]) => m !== 'write:capacity:s-curve');
-      for (const [method] of phaseA) {
-        logDebug(TOOL, msg('step.strategy', { strategy: method, component: name }));
+      if (entries.length < methods.length) {
+        const missing = methods.filter(m => !strategies.has(m));
+        logDebug(TOOL, `Unknown capability strategies skipped: ${missing.join(', ')}`);
+        for (const m of missing) evaluations[m] = { error: `Unknown capability strategy "${m}"` };
       }
-      const phaseAOutcomes = await evaluateStrategiesInParallel(phaseA, component);
-      for (const { method, result, error } of phaseAOutcomes) {
+
+      const outcomes = await evaluateStrategiesInParallel(entries, component);
+      for (const { method, result, error } of outcomes) {
         if (error == null) {
           evaluations[method] = result;
           logDebug(TOOL, msg('step.strategy.result', { strategy: method, evolution: result.evolution, confidence: result.confidence }));
         } else {
           evaluations[method] = { error };
           logDebug(TOOL, msg('step.strategy.error', { strategy: method, error }));
-        }
-      }
-
-      // Phase B: If certitude/ubiquity not on the component, derive from LLM strategies
-      // any: ComponentInput enriched with derived fields from LLM signals
-      const enrichedComponent: any = { ...component };
-      if (enrichedComponent.certitude == null || enrichedComponent.ubiquity == null) {
-        const llmResults = // any: evaluations values are EvolutionResult | {error} | extended LLM results
-(Object.values(evaluations) as any[]).filter(
-          e => !e.error && e.certitude != null && e.ubiquity != null
-        );
-        if (llmResults.length > 0) {
-          // Average certitude/ubiquity from all LLM strategies that provided them
-          enrichedComponent.certitude = Math.round(
-            llmResults.reduce((s: number, r: any) => s + r.certitude, 0) / llmResults.length * 1000
-          ) / 1000;
-          enrichedComponent.ubiquity = Math.round(
-            llmResults.reduce((s: number, r: any) => s + r.ubiquity, 0) / llmResults.length * 1000
-          ) / 1000;
-          logDebug(TOOL, `Enriched "${name}" from ${llmResults.length} LLM result(s): certitude=${enrichedComponent.certitude}, ubiquity=${enrichedComponent.ubiquity}`);
-        }
-      }
-
-      // Phase C: Run s-curve with enriched component
-      const scurveCls = strategies.get('write:capacity:s-curve');
-      if (scurveCls) {
-        try {
-          logDebug(TOOL, msg('step.strategy', { strategy: 'write:capacity:s-curve', component: name }));
-          const instance = createStrategyInstance(scurveCls);
-          const result = await Promise.resolve(instance.evaluate(enrichedComponent));
-          evaluations['write:capacity:s-curve'] = result;
-          logDebug(TOOL, msg('step.strategy.result', { strategy: 'write:capacity:s-curve', evolution: result.evolution, confidence: result.confidence }));
-        } catch (err) {
-          evaluations['write:capacity:s-curve'] = { error: toErrorMessage(err) };
-          logDebug(TOOL, msg('step.strategy.error', { strategy: 'write:capacity:s-curve', error: toErrorMessage(err) }));
         }
       }
     } else {
@@ -251,9 +221,13 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
   if (routingTargets.useSolutionStrategies) {
     logDebug(TOOL, `Dispatching "${name}" to solution strategies`);
     try {
+      // Surface 'auto'/'report' both map to solution-dispatch's internal 'all'
+      // (= run all 12 properties of write:solution:properties).
+      const solutionStrategy =
+        strategy === 'auto' || strategy === 'report' ? 'all' : strategy;
       const solutionEvals = await dispatchSolutionStrategies(component, {
         llmCall: getStrategyLLM('properties-strategy'),
-        strategy: strategy === 'all' ? 'all' : strategy,
+        strategy: solutionStrategy,
         mode: 'auto',
       });
       // Merge solution evaluations (prefix to avoid key collisions)
@@ -615,16 +589,23 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
 
     // Run capability strategies if routed
     if (convRoutingTargets.useCapabilityStrategies) {
-      if (selectedStrategy === 'all') {
+      if (selectedStrategy === 'auto' || selectedStrategy === 'report') {
+        // Routed strategy — resolve via tool.config.json.
+        const resolved = resolveStrategy(selectedStrategy, 'capability');
+        const methods = resolved.kind === 'multi' ? [...resolved.methods] : [resolved.method];
+        logDebug(TOOL, `Resolved "${selectedStrategy}" → ${methods.length} capability strategy(ies): ${methods.join(', ')}`);
+
         const strategies = await loadStrategies();
-        const strategyEntries = [...strategies];
-        const strategyNames = strategyEntries.map(([m]) => m);
-        logDebug(TOOL, `Running ${strategyNames.length} capability strategies: ${strategyNames.join(', ')}`);
-        for (const method of strategyNames) {
-          logDebug(TOOL, `Running strategy "${method}" on "${session.state.name}"...`);
+        const entries: Array<readonly [string, any]> = methods
+          .map(m => [m, strategies.get(m)] as const)
+          .filter(([, cls]) => cls != null);
+
+        if (entries.length < methods.length) {
+          const missing = methods.filter(m => !strategies.has(m));
+          for (const m of missing) evaluations[m] = { error: `Unknown capability strategy "${m}"` };
         }
 
-        const outcomes = await evaluateStrategiesInParallel(strategyEntries, component);
+        const outcomes = await evaluateStrategiesInParallel(entries, component);
         for (const { method, result, error } of outcomes) {
           if (error == null) {
             evaluations[method] = result;
@@ -653,9 +634,11 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
     if (convRoutingTargets.useSolutionStrategies) {
       logDebug(TOOL, `Dispatching "${session.state.name}" to solution strategies (conversational)`);
       try {
+        const solutionStrategy =
+          selectedStrategy === 'auto' || selectedStrategy === 'report' ? 'all' : selectedStrategy;
         const solutionEvals = await dispatchSolutionStrategies(component, {
           llmCall: getStrategyLLM('properties-strategy'),
-          strategy: selectedStrategy === 'all' ? 'all' : selectedStrategy,
+          strategy: solutionStrategy,
           mode: 'conversational',
         });
         for (const [method, result] of Object.entries(solutionEvals)) {

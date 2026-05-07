@@ -29,22 +29,16 @@ console.log('=== mode-router.test.mjs ===\n');
 console.log('--- 1. Explicit mode parameter ---');
 
 assert(detectMode({ name: 'X', mode: 'oneshot' }).mode === MODES.ONESHOT, 'mode=oneshot → ONESHOT');
-assert(detectMode({ name: 'X', mode: 'guided' }).mode === MODES.GUIDED, 'mode=guided → GUIDED');
-assert(detectMode({ name: 'X', mode: 'conversational' }).mode === MODES.GUIDED, 'mode=conversational → GUIDED');
-assert(detectMode({ name: 'X', mode: 'one-shot' }).mode === MODES.ONESHOT, 'mode=one-shot → ONESHOT');
-assert(detectMode({ name: 'X', mode: 'interactive' }).mode === MODES.GUIDED, 'mode=interactive → GUIDED');
-assert(detectMode({ name: 'X', mode: 'multi-turn' }).mode === MODES.GUIDED, 'mode=multi-turn → GUIDED');
-assert(detectMode({ name: 'X', mode: 'single' }).mode === MODES.ONESHOT, 'mode=single → ONESHOT');
-assert(detectMode({ name: 'X', mode: 'direct' }).mode === MODES.ONESHOT, 'mode=direct → ONESHOT');
+assert(detectMode({ name: 'X', mode: 'conversational' }).mode === MODES.CONVERSATIONAL, 'mode=conversational → CONVERSATIONAL');
 
 // ── 2. Auto-Detection Heuristics ───────────────────────────────────────
 
 console.log('\n--- 2. Auto-detection heuristics ---');
 
-// sessionState → guided
+// sessionState → conversational
 assert(
-  detectMode({ name: 'X', sessionState: '{}' }).mode === MODES.GUIDED,
-  'sessionState present → guided'
+  detectMode({ name: 'X', sessionState: '{}' }).mode === MODES.CONVERSATIONAL,
+  'sessionState present → conversational'
 );
 
 // space provided → oneshot
@@ -79,41 +73,37 @@ assert(
   'phaseDistribution → oneshot',
 );
 
-// Partial params → guided
+// Partial params → conversational
 assert(
-  detectMode({ name: 'X', certitude: 0.8 }).mode === MODES.GUIDED,
-  'only certitude (no ubiquity) → guided'
+  detectMode({ name: 'X', certitude: 0.8 }).mode === MODES.CONVERSATIONAL,
+  'only certitude (no ubiquity) → conversational'
 );
 assert(
-  detectMode({ name: 'X', phaseDistribution: { bins: [] } }).mode === MODES.GUIDED,
-  'empty phaseDistribution bins → guided',
-);
-
-// Minimal input → guided
-assert(
-  detectMode({ name: 'X' }).mode === MODES.GUIDED,
-  'only name → guided'
-);
-assert(
-  detectMode({ name: 'X', description: 'Something' }).mode === MODES.GUIDED,
-  'name+description → guided'
+  detectMode({ name: 'X', phaseDistribution: { bins: [] } }).mode === MODES.CONVERSATIONAL,
+  'empty phaseDistribution bins → conversational',
 );
 
-// ── 3. mode=auto and mode=default trigger auto-detection ───────────────
-
-console.log('\n--- 3. Auto/default mode triggers auto-detection ---');
-
+// Minimal input → conversational
 assert(
-  detectMode({ name: 'X', mode: 'auto', certitude: 0.8, ubiquity: 0.7 }).mode === MODES.ONESHOT,
-  'mode=auto with params → auto-detects oneshot'
+  detectMode({ name: 'X' }).mode === MODES.CONVERSATIONAL,
+  'only name → conversational'
 );
+assert(
+  detectMode({ name: 'X', description: 'Something' }).mode === MODES.CONVERSATIONAL,
+  'name+description → conversational'
+);
+
+// ── 3. mode=default triggers auto-detection ───────────────
+
+console.log('\n--- 3. Default mode triggers auto-detection ---');
+
 assert(
   detectMode({ name: 'X', mode: 'default', certitude: 0.8, ubiquity: 0.7 }).mode === MODES.ONESHOT,
   'mode=default with params → auto-detects oneshot'
 );
 assert(
-  detectMode({ name: 'X', mode: 'auto' }).mode === MODES.GUIDED,
-  'mode=auto without params → auto-detects guided'
+  detectMode({ name: 'X', mode: 'default' }).mode === MODES.CONVERSATIONAL,
+  'mode=default without params → auto-detects guided'
 );
 
 // ── 4. Mode reason is always provided ──────────────────────────────────
@@ -139,13 +129,13 @@ assert(d5.reason.includes('insufficient'), 'minimal input has reason with "insuf
 
 console.log('\n--- 5. Edge cases ---');
 
-assert(detectMode(null).mode === MODES.GUIDED, 'null input → guided');
-assert(detectMode({}).mode === MODES.GUIDED, 'empty object → guided');
-assert(detectMode(undefined).mode === MODES.GUIDED, 'undefined → guided');
+assert(detectMode(null).mode === MODES.CONVERSATIONAL, 'null input → conversational');
+assert(detectMode({}).mode === MODES.CONVERSATIONAL, 'empty object → conversational');
+assert(detectMode(undefined).mode === MODES.CONVERSATIONAL, 'undefined → conversational');
 
 // Unknown mode string
 const unknownMode = detectMode({ name: 'X', mode: 'foobar' });
-assert(unknownMode.mode === MODES.GUIDED, 'unknown mode string → guided');
+assert(unknownMode.mode === MODES.CONVERSATIONAL, 'unknown mode string → conversational');
 
 // ── 6. Full Route: One-Shot ────────────────────────────────────────────
 
@@ -176,7 +166,7 @@ const r2 = await routeEstimateEvolution({
   name: 'Kubernetes',
   description: 'Container orchestration platform',
 });
-assert(r2.mode === MODES.GUIDED, 'guided route returns mode=guided');
+assert(r2.mode === MODES.CONVERSATIONAL, 'guided route returns mode=guided');
 assert(r2.modeReason != null, 'guided has modeReason');
 assert(r2.sessionState != null, 'guided has sessionState');
 assert(r2.formatted != null && r2.formatted.length > 0, 'guided has formatted output');
@@ -192,7 +182,7 @@ const r3 = await routeEstimateEvolution({
   certitude: 0.7,
   ubiquity: 0.6,
 });
-assert(r3.mode === MODES.GUIDED, 'continuation is guided');
+assert(r3.mode === MODES.CONVERSATIONAL, 'continuation is guided');
 assert(r3.sessionState != null, 'continuation has sessionState');
 
 // ── 9. Shared Response Shape ───────────────────────────────────────────

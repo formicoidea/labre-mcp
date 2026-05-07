@@ -8,7 +8,7 @@ import type { EvolutionResult } from './evolution.mjs';
 import type { ClassificationResult } from './classification.mjs';
 import type { CapabilityPivotResult, SolutionDiscoveryResult } from './pipeline.mjs';
 
-export type RoutingMode = 'oneshot' | 'guided';
+export type RoutingMode = 'oneshot' | 'conversational';
 
 /** Métadonnées de routing solution/capability émises par le router. */
 export interface RoutingMetadata {
@@ -115,9 +115,9 @@ export type WebSearchVerificationResult = ComponentTypeDetection;
 
 // ─── Guided / re-questioning response variants ─────────────────────────────
 
-/** Guided conversational turn — partial evaluation with a next question. */
+/** Conversational turn — partial evaluation with a next question. */
 export interface GuidedTurnResponse {
-  mode: 'conversational' | 'guided';
+  mode: 'conversational';
   phase: string | null;
   nextQuestion: NextQuestion | null;
   gathered?: Record<string, unknown>;

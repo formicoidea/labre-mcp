@@ -28,10 +28,10 @@ describe('parseConversationalInput — structured formats', () => {
 
   it('parses comma-separated key:value', () => {
     const r = parseConversationalInput(
-      'Component: Docker, Strategy: all, Context: containerization',
+      'Component: Docker, Strategy: auto, Context: containerization',
     );
     assert.equal(r.name, 'Docker');
-    assert.equal(r.strategy, 'all');
+    assert.equal(r.strategy, 'auto');
   });
 
   it('ignores out-of-range numeric values', () => {

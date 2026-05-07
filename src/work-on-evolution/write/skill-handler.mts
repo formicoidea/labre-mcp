@@ -44,7 +44,8 @@ const SPACE_ALIASES = {
  * Known strategy aliases mapped to canonical strategy names.
  */
 const STRATEGY_ALIASES = {
-  all: 'all',
+  auto: 'auto',
+  report: 'report',
   's-curve': 'write:capacity:s-curve',
   scurve: 'write:capacity:s-curve',
   'publication-analysis': 'write:capacity:publication-analysis',
