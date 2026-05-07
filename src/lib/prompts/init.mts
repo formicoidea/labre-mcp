@@ -13,7 +13,7 @@
 
 import { registerParser } from './parsers-registry.mjs';
 
-import { parseCapabilityResponse } from '../../work-on-value-chain/write/component/identify-capability.mjs';
+import { parseCapabilityResponse } from '../../work-on-value-chain/write/component/lib/capability/identify-capability.mjs';
 import { parseAnchorResponse } from '../../work-on-evolution/write/strategies/anchor/estimate-anchor-evolution.mjs';
 import { parsePubResponse } from '../../work-on-evolution/write/strategies/capacity/publication-analysis-strategy.mjs';
 import { parseFallbackPhase } from '../../work-on-evolution/write/strategies/capacity/logprob-distribution-strategy.mjs';
@@ -26,14 +26,14 @@ import {
 } from '../../work-on-evolution/write/patent/cpc-mapper.mjs';
 import { parseCpcSotExtraction } from '../../work-on-evolution/write/strategies/capacity/cpc-evolution-strategy.mjs';
 import { parseSolutionDiscoveryResponse } from '../../work-on-evolution/write/pipeline/pipeline-enriched.mjs';
-import { parseWebSearchResponse } from '../../work-on-value-chain/write/component/web-search-verification.mjs';
+import { parseWebSearchResponse } from '../../work-on-value-chain/write/component/lib/verification/web-search-verification.mjs';
 import { parseLLMClassificationResponse } from '../../work-on-evolution/write/routing/detect-solution.mjs';
 import {
   parseAutoResponse,
   parseSinglePropertyResponse,
 } from '../../work-on-evolution/write/strategies/solution/properties-strategy.mjs';
-import { parseChainMetadataResponse } from '../../work-on-value-chain/write/chain/extract-metadata.mjs';
-import { parseRawValueChainResponse } from '../../work-on-value-chain/write/chain/generate-chain.mjs';
+import { parseChainMetadataResponse } from '../../work-on-value-chain/write/chain/lib/llm/extract-metadata.mjs';
+import { parseRawValueChainResponse } from '../../work-on-value-chain/write/chain/strategies/top-down/generate-chain.mjs';
 
 registerParser('cpcSotExtraction',      parseCpcSotExtraction);
 registerParser('identifyCapability',    parseCapabilityResponse);

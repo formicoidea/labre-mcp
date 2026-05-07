@@ -6,13 +6,8 @@
 //   1. User perception (how end-users perceive the offering)
 //   2. Industry perception (how the market/industry views it)
 //
-// Exposes an MCP tool (estimateAnchorEvolution) for direct invocation.
+// The MCP tool wrapper lives in src/mcp/estimate-anchor-evolution.tool.mts.
 
-import { z } from 'zod';
-import type { McpToolDefinition, JsonSchema } from '../../../../types/mcp.mjs';
-import { EstimateAnchorEvolutionInputSchema, type EstimateAnchorEvolutionInput } from '../../../../schemas/estimate-anchor-evolution.schema.mjs';
-import { getStrategyLLM } from '../../../../lib/llm/registry.mjs';
-import { logDebug } from '../../../../lib/mcp-notifications.mjs';
 import { evolutionToStage } from '../../../../lib/response-formatter.mjs';
 import { parseKeyValueBlock } from '../../../../lib/prompts/parsers.mjs';
 import { getPrompt } from '../../../../lib/prompts/registry.mjs';
@@ -131,20 +126,3 @@ export async function estimateAnchorEvolution(args: any, llmCall: any): Promise<
   };
 }
 
-// ─── MCP Tool Definition ───────────────────────────────────────────────────
-
-export const ESTIMATE_ANCHOR_EVOLUTION_TOOL: McpToolDefinition = {
-  name: 'estimateAnchorEvolution',
-  description:
-    'Estimate the evolution position of an anchor (user need / stakeholder) in a Wardley Map. ' +
-    'Unlike components evaluated by technical maturity, anchors are evaluated through ' +
-    'the consumption culture lens (user perception + industry perception). ' +
-    'The LLM determines a single evolution phase (1–4, Genesis → Commodity). ' +
-    'A phase can be provided directly to skip LLM assessment.',
-  inputSchema: z.toJSONSchema(EstimateAnchorEvolutionInputSchema, { io: 'input' }) as JsonSchema,
-};
-
-export async function handleEstimateAnchorEvolution(args: Record<string, unknown>): Promise<unknown> {
-  const input: EstimateAnchorEvolutionInput = EstimateAnchorEvolutionInputSchema.parse(args);
-  return estimateAnchorEvolution(input, getStrategyLLM('anchor-evolution'));
-}

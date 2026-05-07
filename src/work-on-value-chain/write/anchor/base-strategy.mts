@@ -5,7 +5,7 @@
 //
 // Every anchor-writing strategy must extend this class and implement identify().
 // The method identifier follows the convention "<mode>:<family>:<strategy>",
-// e.g. "write:anchor:narrative", "write:anchor:interview".
+// e.g. "write:anchor:top-down", "write:anchor:interview".
 //
 // Result shape is intentionally left as `unknown` for now — the concrete
 // AnchorCandidate type will be pinned when the first real strategy lands.

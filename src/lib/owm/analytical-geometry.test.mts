@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import { computeGeometry } from './analytical-geometry.mjs';
 import { parseSvgGeometry, type Bbox, type GeometryItem, type EdgeSegment } from './svg-bbox-parser.mjs';
 import { CliOwmAdapter } from './cli-owm-adapter.mjs';
-import { generateChainOwmSyntax, type EmitOwmOptions } from '../../work-on-value-chain/write/chain/emit-owm.mjs';
+import { generateChainOwmSyntax, type EmitOwmOptions } from '../../work-on-value-chain/write/chain/lib/emit/emit-owm.mjs';
 import type { PositionedValueChain, PositionedComponent } from '../../types/value-chain.mjs';
 
 // ─── Fixture builder ───────────────────────────────────────────────────

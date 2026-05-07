@@ -20,7 +20,7 @@ import type {
   PositionedValueChain,
   PositionedComponent,
 } from '../../types/value-chain.mjs';
-import type { EmitOwmOptions } from '../../work-on-value-chain/write/chain/emit-owm.mjs';
+import type { EmitOwmOptions } from '../../work-on-value-chain/write/chain/lib/emit/emit-owm.mjs';
 import {
   LABEL_CHAR_WIDTH,
   LABEL_HEIGHT,

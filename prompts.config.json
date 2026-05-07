@@ -32,12 +32,12 @@
       "parser": { "kind": "custom", "id": "publicationPhases" }
     }
   },
-  "logprob-distribution": {
+  "logprob-fallback": {
     "default": {
       "kind": "template",
       "templateFile": {
-        "system": "prompts/logprob-distribution.system.md",
-        "user": "prompts/logprob-distribution.user.md"
+        "system": "prompts/logprob-fallback.system.md",
+        "user": "prompts/logprob-fallback.user.md"
       },
       "variables": ["component", "description", "context"],
       "parser": { "kind": "custom", "id": "logprobFallback" }
@@ -54,12 +54,12 @@
       "parser": { "kind": "custom", "id": "timelineIteration" }
     }
   },
-  "llm-direct": {
+  "historical-evolution": {
     "with-capability": {
       "kind": "template",
       "templateFile": {
-        "system": "prompts/llm-direct.with-capability.system.md",
-        "user": "prompts/llm-direct.with-capability.user.md"
+        "system": "prompts/historical-evolution.with-capability.system.md",
+        "user": "prompts/historical-evolution.with-capability.user.md"
       },
       "variables": ["capability", "description", "context", "date"],
       "parser": { "kind": "custom", "id": "llmDirect" }
@@ -67,8 +67,8 @@
     "without-capability": {
       "kind": "template",
       "templateFile": {
-        "system": "prompts/llm-direct.without-capability.system.md",
-        "user": "prompts/llm-direct.without-capability.user.md"
+        "system": "prompts/historical-evolution.without-capability.system.md",
+        "user": "prompts/historical-evolution.without-capability.user.md"
       },
       "variables": ["component", "description", "context", "date"],
       "parser": { "kind": "custom", "id": "llmDirect" }
@@ -177,11 +177,11 @@
       "variables": ["nlCommand"],
       "parser": { "kind": "custom", "id": "extractChainMetadata" }
     },
-    "generate-chain": {
+    "top-down": {
       "kind": "template",
       "templateFile": {
-        "system": "prompts/write-chain.generate-chain.system.md",
-        "user": "prompts/write-chain.generate-chain.user.md"
+        "system": "prompts/write-chain.top-down.system.md",
+        "user": "prompts/write-chain.top-down.user.md"
       },
       "variables": ["metadata", "date"],
       "parser": { "kind": "custom", "id": "parseRawValueChain" }

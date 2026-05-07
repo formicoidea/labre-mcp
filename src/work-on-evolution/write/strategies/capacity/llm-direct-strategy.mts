@@ -73,8 +73,8 @@ export class LLMDirectStrategy extends BaseStrategy {
 
     const dateStr = String(component.date ? new Date(component.date).getFullYear() : 'unknown');
     const p = hasCapability
-      ? getPrompt('llm-direct', 'with-capability')
-      : getPrompt('llm-direct', 'without-capability');
+      ? getPrompt('historical-evolution', 'with-capability')
+      : getPrompt('historical-evolution', 'without-capability');
     const built = hasCapability
       ? p.build({
           capability: component.capability ?? '',

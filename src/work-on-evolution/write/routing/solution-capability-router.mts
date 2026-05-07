@@ -1,8 +1,8 @@
 // Solution vs Capability Router
 //
 // Core routing rule:
-//   NAMED components → SOLUTION path  (products, frameworks, methodologies, standards)
-//   GENERIC components → CAPABILITY path (abstract activities, practices, data, knowledge)
+//   NAMED components â†’ SOLUTION path  (products, frameworks, methodologies, standards)
+//   GENERIC components â†’ CAPABILITY path (abstract activities, practices, data, knowledge)
 //
 // "Named" means the component has a specific identity: a brand name, a proper
 // noun, a titled framework or methodology, or a recognized standard.
@@ -25,7 +25,7 @@
 // The router does NOT modify existing strategy files or the capability pipeline.
 // It sits AFTER the classification gate and BEFORE strategy dispatch.
 
-// ─── Detection functions extracted to routing/component-detection.mjs ────────
+// â”€â”€â”€ Detection functions extracted to routing/component-detection.mjs â”€â”€â”€â”€â”€â”€â”€â”€
 // Re-exported here for backward compatibility with existing consumers.
 export {
   detectComponentType,
@@ -44,7 +44,7 @@ import {
   detectComponentType,
 } from '../../../lib/component-detection.mjs';
 
-// ─── Dispatch functions extracted to routing/solution-dispatch.mjs ───────────
+// â”€â”€â”€ Dispatch functions extracted to routing/solution-dispatch.mjs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Re-exported here for backward compatibility with existing consumers.
 export {
   EVAL_MODES,
@@ -57,10 +57,10 @@ export {
 
 import { determineRoutingTargets } from './solution-dispatch.mjs';
 
-// ─── Wardley Type Classification extracted to routing/wardley-type-classification.mjs ─
+// â”€â”€â”€ Wardley Type Classification extracted to routing/wardley-type-classification.mjs â”€
 // Re-exported here for backward compatibility with existing consumers.
 export {
   WARDLEY_TYPE,
   WARDLEY_TYPE_PATTERNS,
   classifyWardleyType,
-} from '../../../work-on-value-chain/write/component/wardley-type-classification.mjs';
+} from '../../../work-on-value-chain/write/component/lib/classification/wardley-type-classification.mjs';

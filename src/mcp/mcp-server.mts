@@ -5,7 +5,7 @@
 // inherits this env var. If that child's MCP config tries to spawn another
 // wardley-assistant server, the nested instance exits cleanly.
 if (process.env._WARDLEY_NESTED) {
-  process.stderr.write('[wardley-assistant] Nested MCP server detected — exiting cleanly\n');
+  process.stderr.write('[wardley-assistant] Nested MCP server detected â€” exiting cleanly\n');
   process.exit(0);
 }
 process.env._WARDLEY_NESTED = '1';
@@ -24,11 +24,11 @@ process.env._WARDLEY_NESTED = '1';
 import { createInterface } from 'node:readline';
 // Register every prompt parser with the registry before any tool handler runs.
 import '../lib/prompts/init.mjs';
-import { ESTIMATE_EVOLUTION_TOOL, handleEstimateEvolution } from './mcp-tool.mjs';
-import { EVALUATE_MAP_TOOL, handleEvaluateMap } from '../work-on-evolution/write/evaluate-map/evaluate-map.mjs';
-import { IDENTIFY_CAPABILITY_TOOL, handleIdentifyCapability } from '../work-on-value-chain/write/component/identify-capability.mjs';
-import { ESTIMATE_ANCHOR_EVOLUTION_TOOL, handleEstimateAnchorEvolution } from '../work-on-evolution/write/strategies/anchor/estimate-anchor-evolution.mjs';
-import { GENERATE_VALUE_CHAIN_TOOL, handleGenerateValueChain } from '../work-on-value-chain/write/chain/generate-value-chain.mjs';
+import { ESTIMATE_EVOLUTION_TOOL, handleEstimateEvolution } from './estimate-evolution.tool.mjs';
+import { EVALUATE_MAP_TOOL, handleEvaluateMap } from './evaluate-map.tool.mjs';
+import { IDENTIFY_CAPABILITY_TOOL, handleIdentifyCapability } from './identify-capability.tool.mjs';
+import { ESTIMATE_ANCHOR_EVOLUTION_TOOL, handleEstimateAnchorEvolution } from './estimate-anchor-evolution.tool.mjs';
+import { GENERATE_VALUE_CHAIN_TOOL, handleGenerateValueChain } from './generate-value-chain.tool.mjs';
 import { logInfo, logError, logWarning } from '../lib/mcp-notifications.mjs';
 import { classifyAndLogLLMError, classifyLLMError } from '../lib/llm/llm-error-handler.mjs';
 import type {
@@ -46,7 +46,7 @@ import {
 } from '../lib/degradation/index.mjs';
 import { registerDefaultHealthChecks } from './boot-health-checks.mjs';
 
-// ─── Tool Registry ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Tool Registry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** All registered MCP tools. Add new tools here if needed. */
 const REGISTERED_TOOLS: McpToolDefinition[] = [
@@ -57,7 +57,7 @@ const REGISTERED_TOOLS: McpToolDefinition[] = [
   GENERATE_VALUE_CHAIN_TOOL,
 ];
 
-/** Map of tool name → handler for fast dispatch */
+/** Map of tool name â†’ handler for fast dispatch */
 const TOOL_HANDLERS: Map<string, ToolHandler> = new Map<string, ToolHandler>([
   [ESTIMATE_EVOLUTION_TOOL.name, handleEstimateEvolution],
   [EVALUATE_MAP_TOOL.name, handleEvaluateMap],
@@ -66,7 +66,7 @@ const TOOL_HANDLERS: Map<string, ToolHandler> = new Map<string, ToolHandler>([
   [GENERATE_VALUE_CHAIN_TOOL.name, handleGenerateValueChain],
 ]);
 
-// ─── MCP Server Implementation ─────────────────────────────────────────────
+// â”€â”€â”€ MCP Server Implementation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SERVER_INFO: McpServerInfo = {
   name: 'wardley-assistant',
@@ -85,11 +85,11 @@ const SERVER_CAPABILITIES: McpServerCapabilities = {
  * Route an incoming JSON-RPC request to the appropriate handler.
  *
  * Supported methods:
- *   - initialize          → server info + capabilities
- *   - tools/list          → list all registered tools
- *   - tools/call          → dispatch to tool handler by name
- *   - notifications/initialized → acknowledge (no response)
- *   - ping                → pong
+ *   - initialize          â†’ server info + capabilities
+ *   - tools/list          â†’ list all registered tools
+ *   - tools/call          â†’ dispatch to tool handler by name
+ *   - notifications/initialized â†’ acknowledge (no response)
+ *   - ping                â†’ pong
  *
  * @param {Object} request - JSON-RPC 2.0 request
  * @returns {Promise<Object|null>} JSON-RPC 2.0 response, or null for notifications
@@ -97,13 +97,13 @@ const SERVER_CAPABILITIES: McpServerCapabilities = {
 async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse | null> {
   const { id, method, params } = request;
 
-  // Notifications (no id) — no response expected
+  // Notifications (no id) â€” no response expected
   if (id === undefined || id === null) {
     return null;
   }
 
   switch (method) {
-    // ── Initialize handshake ──────────────────────────────────────────
+    // â”€â”€ Initialize handshake â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     case 'initialize':
       return {
         jsonrpc: '2.0',
@@ -116,11 +116,11 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
         },
       };
 
-    // ── Ping/pong ────────────────────────────────────────────────────
+    // â”€â”€ Ping/pong â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     case 'ping':
       return { jsonrpc: '2.0', id, result: {} };
 
-    // ── List registered tools ────────────────────────────────────────
+    // â”€â”€ List registered tools â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     case 'tools/list':
       return {
         jsonrpc: '2.0',
@@ -130,7 +130,7 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
         },
       };
 
-    // ── Call a tool ──────────────────────────────────────────────────
+    // â”€â”€ Call a tool â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     case 'tools/call': {
       const callParams = (params ?? {}) as { name?: string; arguments?: Record<string, unknown> };
       const toolName = callParams.name ?? '';
@@ -177,7 +177,7 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
         });
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
-        // Info-level: tool invocation end (success — possibly degraded)
+        // Info-level: tool invocation end (success â€” possibly degraded)
         const endMsg = toolSubject
           ? `${toolName} completed for "${toolSubject}" in ${elapsed}s${wrapped.degraded ? ' (degraded)' : ''}`
           : `${toolName} completed in ${elapsed}s${wrapped.degraded ? ' (degraded)' : ''}`;
@@ -238,7 +238,7 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
       }
     }
 
-    // ── Unknown method ───────────────────────────────────────────────
+    // â”€â”€ Unknown method â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     default:
       return {
         jsonrpc: '2.0',
@@ -251,7 +251,7 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
   }
 }
 
-// ─── Stdio Transport ────────────────────────────────────────────────────────
+// â”€â”€â”€ Stdio Transport â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Start the MCP server listening on stdin/stdout.
@@ -313,11 +313,11 @@ export function startServer() {
   process.stderr.write(`[wardley-assistant] MCP server started. Tools: ${REGISTERED_TOOLS.map(t => t.name).join(', ')}\n`);
 }
 
-// ─── Exports for programmatic use ───────────────────────────────────────────
+// â”€â”€â”€ Exports for programmatic use â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export { REGISTERED_TOOLS, TOOL_HANDLERS, handleRequest };
 
-// ─── Auto-start when run directly ───────────────────────────────────────────
+// â”€â”€â”€ Auto-start when run directly â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}`) {
   startServer();

@@ -120,7 +120,7 @@ export class LogprobDistributionStrategy extends BaseStrategy {
   }
 
   async evaluate(component: ComponentInput): Promise<EvolutionResult> {
-    const p = getPrompt('logprob-distribution');
+    const p = getPrompt('logprob-fallback');
     const built = p.build({
       component: component.name || '',
       description: component.description ?? '',

@@ -11,10 +11,7 @@
 //   import { evaluateMapFile } from './evaluate-map.mjs';
 //   const result = await evaluateMapFile('maps/myMaps/tea-shop.wm');
 
-import { z } from 'zod';
-import type { McpToolDefinition, JsonSchema } from '../../../types/mcp.mjs';
 import type { ParsedWardleyMap, MapItemEvaluation, EvaluateMapOptions } from '../../../types/wm-map.mjs';
-import { EvaluateMapInputSchema, type EvaluateMapInput } from '../../../schemas/evaluate-map.schema.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { classifyComponent } from '../routing/classification-gate.mjs';
 import { estimateEvolutionOneShot } from '../estimate-evolution.mjs';
@@ -511,26 +508,3 @@ export async function evaluateMapFile(filePath: string, options: EvaluateMapOpti
   return { evaluations, summary, report, updatedContent, filePath };
 }
 
-// ─── MCP Tool Definition ────────────────────────────────────────────────────
-
-export const EVALUATE_MAP_TOOL: McpToolDefinition = {
-  name: 'evaluateMap',
-  description:
-    'Evaluate all components in a .wm Wardley Map file, estimate their evolution positions, ' +
-    'and update the file with new maturity values. Uses the classification gate to skip non-economic ' +
-    'components and runs pluggable evaluation strategies on economic ones.',
-  inputSchema: z.toJSONSchema(EvaluateMapInputSchema, { io: 'input' }) as JsonSchema,
-};
-
-/**
- * MCP tool handler for evaluateMap.
- * @param {Object} args - Tool arguments
- * @returns {Promise<Object>}
- */
-export async function handleEvaluateMap(args: Record<string, unknown>): Promise<unknown> {
-  const input: EvaluateMapInput = EvaluateMapInputSchema.parse(args);
-  return evaluateMapFile(input.filePath, {
-    strategy: input.strategy,
-    updateFile: input.updateFile,
-  });
-}

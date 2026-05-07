@@ -11,7 +11,7 @@
 // if available, otherwise export manually).
 
 import '../src/lib/prompts/init.mjs';
-import { handleGenerateValueChain } from '../src/work-on-value-chain/write/chain/generate-value-chain.mjs';
+import { handleGenerateValueChain } from '../src/mcp/generate-value-chain.tool.mjs';
 import { runWithCollector } from '../src/lib/degradation/index.mjs';
 import { DegradationCollector } from '../src/lib/degradation/index.mjs';
 

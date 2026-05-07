@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import './init.mjs';
 import { getPrompt } from './registry.mjs';
 
-import { parseCapabilityResponse } from '../../work-on-value-chain/write/component/identify-capability.mjs';
+import { parseCapabilityResponse } from '../../work-on-value-chain/write/component/lib/capability/identify-capability.mjs';
 import { parseAnchorResponse } from '../../work-on-evolution/write/strategies/anchor/estimate-anchor-evolution.mjs';
 import { parsePubResponse } from '../../work-on-evolution/write/strategies/capacity/publication-analysis-strategy.mjs';
 import { parseFallbackPhase } from '../../work-on-evolution/write/strategies/capacity/logprob-distribution-strategy.mjs';
@@ -23,7 +23,7 @@ import {
 } from '../../work-on-evolution/write/patent/cpc-mapper.mjs';
 import { parseSolutionDiscoveryResponse } from '../../work-on-evolution/write/pipeline/pipeline-enriched.mjs';
 import { parseCpcSotExtraction } from '../../work-on-evolution/write/strategies/capacity/cpc-evolution-strategy.mjs';
-import { parseWebSearchResponse } from '../../work-on-value-chain/write/component/web-search-verification.mjs';
+import { parseWebSearchResponse } from '../../work-on-value-chain/write/component/lib/verification/web-search-verification.mjs';
 import { parseLLMClassificationResponse } from '../../work-on-evolution/write/routing/detect-solution.mjs';
 
 describe('registry round-trip equivalence', () => {
@@ -55,7 +55,7 @@ describe('registry round-trip equivalence', () => {
   it('logprobFallback: registry.parse === parseFallbackPhase', () => {
     const text = 'Phase3';
     assert.deepEqual(
-      getPrompt('logprob-distribution').parse(text),
+      getPrompt('logprob-fallback').parse(text),
       parseFallbackPhase(text),
     );
   });
@@ -71,11 +71,11 @@ describe('registry round-trip equivalence', () => {
   it('llmDirect: registry.parse === parseLLMDirectResponse (both variants)', () => {
     const text = 'evolution=0.75\nconfidence=0.9';
     assert.deepEqual(
-      getPrompt('llm-direct', 'with-capability').parse(text),
+      getPrompt('historical-evolution', 'with-capability').parse(text),
       parseLLMDirectResponse(text),
     );
     assert.deepEqual(
-      getPrompt('llm-direct', 'without-capability').parse(text),
+      getPrompt('historical-evolution', 'without-capability').parse(text),
       parseLLMDirectResponse(text),
     );
   });

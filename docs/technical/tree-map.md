@@ -7,20 +7,20 @@
 
 `WardleyAssistant` est un serveur **MCP** (Model Context Protocol) qui expose 5 outils autour des cartes Wardley :
 
-| Outil MCP | Rôle | Entrée principale |
-|---|---|---|
-| `estimateEvolution` | Évalue l'évolution d'un composant (genesis → commodity) via 7 stratégies | `src/mcp/mcp-tool.mts` |
-| `evaluateMap` | Évalue qualitativement une carte OWM | `src/work-on-evolution/write/evaluate-map/evaluate-map.mts` |
-| `identifyCapability` | Identifie capabilities / solutions dans un texte | `src/work-on-value-chain/write/component/identify-capability.mts` |
-| `estimateAnchorEvolution` | Évolution du composant ancre (user need) | `src/work-on-evolution/write/strategies/anchor/estimate-anchor-evolution.mts` |
-| `generateValueChain` | Construit une chaîne de valeur Wardley complète (OWM DSL) à partir d'un prompt langage naturel | `src/work-on-value-chain/write/chain/generate-value-chain.mts` |
+| Outil MCP | Rôle | Wrapper MCP | Lib métier |
+|---|---|---|---|
+| `estimateEvolution` | Évalue l'évolution d'un composant (genesis → commodity) via 7 stratégies | `src/mcp/estimate-evolution.tool.mts` | `src/work-on-evolution/write/estimate-evolution.mts` |
+| `evaluateMap` | Évalue qualitativement une carte OWM | `src/mcp/evaluate-map.tool.mts` | `src/work-on-evolution/write/evaluate-map/evaluate-map.mts` |
+| `identifyCapability` | Identifie capabilities / solutions dans un texte | `src/mcp/identify-capability.tool.mts` | `src/work-on-value-chain/write/component/lib/capability/identify-capability.mts` |
+| `estimateAnchorEvolution` | Évolution du composant ancre (user need) | `src/mcp/estimate-anchor-evolution.tool.mts` | `src/work-on-evolution/write/strategies/anchor/estimate-anchor-evolution.mts` |
+| `generateValueChain` | Construit une chaîne de valeur Wardley complète (OWM DSL) à partir d'un prompt langage naturel | `src/mcp/generate-value-chain.tool.mts` | `src/work-on-value-chain/write/chain/strategies/top-down/top-down-strategy.mts` |
 
 ## 2. Points d'entrée
 
 - **Script npm (dev)** : `package.json` → `"dev": "tsx src/mcp/mcp-server.mts"` (charge les `.mts` via tsx)
 - **Script npm (prod)** : `package.json` → `"mcp:prod": "node dist/mcp/mcp-server.mjs"` (consomme le build `tsc`)
 - **`.mcp.json`** : `cmd /c npx tsx --env-file=.env src/mcp/mcp-server.mts` (wrapper `cmd /c` requis sous Windows)
-- **Serveur MCP réel** : `src/mcp/mcp-server.mts` — JSON-RPC 2.0 sur stdio, registre des 4 tools.
+- **Serveur MCP réel** : `src/mcp/mcp-server.mts` — JSON-RPC 2.0 sur stdio, registre des 5 tools (un fichier `*.tool.mts` par tool dans `src/mcp/`).
 - **API programmatique** : `src/index.mts` — re-exporte la surface publique pour usage en bibliothèque.
 - **Build** : `tsc` compile `src/**/*.mts` vers `dist/**/*.mjs` + `dist/**/*.d.mts` (sourcemaps inclus). `main` pointe vers `dist/index.mjs`.
 
@@ -30,12 +30,17 @@
 src/
 ├── index.mts                    API programmatique (re-exports publics)
 │
-├── mcp/                         ── Couche MCP (transport + dispatch)
-│   ├── mcp-server.mts                Serveur JSON-RPC stdio, registre + dispatcher (wrap chaque appel via withMcpDegradation)
-│   ├── mcp-tool.mts                  Tool "estimateEvolution" (schéma + handler)
-│   ├── boot-health-checks.mts        Enregistrement des health-checks par défaut (bigquery, llm:*, web-search)
-│   ├── mcp-server-dispatch.test.mts  Test de la fusion Degradable au dispatch
-│   └── mcp-tool-transparent.test.mts
+├── mcp/                         ── Couche MCP (transport + dispatch + wrappers de tools)
+│   ├── mcp-server.mts                          Serveur JSON-RPC stdio, registre + dispatcher (wrap chaque appel via withMcpDegradation)
+│   ├── estimate-evolution.tool.mts             Tool MCP estimateEvolution (schéma + handler, délègue à work-on-evolution)
+│   ├── evaluate-map.tool.mts                   Tool MCP evaluateMap (handler thin sur evaluateMapFile)
+│   ├── identify-capability.tool.mts            Tool MCP identifyCapability (handler thin sur identifyCapability)
+│   ├── estimate-anchor-evolution.tool.mts      Tool MCP estimateAnchorEvolution (handler thin sur estimateAnchorEvolution)
+│   ├── generate-value-chain.tool.mts           Tool MCP generateValueChain (instancie TopDownChainStrategy)
+│   ├── generate-value-chain.tool.test.mts      Tests du tool generateValueChain (mock LLM)
+│   ├── boot-health-checks.mts                  Enregistrement des health-checks par défaut (bigquery, llm:*, web-search)
+│   ├── mcp-server-dispatch.test.mts            Test de la fusion Degradable au dispatch
+│   └── mcp-tool-transparent.test.mts           Tests AC 12 (estimateEvolution transparent solution/capability)
 │
 ├── schemas/                     ── Schémas Zod (source de vérité unique)
 │   ├── estimate-evolution.schema.mts      Entrée de estimateEvolution
@@ -140,31 +145,39 @@ src/
 │   │   └── chain/       { base-strategy.mts, registry.mts }
 │   └── write/                   (stratégies "parametre inventé depuis rien")
 │       ├── anchor/      { base-strategy.mts, registry.mts }
-│       ├── component/
-│       │   ├── base-strategy.mts, registry.mts
-│       │   ├── identify-capability.mts                Décode un nom → capability (nature activity/practice/knowledge/data)
-│       │   ├── infer-capability-from-solution.mts     Déduit la capability sous-jacente d'une solution nommée
-│       │   ├── dual-verification-orchestrator.mts     Pipeline 3 tiers naming/LLM/web-search
-│       │   ├── concurrent-verification.mts            Variante parallèle (LLM + web-search concurrents)
-│       │   ├── verification-reconciliation.mts        Réconciliation des signaux
-│       │   ├── verification-signals.mts               Constructeurs de VerificationSignal
-│       │   ├── signal-combiner.mts                    Fusion des signaux → verdict
-│       │   ├── web-search-verification.mts            Tier 3 via Agent SDK (web search)
-│       │   └── wardley-type-classification.mts        Classification activity/practice/data/knowledge
-│       └── chain/                                     Tool generateValueChain — pipeline 8 étapes "narrative"
-│           ├── base-strategy.mts, registry.mts
-│           ├── generate-value-chain.mts               Tool MCP generateValueChain (handler + schéma)
-│           ├── narrative-strategy.mts                 Orchestrateur (method = write:chain:narrative ; 2 LLM seulement, xHint inline dans LLM #2)
-│           ├── extract-metadata.mts                   Étape 1 — LLM angle/scope/objective/imperatives/temporality
-│           ├── generate-chain.mts                     Étape 2 — LLM ancres + composants + liens A→B + xHint (clarté, pas évolution)
-│           ├── compute-visibility.mts                 Étape 3 — Y déterministe par-branche, multi-ancres, mapHeight
-│           ├── adjust-x.mts                           Étape 4 — X déterministe autour de xHint, mapWidth
-│           ├── place-labels.mts                       Étape 5 — placement labels initial (règles topologiques)
-│           ├── verify-layout.mts                      Étape 6 — placement labels V6 force-directed + V7 canonical snap (analytical geometry, pas de cli-owm en hot path)
-│           ├── force-directed.mts                     simulateLabels + simulateComponents + projectHardConstraints (physics + DSL invariant clamps + strict projection)
-│           ├── canonical-snap.mts                     V7 — snap les offsets continus V6 vers les canoniques V5 (BELOW/RIGHT/LEFT proportional/diagonales) quand ça ne dégrade pas hard
-│           ├── emit-owm.mts                           Étape 7 — émission OWM DSL via src/lib/owm/
-│           └── *.test.mts
+│       ├── component/                                  Domaine pur (le wrapper MCP vit dans src/mcp/identify-capability.tool.mts)
+│       │   ├── lib/
+│       │   │   ├── classification/
+│       │   │   │   ├── wardley-type-classification.mts     Classification activity/practice/data/knowledge
+│       │   │   │   └── infer-capability-from-solution.mts  Déduit la capability sous-jacente d'une solution nommée
+│       │   │   ├── verification/
+│       │   │   │   ├── dual-verification-orchestrator.mts  Pipeline 3 tiers naming/LLM/web-search
+│       │   │   │   ├── concurrent-verification.mts         Variante parallèle (LLM + web-search concurrents)
+│       │   │   │   ├── verification-reconciliation.mts     Réconciliation des signaux
+│       │   │   │   ├── verification-signals.mts            Constructeurs de VerificationSignal
+│       │   │   │   ├── signal-combiner.mts                 Fusion des signaux → verdict
+│       │   │   │   └── web-search-verification.mts         Tier 3 via Agent SDK (web search)
+│       │   │   └── capability/
+│       │   │       └── identify-capability.mts             Décode un nom → capability (nature activity/practice/knowledge/data)
+│       │   └── strategies/                                 base-strategy.mts + registry.mts (scan récursif 1 niveau)
+│       └── chain/                                          Tool generateValueChain — pipeline 8 étapes top-down
+│           ├── lib/
+│           │   ├── layout/                                 Géométrie pure, déterministe (réutilisable par toute stratégie)
+│           │   │   ├── compute-visibility.mts              Étape 3 — Y déterministe par-branche, multi-ancres, mapHeight
+│           │   │   ├── adjust-x.mts                        Étape 4 — X déterministe autour de xHint, mapWidth
+│           │   │   ├── place-labels.mts                    Étape 5 — placement labels initial (règles topologiques)
+│           │   │   ├── verify-layout.mts                   Étape 6 — V6 force-directed + V7 canonical snap (analytical geometry)
+│           │   │   ├── force-directed.mts                  simulateLabels + simulateComponents + projectHardConstraints
+│           │   │   └── canonical-snap.mts                  V7 — snap V6 → canoniques V5 quand ne dégrade pas hard
+│           │   ├── emit/
+│           │   │   └── emit-owm.mts                        Étape 7 — émission OWM DSL via src/lib/owm/
+│           │   └── llm/
+│           │       └── extract-metadata.mts                Étape 1 — LLM angle/scope/objective/imperatives/temporality (générique)
+│           └── strategies/
+│               ├── base-strategy.mts, registry.mts         Registry à scan récursif (1 niveau)
+│               └── top-down/                               write:chain:top-down (algorithme Wardley top-down)
+│                   ├── top-down-strategy.mts               Orchestrateur (2 LLM seulement, xHint inline dans LLM #2)
+│                   └── generate-chain.mts                  Étape 2 — LLM ancres + composants + liens A→B + xHint (prompt 'top-down')
 │
 └── work-on-evolution/           ── Cœur : pipeline d'évaluation d'évolution
     │
@@ -264,6 +277,29 @@ Partagé par tous : src/lib/{llm/llm-call, mcp-notifications, response-formatter
 ## 5. Table de migration (ancien chemin → nouveau chemin)
 
 Utiliser cette table pour réparer les imports. Les chemins sont **relatifs à `src/`** sauf indication.
+
+**Round 4 (lib/strategies split + MCP centralisé + top-down rename — mai 2026)** :
+
+| Ancien | Nouveau |
+|---|---|
+| `./mcp/mcp-tool.mts` | `./mcp/estimate-evolution.tool.mts` |
+| `./work-on-value-chain/write/component/identify-capability.mts` (lib + tool) | lib: `./work-on-value-chain/write/component/lib/capability/identify-capability.mts`, tool: `./mcp/identify-capability.tool.mts` |
+| `./work-on-value-chain/write/component/{infer-capability-from-solution,wardley-type-classification}.mts` | `./work-on-value-chain/write/component/lib/classification/<même fichier>.mts` |
+| `./work-on-value-chain/write/component/{dual-verification-orchestrator,concurrent-verification,verification-reconciliation,verification-signals,signal-combiner,web-search-verification}.mts` | `./work-on-value-chain/write/component/lib/verification/<même fichier>.mts` |
+| `./work-on-value-chain/write/component/{base-strategy,registry}.mts` | `./work-on-value-chain/write/component/strategies/<même fichier>.mts` |
+| `./work-on-value-chain/write/chain/generate-value-chain.mts` (tool MCP) | `./mcp/generate-value-chain.tool.mts` |
+| `./work-on-value-chain/write/chain/narrative-strategy.mts` | `./work-on-value-chain/write/chain/strategies/top-down/top-down-strategy.mts` (classe `TopDownChainStrategy`, méthode `write:chain:top-down`) |
+| `./work-on-value-chain/write/chain/{compute-visibility,adjust-x,place-labels,force-directed,canonical-snap,verify-layout}.mts` | `./work-on-value-chain/write/chain/lib/layout/<même fichier>.mts` |
+| `./work-on-value-chain/write/chain/emit-owm.mts` | `./work-on-value-chain/write/chain/lib/emit/emit-owm.mts` |
+| `./work-on-value-chain/write/chain/extract-metadata.mts` | `./work-on-value-chain/write/chain/lib/llm/extract-metadata.mts` |
+| `./work-on-value-chain/write/chain/generate-chain.mts` | `./work-on-value-chain/write/chain/strategies/top-down/generate-chain.mts` |
+| `./work-on-value-chain/write/chain/{base-strategy,registry}.mts` | `./work-on-value-chain/write/chain/strategies/<même fichier>.mts` |
+| `./work-on-evolution/write/evaluate-map/evaluate-map.mts` (lib + tool) | lib: inchangé. tool extrait : `./mcp/evaluate-map.tool.mts` |
+| `./work-on-evolution/write/strategies/anchor/estimate-anchor-evolution.mts` (lib + tool) | lib: inchangé. tool extrait : `./mcp/estimate-anchor-evolution.tool.mts` |
+| `prompts/write-chain.generate-chain.{system,user}.md` | `prompts/write-chain.top-down.{system,user}.md` (clé config: `write-chain` / `top-down`) |
+| `prompts/logprob-distribution.{system,user}.md` | `prompts/logprob-fallback.{system,user}.md` (clé config: `logprob-fallback` / `default`) |
+| `prompts/llm-direct.{with,without}-capability.{system,user}.md` | `prompts/historical-evolution.{with,without}-capability.{system,user}.md` (clé config: `historical-evolution`) |
+| `method: 'write:chain:narrative'` | `method: 'write:chain:top-down'` |
 
 **Round 3 (read/write split + component identification migration — avril 2026)** :
 
