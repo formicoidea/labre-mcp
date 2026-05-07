@@ -158,12 +158,12 @@ Les notifications standard MCP (`notifications/message`) ne sont pas rendues dan
 claude --dangerously-load-development-channels server:wardley-assistant
 ```
 
-### Quelle est la difference entre oneshot et guided ?
+### Quelle est la difference entre oneshot et conversational ?
 
 - **Oneshot** : tous les parametres en un seul appel → evaluation immediate
-- **Guided** : conversation multi-tour → questions progressives pour rassembler le contexte
+- **Conversational** : conversation multi-tour → questions progressives pour rassembler le contexte
 
-La detection est automatique : si vous fournissez assez de parametres, c'est du oneshot. Sinon, le systeme passe en mode guide.
+La detection est automatique avec `mode: "default"` (ou `mode` omis) : si vous fournissez assez de parametres, c'est du oneshot. Sinon, le systeme passe en mode conversational.
 
 ### Comment ajouter une strategie ?
 

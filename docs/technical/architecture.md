@@ -17,7 +17,7 @@ flowchart TD
     EE & EM & IC & AN --> Zod["Zod validation\nsrc/schemas/*.schema.mts"]
     Zod --> CG["Classification Gate\n(social_good / common_good / economic)"]
     CG -->|"non-economic"| RQ["Re-questions"]
-    CG -->|"economic"| MR["Mode Router\noneshot | guided"]
+    CG -->|"economic"| MR["Mode Router\noneshot | conversational"]
 
     MR --> SCR["Solution/Capability Router\nDetection 3-tiers :\nnaming → LLM → web search"]
 
@@ -56,8 +56,8 @@ Au boot, `src/mcp/boot-health-checks.mts` enregistre un health-check par dependa
 
 Partout où le MCP lance plusieurs appels indépendants dans la même invocation, on utilise **`Promise.allSettled`** — jamais un `for...of + await` séquentiel. Concrètement :
 
-- **Phase A capability** (`src/work-on-evolution/write/estimate-evolution.mts`) : les 5-6 stratégies non-s-curve tournent en parallèle via le helper exporté `evaluateStrategiesInParallel(entries, component)`. La phase B (moyenne certitude/ubiquity) et la phase C (s-curve enrichi) restent séquentielles car elles dépendent des résultats précédents.
-- **Solution dispatch** (`src/work-on-evolution/write/routing/solution-dispatch.mts:149`) : les stratégies solution tournent en parallèle quand `strategy === 'all'`.
+- **Capability `report` mode** (`src/work-on-evolution/write/estimate-evolution.mts`) : quand `strategy === 'report'`, le router resout la liste de strategies via `tool.config.json#report.capability` puis les lance en parallele via `evaluateStrategiesInParallel(entries, component)`. Le mode `auto` lance une seule strategie — pas de parallelisme requis.
+- **Solution dispatch** (`src/work-on-evolution/write/routing/solution-dispatch.mts:149`) : les 12 proprietes solution tournent en parallele quand `strategy === 'all'` au niveau interne (semantique distincte du surface MCP — voir `docs/functional/strategies.md`).
 - **`evaluateMap`** (`src/work-on-evolution/write/evaluate-map/evaluate-map.mts`) : les composants d'une map sont évalués en parallèle. Chaque composant reçoit son propre `DegradationCollector` injecté via `withCollector` et est mergé dans le collector parent après le settle, dans l'ordre d'input pour un output déterministe.
 
 **Isolation des collectors** : la parallélisation est sûre parce que `src/lib/degradation/context.mts` utilise `AsyncLocalStorage`. Chaque branche async d'un `Promise.allSettled` hérite du contexte parent et voit son propre collector ambient — zéro fuite d'événements entre branches concurrentes. Cet invariant est vérifié empiriquement par `src/work-on-evolution/write/estimate-evolution.parallel.test.mts`.
@@ -109,9 +109,10 @@ Aucune duplication entre le JSON Schema MCP, les interfaces TS et la validation 
 | Module | Role |
 |---|---|
 | `src/work-on-evolution/write/routing/classification-gate.mts` | Gate fixe : mots-cles + signaux contextuels → espace economique |
-| `src/work-on-evolution/write/routing/mode-router.mts` | Detection automatique du mode (oneshot/guided) + dispatch |
+| `src/work-on-evolution/write/routing/mode-router.mts` | Detection automatique du mode (oneshot/conversational/default) + branche anchor (court-circuit gate quand `input.type === 'anchor'`) + dispatch |
+| `src/work-on-evolution/write/routing/strategy-resolver.mts` | Traduit surface `auto`/`report`/<specific> en plan de dispatch via `tool.config.json` |
 | `src/work-on-evolution/write/estimate-evolution.mts` | Orchestration oneshot : classification → strategies → formatage |
-| `src/session/conversation-session.mts` | Machine a etats pour le mode guide (5 phases) |
+| `src/session/conversation-session.mts` | Machine a etats pour le mode conversational (5 phases) |
 | `src/work-on-evolution/write/skill-handler.mts` | Parsing de langage naturel → appels API structures |
 | `src/work-on-value-chain/write/component/identify-capability.mts` | Decode les noms techniques (CRM → gestion relation client) via LLM |
 
@@ -210,7 +211,7 @@ Le serveur MCP positionne `_WARDLEY_NESTED=1` au demarrage. Si un processus enfa
 flowchart TD
     Input["Input: name, context, certitude, ubiquity, ..."]
     Input --> Validate["EstimateEvolutionInputSchema.parse()\n(Zod)"]
-    Validate --> Mode["detectMode()\noneshot / guided"]
+    Validate --> Mode["detectMode()\noneshot / conversational"]
     Mode --> Classify["classifyComponent()\nsocial_good / common_good / economic"]
     Classify -->|"non-economic"| ReQ["buildReQuestions() → retour"]
     Classify -->|"economic"| Detect["detectComponentType()\nDetection 3-tiers"]

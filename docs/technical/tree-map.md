@@ -131,7 +131,7 @@ src/
 │       ├── mock-patent-source.mts        Mock pour tests
 │       └── *.test.mts
 │
-├── session/                     ── Sessions conversationnelles (mode guided)
+├── session/                     ── Sessions conversationnelles (mode conversational)
 │   ├── conversation-session.mts         État + branching d'une conversation
 │   ├── conversation-branching.test.mts
 │   └── conversation-guided.test.mts

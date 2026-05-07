@@ -31,27 +31,28 @@ Estime la position d'evolution d'un composant sur l'axe de Wardley (0 = Genesis,
 | `operate` | number [0-1] | non | Proportion de publications "exploitation". Utilise par pub-analysis. |
 | `usage` | number [0-1] | non | Proportion de publications "usage courant". Utilise par pub-analysis. |
 | `space` | enum | non | Pre-classification : `economic`, `social_good`, `common_good`. Si omis, detection automatique. |
-| `strategy` | string | non | Strategie a utiliser. `"all"` par defaut. Ou un nom specifique (ex: `"write:capacity:s-curve"`). |
-| `mode` | enum | non | `oneshot`, `guided`, `conversational`, `auto`, `default`. Auto-detection par defaut. |
-| `sessionState` | string | non | Etat serialise d'une session multi-tour (mode guide). |
-| `forceEstimate` | boolean | non | Force l'estimation avec les donnees disponibles (mode guide). `false` par defaut. |
+| `strategy` | string | non | `"auto"` par defaut (router → 1 strategie par type lue depuis `tool.config.json#auto`). `"report"` pour un fan-out multi-strategies (`tool.config.json#report`). Ou un id specifique (ex: `"write:capacity:s-curve"`) qui by-pass le routing. |
+| `type` | enum | non | `"anchor"` court-circuite la classification gate et route vers `estimateAnchorEvolution` (utile depuis un parse OWM DSL). Sinon detection automatique solution/capability. |
+| `mode` | enum | non | `oneshot`, `conversational`, `default`. `default` declenche l'auto-detection. |
+| `sessionState` | string | non | Etat serialise d'une session multi-tour (mode conversational). |
+| `forceEstimate` | boolean | non | Force l'estimation avec les donnees disponibles (mode conversational). `false` par defaut. |
 | `pipeline` | boolean | non | Active le mode pipeline enrichi (capability pivot + SotA + legacy). `false` par defaut. |
 
 ### Modes d'execution
 
 | Mode | Declenchement | Comportement |
 |---|---|---|
-| **oneshot** | `mode: "oneshot"` ou parametres suffisants (certitude+ubiquity ou wonder+build+operate+usage) | Evaluation immediate en un seul appel |
-| **guided** | `mode: "guided"` ou parametres insuffisants | Conversation multi-tour avec questions progressives |
-| **auto** | Par defaut | Detecte le mode selon les parametres fournis |
+| **oneshot** | `mode: "oneshot"` ou parametres suffisants (certitude+ubiquity ou phaseDistribution) | Evaluation immediate en un seul appel |
+| **conversational** | `mode: "conversational"` ou parametres insuffisants | Conversation multi-tour avec questions progressives |
+| **default** | Par defaut | Detecte le mode selon les parametres fournis |
 
 ### Detection automatique du mode
 
-1. Parametre `mode` explicite → utilise ce mode
-2. `sessionState` present → guided (reprise de conversation)
+1. Parametre `mode` explicite (`oneshot` / `conversational`) → utilise ce mode
+2. `sessionState` present → conversational (reprise de conversation)
 3. `space` pre-classifie → oneshot
 4. Parametres d'evaluation suffisants → oneshot
-5. Sinon → guided
+5. Sinon → conversational
 
 ### Exemple — oneshot
 
@@ -65,12 +66,12 @@ Estime la position d'evolution d'un composant sur l'axe de Wardley (0 = Genesis,
     "space": "economic",
     "certitude": 0.9,
     "ubiquity": 0.85,
-    "strategy": "all"
+    "strategy": "auto"
   }
 }
 ```
 
-### Exemple — mode guide (tour 1)
+### Exemple — mode conversational (tour 1)
 
 ```json
 {
@@ -84,7 +85,7 @@ Estime la position d'evolution d'un composant sur l'axe de Wardley (0 = Genesis,
 
 Reponse : question de la phase suivante + `sessionState` a renvoyer au tour suivant.
 
-### Exemple — mode guide (tour 2)
+### Exemple — mode conversational (tour 2)
 
 ```json
 {
@@ -183,7 +184,7 @@ Evalue tous les composants d'un fichier `.wm` existant et met a jour leurs posit
 | Parametre | Type | Requis | Description |
 |---|---|---|---|
 | `filePath` | string | **oui** | Chemin vers le fichier .wm a evaluer |
-| `strategy` | string | non | Strategie a utiliser (`"all"` par defaut) |
+| `strategy` | string | non | `"auto"` (par defaut) route chaque composant vers une strategie par type via `tool.config.json`. `"report"` fan-out multi-strategies. Une id specifique (ex: `"write:capacity:s-curve"`) force cette strategie sur tous les composants economiques. Les anchors (`type: "anchor"` du DSL) restent routes vers `estimateAnchorEvolution`. |
 | `updateFile` | boolean | non | Met a jour le fichier en place (`true` par defaut) |
 
 ### Exemple

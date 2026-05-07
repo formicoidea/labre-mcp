@@ -199,13 +199,14 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 ## Orchestration
 
-Quand `strategy: "all"`, l'evaluation se fait en deux phases :
+Le surface MCP propose deux modes routes :
 
-1. **Phase A** : Toutes les strategies sauf s-curve s'executent
-2. **Phase B** : Les certitude/ubiquity moyennes des resultats Phase A enrichissent le composant
-3. **Phase C** : S-curve s'execute avec les donnees enrichies
+- **`strategy: "auto"`** (defaut) : le router lit `tool.config.json#estimateEvolution.auto.capability` et execute **une seule** strategie (ex. `write:capacity:llm-direct`). Couteux O(1 appel LLM) — adapte au batch (`evaluateMap`).
+- **`strategy: "report"`** : le router lit `tool.config.json#estimateEvolution.report.capability` et lance **plusieurs** strategies en parallele (`Promise.allSettled` via `evaluateStrategiesInParallel`). Sortie : map keyed by strategy. Adapte a l'analyse approfondie d'un composant unique.
 
-Le consensus final est la moyenne ponderee de toutes les strategies.
+Une `id` specifique (ex. `"write:capacity:s-curve"`) by-pass le routing et execute cette strategie seule — usage expert.
+
+Le `'all'` historique (qui orchestrait phase A enrichment + phase C s-curve) a ete remplace par cette resolution explicite : si tu veux le comportement multi-strategies, utilise `report` et liste les strategies dans `tool.config.json`. Le `'all'` interne reste utilise par `solution-dispatch` pour signifier "lance les 12 proprietes" — c'est un namespace distinct.
 
 ---
 
@@ -272,10 +273,12 @@ flowchart LR
 
 Seule solution strategy actuellement implementee. Supporte deux modes :
 
-| Mode | Methode | Description |
+| Mode (interne) | Methode | Description |
 |---|---|---|
-| **auto** (oneshot) | `_evaluateAuto()` | Un seul appel LLM evalue les 12 proprietes |
-| **conversationnel** | `_evaluateConversational()` | Une propriete par appel, pour le mode guide |
+| **oneshot** | `_evaluateAuto()` | Un seul appel LLM evalue les 12 proprietes |
+| **conversational** | `_evaluateConversational()` | Une propriete par appel, pour le mode multi-tour |
+
+> Note : ce `mode` est interne a la solution strategy. Il est independant du `mode` surface MCP (`oneshot` / `conversational` / `default`) du tool `estimateEvolution`.
 
 ### SolutionEvolutionResult
 

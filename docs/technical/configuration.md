@@ -8,6 +8,7 @@
 | `COPILOT_GITHUB_TOKEN` | `ghp_...` / `gho_...` | *(Optionnel)* Token GitHub, lu uniquement si une strategie route vers un provider `copilot-sdk`. A defaut, le SDK Copilot bascule sur `gh auth login` / `GH_TOKEN` / `GITHUB_TOKEN`. |
 | `WARDLEY_LLM_CONFIG` | chemin absolu ou relatif | Override du fichier de configuration LLM. Par defaut : `<racine>/llm.config.json`. |
 | `WARDLEY_PROMPTS_CONFIG` | chemin absolu ou relatif | Override du fichier de configuration des prompts. Par defaut : `<racine>/prompts.config.json`. |
+| `WARDLEY_TOOL_CONFIG` | chemin absolu ou relatif | Override du fichier de configuration des outils MCP. Par defaut : `<racine>/tool.config.json`. |
 | `WARDLEY_VERBOSE` | `1`, `true`, `yes` | Active les messages debug dans les notifications. Desactive par defaut. |
 | `WARDLEY_EVAL_MODE` | `exclusive`, `parallel` | Mode de routage solution/capability. `exclusive` (defaut) : un seul pipeline. `parallel` : les deux pipelines, resultats fusionnes. |
 | `_WARDLEY_NESTED` | `1` | **Automatique** — Positionne par le serveur au demarrage. Guard anti-recursion. Ne pas modifier. |
@@ -235,6 +236,53 @@ const result = p.parse(response, { name: component, type, context });
 ## Test de non-régression des parsers
 
 `src/lib/prompts/registry-parse-equivalence.test.mts` verifie pour chaque parser enregistre que `getPrompt(...).parse(sample, ctx)` produit la meme valeur que l'appel direct `parseXxx(sample, ctx)`. Lock de non-regression byte-for-byte sur le round-trip registry : toute derive silencieuse du registry (cache, resolution paresseuse, etc.) est capturee immediatement par la CI.
+
+## Configuration des outils — tool.config.json
+
+`tool.config.json` (a la racine, **versionne**) configure le routing automatique des outils MCP. Aujourd'hui une seule entree : `estimateEvolution`.
+
+Structure :
+
+```json
+{
+  "estimateEvolution": {
+    "auto": {
+      "anchor": "anchor-evolution",
+      "solution": "write:solution:properties",
+      "capability": "write:capacity:llm-direct"
+    },
+    "report": {
+      "anchor": ["anchor-evolution"],
+      "solution": ["write:solution:properties"],
+      "capability": [
+        "write:capacity:s-curve",
+        "write:capacity:publication-analysis",
+        "write:capacity:cpc-evolution"
+      ]
+    }
+  }
+}
+```
+
+Semantique :
+
+- **`auto`** : pour chaque type detecte (`anchor` / `solution` / `capability`), le router lance **une seule** strategie. C'est le mode appele par `evaluateMap` pour traiter une carte entiere (cout O(N)).
+- **`report`** : pour chaque type detecte, le router lance **plusieurs** strategies en parallele et renvoie une map keyed by strategy. Adapte a l'analyse approfondie d'un composant unique.
+
+Surface MCP :
+
+- `estimateEvolution({ name, strategy: "auto" })` → 1 strategie via `auto[<type>]`.
+- `estimateEvolution({ name, strategy: "report" })` → N strategies via `report[<type>]`.
+- `estimateEvolution({ name, strategy: "write:capacity:s-curve" })` → cette strategie precise, by-pass du routing.
+- `estimateEvolution({ name, type: "anchor", strategy: "auto" })` → court-circuit de la classification gate, appel direct a `estimateAnchorEvolution`.
+
+Validation :
+
+- Schema Zod dans `src/lib/tool-config/tool-config.schema.mts`. Les `methodId` sont valides structurellement (regex kebab-case + namespace `write:capacity:` / `write:solution:`). L'existence reelle de la strategie dans le registry est verifiee a l'execution (le router signale une strategie inconnue par une entree `error` dans la map evaluations).
+- Loader : `src/lib/tool-config/loader.mts` (singleton lazy + cache). `WARDLEY_TOOL_CONFIG` permet de pointer un autre fichier (utile pour les tests).
+- Resolver : `src/work-on-evolution/write/routing/strategy-resolver.mts` traduit la valeur surface en plan de dispatch (`{ kind: 'single' | 'multi' | 'specific' }`).
+
+> **Le `'all'` interne de `solution-dispatch.mts`** (= "lance les 12 proprietes de `write:solution:properties`") est conserve. C'est un namespace distinct de la surface MCP : les callers experts qui passent directement par `dispatchSolutionStrategies()` continuent a utiliser `strategy: 'all'` la-bas.
 
 ## Fichier .env
 

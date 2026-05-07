@@ -21,7 +21,7 @@ flowchart TD
 
     EE & EM & IC & AN --> Z["Zod validation\nsrc/schemas/*.schema.mts"]
     Z --> CG["Classification Gate\nsocial_good / common_good / economic"]
-    CG --> MR["Mode Router\noneshot / guided / auto"]
+    CG --> MR["Mode Router\noneshot / conversational / default"]
     MR --> SCR["Solution/Capability Router"]
 
     SCR -->|"solution"| SS["Solution Strategies\n12 proprietes Wardley"]

@@ -128,7 +128,7 @@ WardleyAssistant/
 │   ├── schemas/                         # Schemas Zod (source de verite)
 │   ├── types/                           # Re-exports des types inferes
 │   ├── lib/                             # Utilitaires transverses (llm, patent, …)
-│   ├── session/                         # Sessions conversationnelles (mode guided)
+│   ├── session/                         # Sessions conversationnelles (mode conversational)
 │   ├── work-on-evolution/               # Outils d'evolution (estimateEvolution, evaluateMap, anchor)
 │   │   ├── strategies/capacity/         # 7 strategies capability pluggables
 │   │   └── strategies/solution/         # Strategies solution (12-property)
