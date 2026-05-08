@@ -1,0 +1,52 @@
+title Chaîne de valeur de Spotify, plateforme de streaming musical
+style plain
+size [1216, 650]
+// angle: positionnement stratégique de la plateforme
+// scope: écosystème complet de Spotify, de l'ingestion de contenu à l'expérience utilisateur finale
+// temporality: present
+// objective: cartographier la chaîne de valeur de Spotify pour révéler les composants clés, leurs dépendances et les leviers de différenciation concurrentielle
+// context: Spotify est la principale plateforme mondiale de streaming musical, opérant comme intermédiaire entre Ayants droit (labels, artistes) et auditeurs, sur un modèle freemium. La carte vise à éclairer la structure de valeur sous-jacente et les zones de maturité différenciée au sein de la plateforme.
+anchor Auditeur [0.95, 0.85] label [-100, 0]
+component Écouter de la musique [0.83, 0.82] label [0, 25]
+component Découvrir du contenu [0.83, 0.6] label [0, -25]
+component Gérer sa bibliothèque [0.77, 0.65] label [0, 25]
+component Accéder au service [0.79, 0.78] label [-129, -15]
+component Interface utilisateur [0.6, 0.62] label [0, -25]
+component Lecteur audio [0.66, 0.88] label [0, 25]
+component Catalogue musical [0.49, 0.63] label [0, 25]
+component Moteur de recommandation [0.66, 0.66] label [20, 0]
+component Algorithmes de personnalisation [0.47, 0.63] label [0, 25]
+component Données comportementales [0.3, 0.74] label [0, 25]
+component Podcasts & audio non-musical [0.3, 0.6] label [0, 25]
+component Gestion des licences [0.32, 0.52] label [-143, -15]
+component Relations labels & artistes [0.15, 0.53] label [20, 0]
+component Infrastructure de streaming [0.49, 0.85] label [0, -25]
+component Réseau de distribution (CDN) [0.32, 0.85] label [0, -25]
+component Hébergement cloud [0.15, 0.82] label [0, 25]
+component Modèle freemium [0.62, 0.83] label [-108, -15]
+component Régie publicitaire [0.45, 0.15] label [-129, -15]
+component Gestion des abonnements [0.45, 0.78] label [20, 15]
+Auditeur->Écouter de la musique
+Auditeur->Découvrir du contenu
+Auditeur->Gérer sa bibliothèque
+Auditeur->Accéder au service
+Écouter de la musique->Interface utilisateur
+Écouter de la musique->Lecteur audio
+Écouter de la musique->Catalogue musical
+Découvrir du contenu->Interface utilisateur
+Découvrir du contenu->Moteur de recommandation
+Découvrir du contenu->Catalogue musical
+Gérer sa bibliothèque->Interface utilisateur
+Gérer sa bibliothèque->Données comportementales
+Accéder au service->Modèle freemium
+Moteur de recommandation->Algorithmes de personnalisation
+Moteur de recommandation->Catalogue musical
+Algorithmes de personnalisation->Données comportementales
+Catalogue musical->Gestion des licences
+Catalogue musical->Podcasts & audio non-musical
+Gestion des licences->Relations labels & artistes
+Lecteur audio->Infrastructure de streaming
+Infrastructure de streaming->Réseau de distribution (CDN)
+Réseau de distribution (CDN)->Hébergement cloud
+Modèle freemium->Régie publicitaire
+Modèle freemium->Gestion des abonnements
