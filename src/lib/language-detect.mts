@@ -9,7 +9,7 @@
 
 // ─── Language Fingerprints ─────────────────────────────────────────────────
 // Common short words and patterns that strongly signal a language.
-// Ordered by expected frequency in WardleyAssistant usage context.
+// Ordered by expected frequency in labre-mcp usage context.
 
 // Words that are common across multiple languages and should be weighted less
 const AMBIGUOUS_WORDS = new Set([
@@ -202,7 +202,7 @@ export function detectLanguage(text: string): string {
  * Concatenates relevant text fields (name, context, description) to
  * give the language detector enough signal. Field names vary by tool.
  *
- * @param {Object} args - Tool arguments (from any WardleyAssistant tool)
+ * @param {Object} args - Tool arguments (from any labre-mcp tool)
  * @returns {string} Combined user text for language detection
  */
 export function extractUserText(args: Record<string, unknown> | null | undefined): string {

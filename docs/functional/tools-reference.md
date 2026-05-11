@@ -1,6 +1,6 @@
 # Reference des outils MCP
 
-WardleyAssistant expose **4 outils** via le protocole MCP. Chacun est appele via `tools/call` en JSON-RPC 2.0.
+labre-mcp expose **5 outils** via le protocole MCP. Chacun est appele via `tools/call` en JSON-RPC 2.0.
 
 | Outil | Role | Schema Zod |
 |---|---|---|

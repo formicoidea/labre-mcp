@@ -1,6 +1,6 @@
 # Framework de degradation
 
-WardleyAssistant expose 4 outils MCP qui dependent tous de services externes (LLM, BigQuery, web search). Le framework `src/lib/degradation/` factorise la facon dont ces outils signalent qu'une dependance est tombee — sans interrompre le pipeline ni masquer la panne.
+labre-mcp expose 4 outils MCP qui dependent tous de services externes (LLM, BigQuery, web search). Le framework `src/lib/degradation/` factorise la facon dont ces outils signalent qu'une dependance est tombee — sans interrompre le pipeline ni masquer la panne.
 
 ## Pourquoi
 

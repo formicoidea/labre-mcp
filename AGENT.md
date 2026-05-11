@@ -2,18 +2,18 @@
 
 labre-mcp is an MCP (Model Context Protocol) server that helps the user apply practice frameworks — Wardley Maps first, climates / doctrines / gameplays / cycle next. The targeted horizon for the Wardley framework is the full strategic study cycle (9 phases: prompt → chain → evolution → climates → invest → doctrine → orientation → strategy → close). The server exposes MCP tools backed by a pluggable registry of strategies orchestrated by the kernel recipe runner.
 
-> **V1 status — kernel posed, post-audit refactor in progress.** Architectural decisions are recorded as ADRs in [docs/architecture/decisions.md](/WardleyAssistant/docs/architecture/decisions.md) (ARCH-01 to ARCH-25). Strategy classes for Wardley currently live under `src/frameworks/wardley/{chain,evolution}/_legacy/` per ARCH-23 (in-place migration). Physical extraction to the canonical `<tool>/<command>/<subdomain>/` layout is scheduled for V1.5 cleanup. Until then, both the new core `StrategyRegistry` and the legacy `loadStrategies()` filesystem walker resolve to the same classes. The repository directory will eventually be renamed `labre-mcp` (the npm package name and `.mcp.json` server name are already aligned).
+> **V1 status — kernel posed, post-audit refactor in progress.** Architectural decisions are recorded as ADRs in [docs/architecture/decisions.md](/labre-mcp/docs/architecture/decisions.md) (ARCH-01 to ARCH-25). Strategy classes for Wardley currently live under `src/frameworks/wardley/{chain,evolution}/_legacy/` per ARCH-23 (in-place migration). Physical extraction to the canonical `<tool>/<command>/<subdomain>/` layout is scheduled for V1.5 cleanup. Until then, both the new core `StrategyRegistry` and the legacy `loadStrategies()` filesystem walker resolve to the same classes. The repository directory will eventually be renamed `labre-mcp` (the npm package name and `.mcp.json` server name are already aligned).
 
 
 # Architecture (post-migration target)
 
 Read these first if you're new to the project:
 
-- [decisions.md](/WardleyAssistant/docs/architecture/decisions.md) — 22 ADRs that ground every other decision
-- [strategies.md](/WardleyAssistant/docs/architecture/strategies.md) — 5-segment methodIds, 4 commands (read/write/quality/emit), registry, BaseStrategy contract, result format with signals/reasoning/insights
-- [recipes.md](/WardleyAssistant/docs/architecture/recipes.md) — recipe schema, listeners, auto-fanout, shipped+override loader
-- [transport.md](/WardleyAssistant/docs/architecture/transport.md) — HTTP daemon on localhost, context propagation, auth middleware
-- [persistence.md](/WardleyAssistant/docs/architecture/persistence.md) — artefact JSON files in `~/.labre-mcp/runs/`, project identity
+- [decisions.md](/labre-mcp/docs/architecture/decisions.md) — 22 ADRs that ground every other decision
+- [strategies.md](/labre-mcp/docs/architecture/strategies.md) — 5-segment methodIds, 4 commands (read/write/quality/emit), registry, BaseStrategy contract, result format with signals/reasoning/insights
+- [recipes.md](/labre-mcp/docs/architecture/recipes.md) — recipe schema, listeners, auto-fanout, shipped+override loader
+- [transport.md](/labre-mcp/docs/architecture/transport.md) — HTTP daemon on localhost, context propagation, auth middleware
+- [persistence.md](/labre-mcp/docs/architecture/persistence.md) — artefact JSON files in `~/.labre-mcp/runs/`, project identity
 
 ## High-level shape
 
@@ -83,7 +83,7 @@ labre-mcp/
 
 15. Any loop over independent operations (strategies, components, signals) uses `Promise.allSettled(items.map(async ...))` — never `for...of + await`. The degradation collector uses `AsyncLocalStorage`, so each async branch keeps its own ambient frame
 16. Sequential for-loops are reserved for genuinely dependent iterations
-17. Recipe runners auto-fanout array inputs via `over: $.path` in the recipe — see [recipes.md](/WardleyAssistant/docs/architecture/recipes.md)
+17. Recipe runners auto-fanout array inputs via `over: $.path` in the recipe — see [recipes.md](/labre-mcp/docs/architecture/recipes.md)
 
 ## MCP & degradation
 
@@ -100,7 +100,7 @@ labre-mcp/
 
 ## Strategy result format (ARCH-22)
 
-25. Every strategy returns `{ signals[], reasoning[], insights[], result }` — never just a raw value. LLM reasoning traces are captured, not discarded. See [strategies.md](/WardleyAssistant/docs/architecture/strategies.md)
+25. Every strategy returns `{ signals[], reasoning[], insights[], result }` — never just a raw value. LLM reasoning traces are captured, not discarded. See [strategies.md](/labre-mcp/docs/architecture/strategies.md)
 
 ## Recipes (ARCH-06, 07, 08)
 
@@ -123,7 +123,7 @@ labre-mcp/
 
 34. Always present a plan before coding non-trivial changes — never jump straight to implementation
 35. Plans must be resumable across the 5-hour quota window: split into build-green checkpoints, never leave a half-migration broken
-36. Update [/docs/technical/tree-map.md](/WardleyAssistant/docs/technical/tree-map.md) in the same change as any `src/` reorganisation
+36. Update [/docs/technical/tree-map.md](/labre-mcp/docs/technical/tree-map.md) in the same change as any `src/` reorganisation
 37. The migration is big bang, no backwards compatibility (ARCH-16). Each checkpoint leaves a green build; the final cut-over happens in CP10
 
 ## LLM providers (ARCH-21 category 1)
@@ -134,7 +134,7 @@ labre-mcp/
 
 # Map around the code base
 
-1. Migration ADRs and architecture topics live in [/docs/architecture/](/WardleyAssistant/docs/architecture/)
-2. Functional and historical technical docs live in [/docs/technical/](/WardleyAssistant/docs/technical/) and [/docs/functional/](/WardleyAssistant/docs/functional/) — these reflect the **pre-migration** structure until CP9 doc updates land
+1. Migration ADRs and architecture topics live in [/docs/architecture/](/labre-mcp/docs/architecture/)
+2. Functional and historical technical docs live in [/docs/technical/](/labre-mcp/docs/technical/) and [/docs/functional/](/labre-mcp/docs/functional/) — these reflect the **pre-migration** structure until CP9 doc updates land
 3. Plan file: `~/.claude/plans/1-a-2-jolly-octopus.md` (10-checkpoint migration sequence)
 4. Strategies, recipes, transport, persistence — each has a dedicated topic doc under `docs/architecture/`

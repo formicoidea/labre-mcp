@@ -1,1 +1,1 @@
-=> [/AGENT.md](/WardleyAssistant/AGENT.md)
+=> [/AGENT.md](/labre-mcp/AGENT.md)

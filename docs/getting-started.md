@@ -9,8 +9,8 @@
 ## Installation
 
 ```bash
-git clone <repo-url> WardleyAssistant
-cd WardleyAssistant
+git clone <repo-url> labre-mcp
+cd labre-mcp
 pnpm install
 ```
 
@@ -82,10 +82,8 @@ Le fichier `.mcp.json` a la racine enregistre le serveur automatiquement :
 {
   "mcpServers": {
     "labre-mcp": {
-      "command": "cmd",
-      "args": ["/c", "npx", "tsx", "--env-file=.env", "src/mcp/mcp-server.mts"],
-      "cwd": "C:\\...\\WardleyAssistant",
-      "timeout": 180000
+      "type": "http",
+      "url": "http://127.0.0.1:3000/mcp"
     }
   }
 }
@@ -121,7 +119,7 @@ Voir [Notifications](notifications.md) pour plus de details.
 Voir [REPOTREEMAP.md](REPOTREEMAP.md) pour la cartographie complete. Aperçu :
 
 ```
-WardleyAssistant/
+labre-mcp/
 ├── src/
 │   ├── index.mts                        # API programmatique (re-exports)
 │   ├── mcp/                             # Couche MCP (transport JSON-RPC)

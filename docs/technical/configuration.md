@@ -297,20 +297,20 @@ Il est charge automatiquement par Node.js via le flag `--env-file=.env` dans `.m
 
 ## Configuration MCP — .mcp.json
 
-Le fichier `.mcp.json` a la racine enregistre le serveur MCP aupres de Claude Code :
+Le fichier `.mcp.json` a la racine enregistre le serveur MCP aupres de Claude Code via HTTP (le daemon ecoute sur localhost:3000) :
 
 ```json
 {
   "mcpServers": {
     "labre-mcp": {
-      "command": "cmd",
-      "args": ["/c", "npx", "tsx", "--env-file=.env", "src/mcp/mcp-server.mts"],
-      "cwd": "C:\\...\\WardleyAssistant",
-      "timeout": 600
+      "type": "http",
+      "url": "http://127.0.0.1:3000/mcp"
     }
   }
 }
 ```
+
+Le daemon HTTP se demarre avec `pnpm mcp`. La variante legacy stdio reste disponible via `pnpm mcp:legacy:stdio` (voir docs/architecture/transport.md).
 
 | Champ | Description |
 |---|---|

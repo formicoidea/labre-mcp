@@ -1,6 +1,6 @@
 # Evaluation (promptfoo)
 
-WardleyAssistant utilise [promptfoo](https://www.promptfoo.dev/) pour tester la qualite des estimations d'evolution de maniere systematique.
+labre-mcp utilise [promptfoo](https://www.promptfoo.dev/) pour tester la qualite des estimations d'evolution de maniere systematique.
 
 ## Configuration
 

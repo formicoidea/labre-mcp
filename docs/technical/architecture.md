@@ -2,7 +2,7 @@
 
 ## Vue d'ensemble
 
-WardleyAssistant est un serveur MCP implementant le protocole JSON-RPC 2.0 sur stdio. Il ne depend d'aucun framework externe pour le transport — le serveur lit stdin ligne par ligne et ecrit les reponses sur stdout.
+labre-mcp est un serveur MCP implementant le protocole JSON-RPC 2.0. Le transport canonique est HTTP via le daemon dans `src/core/transport/labre-daemon.mts` (entry `pnpm mcp`). Une variante legacy stdio reste disponible via `pnpm mcp:legacy:stdio`.
 
 ## Pipeline de traitement
 

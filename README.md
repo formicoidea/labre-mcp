@@ -1,4 +1,4 @@
-# WardleyAssistant
+# labre-mcp
 
 Serveur MCP (Model Context Protocol) pour l'estimation de la position d'evolution des composants sur les cartes de Wardley. Route automatiquement entre deux pipelines d'evaluation — **capability strategies** (6 strategies pluggables) pour les capacites abstraites et **solution strategies** (12 proprietes Wardley) pour les produits nommes — avec gate de classification economique et modes oneshot/conversationnel.
 

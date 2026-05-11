@@ -1,4 +1,4 @@
-// WardleyAssistant â€” main entry point
+// labre-mcp — main entry point
 //
 // Re-exports the public API surface for programmatic consumers.
 // For MCP server usage, run: npx tsx src/mcp/mcp-server.mts (dev)

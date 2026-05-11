@@ -1,6 +1,6 @@
-# WardleyAssistant — Documentation
+# labre-mcp — Documentation
 
-WardleyAssistant est un serveur MCP (Model Context Protocol) qui estime la position d'evolution des composants sur une Wardley Map. Il expose **4 outils** via JSON-RPC 2.0 sur stdio et route automatiquement entre deux pipelines d'evaluation :
+labre-mcp est un serveur MCP (Model Context Protocol) qui estime la position d'evolution des composants sur une Wardley Map. Il expose **4 outils** via JSON-RPC 2.0 sur stdio et route automatiquement entre deux pipelines d'evaluation :
 
 - **Capability strategies** (7 strategies pluggables, y compris cpc-evolution via BigQuery) pour les capacites abstraites
 - **Solution strategies** (12 proprietes Wardley) pour les produits/solutions nommes

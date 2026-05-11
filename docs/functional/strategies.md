@@ -1,6 +1,6 @@
 # Strategies d'evaluation
 
-WardleyAssistant utilise deux pipelines d'evaluation complementaires, selectionnes automatiquement selon le type de composant :
+labre-mcp utilise deux pipelines d'evaluation complementaires, selectionnes automatiquement selon le type de composant :
 
 - **Capability Strategies** (7 strategies) — pour les capacites abstraites (CRM, container orchestration, data storage)
 - **Solution Strategies** (12 proprietes Wardley) — pour les solutions/produits nommes (Kubernetes, Salesforce, SAP ERP)

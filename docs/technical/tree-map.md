@@ -1,11 +1,11 @@
-# REPOTREEMAP — Cartographie du repo WardleyAssistant
+# tree-map — Cartographie du repo labre-mcp
 
 > Source de vérité pour la navigation dans `src/` et pour la mise à jour des imports.
 > Ce fichier est maintenu à la main : le mettre à jour à chaque réorganisation.
 
 ## 1. Vue d'ensemble
 
-`WardleyAssistant` est un serveur **MCP** (Model Context Protocol) qui expose 5 outils autour des cartes Wardley :
+`labre-mcp` est un serveur **MCP** (Model Context Protocol) qui expose 5 outils autour des cartes Wardley :
 
 | Outil MCP | Rôle | Wrapper MCP | Lib métier |
 |---|---|---|---|
