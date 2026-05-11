@@ -11,7 +11,7 @@ import { toErrorMessage } from '#lib/errors.mjs';
  * @module pipeline/verification-signals
  */
 
-// â”€â”€â”€ raceWithTimeout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── raceWithTimeout ───────────────────────────────────────────────────────────
 
 /**
  * Race a promise against a timeout.  Resolves (never rejects) with a descriptor
@@ -51,7 +51,7 @@ export function raceWithTimeout(promise: Promise<any>, timeoutMs: number, label:
   });
 }
 
-// â”€â”€â”€ Signal builders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Signal builders ───────────────────────────────────────────────────────────
 
 /**
  * Build a VerificationSignal from a successful verification result.

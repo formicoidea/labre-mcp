@@ -29,11 +29,11 @@ import {
   buildResult,
 } from './verification-reconciliation.mjs';
 
-// Re-import thresholds from the orchestrator to avoid circular dependency â€”
+// Re-import thresholds from the orchestrator to avoid circular dependency —
 // we define our own copy of the constants we need.
 import { CONFIDENCE_THRESHOLD } from '#lib/component-detection.mjs';
 
-// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 /**
  * Confidence thresholds for concurrent verification tiers.
@@ -50,7 +50,7 @@ const TOOL = 'dual-verification';
 /** Default timeout per verification signal (ms). Overridable via context. */
 export const DEFAULT_SIGNAL_TIMEOUT_MS = 15_000;
 
-// â”€â”€â”€ Type Definitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Type Definitions ────────────────────────────────────────────────────────
 
 /**
  * @typedef {Object} VerificationSignal
@@ -77,7 +77,7 @@ export const DEFAULT_SIGNAL_TIMEOUT_MS = 15_000;
  * @property {Object}                   [namingResult]
  */
 
-// â”€â”€â”€ verifyConcurrent â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── verifyConcurrent ─────────────────────────────────────────────────────────
 
 /**
  * Concurrent dual-verification orchestrator.
@@ -87,7 +87,7 @@ export const DEFAULT_SIGNAL_TIMEOUT_MS = 15_000;
  * compared to the sequential `verifyClassification` pipeline.
  *
  * Lifecycle:
- *   1. (Optional) Tier 1 naming convention check â€” if confidence >= 90%, returns
+ *   1. (Optional) Tier 1 naming convention check — if confidence >= 90%, returns
  *      immediately without invoking LLM or web search (cost optimization).
  *   2. Launches LLM and web search concurrently (each with independent timeout).
  *   3. Collects both signals (success / timeout / error / skipped).
@@ -127,15 +127,15 @@ export async function verifyConcurrent(componentName: string, context: any = {})
 
   const description = context.description || '';
 
-  // â”€â”€ Optional Tier 1: Naming convention pre-check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Optional Tier 1: Naming convention pre-check ──────────────────────
   if (!context.skipNamingPrecheck) {
     const namingResult = detectComponentType(name, description);
 
-    logDebug(TOOL, `Concurrent: Tier 1 (naming) for "${name}" â†’ ` +
+    logDebug(TOOL, `Concurrent: Tier 1 (naming) for "${name}" → ` +
       `type=${namingResult.type}, confidence=${namingResult.confidence}`);
 
     if (namingResult.confidence >= THRESHOLDS.NAMING_SKIP) {
-      logDebug(TOOL, `Concurrent: Tier 1 sufficient â€” skipping concurrent verification`);
+      logDebug(TOOL, `Concurrent: Tier 1 sufficient — skipping concurrent verification`);
 
       const llmSkipped = buildSkippedSignal('llm', 'Naming confidence sufficient');
       const webSkipped = buildSkippedSignal('web-search', 'Naming confidence sufficient');
@@ -154,7 +154,7 @@ export async function verifyConcurrent(componentName: string, context: any = {})
     }
   }
 
-  // â”€â”€ Prepare concurrent verification promises â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Prepare concurrent verification promises ──────────────────────────
 
   const llmTimeoutMs = context.llmTimeoutMs || DEFAULT_SIGNAL_TIMEOUT_MS;
   const webSearchTimeoutMs = context.webSearchTimeoutMs || DEFAULT_SIGNAL_TIMEOUT_MS;
@@ -217,7 +217,7 @@ export async function verifyConcurrent(componentName: string, context: any = {})
         buildSkippedSignal('web-search', context.skipWebSearch ? 'Forced skip' : 'No web search backend')
       );
 
-  // â”€â”€ Launch both concurrently â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Launch both concurrently ──────────────────────────────────────────
 
   logDebug(TOOL, `Concurrent: Launching LLM (${canUseLLM ? 'active' : 'skipped'}) and ` +
     `web search (${canUseWebSearch ? 'active' : 'skipped'}) for "${name}"...`);
@@ -232,19 +232,19 @@ export async function verifyConcurrent(componentName: string, context: any = {})
     ? webSearchSettled.value
     : buildErrorSignal('web-search', new Error(webSearchSettled.reason?.message || 'Unknown error'), 0);
 
-  logDebug(TOOL, `Concurrent: LLM signal â†’ status=${llmSignal.status}, ` +
+  logDebug(TOOL, `Concurrent: LLM signal → status=${llmSignal.status}, ` +
     `classification=${llmSignal.classification}, confidence=${llmSignal.confidence}, ` +
     `duration=${llmSignal.durationMs}ms`);
-  logDebug(TOOL, `Concurrent: Web signal â†’ status=${webSearchSignal.status}, ` +
+  logDebug(TOOL, `Concurrent: Web signal → status=${webSearchSignal.status}, ` +
     `classification=${webSearchSignal.classification}, confidence=${webSearchSignal.confidence}, ` +
     `duration=${webSearchSignal.durationMs}ms`);
 
-  // â”€â”€ Reconcile the pair â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Reconcile the pair ────────────────────────────────────────────────
 
   const reconciled = reconcileSignalPair(llmSignal, webSearchSignal);
   const totalDurationMs = Date.now() - concurrentStart;
 
-  logDebug(TOOL, `Concurrent: Reconciled â†’ ${reconciled.classification} ` +
+  logDebug(TOOL, `Concurrent: Reconciled → ${reconciled.classification} ` +
     `(confidence=${reconciled.confidence}, method=${reconciled.method}, ` +
     `totalMs=${totalDurationMs})`);
 
@@ -260,7 +260,7 @@ export async function verifyConcurrent(componentName: string, context: any = {})
   };
 }
 
-// â”€â”€â”€ verifyConcurrentFull â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── verifyConcurrentFull ──────────────────────────────────────────────────────
 
 /**
  * Full concurrent verification with Tier 1 pre-check and routing target computation.
@@ -279,7 +279,7 @@ export async function verifyConcurrent(componentName: string, context: any = {})
  * @param {Object} [context={}]  - Same context shape as verifyConcurrent
  * @returns {Promise<Object>}
  */
-// any: same loose context bag as verifyConcurrent â€” full result includes raw signals
+// any: same loose context bag as verifyConcurrent — full result includes raw signals
 export async function verifyConcurrentFull(componentName: string, context: any = {}): Promise<any> {
   const name = (componentName || '').trim();
 
@@ -299,7 +299,7 @@ export async function verifyConcurrentFull(componentName: string, context: any =
 
   const description = context.description || '';
 
-  // â”€â”€ Tier 1: Naming convention â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Tier 1: Naming convention ──────────────────────────────────────────
   const namingResult = detectComponentType(name, description);
   const tiersUsed = ['naming'];
 
@@ -332,7 +332,7 @@ export async function verifyConcurrentFull(componentName: string, context: any =
     };
   }
 
-  // â”€â”€ Tier 2+3 concurrent: LLM + web search in parallel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Tier 2+3 concurrent: LLM + web search in parallel ─────────────────
   const dualSignals = await verifyConcurrent(name, {
     ...context,
     skipNamingPrecheck: true,  // already done
@@ -342,7 +342,7 @@ export async function verifyConcurrentFull(componentName: string, context: any =
   if (dualSignals.llmSignal.status !== 'skipped') tiersUsed.push('llm');
   if (dualSignals.webSearchSignal.status !== 'skipped') tiersUsed.push('web-search');
 
-  // â”€â”€ Tier 4: Reconcile naming + concurrent pair â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Tier 4: Reconcile naming + concurrent pair ─────────────────────────
   const namingIntermediate = toIntermediateResult(namingResult);
   let finalClassification;
   let finalConfidence;
@@ -362,7 +362,7 @@ export async function verifyConcurrentFull(componentName: string, context: any =
     finalReasoning = reconciled.reasoning;
     finalMethod = tiersUsed.join('+');
   } else {
-    // Concurrent pair failed â€” fall back to naming
+    // Concurrent pair failed — fall back to naming
     finalClassification = namingIntermediate.classification;
     finalConfidence = namingIntermediate.confidence;
     finalReasoning = `${namingIntermediate.reasoning} (concurrent verification unavailable)`;

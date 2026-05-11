@@ -1,6 +1,6 @@
-// Tests for force-directed.mts â€” Phase 6b label simulation.
+// Tests for force-directed.mts — Phase 6b label simulation.
 //
-// All tests are pure JS â€” no cli-owm calls. The simulation operates
+// All tests are pure JS — no cli-owm calls. The simulation operates
 // on `PositionedValueChain` directly via `computeGeometry`.
 
 import { describe, it } from 'node:test';
@@ -57,10 +57,10 @@ function findLabel(c: PositionedValueChain, name: string): { dx: number; dy: num
 
 const emitOpts = { style: 'plain' as const };
 
-describe('simulateLabels â€” separation', () => {
+describe('simulateLabels — separation', () => {
   it('separates two labels that start at the exact same position', () => {
     // Two components at almost-identical positions, both with dy=+25.
-    // Their starting label positions coincide â†’ strong repulsion
+    // Their starting label positions coincide → strong repulsion
     // should push them apart.
     const c = chain([
       { name: 'A', role: 'capability', evolution: 0.5, visibility: 0.5, dx: 0, dy: 25 },
@@ -73,11 +73,11 @@ describe('simulateLabels â€” separation', () => {
     const moved = labelA.dx !== 0 || labelA.dy !== 25
                || labelB.dx !== 0 || labelB.dy !== 25;
     assert.ok(moved, 'expected at least one of the labels to have moved');
-    assert.ok(out.modified.length >= 1, 'expected modified list to include â‰¥ 1 label');
+    assert.ok(out.modified.length >= 1, 'expected modified list to include ≥ 1 label');
   });
 });
 
-describe('simulateLabels â€” home attraction', () => {
+describe('simulateLabels — home attraction', () => {
   it('leaves a single isolated label at its home position', () => {
     // A single particle inside the canvas, no other forces. The seed
     // offset IS the home (the spring rest point), so the label
@@ -110,7 +110,7 @@ describe('simulateLabels â€” home attraction', () => {
   });
 });
 
-describe('simulateLabels â€” stability under pathological input', () => {
+describe('simulateLabels — stability under pathological input', () => {
   it('does not diverge when initialised far outside the canvas', () => {
     // Pathological input: label at (10000, 10000). The velocity cap +
     // damping should keep the system bounded.
@@ -125,7 +125,7 @@ describe('simulateLabels â€” stability under pathological input', () => {
   });
 });
 
-describe('simulateLabels â€” convergence', () => {
+describe('simulateLabels — convergence', () => {
   it('terminates within SIM_LABEL_ITERATIONS', () => {
     const c = chain([
       { name: 'A', role: 'capability', evolution: 0.4, visibility: 0.5, dx: 0, dy: 25 },
@@ -134,7 +134,7 @@ describe('simulateLabels â€” convergence', () => {
     ]);
     const out = simulateLabels(c, emitOpts);
     assert.ok(out.iterations <= SIM_LABEL_ITERATIONS,
-      `expected â‰¤ ${SIM_LABEL_ITERATIONS} iterations, got ${out.iterations}`);
+      `expected ≤ ${SIM_LABEL_ITERATIONS} iterations, got ${out.iterations}`);
     assert.ok(typeof out.finalKineticEnergy === 'number');
   });
 
@@ -151,7 +151,7 @@ describe('simulateLabels â€” convergence', () => {
   });
 });
 
-describe('simulateLabels â€” anchor immobility', () => {
+describe('simulateLabels — anchor immobility', () => {
   it('does not move anchor components', () => {
     // Anchors are not particles; their (X, Y) positions and labels
     // remain unchanged after simulation.
@@ -168,7 +168,7 @@ describe('simulateLabels â€” anchor immobility', () => {
   });
 });
 
-describe('simulateLabels â€” boundary respect', () => {
+describe('simulateLabels — boundary respect', () => {
   it('pulls a label inside the canvas when it overflows the right edge', () => {
     // Component at evolution=0.95 with dx=+200 places the label well
     // beyond the right side of the visible map (mapWidth=500 by default).
@@ -183,7 +183,7 @@ describe('simulateLabels â€” boundary respect', () => {
   });
 });
 
-describe('simulateLabels â€” preserved invariants', () => {
+describe('simulateLabels — preserved invariants', () => {
   it('does not mutate the input chain', () => {
     const c = chain([
       { name: 'A', role: 'capability', evolution: 0.5, visibility: 0.5, dx: 0, dy: 25 },
@@ -211,16 +211,16 @@ describe('simulateLabels â€” preserved invariants', () => {
   });
 });
 
-describe('simulateLabels â€” constants sanity', () => {
+describe('simulateLabels — constants sanity', () => {
   it('exposes a positive iteration cap and threshold', () => {
     assert.ok(SIM_LABEL_ITERATIONS > 0);
     assert.ok(KINETIC_ENERGY_THRESHOLD > 0);
   });
 });
 
-// â”€â”€â”€ Phase 6c â€” Component fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Phase 6c — Component fallback ────────────────────────────────────
 
-describe('simulateComponents â€” anchor immobility', () => {
+describe('simulateComponents — anchor immobility', () => {
   it('never moves an anchor component', () => {
     const c = chain([
       { name: 'A', role: 'anchor',     evolution: 0.95, visibility: 0.95, dx: -100, dy: 0 },
@@ -235,7 +235,7 @@ describe('simulateComponents â€” anchor immobility', () => {
   });
 });
 
-describe('simulateComponents â€” DSL invariants', () => {
+describe('simulateComponents — DSL invariants', () => {
   it('preserves Y(parent) > Y(child) for every link', () => {
     // A linear chain. Even after simulation, the parent must remain
     // strictly above the child.
@@ -265,7 +265,7 @@ describe('simulateComponents â€” DSL invariants', () => {
       `expected X within xHint Â± 0.10, got ${a.evolution}`);
   });
 
-  it('keeps every component within global bounds [0.10, 0.90] Ã— [0.10, 0.95]', () => {
+  it('keeps every component within global bounds [0.10, 0.90] × [0.10, 0.95]', () => {
     const c = chain([
       { name: 'A', role: 'capability', evolution: 0.5, visibility: 0.5 },
       { name: 'B', role: 'capability', evolution: 0.5, visibility: 0.5 },
@@ -281,7 +281,7 @@ describe('simulateComponents â€” DSL invariants', () => {
   });
 });
 
-describe('simulateComponents â€” convergence', () => {
+describe('simulateComponents — convergence', () => {
   it('terminates within SIM_COMPONENT_ITERATIONS', () => {
     const c = chain([
       { name: 'A', role: 'capability', evolution: 0.4, visibility: 0.5 },
@@ -305,7 +305,7 @@ describe('simulateComponents â€” convergence', () => {
   });
 });
 
-describe('simulateComponents â€” empty / trivial inputs', () => {
+describe('simulateComponents — empty / trivial inputs', () => {
   it('handles a chain with only an anchor (no movable components)', () => {
     const c = chain([
       { name: 'R', role: 'anchor', evolution: 0.95, visibility: 0.95 },
@@ -316,13 +316,13 @@ describe('simulateComponents â€” empty / trivial inputs', () => {
   });
 });
 
-describe('simulateComponents â€” constants sanity', () => {
+describe('simulateComponents — constants sanity', () => {
   it('exposes a positive component iteration cap', () => {
     assert.ok(SIM_COMPONENT_ITERATIONS > 0);
   });
 });
 
-// â”€â”€â”€ Phase 6d â€” Strict projection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Phase 6d — Strict projection ─────────────────────────────────────
 
 const HARD_KINDS = new Set(['label-label', 'component-label', 'label-canvas']);
 
@@ -331,7 +331,7 @@ function countHardOverlaps(c: PositionedValueChain): number {
   return detectAllOverlaps(geometry).filter(o => HARD_KINDS.has(o.kind)).length;
 }
 
-describe('projectHardConstraints â€” clean baseline', () => {
+describe('projectHardConstraints — clean baseline', () => {
   it('returns the chain unchanged when no hard violation is present', () => {
     const c = chain([
       { name: 'A', role: 'capability', evolution: 0.3, visibility: 0.5, dx: 20, dy: 0 },
@@ -347,7 +347,7 @@ describe('projectHardConstraints â€” clean baseline', () => {
   });
 });
 
-describe('projectHardConstraints â€” separation', () => {
+describe('projectHardConstraints — separation', () => {
   it('separates two coincident labels until they no longer overlap', () => {
     const c = chain([
       { name: 'A', role: 'capability', evolution: 0.5, visibility: 0.5, dx: 0, dy: 25 },
@@ -360,13 +360,13 @@ describe('projectHardConstraints â€” separation', () => {
   });
 });
 
-describe('projectHardConstraints â€” convergence cap', () => {
+describe('projectHardConstraints — convergence cap', () => {
   it('respects PROJECTION_ITERATIONS', () => {
     assert.ok(PROJECTION_ITERATIONS > 0 && PROJECTION_ITERATIONS <= 20);
   });
 
   it('terminates even on unsolvable configurations', () => {
-    // Five labels stacked at the exact same position â€” hard but
+    // Five labels stacked at the exact same position — hard but
     // solvable in a few iterations. The cap protects us if we ever
     // hit a pathological fixed point.
     const c = chain([
@@ -382,7 +382,7 @@ describe('projectHardConstraints â€” convergence cap', () => {
   });
 });
 
-describe('projectHardConstraints â€” anchor immobility', () => {
+describe('projectHardConstraints — anchor immobility', () => {
   it('never moves an anchor label', () => {
     const c = chain([
       { name: 'A', role: 'anchor',     evolution: 0.95, visibility: 0.95, dx: -100, dy: 0 },
@@ -395,7 +395,7 @@ describe('projectHardConstraints â€” anchor immobility', () => {
   });
 });
 
-describe('projectHardConstraints â€” preserved invariants', () => {
+describe('projectHardConstraints — preserved invariants', () => {
   it('does not mutate the input chain', () => {
     const c = chain([
       { name: 'A', role: 'capability', evolution: 0.5, visibility: 0.5, dx: 0, dy: 25 },

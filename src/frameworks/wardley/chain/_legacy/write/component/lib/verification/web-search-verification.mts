@@ -25,11 +25,11 @@
 //   // With default Agent SDK web search backend
 //   const webSearch = createWebSearchCall();
 //   const result = await verifyViaWebSearch('Kubernetes', { webSearchCall: webSearch });
-//   // â†’ { classification: 'solution', confidence: 0.94, evidence: [...], references: [...] }
+//   // → { classification: 'solution', confidence: 0.94, evidence: [...], references: [...] }
 //
 //   // With custom/mock web search function (for testing)
 //   const result = await verifyViaWebSearch('CRM', { webSearchCall: mockSearch });
-//   // â†’ { classification: 'capability', confidence: 0.88, evidence: [...], references: [...] }
+//   // → { classification: 'capability', confidence: 0.88, evidence: [...], references: [...] }
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { logDebug, logWarning } from '#lib/mcp-notifications.mjs';
@@ -40,7 +40,7 @@ import { parseKeyValueBlock, parseDelimitedBlock } from '#lib/prompts/parsers.mj
 import { getPrompt } from '#lib/prompts/registry.mjs';
 import { getCurrentCollector } from '#lib/degradation/index.mjs';
 
-// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const TOOL = 'web-search-verification';
 
@@ -61,7 +61,7 @@ function isRetryableError(err: unknown): boolean {
 
 function sleep(ms: number): Promise<void> { return new Promise(r => setTimeout(r, ms)); }
 
-// â”€â”€â”€ Result Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Result Types ─────────────────────────────────────────────────────────────
 
 /**
  * @typedef {Object} WebSearchEvidence
@@ -81,7 +81,7 @@ function sleep(ms: number): Promise<void> { return new Promise(r => setTimeout(r
 /**
  * @typedef {Object} WebSearchVerificationResult
  * @property {'solution'|'capability'} classification - Component classification
- * @property {number}  confidence   - Confidence score (0â€“1)
+ * @property {number}  confidence   - Confidence score (0–1)
  * @property {string}  method       - Always 'web-search'
  * @property {string}  reasoning    - Human-readable explanation
  * @property {boolean} isSolution   - Convenience flag
@@ -89,7 +89,7 @@ function sleep(ms: number): Promise<void> { return new Promise(r => setTimeout(r
  * @property {WebSearchReference[]} references - Source references found
  */
 
-// â”€â”€â”€ Web Search Prompt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Web Search Prompt ───────────────────────────────────────────────────────
 
 /**
  * Prompt template for web search-based verification.
@@ -101,7 +101,7 @@ function sleep(ms: number): Promise<void> { return new Promise(r => setTimeout(r
  */
 // Prompt text lives in prompts/web-search-verification.md. Resolved via getPrompt('web-search-verification').
 
-// â”€â”€â”€ Response Parsing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Response Parsing ─────────────────────────────────────────────────────────
 
 /**
  * Parse the web search verification response from the LLM.
@@ -119,17 +119,17 @@ export function parseWebSearchResponse(text: string, name: string) {
     return createFallbackResult(name, 'Empty web search response');
   }
 
-  // â”€â”€ Parse classification line â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Parse classification line ────────────────────────────────────────
   const raw = parseKeyValueBlock(text, ['classification', 'confidence', 'reasoning']);
   const classValue = raw.classification?.toLowerCase().match(/^(solution|capability)\b/)?.[1];
 
-  // â”€â”€ Parse evidence block â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Parse evidence block ─────────────────────────────────────────────
   const evidence = parseEvidenceBlock(text);
 
-  // â”€â”€ Parse references block â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Parse references block ───────────────────────────────────────────
   const references = parseReferencesBlock(text);
 
-  // â”€â”€ Build result â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Build result ─────────────────────────────────────────────────────
   if (classValue) {
     const classification = classValue === 'solution' ? 'solution' : 'capability';
     const rawConf = raw.confidence !== undefined ? parseFloat(raw.confidence) : 0.70;
@@ -147,7 +147,7 @@ export function parseWebSearchResponse(text: string, name: string) {
     };
   }
 
-  // â”€â”€ Fallback: keyword-based classification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Fallback: keyword-based classification ───────────────────────────
   return inferFromKeywords(text, name, evidence, references);
 }
 
@@ -319,14 +319,14 @@ function createFallbackResult(name: string, reason: string): WebSearchVerificati
     classification: 'capability',
     confidence: 0.40,
     method: 'web-search',
-    reasoning: `Could not verify "${name}" via web search: ${reason} â€” defaulting to capability`,
+    reasoning: `Could not verify "${name}" via web search: ${reason} — defaulting to capability`,
     isSolution: false,
     evidence: [],
     references: [],
   };
 }
 
-// â”€â”€â”€ Web Search Backend â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Web Search Backend ───────────────────────────────────────────────────────
 
 /**
  * Create a web search call function backed by the Claude Agent SDK.
@@ -400,7 +400,7 @@ export function createWebSearchCall(config: any = {}) {
   };
 }
 
-// â”€â”€â”€ Main Verification Function â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main Verification Function ──────────────────────────────────────────────
 
 /**
  * Verify whether a component is a known product/solution or an abstract
@@ -409,7 +409,7 @@ export function createWebSearchCall(config: any = {}) {
  * This function is designed as the fallback tier in the detection pipeline:
  *   Tier 1: Naming convention heuristics (fast, no cost)
  *   Tier 2: LLM semantic classification (moderate cost)
- *   Tier 3: Web search verification (higher cost, higher accuracy) â† this
+ *   Tier 3: Web search verification (higher cost, higher accuracy) ← this
  *
  * @param {string} name - Component name to verify
  * @param {Object} [options={}]
@@ -469,7 +469,7 @@ export async function verifyViaWebSearch(name: string, options: { description?: 
       classification: 'capability',
       confidence: 0.35,
       method: 'web-search',
-      reasoning: `Web search verification failed for "${trimmed}": ${toErrorMessage(err)} â€” defaulting to capability`,
+      reasoning: `Web search verification failed for "${trimmed}": ${toErrorMessage(err)} — defaulting to capability`,
       isSolution: false,
       evidence: [],
       references: [],
@@ -478,7 +478,7 @@ export async function verifyViaWebSearch(name: string, options: { description?: 
   }
 }
 
-// â”€â”€â”€ Integration Helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Integration Helper ──────────────────────────────────────────────────────
 
 /**
  * Combine web search verification with a prior naming/LLM classification.
@@ -530,5 +530,5 @@ export function combineWithPriorResult(priorResult: any, webResult: WebSearchVer
   };
 }
 
-// â”€â”€â”€ Exports for Testing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Exports for Testing ─────────────────────────────────────────────────────
 

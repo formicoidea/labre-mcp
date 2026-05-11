@@ -8,7 +8,7 @@
 //   - Routing target computation
 //   - VerifiedClassificationResult contract
 //
-// All tests use mocks â€” no real LLM or web search calls are made.
+// All tests use mocks — no real LLM or web search calls are made.
 
 // Register prompt parsers before any test runs (needed because
 // verifyClassification reaches the web-search-verification path which parses
@@ -37,7 +37,7 @@ function assert(condition, message) {
 
 console.log('=== dual-verification-orchestrator test suite ===\n');
 
-// â”€â”€â”€ Contract validation helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Contract validation helper ──────────────────────────────────────────────
 
 function validateResultContract(result, label) {
   assert(typeof result.classification === 'string', `${label}: classification is string`);
@@ -59,7 +59,7 @@ function validateResultContract(result, label) {
   assert(typeof result.routingTargets.useCapabilityStrategies === 'boolean', `${label}: routingTargets.useCapabilityStrategies is boolean`);
 }
 
-// â”€â”€â”€ Test group 1: Known solutions (Tier 1 only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Test group 1: Known solutions (Tier 1 only) ────────────────────────────
 
 console.log('--- Group 1: Known solutions (Tier 1 short-circuit) ---');
 {
@@ -81,7 +81,7 @@ console.log('--- Group 1: Known solutions (Tier 1 short-circuit) ---');
   console.log(`  ${solutions.length} known solutions tested`);
 }
 
-// â”€â”€â”€ Test group 2: Known capabilities (Tier 1 only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Test group 2: Known capabilities (Tier 1 only) ─────────────────────────
 
 console.log('\n--- Group 2: Known capabilities (Tier 1 short-circuit) ---');
 {
@@ -99,7 +99,7 @@ console.log('\n--- Group 2: Known capabilities (Tier 1 short-circuit) ---');
   console.log(`  ${capabilities.length} known capabilities tested`);
 }
 
-// â”€â”€â”€ Test group 3: LLM fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Test group 3: LLM fallback ─────────────────────────────────────────────
 
 console.log('\n--- Group 3: LLM fallback behavior ---');
 {
@@ -133,19 +133,19 @@ console.log('\n--- Group 3: LLM fallback behavior ---');
   console.log('  LLM fallback tests passed');
 }
 
-// â”€â”€â”€ Test group 4: Agreement/disagreement reconciliation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Test group 4: Agreement/disagreement reconciliation ────────────────────
 
 console.log('\n--- Group 4: Tier reconciliation ---');
 {
-  // Agreement: naming=solution (heuristic, ~0.55) + LLM=solution (0.78) â†’ boosted
+  // Agreement: naming=solution (heuristic, ~0.55) + LLM=solution (0.78) → boosted
   const agreeLLM = async () => 'classification=SOLUTION\nconfidence=0.78\nreasoning=Looks like a product';
   const r1 = await verifyClassification('CloudFormation', { llmCall: agreeLLM, skipWebSearch: true });
-  // CloudFormation matches PascalCase compound pattern â†’ solution ~0.55
-  // LLM also says solution â†’ agreement bonus
-  assert(r1.classification === 'solution', 'CloudFormation: agreement â†’ solution');
+  // CloudFormation matches PascalCase compound pattern → solution ~0.55
+  // LLM also says solution → agreement bonus
+  assert(r1.classification === 'solution', 'CloudFormation: agreement → solution');
   assert(r1.confidence > 0.55, `CloudFormation: agreement boosted confidence (got ${r1.confidence})`);
 
-  // Disagreement: naming=solution (heuristic, ~0.55) + LLM=capability (0.88) â†’ LLM wins with penalty
+  // Disagreement: naming=solution (heuristic, ~0.55) + LLM=capability (0.88) → LLM wins with penalty
   const disagreeLLM = async () => 'classification=CAPABILITY\nconfidence=0.88\nreasoning=This is actually a general concept';
   const r2 = await verifyClassification('CloudFormation', { llmCall: disagreeLLM, skipWebSearch: true });
   // Higher confidence tier (LLM at 0.88) should win
@@ -157,7 +157,7 @@ console.log('\n--- Group 4: Tier reconciliation ---');
   console.log('  Reconciliation tests passed');
 }
 
-// â”€â”€â”€ Test group 5: Web search tier â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Test group 5: Web search tier ──────────────────────────────────────────
 
 console.log('\n--- Group 5: Web search tier ---');
 {
@@ -189,55 +189,55 @@ console.log('\n--- Group 5: Web search tier ---');
   console.log('  Web search tier tests passed');
 }
 
-// â”€â”€â”€ Test group 6: Edge cases â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Test group 6: Edge cases ───────────────────────────────────────────────
 
 console.log('\n--- Group 6: Edge cases ---');
 {
   const r1 = await verifyClassification('');
   validateResultContract(r1, 'empty');
-  assert(r1.classification === 'capability', 'Empty â†’ capability');
-  assert(r1.confidence === 0, 'Empty â†’ 0 confidence');
-  assert(r1.verified === false, 'Empty â†’ not verified');
+  assert(r1.classification === 'capability', 'Empty → capability');
+  assert(r1.confidence === 0, 'Empty → 0 confidence');
+  assert(r1.verified === false, 'Empty → not verified');
 
   const r2 = await verifyClassification(null);
   validateResultContract(r2, 'null');
-  assert(r2.classification === 'capability', 'Null â†’ capability');
-  assert(r2.verified === false, 'Null â†’ not verified');
+  assert(r2.classification === 'capability', 'Null → capability');
+  assert(r2.verified === false, 'Null → not verified');
 
   const r3 = await verifyClassification(undefined);
   validateResultContract(r3, 'undefined');
-  assert(r3.classification === 'capability', 'Undefined â†’ capability');
+  assert(r3.classification === 'capability', 'Undefined → capability');
 
   const r4 = await verifyClassification('   ');
   validateResultContract(r4, 'whitespace');
-  assert(r4.classification === 'capability', 'Whitespace â†’ capability');
-  assert(r4.confidence === 0, 'Whitespace â†’ 0 confidence');
+  assert(r4.classification === 'capability', 'Whitespace → capability');
+  assert(r4.confidence === 0, 'Whitespace → 0 confidence');
 
   console.log('  Edge cases passed');
 }
 
-// â”€â”€â”€ Test group 7: classifyNamingOnly â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Test group 7: classifyNamingOnly ───────────────────────────────────────
 
 console.log('\n--- Group 7: classifyNamingOnly convenience ---');
 {
   const r1 = classifyNamingOnly('Kubernetes', 'Container orchestration platform');
   validateResultContract(r1, 'classifyNamingOnly-Kubernetes');
-  assert(r1.classification === 'solution', 'Kubernetes â†’ solution');
-  assert(r1.verified === true, 'Known solution â†’ verified');
+  assert(r1.classification === 'solution', 'Kubernetes → solution');
+  assert(r1.verified === true, 'Known solution → verified');
   assert(r1.tiersUsed.length === 1, 'Only naming tier');
 
   const r2 = classifyNamingOnly('CRM');
-  assert(r2.classification === 'capability', 'CRM â†’ capability');
-  assert(r2.verified === true, 'Known capability â†’ verified');
+  assert(r2.classification === 'capability', 'CRM → capability');
+  assert(r2.verified === true, 'Known capability → verified');
 
   const r3 = classifyNamingOnly('');
-  assert(r3.confidence === 0, 'Empty â†’ 0 confidence');
-  assert(r3.verified === false, 'Empty â†’ not verified');
+  assert(r3.confidence === 0, 'Empty → 0 confidence');
+  assert(r3.verified === false, 'Empty → not verified');
 
   console.log('  classifyNamingOnly tests passed');
 }
 
-// â”€â”€â”€ Test group 8: Constants exported correctly â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Test group 8: Constants exported correctly ─────────────────────────────
 
 console.log('\n--- Group 8: Constants and exports ---');
 {
@@ -251,32 +251,32 @@ console.log('\n--- Group 8: Constants and exports ---');
   console.log('  Constants validated');
 }
 
-// â”€â”€â”€ Test group 9: Routing targets correctness â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Test group 9: Routing targets correctness ──────────────────────────────
 
 console.log('\n--- Group 9: Routing targets ---');
 {
-  // Solution â†’ route to solution strategies (exclusive mode default)
+  // Solution → route to solution strategies (exclusive mode default)
   const r1 = await verifyClassification('Kubernetes');
-  assert(r1.routingTargets.useSolutionStrategies === true, 'Kubernetes â†’ solution strategies');
-  assert(r1.routingTargets.useCapabilityStrategies === false, 'Kubernetes â†’ no capability strategies (exclusive)');
+  assert(r1.routingTargets.useSolutionStrategies === true, 'Kubernetes → solution strategies');
+  assert(r1.routingTargets.useCapabilityStrategies === false, 'Kubernetes → no capability strategies (exclusive)');
 
-  // Capability â†’ route to capability strategies
+  // Capability → route to capability strategies
   const r2 = await verifyClassification('CRM');
-  assert(r2.routingTargets.useSolutionStrategies === false, 'CRM â†’ no solution strategies (exclusive)');
-  assert(r2.routingTargets.useCapabilityStrategies === true, 'CRM â†’ capability strategies');
+  assert(r2.routingTargets.useSolutionStrategies === false, 'CRM → no solution strategies (exclusive)');
+  assert(r2.routingTargets.useCapabilityStrategies === true, 'CRM → capability strategies');
 
   // Parallel mode: both routes
   const origMode = process.env.WARDLEY_EVAL_MODE;
   process.env.WARDLEY_EVAL_MODE = 'parallel';
   const r3 = await verifyClassification('Kubernetes');
-  assert(r3.routingTargets.useSolutionStrategies === true, 'Kubernetes parallel â†’ solution');
-  assert(r3.routingTargets.useCapabilityStrategies === true, 'Kubernetes parallel â†’ capability');
+  assert(r3.routingTargets.useSolutionStrategies === true, 'Kubernetes parallel → solution');
+  assert(r3.routingTargets.useCapabilityStrategies === true, 'Kubernetes parallel → capability');
   process.env.WARDLEY_EVAL_MODE = origMode;
 
   console.log('  Routing targets tests passed');
 }
 
-// â”€â”€â”€ Summary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Summary ────────────────────────────────────────────────────────────────
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
 process.exit(failed > 0 ? 1 : 0);

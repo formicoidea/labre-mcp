@@ -1,4 +1,4 @@
-// Pipeline capability inference â€” deduces the underlying capability from a solution name.
+// Pipeline capability inference — deduces the underlying capability from a solution name.
 //
 // When the pipeline enrichment mode (pipeline: true) receives a solution input
 // (e.g. "Kubernetes", "Scrum", "ISO 27001"), this module uses the Tier 2 LLM
@@ -11,7 +11,7 @@
 //   2. Solution SotA (state-of-the-art solution in the same capability space)
 //   3. Solution legacy (an older/less-evolved solution)
 //
-// This module does NOT add latency to the default routing path â€” it is only
+// This module does NOT add latency to the default routing path — it is only
 // invoked when pipeline: true is explicitly requested.
 //
 // Usage:
@@ -21,7 +21,7 @@
 //     description: 'Container orchestration platform',
 //     llmCall,
 //   });
-//   // â†’ {
+//   // → {
 //   //   solutionName: 'Kubernetes',
 //   //   capability: 'Orchestrate containers',
 //   //   capabilityLabel: 'Container Orchestration',
@@ -35,11 +35,11 @@ import { identifyCapability, parseCapabilityResponse } from '../capability/ident
 import { logDebug } from '#lib/mcp-notifications.mjs';
 import { toErrorMessage, errorCode } from '#lib/errors.mjs';
 
-// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const TOOL = 'pipelineCapabilityInference';
 
-// â”€â”€â”€ Result Type â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Result Type ──────────────────────────────────────────────────────────────
 
 /**
  * @typedef {Object} PipelineCapabilityInferenceResult
@@ -48,23 +48,23 @@ const TOOL = 'pipelineCapabilityInference';
  * @property {string}  capabilityLabel - Clean label for OWM display (e.g. "Container Orchestration")
  * @property {string}  nature          - Wardley component nature: activity | practice | knowledge | data
  * @property {string}  wardleyType     - Component type: component | pipeline | anchor | market | ecosystem
- * @property {number}  confidence      - Confidence in the inference (0â€“1)
+ * @property {number}  confidence      - Confidence in the inference (0–1)
  * @property {string}  justification   - LLM reasoning for the inference
- * @property {boolean} inferred        - Always true â€” marks this as an LLM inference result
+ * @property {boolean} inferred        - Always true — marks this as an LLM inference result
  */
 
-// â”€â”€â”€ Capability Label Normalization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Capability Label Normalization ──────────────────────────────────────────
 
 /**
  * Convert a nature-formatted capability string into a clean display label
  * suitable for OWM component names.
  *
  * Transformations by nature:
- *   - activity: "Orchestrate containers" â†’ "Container Orchestration"
+ *   - activity: "Orchestrate containers" → "Container Orchestration"
  *     (removes leading verb, nominalizes)
- *   - practice: "how to manage IT services" â†’ "IT Service Management"
+ *   - practice: "how to manage IT services" → "IT Service Management"
  *     (removes "how to", nominalizes)
- *   - knowledge: "technical expertise in welding" â†’ "Welding Expertise"
+ *   - knowledge: "technical expertise in welding" → "Welding Expertise"
  *   - data: kept as-is with title case
  *
  * Falls back to title-casing the raw capability if transformation fails.
@@ -81,8 +81,8 @@ export function capabilityToLabel(capability: string, nature?: string): string {
   try {
     switch (nature) {
       case 'activity': {
-        // "Orchestrate containers" â†’ "Container Orchestration"
-        // "Manage customer relationships" â†’ "Customer Relationship Management"
+        // "Orchestrate containers" → "Container Orchestration"
+        // "Manage customer relationships" → "Customer Relationship Management"
         // Remove leading infinitive verb, nominalize the rest
         const verbMatch = trimmed.match(
           /^(manage|orchestrate|automate|process|handle|deliver|provide|build|create|monitor|analyze|store|compute|deploy|serve|route|transform|integrate|authenticate|authorize|brew|develop|test|maintain|secure|encrypt|optimize|schedule|balance|discover|log|cache|message|stream|search|index|render)\s+(.+)$/i
@@ -90,7 +90,7 @@ export function capabilityToLabel(capability: string, nature?: string): string {
         if (verbMatch) {
           const verb = verbMatch[1].toLowerCase();
           const object = verbMatch[2].trim();
-          // Nominalize: verb â†’ noun form
+          // Nominalize: verb → noun form
           const nominalizations = {
             manage: 'Management', orchestrate: 'Orchestration',
             automate: 'Automation', process: 'Processing',
@@ -117,12 +117,12 @@ export function capabilityToLabel(capability: string, nature?: string): string {
           const objectTitled = titleCase(object);
           return `${objectTitled} ${nounForm}`;
         }
-        // No verb detected â€” title case
+        // No verb detected — title case
         return titleCase(trimmed);
       }
 
       case 'practice': {
-        // "how to manage IT services" â†’ "IT Service Management"
+        // "how to manage IT services" → "IT Service Management"
         const howToMatch = trimmed.match(/^how\s+to\s+(.+)$/i);
         if (howToMatch) {
           // Recursively process as activity
@@ -132,8 +132,8 @@ export function capabilityToLabel(capability: string, nature?: string): string {
       }
 
       case 'knowledge': {
-        // "technical expertise in welding" â†’ "Welding Expertise"
-        // "interpersonal skills for coaching" â†’ "Coaching Skills"
+        // "technical expertise in welding" → "Welding Expertise"
+        // "interpersonal skills for coaching" → "Coaching Skills"
         const expertiseMatch = trimmed.match(/(?:technical\s+)?expertise\s+(?:in|for|on)\s+(.+)/i);
         if (expertiseMatch) {
           return `${titleCase(expertiseMatch[1])} Expertise`;
@@ -168,7 +168,7 @@ function titleCase(str: string): string {
   });
 }
 
-// â”€â”€â”€ Main Inference Function â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main Inference Function ─────────────────────────────────────────────────
 
 /**
  * Infer the underlying capability from a solution name using the Tier 2 LLM.
@@ -183,7 +183,7 @@ function titleCase(str: string): string {
  * @param {function} options.llmCall       - LLM call function (from llm-call.mjs)
  * @returns {Promise<PipelineCapabilityInferenceResult>}
  */
-// any: options bag (description, llmCall, ...) â€” result is { capability, nature, confidence, reasoning }
+// any: options bag (description, llmCall, ...) — result is { capability, nature, confidence, reasoning }
 export async function inferCapabilityFromSolution(solutionName: string, options: any = {}): Promise<any> {
   const { description = '', llmCall } = options;
 

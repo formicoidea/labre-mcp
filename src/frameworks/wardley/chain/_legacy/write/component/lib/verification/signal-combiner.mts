@@ -4,9 +4,9 @@
 // solution-or-capability determination with a combined confidence score.
 //
 // Three merge cases:
-//   1. Agreement     â€” Both signals classify the same type â†’ boost confidence
-//   2. Disagreement  â€” Signals disagree â†’ weighted fallback to higher-confidence signal
-//   3. Partial/missing â€” One or both signals are absent/failed â†’ graceful degradation
+//   1. Agreement     — Both signals classify the same type → boost confidence
+//   2. Disagreement  — Signals disagree → weighted fallback to higher-confidence signal
+//   3. Partial/missing — One or both signals are absent/failed → graceful degradation
 //
 // This module is the single source of truth for signal combination logic
 // used by the routing layer (dual-verification-orchestrator, estimate-evolution).
@@ -18,7 +18,7 @@
 import { logDebug } from '#lib/mcp-notifications.mjs';
 import type { VerificationSignal, CombinedSignalResult } from '#types/pipeline.mjs';
 
-// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const TOOL = 'signal-combiner';
 
@@ -65,7 +65,7 @@ export const SIGNAL_STATUS = {
   SKIPPED: 'skipped',
 };
 
-// â”€â”€â”€ Type Definitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Type Definitions ────────────────────────────────────────────────────────
 
 /**
  * @typedef {Object} ClassificationSignal
@@ -94,7 +94,7 @@ export const SIGNAL_STATUS = {
  * @property {ClassificationSignal} [signals.webSearch]  - Web search signal as received
  */
 
-// â”€â”€â”€ Signal Validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Signal Validation ───────────────────────────────────────────────────────
 
 /**
  * Check if a signal is usable (successful with a valid classification).
@@ -157,7 +157,7 @@ function normalizeSignal(signal: VerificationSignal | null | undefined, defaultM
   };
 }
 
-// â”€â”€â”€ Core Combination Function â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Core Combination Function ───────────────────────────────────────────────
 
 /**
  * Combine LLM classification signal and web search signal into a single
@@ -167,17 +167,17 @@ function normalizeSignal(signal: VerificationSignal | null | undefined, defaultM
  *
  *   **Case 1: Agreement** (both usable, same classification)
  *     Confidence = avg(llm, webSearch) + AGREEMENT_BONUS (capped at MAX_CONFIDENCE)
- *     â†’ High confidence because independent signals corroborate each other
+ *     → High confidence because independent signals corroborate each other
  *
  *   **Case 2: Disagreement** (both usable, different classification)
  *     Winner = signal with higher confidence
  *     Confidence = max(weightedLlm, weightedWeb) - DISAGREEMENT_PENALTY (floor at DISAGREEMENT_FLOOR)
- *     â†’ Lower confidence because the signals contradict; fallback to the stronger signal
- *     â†’ When confidences are close (within 0.10), additional penalty applied
+ *     → Lower confidence because the signals contradict; fallback to the stronger signal
+ *     → When confidences are close (within 0.10), additional penalty applied
  *
  *   **Case 3: Partial/missing** (one or both signals not usable)
- *     - One signal usable â†’ use it, apply MISSING_SIGNAL_DEGRADATION factor
- *     - Neither usable â†’ default to capability with confidence 0
+ *     - One signal usable → use it, apply MISSING_SIGNAL_DEGRADATION factor
+ *     - Neither usable → default to capability with confidence 0
  *
  * @param {ClassificationSignal} llmSignal - LLM classification signal
  * @param {ClassificationSignal} webSearchSignal - Web search classification signal
@@ -212,13 +212,13 @@ export function combineSignals(llmSignal: VerificationSignal | null, webSearchSi
 
   logDebug(TOOL,
     `Combining: LLM=${llm.classification}(${llm.confidence}, ${llm.status}), ` +
-    `Web=${web.classification}(${web.confidence}, ${web.status}) â†’ ` +
+    `Web=${web.classification}(${web.confidence}, ${web.status}) → ` +
     `usable: llm=${llmUsable}, web=${webUsable}`);
 
-  // â”€â”€ Case 3: Partial / Missing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Case 3: Partial / Missing ───────────────────────────────────────────
   if (!llmUsable && !webUsable) {
-    // Neither signal is usable â†’ default to capability with zero confidence
-    logDebug(TOOL, 'Case: no-signal â€” defaulting to capability');
+    // Neither signal is usable → default to capability with zero confidence
+    logDebug(TOOL, 'Case: no-signal — defaulting to capability');
     return buildCombinedResult({
       classification: COMPONENT_TYPE.CAPABILITY,
       confidence: 0,
@@ -232,7 +232,7 @@ export function combineSignals(llmSignal: VerificationSignal | null, webSearchSi
   }
 
   if (!llmUsable || !webUsable) {
-    // Only one signal is usable â†’ use it with degradation factor
+    // Only one signal is usable → use it with degradation factor
     const usable = llmUsable ? llm : web;
     const missing = llmUsable ? web : llm;
 
@@ -241,7 +241,7 @@ export function combineSignals(llmSignal: VerificationSignal | null, webSearchSi
     );
 
     logDebug(TOOL,
-      `Case: single-signal (${usable.method}) â†’ ` +
+      `Case: single-signal (${usable.method}) → ` +
       `${usable.classification} conf=${degradedConfidence} (degraded from ${usable.confidence})`);
 
     return buildCombinedResult({
@@ -256,9 +256,9 @@ export function combineSignals(llmSignal: VerificationSignal | null, webSearchSi
     });
   }
 
-  // â”€â”€ Both signals are usable â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Both signals are usable ──────────────────────────────────────────────
 
-  // â”€â”€ Case 1: Agreement â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Case 1: Agreement ─────────────────────────────────────────────────────
   if (llm.classification === web.classification) {
     const boosted = roundConfidence(
       Math.min(
@@ -268,7 +268,7 @@ export function combineSignals(llmSignal: VerificationSignal | null, webSearchSi
     );
 
     logDebug(TOOL,
-      `Case: agreement (${llm.classification}) â†’ boosted conf=${boosted} ` +
+      `Case: agreement (${llm.classification}) → boosted conf=${boosted} ` +
       `(from avg=${((llm.confidence + web.confidence) / 2).toFixed(3)} + bonus=${params.agreementBonus})`);
 
     return buildCombinedResult({
@@ -283,7 +283,7 @@ export function combineSignals(llmSignal: VerificationSignal | null, webSearchSi
     });
   }
 
-  // â”€â”€ Case 2: Disagreement â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Case 2: Disagreement ──────────────────────────────────────────────────
   //
   // When LLM and web search disagree, we apply weighted scoring to determine
   // the winner, then apply a confidence penalty for the conflict.
@@ -301,7 +301,7 @@ export function combineSignals(llmSignal: VerificationSignal | null, webSearchSi
   // Base penalty
   let penalty = params.disagreementPenalty;
 
-  // Extra penalty when confidences are close (within 0.10) â€” higher ambiguity
+  // Extra penalty when confidences are close (within 0.10) — higher ambiguity
   const confGap = Math.abs(llm.confidence - web.confidence);
   if (confGap < 0.10) {
     penalty += 0.05;
@@ -312,8 +312,8 @@ export function combineSignals(llmSignal: VerificationSignal | null, webSearchSi
   );
 
   logDebug(TOOL,
-    `Case: disagreement â€” LLM=${llm.classification}(${llm.confidence}), ` +
-    `Web=${web.classification}(${web.confidence}) â†’ ` +
+    `Case: disagreement — LLM=${llm.classification}(${llm.confidence}), ` +
+    `Web=${web.classification}(${web.confidence}) → ` +
     `winner=${winner.method}(weighted: llm=${llmWeighted.toFixed(3)}, web=${webWeighted.toFixed(3)}), ` +
     `conf=${penalizedConfidence} (penalty=${penalty})`);
 
@@ -329,7 +329,7 @@ export function combineSignals(llmSignal: VerificationSignal | null, webSearchSi
   });
 }
 
-// â”€â”€â”€ Three-way Combination (with Naming Signal) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Three-way Combination (with Naming Signal) ─────────────────────────────
 
 /**
  * Combine three signals: naming convention + LLM + web search.
@@ -367,12 +367,12 @@ export function combineAllSignals(namingSignal: VerificationSignal | null, llmSi
   const namingUsable = isSignalUsable(naming);
 
   if (!namingUsable) {
-    // No usable naming signal â€” return the dual result directly
+    // No usable naming signal — return the dual result directly
     return dualResult;
   }
 
   if (dualResult.mergeCase === 'no-signal') {
-    // Dual verification produced nothing â€” return naming with degradation
+    // Dual verification produced nothing — return naming with degradation
     const degradedConfidence = roundConfidence(
       naming.confidence * COMBINATION_PARAMS.MISSING_SIGNAL_DEGRADATION
     );
@@ -390,7 +390,7 @@ export function combineAllSignals(namingSignal: VerificationSignal | null, llmSi
 
   // Step 3: Reconcile naming with the dual result
   if (naming.classification === dualResult.classification) {
-    // Triple agreement (or naming agrees with dual winner) â†’ strong boost
+    // Triple agreement (or naming agrees with dual winner) → strong boost
     const boosted = roundConfidence(
       Math.min(
         params.maxConfidence,
@@ -410,7 +410,7 @@ export function combineAllSignals(namingSignal: VerificationSignal | null, llmSi
     });
   }
 
-  // Naming disagrees with dual result â†’ trust dual (it's multi-signal) but penalize
+  // Naming disagrees with dual result → trust dual (it's multi-signal) but penalize
   const penalized = roundConfidence(
     Math.max(params.disagreementFloor, dualResult.confidence - params.disagreementPenalty)
   );
@@ -427,7 +427,7 @@ export function combineAllSignals(namingSignal: VerificationSignal | null, llmSi
   });
 }
 
-// â”€â”€â”€ Reasoning Builders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Reasoning Builders ──────────────────────────────────────────────────────
 
 /**
  * Build reasoning string for the no-signal case.
@@ -470,13 +470,13 @@ function buildAgreementReasoning(llm: VerificationSignal, web: VerificationSigna
  */
 function buildDisagreementReasoning(winner: VerificationSignal, loser: VerificationSignal, confGap: number): string {
   const ambiguityNote = confGap < 0.10
-    ? ' â€” signals are close in confidence, classification is ambiguous'
+    ? ' — signals are close in confidence, classification is ambiguous'
     : '';
   return `${winner.method} overrides ${loser.method}: ${winner.reasoning || winner.classification} ` +
     `(${loser.method} said: ${loser.classification}${loser.reasoning ? `, ${loser.reasoning}` : ''})${ambiguityNote}`;
 }
 
-// â”€â”€â”€ Result Builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Result Builder ──────────────────────────────────────────────────────────
 
 /**
  * Build a CombinedClassificationResult.
@@ -502,7 +502,7 @@ function buildCombinedResult(params: { classification: string | null; confidence
   };
 }
 
-// â”€â”€â”€ Utility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Utility ─────────────────────────────────────────────────────────────────
 
 /**
  * Round a confidence value to 2 decimal places.

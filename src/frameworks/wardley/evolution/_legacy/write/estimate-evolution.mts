@@ -3,7 +3,7 @@
 // Accepts all required parameters (name, description, space) in a single call
 // and returns a complete evolution estimation result.
 //
-// Pipeline: validate â†’ classify (or use provided space) â†’ evaluate â†’ format
+// Pipeline: validate → classify (or use provided space) → evaluate → format
 //
 // This module provides a high-level API on top of the MCP tool handler,
 // adding explicit one-shot mode support with a `space` parameter that
@@ -40,11 +40,11 @@ import { resolveStrategy } from './routing/strategy-resolver.mjs';
  * @property {string[]|null} reQuestions - Re-questioning prompts if non-economic
  * @property {Object<string, import('./strategies/capacity/base-strategy.mjs').EvolutionResult>|null} evaluations
  * @property {Object}    [routing]      - Solution/capability routing metadata
- * @property {{ type: string, confidence: number, reason: string }} [wardleyType] - Wardley component type (activity/practice/data/knowledge) â€” informative metadata only
+ * @property {{ type: string, confidence: number, reason: string }} [wardleyType] - Wardley component type (activity/practice/data/knowledge) — informative metadata only
  * @property {string}    message        - Human-readable summary
  */
 
-// â”€â”€â”€ One-Shot Evaluation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── One-Shot Evaluation ────────────────────────────────────────────────────
 
 /**
  * Estimate evolution of a Wardley Map component in one-shot mode.
@@ -66,7 +66,7 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
   const validated = validateOneShotInput(rawInput);
   const { name, description, space, strategy, pipeline, ...componentData } = validated;
 
-  // â”€â”€ Localized message resolver (pilot: estimateEvolution) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Localized message resolver (pilot: estimateEvolution) ──────────
   const { msg, lang } = createMessageResolverFromArgs({ name, description, context: description });
   const TOOL = 'estimateEvolution';
 
@@ -82,7 +82,7 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
 
   logDebug(TOOL, msg('step.classification', { component: name, space: classification.space }));
 
-  // Step 3: Non-economic â†’ re-questioning
+  // Step 3: Non-economic → re-questioning
   if (classification.requiresReQuestion) {
     const reQuestions = buildReQuestions(classification, name);
     const duration = Date.now() - t0;
@@ -94,12 +94,12 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
       evaluations: null,
       message:
         `Component "${name}" classified as ${classification.space}. ` +
-        `Evolution evaluation is not applicable â€” please review the re-questioning prompts.`,
+        `Evolution evaluation is not applicable — please review the re-questioning prompts.`,
     };
   }
 
   // Step 4: Build component input for strategies.
-  // `context` and `description` have distinct semantics â€” never fall back from
+  // `context` and `description` have distinct semantics — never fall back from
   // one to the other. Caller supplies each slot independently; missing context
   // is a signal for strategies to warn, not something to paper over here.
   // any: ComponentInput superset including pipeline-specific fields
@@ -116,7 +116,7 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
     component.nature = capResult.nature;
     logDebug(TOOL, `Identified capability for "${name}": ${capResult.capability} (${capResult.nature})`);
   } catch {
-    // LLM not available â€” skip capability identification (analytical strategies don't need it)
+    // LLM not available — skip capability identification (analytical strategies don't need it)
   }
 
   // Step 4c: Route component to solution or capability strategies
@@ -133,7 +133,7 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
   // Forwards the component name plus any partial classification context
   // accumulated so far (description, capability, nature).
   if (detection.needsFallback) {
-    logDebug(TOOL, `Naming confidence ${detection.confidence} < 0.90 for "${name}" â€” triggering dual-verification fallback`);
+    logDebug(TOOL, `Naming confidence ${detection.confidence} < 0.90 for "${name}" — triggering dual-verification fallback`);
 
     try {
       const partialContext = {
@@ -153,9 +153,9 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
         `confidence=${verifiedDetection.confidence}, method=${verifiedDetection.method}, ` +
         `verified=${verifiedDetection.verified}, tiers=${verifiedDetection.tiersUsed.join('+')}`);
     } catch (err) {
-      // Fallback failed â€” continue with the naming-only detection
+      // Fallback failed — continue with the naming-only detection
       logDebug(TOOL,
-        `Dual-verification fallback failed for "${name}": ${toErrorMessage(err)} â€” using naming-only routing`);
+        `Dual-verification fallback failed for "${name}": ${toErrorMessage(err)} — using naming-only routing`);
     }
   }
 
@@ -168,7 +168,7 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
   const effectiveType = verifiedDetection ? verifiedDetection.classification : detection.type;
   component.kind = effectiveType === COMPONENT_TYPE.SOLUTION ? 'solution' : 'capability';
 
-  // Step 5: Evaluate with selected strategy(ies) â€” dispatched via routing
+  // Step 5: Evaluate with selected strategy(ies) — dispatched via routing
   const evaluations: Record<string, any> = {};
 
   // Step 5a: Run capability strategies (existing pipeline) if routed
@@ -253,12 +253,12 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
   // Info-level: tool end (localized)
   logInfo(TOOL, msg('tool.end', { tool: TOOL, component: name, duration }));
 
-  // Build routing metadata â€” use verified detection if available, else naming-only
+  // Build routing metadata — use verified detection if available, else naming-only
   // effectiveType already computed above when we posed component.kind
   const effectiveConfidence = verifiedDetection ? verifiedDetection.confidence : detection.confidence;
   const effectiveMethod = verifiedDetection ? verifiedDetection.method : detection.method;
 
-  // Classify Wardley component type (activity/practice/data/knowledge) â€” informative metadata only
+  // Classify Wardley component type (activity/practice/data/knowledge) — informative metadata only
   const wardleyTypeResult = classifyWardleyType(name, {
     description,
     nature: detection.nature,
@@ -303,9 +303,9 @@ export async function estimateEvolutionOneShot(rawInput: any): Promise<any> {
     message,
   };
 
-  // â”€â”€ Pipeline enrichment: when pipeline=true, orchestrate the 3-step evaluation
+  // ── Pipeline enrichment: when pipeline=true, orchestrate the 3-step evaluation
   if (pipeline) {
-    logDebug(TOOL, `Pipeline mode enabled for "${name}" â€” running enriched pipeline`);
+    logDebug(TOOL, `Pipeline mode enabled for "${name}" — running enriched pipeline`);
 
     // Provide a capability evaluation function that re-uses estimateEvolutionOneShot
     // but forces capability path (no pipeline recursion)
@@ -366,7 +366,7 @@ function createStrategyInstance(StrategyCls: any): any {
     return new StrategyCls({ llmLogprobCall: getStrategyLogprobLLM('logprob-distribution') });
   }
 
-  // Unknown strategy type â€” try default constructor
+  // Unknown strategy type — try default constructor
   return new StrategyCls();
 }
 
@@ -379,7 +379,7 @@ function createStrategyInstance(StrategyCls: any): any {
  * per-strategy logging/i18n context.
  *
  * The degradation collector uses AsyncLocalStorage (see src/lib/degradation/
- * context.mts) so each async branch inherits the caller's ambient context â€”
+ * context.mts) so each async branch inherits the caller's ambient context —
  * per-strategy events do not bleed between concurrent frames.
  *
  * A strategy that throws produces `{ error }` for that slot; the other
@@ -404,7 +404,7 @@ export async function evaluateStrategiesInParallel(
   });
 }
 
-// â”€â”€â”€ Conversational Mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Conversational Mode ────────────────────────────────────────────────────
 
 /**
  * @typedef {Object} ConversationalResult
@@ -447,7 +447,7 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
       logDebug(TOOL, `Session restored (phase: ${session.phase})`);
     } catch {
       session = new ConversationSession();
-      logDebug(TOOL, 'Session deserialization failed â€” new session created');
+      logDebug(TOOL, 'Session deserialization failed — new session created');
     }
   } else {
     session = new ConversationSession();
@@ -469,19 +469,19 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
   // Force estimation if requested
   if (forceEstimate && !session.isReadyForEstimation()) {
     session.forceReady();
-    logDebug(TOOL, 'Force estimation requested â€” session marked as ready');
+    logDebug(TOOL, 'Force estimation requested — session marked as ready');
   }
 
   // Check for non-economic classification (triggers re-questioning)
   if (session.isReadyForEstimation() && session.isNonEconomic()) {
     const classification = session.getClassification();
     const reQuestions = session.getReQuestions();
-    // invariant: isNonEconomic() â‡’ classification was set
+    // invariant: isNonEconomic() ⇒ classification was set
     if (!classification) {
       throw new Error('estimateEvolutionConversational: isNonEconomic() but no classification');
     }
 
-    logDebug(TOOL, `Component "${session.state.name}" classified as ${classification.space} â€” re-questioning`);
+    logDebug(TOOL, `Component "${session.state.name}" classified as ${classification.space} — re-questioning`);
 
     return {
       mode: 'conversational',
@@ -494,7 +494,7 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
       sessionState: session.serialize(),
       message:
         `Component "${session.state.name}" classified as ${classification.space}. ` +
-        `Evolution evaluation is not applicable â€” the component is outside the economic space. ` +
+        `Evolution evaluation is not applicable — the component is outside the economic space. ` +
         `Please review the re-questioning prompts to reframe the component.`,
     };
   }
@@ -512,7 +512,7 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
     //
     // The conversation session already detected the component type during the
     // classification phase (stored in session.state.componentType). We reuse
-    // that detection here instead of re-running detectComponentType() â€” this
+    // that detection here instead of re-running detectComponentType() — this
     // ensures routing is consistent with the conversation branching the user
     // experienced (solution_context vs characteristics/market_signals path).
     //
@@ -523,7 +523,7 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
     const sessionDetection = session.getComponentTypeDetection();
 
     if (sessionDetection.type && (sessionDetection.confidence ?? 0) >= CONFIDENCE_THRESHOLD) {
-      // Session already has high-confidence detection â€” reuse it directly
+      // Session already has high-confidence detection — reuse it directly
       convDetection = {
         type: sessionDetection.type,
         confidence: sessionDetection.confidence,
@@ -557,7 +557,7 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
     // Forwards component name plus partial classification context from session.
     if (convDetection.needsFallback) {
       logDebug(TOOL,
-        `Naming confidence ${convDetection.confidence} < 0.90 for "${session.state.name}" â€” ` +
+        `Naming confidence ${convDetection.confidence} < 0.90 for "${session.state.name}" — ` +
         `triggering dual-verification fallback (conversational)`);
 
       try {
@@ -579,7 +579,7 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
           `verified=${convVerifiedDetection.verified}, tiers=${convVerifiedDetection.tiersUsed.join('+')}`);
       } catch (err) {
         logDebug(TOOL,
-          `Dual-verification fallback failed for "${session.state.name}": ${toErrorMessage(err)} â€” ` +
+          `Dual-verification fallback failed for "${session.state.name}": ${toErrorMessage(err)} — ` +
           `using naming-only routing`);
       }
     }
@@ -659,12 +659,12 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
 
     logDebug(TOOL, `Conversational results for "${session.state.name}": ${successCount} succeeded, ${errorCount} failed, ${summary.exchangeCount} exchange(s)`);
 
-    // Build routing metadata â€” use verified detection if available
+    // Build routing metadata — use verified detection if available
     const convEffectiveType = convVerifiedDetection ? convVerifiedDetection.classification : convDetection.type;
     const convEffectiveConfidence = convVerifiedDetection ? convVerifiedDetection.confidence : convDetection.confidence;
     const convEffectiveMethod = convVerifiedDetection ? convVerifiedDetection.method : convDetection.method;
 
-    let message = `Component "${session.state.name}" â€” conversational estimation complete after ${summary.exchangeCount} exchange(s)`;
+    let message = `Component "${session.state.name}" — conversational estimation complete after ${summary.exchangeCount} exchange(s)`;
     if (convEffectiveType === COMPONENT_TYPE.SOLUTION) {
       message += ` (detected as solution, confidence=${convEffectiveConfidence})`;
     }
@@ -674,7 +674,7 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
     }
     message += '.';
 
-    // Classify Wardley component type (activity/practice/data/knowledge) â€” informative metadata
+    // Classify Wardley component type (activity/practice/data/knowledge) — informative metadata
     const convWardleyType = classifyWardleyType(session.state.name ?? '', {
       description: session.state.description || '',
       nature: convDetection.nature,
@@ -713,7 +713,7 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
     };
   }
 
-  // Not ready yet â€” return the next question
+  // Not ready yet — return the next question
   const nextQuestion = session.nextQuestion();
   const summary = session.getSummary();
 
@@ -735,10 +735,10 @@ export async function estimateEvolutionConversational(input: any = {}): Promise<
   };
 }
 
-// â”€â”€â”€ Re-export ConversationSession for external use â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Re-export ConversationSession for external use ─────────────────────────
 
 export { ConversationSession };
 
-// â”€â”€â”€ Convenience: list available strategies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Convenience: list available strategies ──────────────────────────────────
 
 export { listStrategies };

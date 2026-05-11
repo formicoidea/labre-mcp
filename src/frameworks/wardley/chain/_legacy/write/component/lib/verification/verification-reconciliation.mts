@@ -31,11 +31,11 @@ export function toIntermediateResult(detection: ComponentTypeDetection): any {
  * Reconcile two tier results using agreement/disagreement logic.
  *
  * When both tiers agree on classification:
- *   â†’ Boost confidence: average of both + 0.10 agreement bonus (capped at 0.98)
+ *   → Boost confidence: average of both + 0.10 agreement bonus (capped at 0.98)
  *
  * When tiers disagree:
- *   â†’ Trust the tier with higher confidence, but apply a 0.10 disagreement penalty
- *   â†’ Minimum confidence floor of 0.45
+ *   → Trust the tier with higher confidence, but apply a 0.10 disagreement penalty
+ *   → Minimum confidence floor of 0.45
  *
  * This mirrors the combineWithPriorResult logic in web-search-verification.mjs
  * and the naming+llm reconciliation in detect-solution.mjs.
@@ -80,10 +80,10 @@ export function reconcileTwoTiers(tierA: any, tierB: any): any {
  * Reconcile a pair of verification signals into a single classification.
  *
  * Resolution rules (ordered by priority):
- *   1. Both successful and agree â†’ boost confidence (average + 0.10 bonus, capped at 0.98)
- *   2. Both successful but disagree â†’ trust higher confidence, apply 0.10 penalty (floor 0.45)
- *   3. Only one successful â†’ use its result directly
- *   4. Neither successful â†’ default to capability with 0 confidence
+ *   1. Both successful and agree → boost confidence (average + 0.10 bonus, capped at 0.98)
+ *   2. Both successful but disagree → trust higher confidence, apply 0.10 penalty (floor 0.45)
+ *   3. Only one successful → use its result directly
+ *   4. Neither successful → default to capability with 0 confidence
  *
  * @param {import('./dual-verification-orchestrator.mjs').VerificationSignal} llmSignal
  * @param {import('./dual-verification-orchestrator.mjs').VerificationSignal} webSearchSignal
@@ -131,7 +131,7 @@ export function reconcileSignalPair(llmSignal: any, webSearchSignal: any): Combi
 
   // Case 1 & 2: Both succeeded
   if (llmSignal.classification === webSearchSignal.classification) {
-    // Case 1: Agreement â€” boost confidence
+    // Case 1: Agreement — boost confidence
     const boosted = Math.round(
       Math.min(0.98, (llmSignal.confidence + webSearchSignal.confidence) / 2 + 0.10) * 100
     ) / 100;
@@ -144,7 +144,7 @@ export function reconcileSignalPair(llmSignal: any, webSearchSignal: any): Combi
     };
   }
 
-  // Case 2: Disagreement â€” trust higher confidence with penalty
+  // Case 2: Disagreement — trust higher confidence with penalty
   const winner = llmSignal.confidence >= webSearchSignal.confidence ? llmSignal : webSearchSignal;
   const loser = llmSignal.confidence >= webSearchSignal.confidence ? webSearchSignal : llmSignal;
 
@@ -160,14 +160,14 @@ export function reconcileSignalPair(llmSignal: any, webSearchSignal: any): Combi
   };
 }
 
-// â”€â”€â”€ Result Builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Result Builder ─────────────────────────────────────────────────────────
 
 /**
  * Build a VerifiedClassificationResult with routing targets pre-computed.
  *
  * @param {Object} params
  * @param {string} params.classification - 'solution' or 'capability'
- * @param {number} params.confidence - Confidence score (0â€“1)
+ * @param {number} params.confidence - Confidence score (0–1)
  * @param {string} params.method - Method chain
  * @param {string} params.reasoning - Human-readable explanation
  * @param {boolean} [params.verified] - Whether the result meets verification threshold

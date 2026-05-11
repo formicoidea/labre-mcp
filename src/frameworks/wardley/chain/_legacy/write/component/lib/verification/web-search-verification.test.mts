@@ -20,7 +20,7 @@ import {
 } from './web-search-verification.mjs';
 import { loadPromptsConfig } from '#lib/prompts/config.loader.mjs';
 
-// â”€â”€â”€ Mock Web Search Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Mock Web Search Helpers ────────────────────────────────────────────────
 
 /**
  * Create a mock web search function that returns a canned response.
@@ -68,7 +68,7 @@ function spyWebSearch(returnValue) {
   return spy;
 }
 
-// â”€â”€â”€ Response Parsing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Response Parsing ───────────────────────────────────────────────────────
 
 describe('parseWebSearchResponse', () => {
 
@@ -276,7 +276,7 @@ It is a category of tools rather than a specific product.`;
 
       const result = parseWebSearchResponse(response, 'test');
       assert.equal(result.evidence[0].type, 'product-page');  // normalized from "Product Page"
-      assert.equal(result.evidence[1].type, 'generic');        // unknown â†’ generic
+      assert.equal(result.evidence[1].type, 'generic');        // unknown → generic
       assert.equal(result.evidence[2].type, 'vendor-association');
     });
 
@@ -316,7 +316,7 @@ It is a category of tools rather than a specific product.`;
   });
 });
 
-// â”€â”€â”€ Main Verification Function â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main Verification Function ─────────────────────────────────────────────
 
 describe('verifyViaWebSearch', () => {
 
@@ -415,7 +415,7 @@ describe('verifyViaWebSearch', () => {
   });
 });
 
-// â”€â”€â”€ Combine With Prior Result â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Combine With Prior Result ──────────────────────────────────────────────
 
 describe('combineWithPriorResult', () => {
 
@@ -549,7 +549,7 @@ describe('combineWithPriorResult', () => {
   });
 });
 
-// â”€â”€â”€ Prompt Template â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Prompt Template ────────────────────────────────────────────────────────
 
 describe('web-search-verification template', () => {
   const template = loadPromptsConfig().templates['web-search-verification'].default.text;
@@ -576,7 +576,7 @@ describe('web-search-verification template', () => {
   });
 });
 
-// â”€â”€â”€ createWebSearchCall Factory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── createWebSearchCall Factory ────────────────────────────────────────────
 
 describe('createWebSearchCall', () => {
 
@@ -596,7 +596,7 @@ describe('createWebSearchCall', () => {
   });
 });
 
-// â”€â”€â”€ Routing Accuracy (evaluation criterion) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Routing Accuracy (evaluation criterion) ─────────────────────────────────
 
 describe('routing accuracy with web search verification', () => {
 

@@ -1,4 +1,4 @@
-// Tests for verify-layout.mts (V7 â€” force-directed + canonical snap).
+// Tests for verify-layout.mts (V7 — force-directed + canonical snap).
 //
 // V7 doesn't invoke any external renderer during placement, so tests
 // construct a `PositionedValueChain` directly and assert the
@@ -21,7 +21,7 @@ import type {
 import { computeGeometry } from '#lib/owm/analytical-geometry.mjs';
 import { detectAllOverlaps } from '#lib/owm/overlap-detector.mjs';
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ────────────────────────────────────────────────────────────
 
 interface Seed {
   name: string;
@@ -61,9 +61,9 @@ function countHardOverlaps(c: PositionedValueChain): number {
   return detectAllOverlaps(geometry).filter(o => HARD_KINDS.has(o.kind)).length;
 }
 
-// â”€â”€â”€ Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Tests ──────────────────────────────────────────────────────────────
 
-describe('verifyLayout â€” public contract', () => {
+describe('verifyLayout — public contract', () => {
   it('returns a result with the expected report shape', () => {
     const c = chain([
       { name: 'A', role: 'anchor',     visibility: 0.95, evolution: 0.5, label: { dx: -100, dy: 0 } },
@@ -83,7 +83,7 @@ describe('verifyLayout â€” public contract', () => {
 
 });
 
-describe('verifyLayout â€” hard-violation guarantee', () => {
+describe('verifyLayout — hard-violation guarantee', () => {
   it('emits zero hard violations on a well-spread chain', () => {
     const c = chain(
       [
@@ -116,7 +116,7 @@ describe('verifyLayout â€” hard-violation guarantee', () => {
   });
 });
 
-describe('verifyLayout â€” anchor immobility', () => {
+describe('verifyLayout — anchor immobility', () => {
   it('preserves anchor positions and labels exactly', () => {
     const c = chain([
       { name: 'A', role: 'anchor',     visibility: 0.95, evolution: 0.95, label: { dx: -100, dy: 0 } },
@@ -135,7 +135,7 @@ describe('verifyLayout â€” anchor immobility', () => {
   });
 });
 
-describe('verifyLayout â€” DSL invariants on output chain', () => {
+describe('verifyLayout — DSL invariants on output chain', () => {
   it('keeps Y(parent) > Y(child) for every link', () => {
     const c = chain(
       [
@@ -166,7 +166,7 @@ describe('verifyLayout â€” DSL invariants on output chain', () => {
   });
 });
 
-describe('verifyLayout â€” output integrity', () => {
+describe('verifyLayout — output integrity', () => {
   it('does not mutate the input chain', () => {
     const c = chain([
       { name: 'A', role: 'capability', visibility: 0.5, evolution: 0.5, label: { dx: 0, dy: 25 } },
@@ -194,7 +194,7 @@ describe('verifyLayout â€” output integrity', () => {
   });
 });
 
-describe('verifyLayout â€” modifiedLabels tracking', () => {
+describe('verifyLayout — modifiedLabels tracking', () => {
   it('lists labels that moved during simulation', () => {
     const c = chain([
       { name: 'A', role: 'capability', visibility: 0.5, evolution: 0.5, label: { dx: 0, dy: 25 } },
@@ -204,11 +204,11 @@ describe('verifyLayout â€” modifiedLabels tracking', () => {
     // At least one of the two labels must have moved to resolve the
     // collision.
     assert.ok(out.report.modifiedLabels.length >= 1,
-      'expected modifiedLabels to include â‰¥ 1 name');
+      'expected modifiedLabels to include ≥ 1 name');
   });
 
   it('reports an empty modifiedLabels list when nothing changed', () => {
-    // A trivial chain with one anchor â€” no labels to perturb.
+    // A trivial chain with one anchor — no labels to perturb.
     const c = chain([
       { name: 'A', role: 'anchor', visibility: 0.95, evolution: 0.5, label: { dx: -100, dy: 0 } },
     ]);

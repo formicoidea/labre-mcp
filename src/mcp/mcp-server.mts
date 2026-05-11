@@ -12,7 +12,7 @@
 // inherits this env var. If that child's MCP config tries to spawn another
 // labre-mcp server, the nested instance exits cleanly.
 if (process.env._WARDLEY_NESTED) {
-  process.stderr.write('[labre-mcp] Nested MCP server detected â€” exiting cleanly\n');
+  process.stderr.write('[labre-mcp] Nested MCP server detected — exiting cleanly\n');
   process.exit(0);
 }
 process.env._WARDLEY_NESTED = '1';
@@ -53,7 +53,7 @@ import {
 } from '../lib/degradation/index.mjs';
 import { registerDefaultHealthChecks } from './boot-health-checks.mjs';
 
-// â”€â”€â”€ Tool Registry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Tool Registry ──────────────────────────────────────────────────────────
 
 /** All registered MCP tools. Add new tools here if needed. */
 const REGISTERED_TOOLS: McpToolDefinition[] = [
@@ -64,7 +64,7 @@ const REGISTERED_TOOLS: McpToolDefinition[] = [
   GENERATE_VALUE_CHAIN_TOOL,
 ];
 
-/** Map of tool name â†’ handler for fast dispatch */
+/** Map of tool name → handler for fast dispatch */
 const TOOL_HANDLERS: Map<string, ToolHandler> = new Map<string, ToolHandler>([
   [ESTIMATE_EVOLUTION_TOOL.name, handleEstimateEvolution],
   [EVALUATE_MAP_TOOL.name, handleEvaluateMap],
@@ -73,7 +73,7 @@ const TOOL_HANDLERS: Map<string, ToolHandler> = new Map<string, ToolHandler>([
   [GENERATE_VALUE_CHAIN_TOOL.name, handleGenerateValueChain],
 ]);
 
-// â”€â”€â”€ MCP Server Implementation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── MCP Server Implementation ─────────────────────────────────────────────
 
 const SERVER_INFO: McpServerInfo = {
   name: 'labre-mcp',
@@ -92,11 +92,11 @@ const SERVER_CAPABILITIES: McpServerCapabilities = {
  * Route an incoming JSON-RPC request to the appropriate handler.
  *
  * Supported methods:
- *   - initialize          â†’ server info + capabilities
- *   - tools/list          â†’ list all registered tools
- *   - tools/call          â†’ dispatch to tool handler by name
- *   - notifications/initialized â†’ acknowledge (no response)
- *   - ping                â†’ pong
+ *   - initialize          → server info + capabilities
+ *   - tools/list          → list all registered tools
+ *   - tools/call          → dispatch to tool handler by name
+ *   - notifications/initialized → acknowledge (no response)
+ *   - ping                → pong
  *
  * @param {Object} request - JSON-RPC 2.0 request
  * @returns {Promise<Object|null>} JSON-RPC 2.0 response, or null for notifications
@@ -104,13 +104,13 @@ const SERVER_CAPABILITIES: McpServerCapabilities = {
 async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse | null> {
   const { id, method, params } = request;
 
-  // Notifications (no id) â€” no response expected
+  // Notifications (no id) — no response expected
   if (id === undefined || id === null) {
     return null;
   }
 
   switch (method) {
-    // â”€â”€ Initialize handshake â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Initialize handshake ──────────────────────────────────────────
     case 'initialize':
       return {
         jsonrpc: '2.0',
@@ -123,11 +123,11 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
         },
       };
 
-    // â”€â”€ Ping/pong â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Ping/pong ────────────────────────────────────────────────────
     case 'ping':
       return { jsonrpc: '2.0', id, result: {} };
 
-    // â”€â”€ List registered tools â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── List registered tools ────────────────────────────────────────
     case 'tools/list':
       return {
         jsonrpc: '2.0',
@@ -137,7 +137,7 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
         },
       };
 
-    // â”€â”€ Call a tool â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Call a tool ──────────────────────────────────────────────────
     case 'tools/call': {
       const callParams = (params ?? {}) as { name?: string; arguments?: Record<string, unknown> };
       const toolName = callParams.name ?? '';
@@ -184,7 +184,7 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
         });
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
-        // Info-level: tool invocation end (success â€” possibly degraded)
+        // Info-level: tool invocation end (success — possibly degraded)
         const endMsg = toolSubject
           ? `${toolName} completed for "${toolSubject}" in ${elapsed}s${wrapped.degraded ? ' (degraded)' : ''}`
           : `${toolName} completed in ${elapsed}s${wrapped.degraded ? ' (degraded)' : ''}`;
@@ -245,7 +245,7 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
       }
     }
 
-    // â”€â”€ Unknown method â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Unknown method ───────────────────────────────────────────────
     default:
       return {
         jsonrpc: '2.0',
@@ -258,7 +258,7 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
   }
 }
 
-// â”€â”€â”€ Stdio Transport â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Stdio Transport ────────────────────────────────────────────────────────
 
 /**
  * Start the MCP server listening on stdin/stdout.
@@ -320,11 +320,11 @@ export function startServer() {
   process.stderr.write(`[labre-mcp] MCP server started. Tools: ${REGISTERED_TOOLS.map(t => t.name).join(', ')}\n`);
 }
 
-// â”€â”€â”€ Exports for programmatic use â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Exports for programmatic use ───────────────────────────────────────────
 
 export { REGISTERED_TOOLS, TOOL_HANDLERS, handleRequest };
 
-// â”€â”€â”€ Auto-start when run directly â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Auto-start when run directly ───────────────────────────────────────────
 
 if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}`) {
   startServer();

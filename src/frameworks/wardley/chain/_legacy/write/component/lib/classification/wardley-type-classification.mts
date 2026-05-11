@@ -140,7 +140,7 @@ export function classifyWardleyType(name: string, options: any = {}): any {
 
   const maxScore = Math.max(...Object.values(scores));
   if (maxScore > 0) {
-    // invariant: maxScore > 0 â‡’ at least one entry has that score
+    // invariant: maxScore > 0 ⇒ at least one entry has that score
     const bestEntry = Object.entries(scores).find(([, s]) => s === maxScore);
     if (!bestEntry) throw new Error('wardley-type-classification: maxScore > 0 but no matching entry');
     const bestType = bestEntry[0];

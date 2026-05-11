@@ -1,10 +1,10 @@
 // Timeline benchmark strategy: evolution estimation based on historical
 // capability analysis and iterative timeline reconstruction.
 //
-// Phase 1: Capability Identification â€” looks behind technical labels to
+// Phase 1: Capability Identification — looks behind technical labels to
 //          identify the true underlying capability or need
 //          (delegated to src/tools/identify-capability.mjs)
-// Phase 2: Recursive Historical Timeline â€” iteratively builds a chronological
+// Phase 2: Recursive Historical Timeline — iteratively builds a chronological
 //          timeline of solutions/manifestations until the current year,
 //          each milestone evaluated by LLMDirectStrategy with date context
 //
@@ -30,7 +30,7 @@ const MAX_HISTORY_ITERATIONS = 15;
 
 // Prompt text lives in prompts/timeline-benchmark.md. Resolved via getPrompt().
 // The {{current_year}} placeholder replaces the former ${CURRENT_YEAR} template
-// literal (same resolved value â€” CURRENT_YEAR is passed in via build()).
+// literal (same resolved value — CURRENT_YEAR is passed in via build()).
 
 /**
  * Parse a single history iteration response from the LLM.
@@ -61,7 +61,7 @@ export function parseHistoryIterationResponse(text: string): ParsedHistoryIterat
  */
 export function formatHistorySection(history: TimelineMilestone[]): string {
   if (history.length === 0) {
-    return 'History so far: (none â€” identify the GENESIS-ERA origin: the EARLIEST known form of this capability, when it was first conceived or rudimentarily practiced. This should be in the Genesis stage of evolution: novel, poorly understood, rare.)';
+    return 'History so far: (none — identify the GENESIS-ERA origin: the EARLIEST known form of this capability, when it was first conceived or rudimentarily practiced. This should be in the Genesis stage of evolution: novel, poorly understood, rare.)';
   }
   const lines = history.map(
     (h: TimelineMilestone) => `- ${h.name} (${h.date}): evolution=${h.evolution}`,
@@ -120,7 +120,7 @@ export function computeTimelineConfidence(history: TimelineMilestone[]): number 
   // Factor 3: average confidence from LLM-direct evaluations
   const avgLlmConfidence = history.reduce((s: number, h: TimelineMilestone) => s + h.confidence, 0) / history.length;
 
-  // Factor 4: temporal coverage â€” did the timeline reach the present?
+  // Factor 4: temporal coverage — did the timeline reach the present?
   const firstDate = history[0].date;
   const lastDate = history[history.length - 1].date;
   const totalSpan = CURRENT_YEAR - firstDate;
@@ -135,7 +135,7 @@ export function computeTimelineConfidence(history: TimelineMilestone[]): number 
 }
 
 export class TimelineBenchmarkStrategy extends BaseStrategy {
-  // any: LLM closure injected via DI â€” diverse backend signatures
+  // any: LLM closure injected via DI — diverse backend signatures
   _llmCall: any;
 
   constructor({ llmCall }: { llmCall?: any } = {}) {
@@ -149,7 +149,7 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
 
   static get disabled() {
     return {
-      reason: 'High LLM latency (>30 min/run) â€” disabled pending optimization',
+      reason: 'High LLM latency (>30 min/run) — disabled pending optimization',
     };
   }
 
@@ -162,12 +162,12 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
       throw new Error('TimelineBenchmarkStrategy requires an llmCall function');
     }
 
-    // â”€â”€ Phase 1: Capability Identification (skip if pre-identified by orchestrator)
+    // ── Phase 1: Capability Identification (skip if pre-identified by orchestrator)
     const capability = component.capability
       ? { capability: component.capability, nature: component.nature || 'none' }
       : await identifyCapability(component, this._llmCall);
 
-    // â”€â”€ Phase 2: Recursive Historical Timeline Loop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Phase 2: Recursive Historical Timeline Loop ─────────────────
     const llmDirect = new LLMDirectStrategy({ llmCall: this._llmCall });
     const history = []; // Array<{ name, date, evolution, confidence, certitude, ubiquity }>
 
@@ -233,7 +233,7 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
       }
     }
 
-    // â”€â”€ Fallback: force present-day evaluation if loop didn't reach current year
+    // ── Fallback: force present-day evaluation if loop didn't reach current year
     if (history.length > 0 && history[history.length - 1].date < CURRENT_YEAR) {
       try {
         const wrapped = await llmDirect.evaluate(
@@ -263,7 +263,7 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
       }
     }
 
-    // â”€â”€ Compute final result â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Compute final result ────────────────────────────────────────
     const lastMilestone = history[history.length - 1];
     const evolution = Math.round(
       Math.max(0, Math.min(1, lastMilestone.evolution)) * 1000,

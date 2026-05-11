@@ -50,8 +50,8 @@ export function parseCapabilityResponse(text: string, component: any): ParsedCap
  * Identify the true underlying capability or need behind a component label.
  *
  * When type is provided (from OWM DSL):
- *   - anchor/market/ecosystem â†’ skip immediately, no LLM call
- *   - component/pipeline â†’ LLM identifies nature/capability, input type is authoritative
+ *   - anchor/market/ecosystem → skip immediately, no LLM call
+ *   - component/pipeline → LLM identifies nature/capability, input type is authoritative
  *
  * When type is absent:
  *   - LLM estimates type + nature + capability (no penalty)
@@ -83,7 +83,7 @@ export async function identifyCapability(component: any, llmCall?: any): Promise
     context: component.context ?? '',
   });
   // Wrap the LLM call so a failure (rate limit, auth, network) surfaces
-  // on the ambient degradation collector â€” the caller still receives a
+  // on the ambient degradation collector — the caller still receives a
   // valid capability shape, but the MCP envelope flips degraded:true.
   const response = await tryDegradeAmbient(
     'llm:identify-capability',

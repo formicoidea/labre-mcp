@@ -61,7 +61,7 @@ function assertApprox(actual, expected, tolerance, message) {
 
 console.log('=== dual-verification-concurrent test suite ===\n');
 
-// â”€â”€â”€ Helper mocks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helper mocks ──────────────────────────────────────────────────────────
 
 /** Mock LLM that returns solution classification after a delay */
 function createMockLLM(classification, confidence, delayMs = 10) {
@@ -95,9 +95,9 @@ function createHangingMock() {
   return () => new Promise(() => {}); // never resolves
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
 // GROUP 1: Signal builder unit tests
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
 
 console.log('--- Group 1: Signal builders ---');
 {
@@ -133,9 +133,9 @@ console.log('--- Group 1: Signal builders ---');
   console.log('  Signal builder tests passed');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
 // GROUP 2: reconcileSignalPair unit tests
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
 
 console.log('\n--- Group 2: Signal pair reconciliation ---');
 {
@@ -145,7 +145,7 @@ console.log('\n--- Group 2: Signal pair reconciliation ---');
     buildSuccessSignal({ classification: 'solution', confidence: 0.85, reasoning: 'Web: solution' }, 'web-search', 200),
   );
   assert(r1.classification === 'solution', 'Agreement solution: classification');
-  // Average 0.825 + 0.10 = 0.925 â†’ capped at 0.93
+  // Average 0.825 + 0.10 = 0.925 → capped at 0.93
   assertApprox(r1.confidence, 0.93, 0.02, 'Agreement solution: boosted confidence');
   assert(r1.method === 'llm+web-search', 'Agreement: method chain');
 
@@ -212,9 +212,9 @@ console.log('\n--- Group 2: Signal pair reconciliation ---');
   console.log('  Reconciliation tests passed');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
 // GROUP 3: raceWithTimeout unit tests
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
 
 console.log('\n--- Group 3: raceWithTimeout ---');
 {
@@ -243,9 +243,9 @@ console.log('\n--- Group 3: raceWithTimeout ---');
   console.log('  raceWithTimeout tests passed');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// GROUP 4: verifyConcurrent â€” basic concurrent execution
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
+// GROUP 4: verifyConcurrent — basic concurrent execution
+// ═══════════════════════════════════════════════════════════════════════════
 
 console.log('\n--- Group 4: verifyConcurrent basic behavior ---');
 {
@@ -254,7 +254,7 @@ console.log('\n--- Group 4: verifyConcurrent basic behavior ---');
     llmCall: createFailingMock('Should not be called'),
     webSearchCall: createFailingMock('Should not be called'),
   });
-  assert(r1.classification === 'solution', 'Kubernetes: naming short-circuit â†’ solution');
+  assert(r1.classification === 'solution', 'Kubernetes: naming short-circuit → solution');
   assert(r1.confidence >= 0.90, `Kubernetes: confidence >= 0.90 (got ${r1.confidence})`);
   assert(r1.verified === true, 'Kubernetes: verified');
   assert(r1.llmSignal.status === 'skipped', 'Kubernetes: LLM skipped');
@@ -266,16 +266,16 @@ console.log('\n--- Group 4: verifyConcurrent basic behavior ---');
   const r2 = await verifyConcurrent('CRM', {
     llmCall: createFailingMock('Should not be called'),
   });
-  assert(r2.classification === 'capability', 'CRM: naming short-circuit â†’ capability');
+  assert(r2.classification === 'capability', 'CRM: naming short-circuit → capability');
   assert(r2.verified === true, 'CRM: verified');
   assert(r2.llmSignal.status === 'skipped', 'CRM: LLM skipped');
 
   console.log('  Basic behavior tests passed');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// GROUP 5: verifyConcurrent â€” concurrent LLM + web search
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
+// GROUP 5: verifyConcurrent — concurrent LLM + web search
+// ═══════════════════════════════════════════════════════════════════════════
 
 console.log('\n--- Group 5: verifyConcurrent concurrent execution ---');
 {
@@ -320,9 +320,9 @@ console.log('\n--- Group 5: verifyConcurrent concurrent execution ---');
   console.log('  Concurrent execution tests passed');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// GROUP 6: verifyConcurrent â€” timeout handling
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
+// GROUP 6: verifyConcurrent — timeout handling
+// ═══════════════════════════════════════════════════════════════════════════
 
 console.log('\n--- Group 6: verifyConcurrent timeout handling ---');
 {
@@ -370,9 +370,9 @@ console.log('\n--- Group 6: verifyConcurrent timeout handling ---');
   console.log('  Timeout handling tests passed');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// GROUP 7: verifyConcurrent â€” error handling
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
+// GROUP 7: verifyConcurrent — error handling
+// ═══════════════════════════════════════════════════════════════════════════
 
 console.log('\n--- Group 7: verifyConcurrent error handling ---');
 {
@@ -387,7 +387,7 @@ console.log('\n--- Group 7: verifyConcurrent error handling ---');
   assert(r1.webSearchSignal.status === 'success', 'LLM error: web succeeded');
   assert(r1.classification === 'solution', 'LLM error: web result used');
 
-  // Web search throws â€” verifyViaWebSearch catches errors internally and
+  // Web search throws — verifyViaWebSearch catches errors internally and
   // returns a fallback result { classification: 'capability', confidence: 0.35 },
   // so our signal sees it as 'success' with the fallback data
   const r2 = await verifyConcurrent('ErrorWeb', {
@@ -399,7 +399,7 @@ console.log('\n--- Group 7: verifyConcurrent error handling ---');
   assert(r2.webSearchSignal.status === 'success', 'Web error: signal shows success (internal fallback)');
   assert(r2.webSearchSignal.confidence <= 0.40, `Web error: low fallback confidence (got ${r2.webSearchSignal.confidence})`);
   assert(r2.llmSignal.status === 'success', 'Web error: LLM succeeded');
-  assert(r2.classification === 'capability', 'Web error: LLM+fallback â†’ capability');
+  assert(r2.classification === 'capability', 'Web error: LLM+fallback → capability');
 
   // Both throw: LLM propagates error, web search returns internal fallback
   const r3 = await verifyConcurrent('BothError', {
@@ -408,19 +408,19 @@ console.log('\n--- Group 7: verifyConcurrent error handling ---');
     skipNamingPrecheck: true,
   });
   assert(r3.llmSignal.status === 'error', 'Both error: LLM error (propagated)');
-  // Web search catches errors internally â†’ appears as success with fallback
+  // Web search catches errors internally → appears as success with fallback
   assert(r3.webSearchSignal.status === 'success', 'Both error: web shows success (internal fallback)');
   assert(r3.webSearchSignal.confidence <= 0.40, `Both error: web low confidence (got ${r3.webSearchSignal.confidence})`);
   assert(r3.classification === 'capability', 'Both error: defaults to capability');
-  // LLM failed, web fallback has confidence=0.35 â†’ only web signal used
+  // LLM failed, web fallback has confidence=0.35 → only web signal used
   assert(r3.confidence <= 0.40, `Both error: low confidence (got ${r3.confidence})`);
 
   console.log('  Error handling tests passed');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// GROUP 8: verifyConcurrent â€” skip flags
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
+// GROUP 8: verifyConcurrent — skip flags
+// ═══════════════════════════════════════════════════════════════════════════
 
 console.log('\n--- Group 8: verifyConcurrent skip flags ---');
 {
@@ -468,9 +468,9 @@ console.log('\n--- Group 8: verifyConcurrent skip flags ---');
   console.log('  Skip flags tests passed');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// GROUP 9: verifyConcurrent â€” edge cases
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
+// GROUP 9: verifyConcurrent — edge cases
+// ═══════════════════════════════════════════════════════════════════════════
 
 console.log('\n--- Group 9: verifyConcurrent edge cases ---');
 {
@@ -499,9 +499,9 @@ console.log('\n--- Group 9: verifyConcurrent edge cases ---');
   console.log('  Edge cases passed');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
 // GROUP 10: DualSignalPair contract validation
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
 
 console.log('\n--- Group 10: DualSignalPair contract ---');
 {
@@ -574,9 +574,9 @@ console.log('\n--- Group 10: DualSignalPair contract ---');
   console.log('  DualSignalPair contract tests passed');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// GROUP 11: verifyConcurrentFull â€” integration with VerifiedClassificationResult
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
+// GROUP 11: verifyConcurrentFull — integration with VerifiedClassificationResult
+// ═══════════════════════════════════════════════════════════════════════════
 
 console.log('\n--- Group 11: verifyConcurrentFull ---');
 {
@@ -631,16 +631,16 @@ console.log('\n--- Group 11: verifyConcurrentFull ---');
   });
   assert(r6.classification != null, 'Full failures: still has classification');
   assert(r6.dualSignals.llmSignal.status === 'error', 'Full failures: LLM errored');
-  // Web search catches errors internally â†’ appears as success with low-confidence fallback
+  // Web search catches errors internally → appears as success with low-confidence fallback
   assert(r6.dualSignals.webSearchSignal.status === 'success', 'Full failures: web internal fallback');
   assert(r6.dualSignals.webSearchSignal.confidence <= 0.40, 'Full failures: web low confidence fallback');
 
   console.log('  verifyConcurrentFull tests passed');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// GROUP 12: verifyConcurrentFull â€” parallel mode routing
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
+// GROUP 12: verifyConcurrentFull — parallel mode routing
+// ═══════════════════════════════════════════════════════════════════════════
 
 console.log('\n--- Group 12: verifyConcurrentFull parallel mode ---');
 {
@@ -672,9 +672,9 @@ console.log('\n--- Group 12: verifyConcurrentFull parallel mode ---');
   console.log('  Parallel mode routing tests passed');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
 // GROUP 13: Constants and default timeout
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
 
 console.log('\n--- Group 13: Constants ---');
 {
@@ -688,13 +688,13 @@ console.log('\n--- Group 13: Constants ---');
   console.log('  Constants validated');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
 // GROUP 14: Mixed timeout and error scenarios
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
 
 console.log('\n--- Group 14: Mixed timeout+error scenarios ---');
 {
-  // LLM times out, web search errors (but verifyViaWebSearch catches â†’ fallback)
+  // LLM times out, web search errors (but verifyViaWebSearch catches → fallback)
   const r1 = await verifyConcurrent('MixedFail', {
     llmCall: createHangingMock(),
     webSearchCall: createFailingMock('503 Service Unavailable', 5),
@@ -702,12 +702,12 @@ console.log('\n--- Group 14: Mixed timeout+error scenarios ---');
     llmTimeoutMs: 100,
   });
   assert(r1.llmSignal.status === 'timeout', 'Mixed: LLM timed out');
-  // Web search catches errors internally â†’ fallback result appears as 'success'
+  // Web search catches errors internally → fallback result appears as 'success'
   assert(r1.webSearchSignal.status === 'success', 'Mixed: web internal fallback (appears success)');
   assert(r1.webSearchSignal.confidence <= 0.40, 'Mixed: web low fallback confidence');
   assert(r1.classification === 'capability', 'Mixed: defaults to capability');
 
-  // LLM errors, web search times out (verifyViaWebSearch wrapper hangs â†’ our timeout fires)
+  // LLM errors, web search times out (verifyViaWebSearch wrapper hangs → our timeout fires)
   const r2 = await verifyConcurrent('MixedFail2', {
     llmCall: createFailingMock('Rate limit exceeded', 5),
     webSearchCall: createHangingMock(),
@@ -733,9 +733,9 @@ console.log('\n--- Group 14: Mixed timeout+error scenarios ---');
   console.log('  Mixed scenarios passed');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// GROUP 15: Backward compatibility â€” existing tests still pass
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
+// GROUP 15: Backward compatibility — existing tests still pass
+// ═══════════════════════════════════════════════════════════════════════════
 
 console.log('\n--- Group 15: Backward compatibility ---');
 {
@@ -764,9 +764,9 @@ console.log('\n--- Group 15: Backward compatibility ---');
   console.log('  Backward compatibility confirmed');
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
 // Summary
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
 process.exit(failed > 0 ? 1 : 0);

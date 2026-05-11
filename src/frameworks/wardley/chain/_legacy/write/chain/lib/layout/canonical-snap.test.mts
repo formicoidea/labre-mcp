@@ -55,7 +55,7 @@ function countHard(c: PositionedValueChain): number {
   return detectAllOverlaps(geometry).filter(o => HARD_KINDS.has(o.kind)).length;
 }
 
-// â”€â”€â”€ Canonical candidate set â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Canonical candidate set ──────────────────────────────────────────
 
 describe('canonicalOffsetsFor', () => {
   it('returns exactly 8 candidates per call', () => {
@@ -71,7 +71,7 @@ describe('canonicalOffsetsFor', () => {
     const dxLong  = longer.find(c => c.dx < 0 && c.dy === 0)!.dx;
     assert.equal(dxShort, -(3 * LABEL_CHAR_WIDTH + LEFT_FLUSH_BUFFER_PX));
     assert.equal(dxLong,  -(11 * LABEL_CHAR_WIDTH + LEFT_FLUSH_BUFFER_PX));
-    assert.ok(dxLong < dxShort, 'longer name â†’ more negative dx');
+    assert.ok(dxLong < dxShort, 'longer name → more negative dx');
   });
 
   it('RIGHT cardinal stays at +RIGHT_OFFSET_PX regardless of length', () => {
@@ -91,9 +91,9 @@ describe('canonicalOffsetsFor', () => {
   });
 });
 
-// â”€â”€â”€ snapToCanonical behaviour â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── snapToCanonical behaviour ────────────────────────────────────────
 
-describe('snapToCanonical â€” clean baseline', () => {
+describe('snapToCanonical — clean baseline', () => {
   it('hard count stays at 0 when input is already canonical-friendly', () => {
     const c = chain([
       { name: 'A', role: 'anchor',     visibility: 0.95, evolution: 0.5,  label: { dx: -100, dy: 0 } },
@@ -105,7 +105,7 @@ describe('snapToCanonical â€” clean baseline', () => {
   });
 });
 
-describe('snapToCanonical â€” preferences canonical at hard ties', () => {
+describe('snapToCanonical — preferences canonical at hard ties', () => {
   it('snaps a continuous label toward a canonical offset when both achieve hard=0', () => {
     // Component at (0.5, 0.5) with a slightly off-canonical label.
     // Candidates BELOW [0, 25] and ABOVE [0, -25] are both hard=0 (no
@@ -124,7 +124,7 @@ describe('snapToCanonical â€” preferences canonical at hard ties', () => {
   });
 });
 
-describe('snapToCanonical â€” anchor immobility', () => {
+describe('snapToCanonical — anchor immobility', () => {
   it('never snaps an anchor label', () => {
     const c = chain([
       { name: 'A', role: 'anchor',     visibility: 0.95, evolution: 0.95, label: { dx: -100, dy: 0 } },
@@ -139,9 +139,9 @@ describe('snapToCanonical â€” anchor immobility', () => {
   });
 });
 
-describe('snapToCanonical â€” hard-guarantee preserved', () => {
+describe('snapToCanonical — hard-guarantee preserved', () => {
   it('hard count never increases after snap', () => {
-    // Multiple components â€” snap evaluates each, never picks a candidate
+    // Multiple components — snap evaluates each, never picks a candidate
     // that increases hard.
     const c = chain([
       { name: 'A', role: 'capability', visibility: 0.7, evolution: 0.3, label: { dx: 7, dy: 18 } },
@@ -156,7 +156,7 @@ describe('snapToCanonical â€” hard-guarantee preserved', () => {
   });
 });
 
-describe('snapToCanonical â€” output integrity', () => {
+describe('snapToCanonical — output integrity', () => {
   it('does not mutate the input chain', () => {
     const c = chain([
       { name: 'A', role: 'capability', visibility: 0.5, evolution: 0.5, label: { dx: 5, dy: 22 } },

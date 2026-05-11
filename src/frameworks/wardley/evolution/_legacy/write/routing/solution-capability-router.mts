@@ -1,8 +1,8 @@
 // Solution vs Capability Router
 //
 // Core routing rule:
-//   NAMED components â†’ SOLUTION path  (products, frameworks, methodologies, standards)
-//   GENERIC components â†’ CAPABILITY path (abstract activities, practices, data, knowledge)
+//   NAMED components → SOLUTION path  (products, frameworks, methodologies, standards)
+//   GENERIC components → CAPABILITY path (abstract activities, practices, data, knowledge)
 //
 // "Named" means the component has a specific identity: a brand name, a proper
 // noun, a titled framework or methodology, or a recognized standard.
@@ -25,7 +25,7 @@
 // The router does NOT modify existing strategy files or the capability pipeline.
 // It sits AFTER the classification gate and BEFORE strategy dispatch.
 
-// â”€â”€â”€ Detection functions extracted to routing/component-detection.mjs â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Detection functions extracted to routing/component-detection.mjs ────────
 // Re-exported here for backward compatibility with existing consumers.
 export {
   detectComponentType,
@@ -44,7 +44,7 @@ import {
   detectComponentType,
 } from '#lib/component-detection.mjs';
 
-// â”€â”€â”€ Dispatch functions extracted to routing/solution-dispatch.mjs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Dispatch functions extracted to routing/solution-dispatch.mjs ───────────
 // Re-exported here for backward compatibility with existing consumers.
 export {
   EVAL_MODES,
@@ -57,7 +57,7 @@ export {
 
 import { determineRoutingTargets } from './solution-dispatch.mjs';
 
-// â”€â”€â”€ Wardley Type Classification extracted to routing/wardley-type-classification.mjs â”€
+// ─── Wardley Type Classification extracted to routing/wardley-type-classification.mjs ─
 // Re-exported here for backward compatibility with existing consumers.
 export {
   WARDLEY_TYPE,

@@ -1,4 +1,4 @@
-// Tests for compute-visibility.mts (V4 â€” per-branch, multi-anchor).
+// Tests for compute-visibility.mts (V4 — per-branch, multi-anchor).
 //
 // Validates:
 //   - anchor pinned at ANCHOR_VISIBILITY (single-anchor case)
@@ -12,7 +12,7 @@
 //   - semantic jitter: components on the longest chain ratio=1 are pushed
 //     up; components on shorter chains are pushed down or unbiased
 //   - orphans land at ORPHAN_FALLBACK_Y
-//   - mapSize stays at base for L â‰¤ 24 and scales with L beyond that
+//   - mapSize stays at base for L ≤ 24 and scales with L beyond that
 //   - throws when no anchor is present
 //   - evolution seeded from PHASE_CENTROIDS (anchors at 0.5)
 //   - label placeholder is { 0, 0 }
@@ -34,7 +34,7 @@ import {
 } from './compute-visibility.mjs';
 import type { RawValueChain } from '#types/value-chain.mjs';
 
-// â”€â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── helpers ─────────────────────────────────────────────────────────────
 
 function chain(overrides: Partial<RawValueChain> = {}): RawValueChain {
   return {
@@ -66,9 +66,9 @@ function assertEdgeDirection(result: ReturnType<typeof computeVisibility>): void
   }
 }
 
-// â”€â”€â”€ basic anchor + evolution + label â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── basic anchor + evolution + label ───────────────────────────────────
 
-describe('computeVisibility â€” basic invariants', () => {
+describe('computeVisibility — basic invariants', () => {
   it('pins a single anchor at ANCHOR_VISIBILITY with evolution 0.5', () => {
     const result = computeVisibility(chain({
       components: [
@@ -133,11 +133,11 @@ function findEvolution(result: ReturnType<typeof computeVisibility>, name: strin
   return result.chain.components.find(c => c.name === name)!.evolution;
 }
 
-// â”€â”€â”€ effective-L floor: L=1 / L=2 stay near the anchor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── effective-L floor: L=1 / L=2 stay near the anchor ──────────────────
 
-describe('computeVisibility â€” effective L floor for short chains', () => {
+describe('computeVisibility — effective L floor for short chains', () => {
   it('L=1 keeps the only need above 0.5 (close to anchor)', () => {
-    // step uses MIN_EFFECTIVE_L=3 â†’ step â‰ˆ 0.283. Need at depth 1 lands
+    // step uses MIN_EFFECTIVE_L=3 → step ≈ 0.283. Need at depth 1 lands
     // around Y = 0.95 - 0.283 = 0.667 (Â± jitter). Not at Y_MIN.
     const result = computeVisibility(chain({
       components: [
@@ -169,9 +169,9 @@ describe('computeVisibility â€” effective L floor for short chains', () => 
   });
 });
 
-// â”€â”€â”€ L=3: leaf reaches Y_MIN (within band_half) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── L=3: leaf reaches Y_MIN (within band_half) ─────────────────────────
 
-describe('computeVisibility â€” full-range usage from L=3', () => {
+describe('computeVisibility — full-range usage from L=3', () => {
   it('L=3 places the leaf of the longest chain near Y_MIN', () => {
     const result = computeVisibility(chain({
       components: [
@@ -187,10 +187,10 @@ describe('computeVisibility â€” full-range usage from L=3', () => {
       ],
     }));
     const yLeaf = findY(result, 'D');
-    // step = 0.85/3 â‰ˆ 0.283. Y_nominal(D) = 0.10. With ratio=1, offset = +band_half,
-    // but clamp keeps it in [Y_MIN, ANCHOR_VISIBILITY]. Y(D) âˆˆ [0.10, 0.10 + BAND_MAX].
+    // step = 0.85/3 ≈ 0.283. Y_nominal(D) = 0.10. With ratio=1, offset = +band_half,
+    // but clamp keeps it in [Y_MIN, ANCHOR_VISIBILITY]. Y(D) ∈ [0.10, 0.10 + BAND_MAX].
     assert.ok(yLeaf >= Y_MIN);
-    assert.ok(yLeaf <= Y_MIN + BAND_MAX + 1e-9, `expected Y(D) â‰¤ ${Y_MIN + BAND_MAX}, got ${yLeaf}`);
+    assert.ok(yLeaf <= Y_MIN + BAND_MAX + 1e-9, `expected Y(D) ≤ ${Y_MIN + BAND_MAX}, got ${yLeaf}`);
     assertEdgeDirection(result);
   });
 
@@ -217,12 +217,12 @@ describe('computeVisibility â€” full-range usage from L=3', () => {
   });
 });
 
-// â”€â”€â”€ Multi-anchor: example from the design doc â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Multi-anchor: example from the design doc ──────────────────────────
 
-describe('computeVisibility â€” multi-anchor placement', () => {
+describe('computeVisibility — multi-anchor placement', () => {
   it('places R2 between Y(D) and Y(E) in the converging-chains example', () => {
-    // R1 â†’ A â†’ B â†’ C â†’ D â†’ E â†’ F â†’ G â†’ H â†’ I  (depth 1..9)
-    // R2 â†’ E â†’ J â†’ K                          (J at depth 6, K at depth 7)
+    // R1 → A → B → C → D → E → F → G → H → I  (depth 1..9)
+    // R2 → E → J → K                          (J at depth 6, K at depth 7)
     const result = computeVisibility(chain({
       components: [
         { name: 'R1', type: 'anchor',    role: 'anchor' },
@@ -299,9 +299,9 @@ describe('computeVisibility â€” multi-anchor placement', () => {
   });
 });
 
-// â”€â”€â”€ Strict edge direction on common shapes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Strict edge direction on common shapes ─────────────────────────────
 
-describe('computeVisibility â€” strict edge direction', () => {
+describe('computeVisibility — strict edge direction', () => {
   it('linear chain', () => {
     const result = computeVisibility(chain({
       components: [
@@ -319,7 +319,7 @@ describe('computeVisibility â€” strict edge direction', () => {
     assertEdgeDirection(result);
   });
 
-  it('diamond â€” two parents converge on one child', () => {
+  it('diamond — two parents converge on one child', () => {
     const result = computeVisibility(chain({
       components: [
         { name: 'Anchor', type: 'anchor',    role: 'anchor' },
@@ -337,8 +337,8 @@ describe('computeVisibility â€” strict edge direction', () => {
     assertEdgeDirection(result);
   });
 
-  it('shortcut â€” direct edge bypasses an intermediate node', () => {
-    // Anchor â†’ A â†’ B AND Anchor â†’ B (shortcut). Longest-path depth keeps
+  it('shortcut — direct edge bypasses an intermediate node', () => {
+    // Anchor → A → B AND Anchor → B (shortcut). Longest-path depth keeps
     // B strictly below A (depth(B) = 2 via A, beats the shortcut's 1).
     const result = computeVisibility(chain({
       components: [
@@ -355,10 +355,10 @@ describe('computeVisibility â€” strict edge direction', () => {
     assertEdgeDirection(result);
     const y = (n: string) => findY(result, n);
     assert.ok(y('A') - y('B') >= EDGE_MIN_GAP - 1e-9,
-      `expected Y(A)âˆ’Y(B) â‰¥ ${EDGE_MIN_GAP}, got ${(y('A') - y('B')).toFixed(4)}`);
+      `expected Y(A)−Y(B) ≥ ${EDGE_MIN_GAP}, got ${(y('A') - y('B')).toFixed(4)}`);
   });
 
-  it('mixed depths â€” short branch and long branch coexist', () => {
+  it('mixed depths — short branch and long branch coexist', () => {
     const result = computeVisibility(chain({
       components: [
         { name: 'Anchor', type: 'anchor',    role: 'anchor' },
@@ -380,11 +380,11 @@ describe('computeVisibility â€” strict edge direction', () => {
   });
 });
 
-// â”€â”€â”€ Semantic jitter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Semantic jitter ────────────────────────────────────────────────────
 
-describe('computeVisibility â€” semantic jitter', () => {
+describe('computeVisibility — semantic jitter', () => {
   it('component on the longest chain is biased upward (+band_half)', () => {
-    // Single linear chain of length 5 â€” every node's chain_through equals
+    // Single linear chain of length 5 — every node's chain_through equals
     // L, so every offset is +band_half.
     const result = computeVisibility(chain({
       components: [
@@ -404,7 +404,7 @@ describe('computeVisibility â€” semantic jitter', () => {
       ],
     }));
     // L=5, step=0.17. Y_nominal(B)=0.78. With +band_half (0.05):
-    // Y(B) â‰ˆ 0.83. We assert above-nominal as a lower bound.
+    // Y(B) ≈ 0.83. We assert above-nominal as a lower bound.
     const yB = findY(result, 'B');
     const stepValue = (ANCHOR_VISIBILITY - Y_MIN) / 5;
     const yNominalB = ANCHOR_VISIBILITY - stepValue;
@@ -412,10 +412,10 @@ describe('computeVisibility â€” semantic jitter', () => {
       `B on the longest chain should sit at or above its nominal Y (${yNominalB}), got ${yB}`);
   });
 
-  it('leaf of a short side branch is biased downward (âˆ’band_half)', () => {
-    // Anchor â†’ S (short, leaf at depth 1) AND Anchor â†’ L1 â†’ L2 â†’ L3 â†’ L4
+  it('leaf of a short side branch is biased downward (−band_half)', () => {
+    // Anchor → S (short, leaf at depth 1) AND Anchor → L1 → L2 → L3 → L4
     // (long, L=4). L=4. S has chain_through = 1. Long-chain nodes have
-    // chain_through = 4. ratio(S)=0.25 â†’ offset(S) < 0.
+    // chain_through = 4. ratio(S)=0.25 → offset(S) < 0.
     const result = computeVisibility(chain({
       components: [
         { name: 'Anchor', type: 'anchor',    role: 'anchor' },
@@ -445,9 +445,9 @@ describe('computeVisibility â€” semantic jitter', () => {
   });
 });
 
-// â”€â”€â”€ Orphans â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Orphans ────────────────────────────────────────────────────────────
 
-describe('computeVisibility â€” orphans', () => {
+describe('computeVisibility — orphans', () => {
   it('orphan components land at ORPHAN_FALLBACK_Y', () => {
     const result = computeVisibility(chain({
       components: [
@@ -464,10 +464,10 @@ describe('computeVisibility â€” orphans', () => {
   });
 });
 
-// â”€â”€â”€ Map sizing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Map sizing ─────────────────────────────────────────────────────────
 
 describe('computeMapHeight', () => {
-  it('keeps the base height for L â‰¤ DENSITY_LIMIT_L', () => {
+  it('keeps the base height for L ≤ DENSITY_LIMIT_L', () => {
     assert.equal(computeMapHeight(0),  BASE_CANVAS_HEIGHT);
     assert.equal(computeMapHeight(1),  BASE_CANVAS_HEIGHT);
     assert.equal(computeMapHeight(MIN_EFFECTIVE_L), BASE_CANVAS_HEIGHT);
@@ -475,11 +475,11 @@ describe('computeMapHeight', () => {
   });
 
   it('scales the height proportionally for L > DENSITY_LIMIT_L', () => {
-    // L=25 â†’ 650*25/25 = 650 (no scaling at the boundary).
+    // L=25 → 650*25/25 = 650 (no scaling at the boundary).
     assert.equal(computeMapHeight(25), 650);
-    // L=26 â†’ ceil(650*26/25) = 676.
+    // L=26 → ceil(650*26/25) = 676.
     assert.equal(computeMapHeight(26), 676);
-    // L=50 â†’ ceil(650*50/25) = 1300.
+    // L=50 → ceil(650*50/25) = 1300.
     assert.equal(computeMapHeight(50), 1300);
   });
 
@@ -495,9 +495,9 @@ describe('computeMapHeight', () => {
   });
 });
 
-// â”€â”€â”€ Constants sanity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Constants sanity ───────────────────────────────────────────────────
 
-describe('computeVisibility â€” constants sanity', () => {
+describe('computeVisibility — constants sanity', () => {
   it('SECONDARY_ANCHOR_OFFSET stays within (0, 1) so secondary anchors land between two integer levels', () => {
     assert.ok(SECONDARY_ANCHOR_OFFSET > 0 && SECONDARY_ANCHOR_OFFSET < 1);
   });

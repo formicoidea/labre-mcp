@@ -7,11 +7,11 @@
 //
 // Pipeline (ordered by cost, short-circuits when confident):
 //   Tier 1: Naming convention heuristics     (free, sub-ms)
-//           â†’ If confidence >= 90%, return immediately
+//           → If confidence >= 90%, return immediately
 //   Tier 2: LLM semantic classification      (moderate cost)
-//           â†’ Invoked when naming confidence < 90% and llmCall available
+//           → Invoked when naming confidence < 90% and llmCall available
 //   Tier 3: Web search evidence              (higher cost, highest accuracy)
-//           â†’ Invoked when LLM does not resolve above threshold
+//           → Invoked when LLM does not resolve above threshold
 //   Tier 4: Reconciliation                   (combine all available signals)
 //
 // The result includes the verified classification plus the raw tier results
@@ -21,7 +21,7 @@
 //
 // This module does NOT modify any existing strategy files or the capability
 // evaluation pipeline. It sits AFTER the classification gate and BEFORE
-// strategy dispatch â€” called by estimate-evolution.mjs as a replacement for
+// strategy dispatch — called by estimate-evolution.mjs as a replacement for
 // the direct detectComponentType() call when dual verification is desired.
 //
 // Usage:
@@ -31,7 +31,7 @@
 //     description: 'Container platform for microservices',
 //     llmCall: myLlmCall,
 //   });
-//   // â†’ { classification: 'solution', confidence: 0.98, verified: true, ... }
+//   // → { classification: 'solution', confidence: 0.98, verified: true, ... }
 
 import {
   detectComponentType,
@@ -58,7 +58,7 @@ import {
   buildResult,
 } from './verification-reconciliation.mjs';
 
-// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const TOOL = 'dual-verification';
 
@@ -76,7 +76,7 @@ export const THRESHOLDS = {
   MIN_VERIFIED: 0.70,
 };
 
-// â”€â”€â”€ Type Definitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Type Definitions ────────────────────────────────────────────────────────
 
 /**
  * @typedef {Object} ClassificationContext
@@ -113,7 +113,7 @@ export const THRESHOLDS = {
  * @property {Object}  [webSearchResult] - Raw result from Tier 3 web search (if invoked)
  */
 
-// â”€â”€â”€ Core Orchestrator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Core Orchestrator ──────────────────────────────────────────────────────
 
 /**
  * Dual-verification orchestrator: classify a component as solution or capability
@@ -124,16 +124,16 @@ export const THRESHOLDS = {
  * confidence or resolve ambiguity.
  *
  * Verification logic:
- *   - Tier 1 alone at >= 90% confidence â†’ verified = true (dictionary match)
- *   - Tier 1 + Tier 2 agree â†’ verified = true (boosted confidence)
- *   - Tier 1 + Tier 2 disagree â†’ Tier 3 invoked as tiebreaker (if available)
- *   - Any final confidence >= MIN_VERIFIED (0.70) â†’ verified = true
+ *   - Tier 1 alone at >= 90% confidence → verified = true (dictionary match)
+ *   - Tier 1 + Tier 2 agree → verified = true (boosted confidence)
+ *   - Tier 1 + Tier 2 disagree → Tier 3 invoked as tiebreaker (if available)
+ *   - Any final confidence >= MIN_VERIFIED (0.70) → verified = true
  *
  * @param {string} componentName - Component name to classify
  * @param {ClassificationContext} [context={}] - Partial classification context
  * @returns {Promise<VerifiedClassificationResult>} Verified classification result
  */
-// any: context bag (description, llmCall, webSearchCall, timeoutMs, etc.) â€” heterogeneous result shape
+// any: context bag (description, llmCall, webSearchCall, timeoutMs, etc.) — heterogeneous result shape
 export async function verifyClassification(componentName: string, context: any = {}): Promise<any> {
   const name = (componentName || '').trim();
 
@@ -151,7 +151,7 @@ export async function verifyClassification(componentName: string, context: any =
 
   const description = context.description || '';
 
-  // â”€â”€ Tier 1: Naming convention heuristics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Tier 1: Naming convention heuristics ─────────────────────────────────
   logDebug(TOOL, `Tier 1 (naming) for "${name}"...`);
 
   const namingResult = detectComponentType(name, description);
@@ -161,9 +161,9 @@ export async function verifyClassification(componentName: string, context: any =
     `Tier 1 result: type=${namingResult.type}, confidence=${namingResult.confidence}, ` +
     `method=${namingResult.method}, needsFallback=${namingResult.needsFallback}`);
 
-  // Short-circuit: high-confidence naming match â†’ no further verification needed
+  // Short-circuit: high-confidence naming match → no further verification needed
   if (namingResult.confidence >= THRESHOLDS.NAMING_SKIP) {
-    logDebug(TOOL, `Tier 1 sufficient (confidence=${namingResult.confidence} >= ${THRESHOLDS.NAMING_SKIP}) â€” skipping LLM/web`);
+    logDebug(TOOL, `Tier 1 sufficient (confidence=${namingResult.confidence} >= ${THRESHOLDS.NAMING_SKIP}) — skipping LLM/web`);
 
     return buildResult({
       classification: namingResult.type,
@@ -177,7 +177,7 @@ export async function verifyClassification(componentName: string, context: any =
     });
   }
 
-  // â”€â”€ Tier 2: LLM semantic classification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Tier 2: LLM semantic classification ──────────────────────────────────
   let llmResult = null;
   let currentBest = toIntermediateResult(namingResult);
 
@@ -209,7 +209,7 @@ export async function verifyClassification(componentName: string, context: any =
       // Short-circuit: if combined result is above LLM_SKIP threshold, stop
       if (currentBest.confidence >= THRESHOLDS.LLM_SKIP) {
         logDebug(TOOL,
-          `Tier 1+2 sufficient (confidence=${currentBest.confidence} >= ${THRESHOLDS.LLM_SKIP}) â€” skipping web search`);
+          `Tier 1+2 sufficient (confidence=${currentBest.confidence} >= ${THRESHOLDS.LLM_SKIP}) — skipping web search`);
 
         return buildResult({
           ...currentBest,
@@ -229,7 +229,7 @@ export async function verifyClassification(componentName: string, context: any =
     logDebug(TOOL, `Tier 2 (LLM) skipped: ${context.skipLLM ? 'forced skip' : 'no llmCall provided'}`);
   }
 
-  // â”€â”€ Tier 3: Web search evidence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Tier 3: Web search evidence ──────────────────────────────────────────
   let webSearchResult = null;
 
   const canUseWebSearch = !context.skipWebSearch &&
@@ -274,7 +274,7 @@ export async function verifyClassification(componentName: string, context: any =
       `Tier 3 (web search) skipped: ${context.skipWebSearch ? 'forced skip' : currentBest.confidence >= THRESHOLDS.LLM_SKIP ? 'confidence sufficient' : 'no search backend'}`);
   }
 
-  // â”€â”€ Final result â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Final result ─────────────────────────────────────────────────────────
   const methodChain = tiersUsed.join('+');
 
   return buildResult({
@@ -291,11 +291,11 @@ export async function verifyClassification(componentName: string, context: any =
   });
 }
 
-// â”€â”€â”€ Reconciliation Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Reconciliation Helpers ─────────────────────────────────────────────────
 
-// toIntermediateResult, reconcileTwoTiers, buildResult â€” imported from ./verification-reconciliation.mjs
+// toIntermediateResult, reconcileTwoTiers, buildResult — imported from ./verification-reconciliation.mjs
 
-// â”€â”€â”€ Concurrent Dual-Verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Concurrent Dual-Verification ───────────────────────────────────────────
 // Extracted to ./concurrent-verification.mjs for single-responsibility.
 // Re-exported here for backward compatibility.
 
@@ -308,7 +308,7 @@ import { toErrorMessage, errorCode } from '#lib/errors.mjs';
 
 export { verifyConcurrent, verifyConcurrentFull };
 
-// â”€â”€â”€ Convenience: classify without fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Convenience: classify without fallback ─────────────────────────────────
 
 /**
  * Quick classification using only Tier 1 naming convention (no LLM, no web search).
@@ -339,7 +339,7 @@ export function classifyNamingOnly(componentName: string, description: string = 
   });
 }
 
-// â”€â”€â”€ Re-exports for consumer convenience â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Re-exports for consumer convenience ────────────────────────────────────
 
 export { COMPONENT_TYPE, CONFIDENCE_THRESHOLD };
 

@@ -1,11 +1,11 @@
 // Tests for adjust-x.mts
 //
 // Validates the four deterministic invariants:
-//   (a) preservation of LLM intent: final X âˆˆ [xHint âˆ’ BAND_HALF, xHint + BAND_HALF]
+//   (a) preservation of LLM intent: final X ∈ [xHint − BAND_HALF, xHint + BAND_HALF]
 //       (or in the global bounds if anti-collision overrides)
 //   (b) clamp to [LEFT_BOUND, RIGHT_BOUND]
 //   (c) anti-collision: no two same-Y components within MIN_GAP_X
-//   (d) supplier alignment: a supplier with â‰¥ 2 consumers sits at the
+//   (d) supplier alignment: a supplier with ≥ 2 consumers sits at the
 //       (band-clamped) mean of their X
 //   (e) multi-anchor: two anchors with the same xHint at the same Y end
 //       up at least MIN_GAP_X apart
@@ -65,7 +65,7 @@ function xByName(chain: PositionedValueChain): Map<string, number> {
   return new Map(chain.components.map(c => [c.name, c.evolution]));
 }
 
-describe('adjustX â€” clamp & preservation (a, b)', () => {
+describe('adjustX — clamp & preservation (a, b)', () => {
   it('keeps every X within [LEFT_BOUND, RIGHT_BOUND]', () => {
     const out = adjustX(seed(
       [
@@ -97,8 +97,8 @@ describe('adjustX â€” clamp & preservation (a, b)', () => {
   });
 });
 
-describe('adjustX â€” anti-collision (c, e)', () => {
-  it('separates two same-Y components with identical xHint by â‰¥ MIN_GAP_X', () => {
+describe('adjustX — anti-collision (c, e)', () => {
+  it('separates two same-Y components with identical xHint by ≥ MIN_GAP_X', () => {
     const out = adjustX(seed(
       [
         { name: 'A', role: 'anchor', visibility: 0.95, xHint: 0.50 },
@@ -147,8 +147,8 @@ describe('adjustX â€” anti-collision (c, e)', () => {
   });
 });
 
-describe('adjustX â€” supplier alignment (d)', () => {
-  it('aligns a supplier with â‰¥ 2 consumers on the consumer X mean', () => {
+describe('adjustX — supplier alignment (d)', () => {
+  it('aligns a supplier with ≥ 2 consumers on the consumer X mean', () => {
     // S has two consumers at xHint 0.20 and 0.80. S's hint is 0.50; mean is 0.50.
     const out = adjustX(seed(
       [
@@ -165,12 +165,12 @@ describe('adjustX â€” supplier alignment (d)', () => {
       ],
     ));
     const x = xByName(out.chain);
-    // Mean(B, C) = (0.20 + 0.80) / 2 = 0.50, equal to S.xHint â†’ S stays at 0.50.
+    // Mean(B, C) = (0.20 + 0.80) / 2 = 0.50, equal to S.xHint → S stays at 0.50.
     assert.ok(Math.abs(x.get('S')! - 0.50) < 1e-9);
   });
 
   it('caps supplier alignment to the band when consumer mean is outside', () => {
-    // S's hint is 0.30. Consumer mean is 0.70 â†’ outside [0.20, 0.40].
+    // S's hint is 0.30. Consumer mean is 0.70 → outside [0.20, 0.40].
     // S should stop at 0.40 (band edge).
     const out = adjustX(seed(
       [
@@ -187,7 +187,7 @@ describe('adjustX â€” supplier alignment (d)', () => {
       ],
     ));
     const x = xByName(out.chain);
-    // 0.30 + BAND_HALF (0.10) = 0.40 â€” band edge.
+    // 0.30 + BAND_HALF (0.10) = 0.40 — band edge.
     assert.ok(Math.abs(x.get('S')! - (0.30 + BAND_HALF)) < 1e-9);
   });
 
@@ -205,7 +205,7 @@ describe('adjustX â€” supplier alignment (d)', () => {
   });
 });
 
-describe('adjustX â€” fallback for missing xHint (g)', () => {
+describe('adjustX — fallback for missing xHint (g)', () => {
   it('spreads no-hint components uniformly within their Y level', () => {
     const out = adjustX(seed(
       [
@@ -237,7 +237,7 @@ describe('adjustX â€” fallback for missing xHint (g)', () => {
   });
 });
 
-describe('adjustX â€” mapWidth (f)', () => {
+describe('adjustX — mapWidth (f)', () => {
   function chainWithKHints(K: number): PositionedValueChain {
     // K components inside the same Â±DENSITY_WINDOW_HALF window (here 0.45..0.55).
     const peers: Seed[] = Array.from({ length: K }, (_, i) => ({
@@ -253,7 +253,7 @@ describe('adjustX â€” mapWidth (f)', () => {
     );
   }
 
-  it('keeps mapWidth at BASE when K_max â‰¤ DENSITY_LIMIT_K', () => {
+  it('keeps mapWidth at BASE when K_max ≤ DENSITY_LIMIT_K', () => {
     // Build a chain whose densest Â±0.05 window holds DENSITY_LIMIT_K
     // components. Use sparse hints so anti-collision doesn't pile peers up.
     const out = adjustX(seed(
@@ -273,8 +273,8 @@ describe('adjustX â€” mapWidth (f)', () => {
   });
 
   it('scales mapWidth when the densest window saturates', () => {
-    // 6 peers crammed inside one window â†’ K_max = 6 > DENSITY_LIMIT_K = 4.
-    // After anti-collision the 6 components span ~5 Ã— MIN_GAP_X = 0.10,
+    // 6 peers crammed inside one window → K_max = 6 > DENSITY_LIMIT_K = 4.
+    // After anti-collision the 6 components span ~5 × MIN_GAP_X = 0.10,
     // exactly the window width, so 6 still fit in one window.
     const out = adjustX(chainWithKHints(6));
     const expected = Math.ceil((BASE_CANVAS_WIDTH * 6) / DENSITY_REFERENCE_K);
@@ -282,11 +282,11 @@ describe('adjustX â€” mapWidth (f)', () => {
   });
 });
 
-describe('adjustX â€” constants sanity (h)', () => {
+describe('adjustX — constants sanity (h)', () => {
   it('LEFT_BOUND < RIGHT_BOUND', () => {
     assert.ok(LEFT_BOUND < RIGHT_BOUND);
   });
-  it('MIN_GAP_X is small enough to fit â‰¥ 2 in one window', () => {
+  it('MIN_GAP_X is small enough to fit ≥ 2 in one window', () => {
     assert.ok(MIN_GAP_X * 2 <= 2 * 0.05);
   });
   it('BAND_HALF leaves room for anti-collision', () => {

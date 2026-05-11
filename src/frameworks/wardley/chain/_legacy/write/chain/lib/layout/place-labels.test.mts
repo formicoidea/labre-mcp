@@ -1,12 +1,12 @@
 // Tests for place-labels.mts (V2 rule).
 //
 // Validates:
-//   - leaf component â†’ label below center
-//   - component on the right edge (X >= 0.95) â†’ label on the LEFT
-//   - component on the left edge (X <= 0.05) â†’ label on the RIGHT
-//   - middle component with more right children â†’ label on the LEFT
-//   - middle component with more left children â†’ label on the RIGHT
-//   - tie â†’ label LEFT (deterministic default)
+//   - leaf component → label below center
+//   - component on the right edge (X >= 0.95) → label on the LEFT
+//   - component on the left edge (X <= 0.05) → label on the RIGHT
+//   - middle component with more right children → label on the LEFT
+//   - middle component with more left children → label on the RIGHT
+//   - tie → label LEFT (deterministic default)
 //   - assignment is deterministic and does not mutate the input
 
 import { describe, it } from 'node:test';
@@ -69,7 +69,7 @@ describe('pickLabelOffset', () => {
     assert.deepEqual(pickLabelOffset(left, ch), LABEL_RIGHT);
   });
 
-  it('middle component with more right children â†’ label LEFT', () => {
+  it('middle component with more right children → label LEFT', () => {
     const mid = comp('M', 0.5, 0.5);
     const r1 = comp('R1', 0.3, 0.7);
     const r2 = comp('R2', 0.3, 0.85);
@@ -82,7 +82,7 @@ describe('pickLabelOffset', () => {
     assert.deepEqual(pickLabelOffset(mid, ch), LABEL_LEFT);
   });
 
-  it('middle component with more left children â†’ label RIGHT', () => {
+  it('middle component with more left children → label RIGHT', () => {
     const mid = comp('M', 0.5, 0.5);
     const l1 = comp('L1', 0.3, 0.3);
     const l2 = comp('L2', 0.3, 0.15);

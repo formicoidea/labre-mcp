@@ -13,7 +13,7 @@
 //   6. Conversational mode also triggers fallback
 //   7. Environment variable doesn't interfere with fallback logic
 //
-// All tests use direct function calls or mocks â€” no real LLM calls.
+// All tests use direct function calls or mocks — no real LLM calls.
 
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,9 +31,9 @@ import {
   THRESHOLDS,
 } from '#work-on-value-chain/write/component/lib/verification/dual-verification-orchestrator.mjs';
 
-// â”€â”€â”€ Test Suite â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Test Suite ──────────────────────────────────────────────────────────────
 
-describe('Fallback routing trigger â€” Sub-AC 2', () => {
+describe('Fallback routing trigger — Sub-AC 2', () => {
   let originalMode;
 
   before(() => {
@@ -49,9 +49,9 @@ describe('Fallback routing trigger â€” Sub-AC 2', () => {
     }
   });
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════════════════════
   // Group 1: High-confidence names do NOT trigger fallback
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════════════════════
 
   describe('high-confidence names skip fallback', () => {
     const highConfidenceSolutions = [
@@ -60,7 +60,7 @@ describe('Fallback routing trigger â€” Sub-AC 2', () => {
     ];
 
     for (const name of highConfidenceSolutions) {
-      it(`${name} â†’ needsFallback=false (known solution, confidence â‰¥ 0.90)`, () => {
+      it(`${name} → needsFallback=false (known solution, confidence ≥ 0.90)`, () => {
         const detection = detectComponentType(name);
         assert.equal(detection.type, COMPONENT_TYPE.SOLUTION);
         assert.ok(detection.confidence >= CONFIDENCE_THRESHOLD,
@@ -76,7 +76,7 @@ describe('Fallback routing trigger â€” Sub-AC 2', () => {
     ];
 
     for (const name of highConfidenceCapabilities) {
-      it(`${name} â†’ needsFallback=false (known capability, confidence â‰¥ 0.90)`, () => {
+      it(`${name} → needsFallback=false (known capability, confidence ≥ 0.90)`, () => {
         const detection = detectComponentType(name);
         assert.equal(detection.type, COMPONENT_TYPE.CAPABILITY);
         assert.ok(detection.confidence >= 0.88,
@@ -89,13 +89,13 @@ describe('Fallback routing trigger â€” Sub-AC 2', () => {
     }
   });
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════════════════════
   // Group 2: Low-confidence/ambiguous names DO trigger fallback
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════════════════════
 
   describe('low-confidence names trigger fallback (needsFallback=true)', () => {
     const ambiguousNames = [
-      'XyzWidget',       // Unknown â€” heuristic only
+      'XyzWidget',       // Unknown — heuristic only
       'MyCustomTool',    // No brand recognition
       'Blarg',           // Completely unknown
       'SuperApp',        // Looks like product but unknown
@@ -103,7 +103,7 @@ describe('Fallback routing trigger â€” Sub-AC 2', () => {
     ];
 
     for (const name of ambiguousNames) {
-      it(`${name} â†’ needsFallback=true (confidence < 0.90)`, () => {
+      it(`${name} → needsFallback=true (confidence < 0.90)`, () => {
         const detection = detectComponentType(name);
         assert.ok(detection.confidence < CONFIDENCE_THRESHOLD,
           `${name}: confidence ${detection.confidence} should be < ${CONFIDENCE_THRESHOLD} for ambiguous names`);
@@ -113,13 +113,13 @@ describe('Fallback routing trigger â€” Sub-AC 2', () => {
     }
   });
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════════════════════
   // Group 3: Dual-verification orchestrator correctly receives context
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════════════════════
 
   describe('verifyClassification receives and uses partial context', () => {
     it('accepts description in context', async () => {
-      // Known solution â€” should short-circuit at Tier 1 regardless of context
+      // Known solution — should short-circuit at Tier 1 regardless of context
       const result = await verifyClassification('Docker', {
         description: 'Container platform for microservices',
       });
@@ -165,9 +165,9 @@ describe('Fallback routing trigger â€” Sub-AC 2', () => {
     });
   });
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════════════════════
   // Group 4: Fallback error handling (graceful degradation)
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════════════════════
 
   describe('fallback error handling', () => {
     it('LLM error in verifyClassification returns naming-only result', async () => {
@@ -188,9 +188,9 @@ describe('Fallback routing trigger â€” Sub-AC 2', () => {
     });
   });
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════════════════════
   // Group 5: Routing metadata includes verification info
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════════════════════
 
   describe('verified result provides routing targets', () => {
     it('high-confidence verified result has routing targets', async () => {
@@ -220,16 +220,16 @@ describe('Fallback routing trigger â€” Sub-AC 2', () => {
         skipWebSearch: true,
       });
 
-      // LLM says solution â†’ routingTargets should reflect that
+      // LLM says solution → routingTargets should reflect that
       assert.equal(result.classification, 'solution');
       assert.ok(result.routingTargets.useSolutionStrategies,
         'LLM-verified solution should use solution strategies');
     });
   });
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════════════════════
   // Group 6: Confidence threshold is exactly 0.90
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════════════════════
 
   describe('confidence threshold boundary', () => {
     it('CONFIDENCE_THRESHOLD is 0.90', () => {
@@ -247,7 +247,7 @@ describe('Fallback routing trigger â€” Sub-AC 2', () => {
     });
 
     it('heuristic result capped at 0.89 always needs fallback', () => {
-      // "React 18" has version number + product suffix heuristic â†’ capped at 0.89
+      // "React 18" has version number + product suffix heuristic → capped at 0.89
       const detection = detectComponentType('React 18');
       assert.ok(detection.confidence <= 0.89,
         `Heuristic confidence ${detection.confidence} should be <= 0.89`);
@@ -255,9 +255,9 @@ describe('Fallback routing trigger â€” Sub-AC 2', () => {
     });
   });
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════════════════════
   // Group 7: classifyNamingOnly provides consistent VerifiedClassificationResult
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════════════════════
 
   describe('classifyNamingOnly convenience function', () => {
     it('returns same shape as verifyClassification', () => {
@@ -277,9 +277,9 @@ describe('Fallback routing trigger â€” Sub-AC 2', () => {
     });
   });
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════════════════════
   // Group 8: Parallel mode does not block fallback logic
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════════════════════
 
   describe('WARDLEY_EVAL_MODE does not affect fallback detection', () => {
     let saved;
