@@ -188,7 +188,7 @@ User files take precedence by name. Same merge model applies to `llm.config.json
 
 **Context:** The current MCP server runs per-project via stdio. This conflicts with using the Claude Agent SDK (which spawns sub-processes that collide with active Claude Code sessions). It also makes the trajectory to a hosted multi-tenant service expensive (different transport, different state model).
 
-**Decision:** labre-mcp runs as a locally-installed daemon, exposing MCP over HTTP on localhost (default port 3000). Transport choice intentionally aligns with V3 SaaS: same protocol, different host + auth.
+**Decision:** labre-mcp runs as a locally-installed daemon, exposing MCP over HTTP on localhost (default port 6767). Transport choice intentionally aligns with V3 SaaS: same protocol, different host + auth.
 
 **Consequences:** All tool calls become self-contained (no implicit `cwd`). The Agent SDK is usable inside the daemon (no Claude Code session conflict). Auth is a no-op middleware in V1, real in V3 (see ARCH-15). Existing stdio support is dropped in CP10.
 

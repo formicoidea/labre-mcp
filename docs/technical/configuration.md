@@ -297,14 +297,14 @@ Il est charge automatiquement par Node.js via le flag `--env-file=.env` dans `.m
 
 ## Configuration MCP — .mcp.json
 
-Le fichier `.mcp.json` a la racine enregistre le serveur MCP aupres de Claude Code via HTTP (le daemon ecoute sur localhost:3000) :
+Le fichier `.mcp.json` a la racine enregistre le serveur MCP aupres de Claude Code via HTTP (le daemon ecoute sur localhost:6767) :
 
 ```json
 {
   "mcpServers": {
     "labre-mcp": {
       "type": "http",
-      "url": "http://127.0.0.1:3000/mcp"
+      "url": "http://127.0.0.1:6767/mcp"
     }
   }
 }

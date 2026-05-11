@@ -83,7 +83,7 @@ Le fichier `.mcp.json` a la racine enregistre le serveur automatiquement :
   "mcpServers": {
     "labre-mcp": {
       "type": "http",
-      "url": "http://127.0.0.1:3000/mcp"
+      "url": "http://127.0.0.1:6767/mcp"
     }
   }
 }

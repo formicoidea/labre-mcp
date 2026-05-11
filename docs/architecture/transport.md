@@ -42,10 +42,10 @@ The `/mcp` endpoint accepts these MCP methods:
 The canonical entrypoint is the HTTP daemon in [`src/core/transport/labre-daemon.mts`](../../src/core/transport/labre-daemon.mts), launched by `pnpm mcp` (dev) or `pnpm mcp:prod` (post-`pnpm build`). The daemon:
 
 1. Builds the strategy registry via `buildStrategyRegistry()`.
-2. Boots the HTTP server on `LABRE_HTTP_PORT` (default `3000`).
+2. Boots the HTTP server on `LABRE_HTTP_PORT` (default `6767`).
 3. Logs the registered tool list and the strategy methodIds.
 
-The `.mcp.json` at the repo root declares the labre-mcp server with HTTP transport (`"type": "http"`, `"url": "http://127.0.0.1:3000/mcp"`), so Claude Code connects to the running daemon rather than spawning a fresh stdio server.
+The `.mcp.json` at the repo root declares the labre-mcp server with HTTP transport (`"type": "http"`, `"url": "http://127.0.0.1:6767/mcp"`), so Claude Code connects to the running daemon rather than spawning a fresh stdio server.
 
 ### Legacy stdio fallback
 
@@ -53,7 +53,7 @@ The `.mcp.json` at the repo root declares the labre-mcp server with HTTP transpo
 
 ## Configuration
 
-The daemon reads the port from `LABRE_HTTP_PORT` (default `3000`). Bind address defaults to `127.0.0.1` (loopback-only — never bind to `0.0.0.0` in V1).
+The daemon reads the port from `LABRE_HTTP_PORT` (default `6767`). Bind address defaults to `127.0.0.1` (loopback-only — never bind to `0.0.0.0` in V1).
 
 ### Shipped recipes location
 
@@ -116,7 +116,7 @@ This aligns with the ping-pong nature of LLM↔MCP interaction. Async run patter
 ## Smoke test
 
 ```bash
-curl -s http://127.0.0.1:3000/mcp \
+curl -s http://127.0.0.1:6767/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"ping"}'
 # {"jsonrpc":"2.0","id":1,"result":{}}

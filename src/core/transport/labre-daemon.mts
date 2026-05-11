@@ -17,7 +17,7 @@ import { handleEstimateEvolutionViaRecipe } from "#mcp/estimate-evolution-via-re
 import { EstimateEvolutionInputSchema } from "#schemas/estimate-evolution.schema.mjs";
 import { z } from "zod";
 
-const DEFAULT_PORT = 3000;
+const DEFAULT_PORT = 6767;
 
 function readPort(): number {
   const raw = process.env.LABRE_HTTP_PORT;
