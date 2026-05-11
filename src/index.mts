@@ -15,11 +15,11 @@ export { ESTIMATE_ANCHOR_EVOLUTION_TOOL, handleEstimateAnchorEvolution } from '.
 export { GENERATE_VALUE_CHAIN_TOOL, handleGenerateValueChain } from './mcp/generate-value-chain.tool.mjs';
 
 // â”€â”€â”€ Strategy Registry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-export { loadStrategies, getStrategy, listStrategies } from './work-on-evolution/write/strategies/capacity/registry.mjs';
+export { loadStrategies, getStrategy, listStrategies } from '#work-on-evolution/write/strategies/capacity/registry.mjs';
 
 // â”€â”€â”€ Routing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-export { classifyComponent } from './work-on-evolution/write/routing/classification-gate.mjs';
-export { detectMode, routeEstimateEvolution } from './work-on-evolution/write/routing/mode-router.mjs';
+export { classifyComponent } from '#work-on-evolution/write/routing/classification-gate.mjs';
+export { detectMode, routeEstimateEvolution } from '#work-on-evolution/write/routing/mode-router.mjs';
 
 // â”€â”€â”€ Shared Utilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export { createLLMCall, createStructuredLLMCall } from './lib/llm/llm-call.mjs';

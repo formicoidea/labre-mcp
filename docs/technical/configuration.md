@@ -302,7 +302,7 @@ Le fichier `.mcp.json` a la racine enregistre le serveur MCP aupres de Claude Co
 ```json
 {
   "mcpServers": {
-    "wardley-assistant": {
+    "labre-mcp": {
       "command": "cmd",
       "args": ["/c", "npx", "tsx", "--env-file=.env", "src/mcp/mcp-server.mts"],
       "cwd": "C:\\...\\WardleyAssistant",
@@ -340,7 +340,7 @@ const SERVER_CAPABILITIES = {
 ### 2. Lancement avec le flag
 
 ```bash
-claude --dangerously-load-development-channels server:wardley-assistant
+claude --dangerously-load-development-channels server:labre-mcp
 ```
 
 Ce flag est necessaire car le serveur n'est pas sur l'allowlist officielle Anthropic (feature en preview).

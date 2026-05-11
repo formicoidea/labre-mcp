@@ -10,7 +10,7 @@
 import { z } from 'zod';
 import type { McpToolDefinition, JsonSchema } from '../types/mcp.mjs';
 import { EstimateEvolutionInputSchema, type EstimateEvolutionInput } from '../schemas/estimate-evolution.schema.mjs';
-import { routeEstimateEvolution } from '../work-on-evolution/write/routing/mode-router.mjs';
+import { routeEstimateEvolution } from '#work-on-evolution/write/routing/mode-router.mjs';
 
 export const ESTIMATE_EVOLUTION_TOOL: McpToolDefinition = {
   name: 'estimateEvolution',

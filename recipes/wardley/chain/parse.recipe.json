@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0",
+  "name": "parse",
+  "domain": "wardley",
+  "tool": "chain",
+  "description": "Parse an existing OWM DSL string into a WardleyChainAST. Used as the read-side entry for any analysis that operates on an existing map.",
+  "steps": [
+    {
+      "stepId": "parse",
+      "tool": "wardley:chain:read:map:owm-parser",
+      "in": "$.input",
+      "out": "$.chain"
+    }
+  ],
+  "listeners": []
+}

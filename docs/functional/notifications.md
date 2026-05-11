@@ -144,13 +144,13 @@ Pour que les notifications apparaissent dans le chat :
 1. Verifiez que `experimental: { 'claude/channel': {} }` est dans les capabilities du serveur (deja configure)
 2. Lancez Claude Code avec :
    ```bash
-   claude --dangerously-load-development-channels server:wardley-assistant
+   claude --dangerously-load-development-channels server:labre-mcp
    ```
 3. Reconnectez le MCP : `/mcp` dans le chat
 
 Les messages arrivent dans le contexte Claude comme :
 ```xml
-<channel source="wardley-assistant" level="info" tool="estimateEvolution">
+<channel source="labre-mcp" level="info" tool="estimateEvolution">
 Starting estimateEvolution for "ERP"...
 </channel>
 ```

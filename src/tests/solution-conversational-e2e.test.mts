@@ -14,12 +14,12 @@
 
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { estimateEvolutionConversational } from '../work-on-evolution/write/estimate-evolution.mjs';
+import { estimateEvolutionConversational } from '#work-on-evolution/write/estimate-evolution.mjs';
 import { ConversationSession } from '../session/conversation-session.mjs';
 import { COMPONENT_TYPE } from '../lib/component-detection.mjs';
 import {
   dispatchSolutionStrategies,
-} from '../work-on-evolution/write/routing/solution-dispatch.mjs';
+} from '#work-on-evolution/write/routing/solution-dispatch.mjs';
 
 // Standard mock LLM that returns all-phase-3 evaluations
 const mockLlmPhase3 = async () => [

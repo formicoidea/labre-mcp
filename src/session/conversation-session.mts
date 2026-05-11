@@ -31,7 +31,7 @@
 //   // ... exchange more turns ...
 //   if (session.isReadyForEstimation()) { ... }
 
-import { classifyComponent, buildReQuestions } from '../work-on-evolution/write/routing/classification-gate.mjs';
+import { classifyComponent, buildReQuestions } from '#work-on-evolution/write/routing/classification-gate.mjs';
 import type { SessionState, SessionExchange, SessionSummary } from '../types/session.mjs';
 import type { PhaseDistribution } from '../schemas/inputs.schema.mjs';
 import { phase4Distribution } from '../schemas/inputs.schema.mjs';

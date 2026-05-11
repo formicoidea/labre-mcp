@@ -36,7 +36,7 @@ pnpm run dev
 
 Sortie attendue sur stderr :
 ```
-[wardley-assistant] MCP server started. Tools: estimateEvolution, evaluateMap, identifyCapability, estimateAnchorEvolution
+[labre-mcp] MCP server started. Tools: estimateEvolution, evaluateMap, identifyCapability, estimateAnchorEvolution
 ```
 
 Ctrl+C pour stopper.
@@ -81,7 +81,7 @@ Le fichier `.mcp.json` a la racine enregistre le serveur automatiquement :
 ```json
 {
   "mcpServers": {
-    "wardley-assistant": {
+    "labre-mcp": {
       "command": "cmd",
       "args": ["/c", "npx", "tsx", "--env-file=.env", "src/mcp/mcp-server.mts"],
       "cwd": "C:\\...\\WardleyAssistant",
@@ -100,7 +100,7 @@ Quand Claude Code demarre dans ce repertoire, le serveur MCP est disponible et l
 Pour voir les messages de progression en temps reel dans le chat Claude Code, lancez avec le flag channels :
 
 ```bash
-claude --dangerously-load-development-channels server:wardley-assistant
+claude --dangerously-load-development-channels server:labre-mcp
 ```
 
 Voir [Notifications](notifications.md) pour plus de details.

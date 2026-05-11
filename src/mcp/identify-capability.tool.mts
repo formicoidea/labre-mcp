@@ -8,7 +8,7 @@ import { z } from 'zod';
 import type { McpToolDefinition, JsonSchema } from '../types/mcp.mjs';
 import { IdentifyCapabilityInputSchema, type IdentifyCapabilityInput } from '../schemas/identify-capability.schema.mjs';
 import { getStrategyLLM } from '../lib/llm/registry.mjs';
-import { identifyCapability } from '../work-on-value-chain/write/component/lib/capability/identify-capability.mjs';
+import { identifyCapability } from '#work-on-value-chain/write/component/lib/capability/identify-capability.mjs';
 
 export const IDENTIFY_CAPABILITY_TOOL: McpToolDefinition = {
   name: 'identifyCapability',

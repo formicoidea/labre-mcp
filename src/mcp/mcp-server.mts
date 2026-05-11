@@ -1,16 +1,23 @@
 #!/usr/bin/env node
 
+// LEGACY stdio MCP server. The canonical entrypoint is the HTTP daemon in
+// `src/core/transport/labre-daemon.mts` (ARCH-14). This stdio server is kept
+// for transition compatibility and is reachable via `pnpm mcp:legacy:stdio`.
+// It bypasses the kernel recipe runner and dispatches via the older
+// per-tool handlers; new functionality should land on the daemon path.
+// Slated for full removal in V1.5.
+
 // Guard: prevent recursive MCP server spawning.
 // When the server spawns a Claude Code agent (via Agent SDK), the child process
 // inherits this env var. If that child's MCP config tries to spawn another
-// wardley-assistant server, the nested instance exits cleanly.
+// labre-mcp server, the nested instance exits cleanly.
 if (process.env._WARDLEY_NESTED) {
-  process.stderr.write('[wardley-assistant] Nested MCP server detected â€” exiting cleanly\n');
+  process.stderr.write('[labre-mcp] Nested MCP server detected â€” exiting cleanly\n');
   process.exit(0);
 }
 process.env._WARDLEY_NESTED = '1';
 
-// MCP Server for WardleyAssistant
+// MCP Server for labre-mcp (legacy stdio path).
 //
 // Implements the Model Context Protocol (MCP) over stdio using JSON-RPC 2.0.
 // Registers the estimateEvolution tool and routes tool/call requests to its handler.
@@ -69,7 +76,7 @@ const TOOL_HANDLERS: Map<string, ToolHandler> = new Map<string, ToolHandler>([
 // â”€â”€â”€ MCP Server Implementation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SERVER_INFO: McpServerInfo = {
-  name: 'wardley-assistant',
+  name: 'labre-mcp',
   version: '1.0.0',
 };
 
@@ -112,7 +119,7 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
           protocolVersion: '2024-11-05',
           serverInfo: SERVER_INFO,
           capabilities: SERVER_CAPABILITIES,
-          instructions: 'Progress notifications arrive as <channel source="wardley-assistant" level="..." tool="...">. They are one-way status updates showing tool execution progress. Display them to the user as real-time progress indicators. No reply expected.',
+          instructions: 'Progress notifications arrive as <channel source="labre-mcp" level="..." tool="...">. They are one-way status updates showing tool execution progress. Display them to the user as real-time progress indicators. No reply expected.',
         },
       };
 
@@ -310,7 +317,7 @@ export function startServer() {
   });
 
   // Signal readiness to stderr (not stdout, to avoid protocol pollution)
-  process.stderr.write(`[wardley-assistant] MCP server started. Tools: ${REGISTERED_TOOLS.map(t => t.name).join(', ')}\n`);
+  process.stderr.write(`[labre-mcp] MCP server started. Tools: ${REGISTERED_TOOLS.map(t => t.name).join(', ')}\n`);
 }
 
 // â”€â”€â”€ Exports for programmatic use â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

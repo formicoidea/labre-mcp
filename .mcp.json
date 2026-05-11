@@ -1,10 +1,8 @@
 {
   "mcpServers": {
-    "wardley-assistant": {
-      "command": "cmd",
-      "args": ["/c", "npx", "tsx", "--env-file=.env", "src/mcp/mcp-server.mts"],
-      "cwd": "C:\\Users\\Dell\\Documents\\5-DEV\\DevWardleyMaps\\WardleyAssistant",
-      "timeout": 180000
+    "labre-mcp": {
+      "type": "http",
+      "url": "http://127.0.0.1:3000/mcp"
     }
   }
 }

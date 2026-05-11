@@ -1,0 +1,119 @@
+// MCP method dispatcher. Maps incoming JSON-RPC method names to handlers:
+//   initialize → server info + capabilities
+//   ping → empty success
+//   notifications/initialized → no-op (one-way)
+//   tools/list → list of registered tools
+//   tools/call → invoke a tool by name
+//
+// Tool registration is decoupled from this module: a ToolRegistry is passed
+// in. Concrete tools (estimateEvolution, evaluateMap, etc.) register
+// themselves at boot. CP4-CP6 will migrate the existing 5 tools to this
+// registry; CP3 ships with the registry empty (or holding only smoke tools).
+
+import type { RequestContext } from "../context/request-context.mjs";
+import { type JsonRpcRequest, type JsonRpcResponse, JsonRpcErrorCode } from "./json-rpc.schema.mjs";
+
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  // any: per-tool input shape — opaque at the dispatcher level (handler validates)
+  inputSchema: Record<string, unknown>;
+  handler: (args: unknown, context: RequestContext) => Promise<unknown>;
+}
+
+export class ToolRegistry {
+  private readonly map = new Map<string, ToolDefinition>();
+
+  register(tool: ToolDefinition): void {
+    if (this.map.has(tool.name)) {
+      throw new Error(`Tool "${tool.name}" already registered`);
+    }
+    this.map.set(tool.name, tool);
+  }
+
+  list(): Array<Pick<ToolDefinition, "name" | "description" | "inputSchema">> {
+    return [...this.map.values()].map(({ name, description, inputSchema }) => ({
+      name,
+      description,
+      inputSchema,
+    }));
+  }
+
+  get(name: string): ToolDefinition | undefined {
+    return this.map.get(name);
+  }
+}
+
+const SERVER_INFO = {
+  name: "labre-mcp",
+  version: "1.0.0-migration",
+};
+
+const SERVER_CAPABILITIES = {
+  tools: {},
+};
+
+export interface DispatchOptions {
+  request: JsonRpcRequest;
+  context: RequestContext;
+  tools: ToolRegistry;
+}
+
+export async function dispatch(options: DispatchOptions): Promise<JsonRpcResponse | null> {
+  const { request, context, tools } = options;
+  const id = request.id ?? null;
+
+  // Notifications (no id) — one-way, no response.
+  if (request.method.startsWith("notifications/")) {
+    return null;
+  }
+
+  try {
+    switch (request.method) {
+      case "initialize":
+        return success(id, {
+          protocolVersion: "2024-11-05",
+          serverInfo: SERVER_INFO,
+          capabilities: SERVER_CAPABILITIES,
+        });
+
+      case "ping":
+        return success(id, {});
+
+      case "tools/list":
+        return success(id, { tools: tools.list() });
+
+      case "tools/call": {
+        // any: params validated below
+        const params = (request.params as { name?: string; arguments?: unknown }) ?? {};
+        if (!params.name || typeof params.name !== "string") {
+          return error(id, JsonRpcErrorCode.InvalidParams, "tools/call requires a 'name' string parameter");
+        }
+        const tool = tools.get(params.name);
+        if (!tool) {
+          return error(id, JsonRpcErrorCode.MethodNotFound, `Unknown tool: ${params.name}`);
+        }
+        const result = await tool.handler(params.arguments ?? {}, context);
+        return success(id, result);
+      }
+
+      default:
+        return error(id, JsonRpcErrorCode.MethodNotFound, `Method not found: ${request.method}`);
+    }
+  } catch (err) {
+    return error(id, JsonRpcErrorCode.InternalError, (err as Error).message ?? String(err));
+  }
+}
+
+function success(id: string | number | null, result: unknown): JsonRpcResponse {
+  return { jsonrpc: "2.0", id, result };
+}
+
+function error(
+  id: string | number | null,
+  code: number,
+  message: string,
+  data?: unknown,
+): JsonRpcResponse {
+  return { jsonrpc: "2.0", id, error: { code, message, data } };
+}

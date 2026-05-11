@@ -6,7 +6,7 @@
 import { z } from 'zod';
 import type { McpToolDefinition, JsonSchema } from '../types/mcp.mjs';
 import { EvaluateMapInputSchema, type EvaluateMapInput } from '../schemas/evaluate-map.schema.mjs';
-import { evaluateMapFile } from '../work-on-evolution/write/evaluate-map/evaluate-map.mjs';
+import { evaluateMapFile } from '#work-on-evolution/write/evaluate-map/evaluate-map.mjs';
 
 export const EVALUATE_MAP_TOOL: McpToolDefinition = {
   name: 'evaluateMap',

@@ -163,7 +163,7 @@ Chaque reponse contient deux champs additionnels :
 }
 ```
 
-Quand `degraded: true`, le resultat est valide mais une ou plusieurs dependances etaient inaccessibles. Les notifications MCP correspondantes (canal `wardley-assistant`, niveau `warning`) sont aussi emises pour affichage temps reel.
+Quand `degraded: true`, le resultat est valide mais une ou plusieurs dependances etaient inaccessibles. Les notifications MCP correspondantes (canal `labre-mcp`, niveau `warning`) sont aussi emises pour affichage temps reel.
 
 ## Tests
 

@@ -15,7 +15,7 @@ Toute reponse contient les champs `degraded` (boolean) et `degradationEvents` (a
 | `write:capacity:cpc-evolution` | Erreur inattendue dans le pipeline CPC (safety net). Le `detail` contient le message original. |
 | `evaluateMap:<componentName>` | Une evaluation par-composant a leve une exception. Le composant est marque `skipped` avec la raison. |
 
-Les memes informations apparaissent en notifications MCP (canal `wardley-assistant`, niveau `warning`) — affichees en temps reel dans Claude Code. Voir [degradation.md](degradation.md) pour la conception du framework.
+Les memes informations apparaissent en notifications MCP (canal `labre-mcp`, niveau `warning`) — affichees en temps reel dans Claude Code. Voir [degradation.md](degradation.md) pour la conception du framework.
 
 ## Erreurs courantes
 
@@ -155,7 +155,7 @@ Le Claude Agent SDK cree un sous-processus qui entre en conflit avec une session
 Les notifications standard MCP (`notifications/message`) ne sont pas rendues dans le chat Claude Code. Il faut utiliser les channels (`notifications/claude/channel`) et lancer Claude Code avec :
 
 ```bash
-claude --dangerously-load-development-channels server:wardley-assistant
+claude --dangerously-load-development-channels server:labre-mcp
 ```
 
 ### Quelle est la difference entre oneshot et conversational ?

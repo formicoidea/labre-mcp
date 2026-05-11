@@ -14,7 +14,7 @@ import {
   type GenerateValueChainInput,
 } from '../schemas/generate-value-chain.schema.mjs';
 import { getStrategyLLM } from '../lib/llm/registry.mjs';
-import { TopDownChainStrategy } from '../work-on-value-chain/write/chain/strategies/top-down/top-down-strategy.mjs';
+import { TopDownChainStrategy } from '#work-on-value-chain/write/chain/strategies/top-down/top-down-strategy.mjs';
 import type { ChainMetadata } from '../types/value-chain.mjs';
 
 export interface GenerateValueChainResult {

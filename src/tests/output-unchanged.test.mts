@@ -12,8 +12,8 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { setVerbose } from '../lib/mcp-notifications.mjs';
-import { estimateEvolutionOneShot } from '../work-on-evolution/write/estimate-evolution.mjs';
-import { parseWardleyMap, formatEvaluationReport } from '../work-on-evolution/write/evaluate-map/evaluate-map.mjs';
+import { estimateEvolutionOneShot } from '#work-on-evolution/write/estimate-evolution.mjs';
+import { parseWardleyMap, formatEvaluationReport } from '#work-on-evolution/write/evaluate-map/evaluate-map.mjs';
 import { handleRequest, REGISTERED_TOOLS, TOOL_HANDLERS } from '../mcp/mcp-server.mjs';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -167,7 +167,7 @@ describe('AC 8: Existing tool output unchanged', () => {
     assert.equal(response.id, 1);
     assert.ok(response.result);
     assert.equal(response.result.protocolVersion, '2024-11-05');
-    assert.equal(response.result.serverInfo.name, 'wardley-assistant');
+    assert.equal(response.result.serverInfo.name, 'labre-mcp');
     assert.equal(response.result.serverInfo.version, '1.0.0');
     assert.ok(response.result.capabilities.tools !== undefined);
     assert.ok(response.result.capabilities.logging !== undefined);

@@ -9,7 +9,7 @@ import { registerHealthCheck } from '../lib/degradation/registry.mjs';
 import { checkEnvironment as checkBigQueryEnvironment } from '../lib/patent/bigquery-client.mjs';
 
 /**
- * Register every default health check used by the wardley-assistant MCP
+ * Register every default health check used by the labre-mcp MCP
  * server. Idempotent — re-registering the same source overwrites the
  * previous check, which is fine for tests.
  */

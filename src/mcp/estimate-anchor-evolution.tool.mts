@@ -7,7 +7,7 @@ import { z } from 'zod';
 import type { McpToolDefinition, JsonSchema } from '../types/mcp.mjs';
 import { EstimateAnchorEvolutionInputSchema, type EstimateAnchorEvolutionInput } from '../schemas/estimate-anchor-evolution.schema.mjs';
 import { getStrategyLLM } from '../lib/llm/registry.mjs';
-import { estimateAnchorEvolution } from '../work-on-evolution/write/strategies/anchor/estimate-anchor-evolution.mjs';
+import { estimateAnchorEvolution } from '#work-on-evolution/write/strategies/anchor/estimate-anchor-evolution.mjs';
 
 export const ESTIMATE_ANCHOR_EVOLUTION_TOOL: McpToolDefinition = {
   name: 'estimateAnchorEvolution',
