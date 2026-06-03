@@ -172,7 +172,7 @@ import {
 import type { RequestContext } from '#core/context/request-context.mjs';
 import { getStrategyLogprobLLM } from '#lib/llm/registry.mjs';
 
-const NEW_METHOD_ID_LOGPROB = 'wardley:evolution:write:capacity:logprob-distribution';
+const NEW_METHOD_ID_LOGPROB = 'wardley:map:climate:position-functional-in-evolution:logprob-distribution';
 
 export class LogprobDistributionStrategyCore extends CoreBaseStrategy<ComponentInput, EvolutionResult> {
   private readonly _llmLogprobCall: import('#types/llm.mjs').LogprobLLMCall | null;

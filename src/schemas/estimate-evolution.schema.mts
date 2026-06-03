@@ -39,7 +39,7 @@ export const EstimateEvolutionInputSchema = z.object({
     '"auto" (default) routes the component to one strategy per detected type (anchor / solution / capability) ' +
     'via tool.config.json. ' +
     '"report" fans out to several strategies per type for a multi-perspective view. ' +
-    'A specific method id (e.g. "wardley:evolution:write:capacity:s-curve") bypasses routing and runs that strategy directly.'
+    'A specific method id (e.g. "wardley:map:climate:position-functional-in-evolution:s-curve") bypasses routing and runs that strategy directly.'
   ),
   mode: z.enum(['oneshot', 'conversational', 'default']).default('default').describe(
     'Execution mode. "oneshot" accepts all parameters in a single call. ' +

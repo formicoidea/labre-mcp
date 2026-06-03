@@ -13,7 +13,7 @@ function validRecipeBody(name: string): Recipe {
     domain: "wardley",
     tool: "evolution",
     steps: [
-      { stepId: "s1", tool: "wardley:evolution:write:capacity:s-curve" },
+      { stepId: "s1", tool: "wardley:map:climate:position-functional-in-evolution:s-curve" },
     ],
     listeners: [],
   };
@@ -48,15 +48,15 @@ describe("recipe-loader (shipped + override)", () => {
     });
 
     assert.equal(loaded.name, "estimate-component");
-    assert.equal(loaded.steps[0].tool, "wardley:evolution:write:capacity:s-curve");
+    assert.equal(loaded.steps[0].tool, "wardley:map:climate:position-functional-in-evolution:s-curve");
   });
 
   it("user override takes precedence over shipped", async () => {
     const shipped = validRecipeBody("estimate-component");
-    shipped.steps[0].tool = "wardley:evolution:write:capacity:s-curve";
+    shipped.steps[0].tool = "wardley:map:climate:position-functional-in-evolution:s-curve";
 
     const overridden = validRecipeBody("estimate-component");
-    overridden.steps[0].tool = "wardley:evolution:write:capacity:llm-direct";
+    overridden.steps[0].tool = "wardley:map:climate:position-functional-in-evolution:llm-direct";
 
     await writeRecipe(shippedRoot, "wardley", "evolution", "estimate-component", shipped);
     await writeRecipe(projectRoot, "wardley", "evolution", "estimate-component", overridden);
@@ -69,7 +69,7 @@ describe("recipe-loader (shipped + override)", () => {
       projectRoot,
     });
 
-    assert.equal(loaded.steps[0].tool, "wardley:evolution:write:capacity:llm-direct");
+    assert.equal(loaded.steps[0].tool, "wardley:map:climate:position-functional-in-evolution:llm-direct");
   });
 
   it("throws when the recipe does not exist in either location", async () => {

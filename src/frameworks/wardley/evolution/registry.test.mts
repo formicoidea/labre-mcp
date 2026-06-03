@@ -29,12 +29,12 @@ describe('evolution registry — SCurveStrategy', () => {
   it('registers SCurveStrategy under the 5-segment methodId', () => {
     const registry = new StrategyRegistry<BaseStrategy>();
     registerEvolutionStrategies(registry);
-    assert.equal(registry.has('wardley:evolution:write:capacity:s-curve'), true);
-    assert.equal(registry.has('wardley:evolution:write:capacity:llm-direct'), true);
-    assert.equal(registry.has('wardley:evolution:write:capacity:publication-analysis'), true);
-    assert.equal(registry.has('wardley:evolution:write:capacity:cpc-evolution'), true);
-    assert.equal(registry.has('wardley:evolution:write:capacity:timeline-benchmark'), true);
-    assert.equal(registry.has('wardley:evolution:write:capacity:logprob-distribution'), true);
+    assert.equal(registry.has('wardley:map:climate:position-functional-in-evolution:s-curve'), true);
+    assert.equal(registry.has('wardley:map:climate:position-functional-in-evolution:llm-direct'), true);
+    assert.equal(registry.has('wardley:map:climate:position-functional-in-evolution:publication-analysis'), true);
+    assert.equal(registry.has('wardley:map:climate:position-functional-in-evolution:cpc-evolution'), true);
+    assert.equal(registry.has('wardley:map:climate:position-functional-in-evolution:timeline-benchmark'), true);
+    assert.equal(registry.has('wardley:map:climate:position-functional-in-evolution:logprob-distribution'), true);
     assert.equal(registry.has('wardley:evolution:write:solution:properties'), true);
     assert.equal(registry.has('wardley:evolution:read:component:identify-capability'), true);
     assert.equal(registry.has('wardley:evolution:write:anchor:culture-phase'), true);
@@ -44,26 +44,26 @@ describe('evolution registry — SCurveStrategy', () => {
   it('CpcEvolutionStrategyCore.method returns the 5-segment id', () => {
     assert.equal(
       CpcEvolutionStrategyCore.method,
-      'wardley:evolution:write:capacity:cpc-evolution',
+      'wardley:map:climate:position-functional-in-evolution:cpc-evolution',
     );
   });
 
   it('TimelineBenchmarkStrategyCore.method returns the 5-segment id', () => {
     assert.equal(
       TimelineBenchmarkStrategyCore.method,
-      'wardley:evolution:write:capacity:timeline-benchmark',
+      'wardley:map:climate:position-functional-in-evolution:timeline-benchmark',
     );
   });
 
   it('LogprobDistributionStrategyCore.method returns the 5-segment id', () => {
     assert.equal(
       LogprobDistributionStrategyCore.method,
-      'wardley:evolution:write:capacity:logprob-distribution',
+      'wardley:map:climate:position-functional-in-evolution:logprob-distribution',
     );
   });
 
   it('SCurveStrategy.method returns the 5-segment id', () => {
-    assert.equal(SCurveStrategy.method, 'wardley:evolution:write:capacity:s-curve');
+    assert.equal(SCurveStrategy.method, 'wardley:map:climate:position-functional-in-evolution:s-curve');
   });
 
   it('SCurveStrategy.evaluate returns a valid StrategyResult shape', async () => {
@@ -81,7 +81,7 @@ describe('evolution registry — SCurveStrategy', () => {
     assert.equal(typeof out.result.evolution, 'number');
     assert.ok(out.result.evolution >= 0 && out.result.evolution <= 1);
     assert.equal(typeof out.result.confidence, 'number');
-    assert.equal(out.result.method, 'wardley:evolution:write:capacity:s-curve');
+    assert.equal(out.result.method, 'wardley:map:climate:position-functional-in-evolution:s-curve');
   });
 
   it('SCurveStrategy.evaluate captures input signals with source = user-input', async () => {
@@ -109,7 +109,7 @@ describe('evolution registry — SCurveStrategy', () => {
 
 describe('evolution registry — LLMDirectStrategy', () => {
   it('LLMDirectStrategy.method returns the 5-segment id', () => {
-    assert.equal(LLMDirectStrategy.method, 'wardley:evolution:write:capacity:llm-direct');
+    assert.equal(LLMDirectStrategy.method, 'wardley:map:climate:position-functional-in-evolution:llm-direct');
   });
 
   it('LLMDirectStrategy.evaluate captures the raw LLM response in reasoning[0].text', async () => {
@@ -123,9 +123,9 @@ describe('evolution registry — LLMDirectStrategy', () => {
     );
     assert.equal(out.reasoning.length, 1);
     assert.equal(out.reasoning[0].text, cannedResponse);
-    assert.equal(out.reasoning[0].by, 'wardley:evolution:write:capacity:llm-direct');
+    assert.equal(out.reasoning[0].by, 'wardley:map:climate:position-functional-in-evolution:llm-direct');
     assert.ok(out.result.evolution >= 0 && out.result.evolution <= 1);
-    assert.equal(out.result.method, 'wardley:evolution:write:capacity:llm-direct');
+    assert.equal(out.result.method, 'wardley:map:climate:position-functional-in-evolution:llm-direct');
   });
 
   it('LLMDirectStrategy captures capability/date/context as user-input signals', async () => {
@@ -148,7 +148,7 @@ describe('evolution registry — PublicationAnalysisStrategy', () => {
   it('PublicationAnalysisStrategy.method returns the 5-segment id', () => {
     assert.equal(
       PublicationAnalysisStrategy.method,
-      'wardley:evolution:write:capacity:publication-analysis',
+      'wardley:map:climate:position-functional-in-evolution:publication-analysis',
     );
   });
 
@@ -165,7 +165,7 @@ describe('evolution registry — PublicationAnalysisStrategy', () => {
     const distSig = out.signals.find((s) => s.name === 'distribution');
     assert.ok(distSig);
     assert.equal(distSig.source, 'user-input');
-    assert.equal(out.result.method, 'wardley:evolution:write:capacity:publication-analysis');
+    assert.equal(out.result.method, 'wardley:map:climate:position-functional-in-evolution:publication-analysis');
     assert.ok(typeof out.result.evolution === 'number');
   });
 

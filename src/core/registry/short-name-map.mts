@@ -13,6 +13,13 @@ export const SHORT_NAME_TO_METHOD_ID: Record<string, string> = {
   "write-chain": "wardley:map:value-chain:generate:top-down",
   // CP3 — render-owm strategies (no LLM, no short-name needed but registered
   // for symmetry; llm.config.json does not reference them).
+  // CP5 — evolution capacity strategies (positioning functional components in evolution)
+  "s-curve":              "wardley:map:climate:position-functional-in-evolution:s-curve",
+  "llm-direct":           "wardley:map:climate:position-functional-in-evolution:llm-direct",
+  "publication-analysis": "wardley:map:climate:position-functional-in-evolution:publication-analysis",
+  "cpc-evolution":        "wardley:map:climate:position-functional-in-evolution:cpc-evolution",
+  "timeline-benchmark":   "wardley:map:climate:position-functional-in-evolution:timeline-benchmark",
+  "logprob-distribution": "wardley:map:climate:position-functional-in-evolution:logprob-distribution",
 };
 
 export const METHOD_ID_TO_SHORT_NAME: Record<string, string> = Object.fromEntries(

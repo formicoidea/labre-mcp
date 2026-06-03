@@ -3,7 +3,7 @@
 // (activity, practice, knowledge, or data) it represents.
 //
 // Implements the core BaseStrategy contract with methodId
-// `wardley:evolution:write:capacity:llm-direct`. Constructor `llmCall` is
+// `wardley:map:climate:position-functional-in-evolution:llm-direct`. Constructor `llmCall` is
 // optional — when omitted, the strategy falls back to `getStrategyLLM(method)`
 // at evaluate time, so the kernel recipe runner can `new LLMDirectStrategy()`
 // with no args.
@@ -22,7 +22,7 @@ import { parseKeyValueBlock } from '#lib/prompts/parsers.mjs';
 import { getPrompt, type BuiltPrompt } from '#lib/prompts/registry.mjs';
 import { getStrategyLLM } from '#lib/llm/registry.mjs';
 
-const NEW_METHOD_ID = 'wardley:evolution:write:capacity:llm-direct';
+const NEW_METHOD_ID = 'wardley:map:climate:position-functional-in-evolution:llm-direct';
 
 // any: prompt-registry parse outputs are dynamically typed; the legacy parser
 // returns {evolution: number, confidence: number}

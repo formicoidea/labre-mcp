@@ -298,7 +298,7 @@ import type { RequestContext } from '#core/context/request-context.mjs';
 import type { LLMCall } from '#types/llm.mjs';
 import { getStrategyLLM } from '#lib/llm/registry.mjs';
 
-const NEW_METHOD_ID_TB = 'wardley:evolution:write:capacity:timeline-benchmark';
+const NEW_METHOD_ID_TB = 'wardley:map:climate:position-functional-in-evolution:timeline-benchmark';
 
 export class TimelineBenchmarkStrategyCore extends CoreBaseStrategy<ComponentInput, EvolutionResult> {
   private readonly _llmCall: LLMCall | null;

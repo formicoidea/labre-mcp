@@ -3,7 +3,7 @@
 // This is the primary deterministic/analytical capacity strategy.
 //
 // Implements the core BaseStrategy contract with methodId
-// `wardley:evolution:write:capacity:s-curve`. Registered in the core
+// `wardley:map:climate:position-functional-in-evolution:s-curve`. Registered in the core
 // StrategyRegistry via `frameworks/wardley/evolution/registry.mts`.
 
 import {
@@ -14,7 +14,7 @@ import type { RequestContext } from '#core/context/request-context.mjs';
 import type { ComponentInput, EvolutionResult } from '#types/evolution.mjs';
 import { computeEvolution } from '../../s-curve/s-curve.mjs';
 
-const NEW_METHOD_ID = 'wardley:evolution:write:capacity:s-curve';
+const NEW_METHOD_ID = 'wardley:map:climate:position-functional-in-evolution:s-curve';
 
 // any: matches the inferred return type of `computeEvolution` — kept open
 // because the s-curve module does not export it

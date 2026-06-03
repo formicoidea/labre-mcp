@@ -5,7 +5,7 @@
 // or estimated by an injected LLM call from the component name + context.
 //
 // Implements the core BaseStrategy contract with methodId
-// `wardley:evolution:write:capacity:publication-analysis`. Optional `llmCall`
+// `wardley:map:climate:position-functional-in-evolution:publication-analysis`. Optional `llmCall`
 // constructor; falls back to `getStrategyLLM('publication-analysis')`.
 
 import {
@@ -23,7 +23,7 @@ import {
 import { getPrompt } from '#lib/prompts/registry.mjs';
 import { getStrategyLLM } from '#lib/llm/registry.mjs';
 
-const NEW_METHOD_ID = 'wardley:evolution:write:capacity:publication-analysis';
+const NEW_METHOD_ID = 'wardley:map:climate:position-functional-in-evolution:publication-analysis';
 
 /**
  * Parse LLM response into phase probabilities.

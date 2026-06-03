@@ -20,7 +20,7 @@ const SCURVE_RECIPE = {
   steps: [
     {
       stepId: 'estimate',
-      tool: 'wardley:evolution:write:capacity:s-curve',
+      tool: 'wardley:map:climate:position-functional-in-evolution:s-curve',
       in: '$.input',
       out: '$.estimate',
     },
@@ -71,7 +71,7 @@ describe('handleEstimateEvolutionViaRecipe — end-to-end wiring', () => {
       signals: Array<{ name: string }>;
     };
     assert.ok(estimate.result);
-    assert.equal(estimate.result.method, 'wardley:evolution:write:capacity:s-curve');
+    assert.equal(estimate.result.method, 'wardley:map:climate:position-functional-in-evolution:s-curve');
     assert.ok(estimate.result.evolution >= 0 && estimate.result.evolution <= 1);
     assert.ok(estimate.signals.length >= 2, 'certitude + ubiquity captured as signals');
 
@@ -91,7 +91,7 @@ describe('handleEstimateEvolutionViaRecipe — end-to-end wiring', () => {
     assert.ok(artifactJson.events.length >= 3);
     assert.equal(
       (artifactJson.ast.estimate.result as { method: string }).method,
-      'wardley:evolution:write:capacity:s-curve',
+      'wardley:map:climate:position-functional-in-evolution:s-curve',
     );
   });
 

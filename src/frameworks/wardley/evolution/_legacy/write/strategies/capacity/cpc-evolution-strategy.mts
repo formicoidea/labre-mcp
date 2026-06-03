@@ -872,7 +872,7 @@ import {
 import type { RequestContext } from '#core/context/request-context.mjs';
 import type { LLMCall } from '#types/llm.mjs';
 
-const NEW_METHOD_ID_CPC = 'wardley:evolution:write:capacity:cpc-evolution';
+const NEW_METHOD_ID_CPC = 'wardley:map:climate:position-functional-in-evolution:cpc-evolution';
 
 export class CpcEvolutionStrategyCore extends CoreBaseStrategy<ComponentInput, EvolutionResult> {
   private readonly _llmCall: LLMCall | null;

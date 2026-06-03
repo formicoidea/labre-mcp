@@ -15,13 +15,13 @@ describe("labre-daemon boot wiring", () => {
     assert.equal(registry.size(), 14);
 
     const expected = [
-      // evolution capacity (6)
-      "wardley:evolution:write:capacity:s-curve",
-      "wardley:evolution:write:capacity:llm-direct",
-      "wardley:evolution:write:capacity:publication-analysis",
-      "wardley:evolution:write:capacity:cpc-evolution",
-      "wardley:evolution:write:capacity:timeline-benchmark",
-      "wardley:evolution:write:capacity:logprob-distribution",
+      // map climate: position-functional-in-evolution (6)
+      "wardley:map:climate:position-functional-in-evolution:s-curve",
+      "wardley:map:climate:position-functional-in-evolution:llm-direct",
+      "wardley:map:climate:position-functional-in-evolution:publication-analysis",
+      "wardley:map:climate:position-functional-in-evolution:cpc-evolution",
+      "wardley:map:climate:position-functional-in-evolution:timeline-benchmark",
+      "wardley:map:climate:position-functional-in-evolution:logprob-distribution",
       // evolution solution (1)
       "wardley:evolution:write:solution:properties",
       // evolution read (1)

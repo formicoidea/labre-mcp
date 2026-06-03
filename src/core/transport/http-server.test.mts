@@ -132,7 +132,7 @@ describe("labre-mcp HTTP transport", () => {
         steps: [
           {
             stepId: "estimate",
-            tool: "wardley:evolution:write:capacity:s-curve",
+            tool: "wardley:map:climate:position-functional-in-evolution:s-curve",
             in: "$.input",
             out: "$.estimate",
           },
@@ -178,7 +178,7 @@ describe("labre-mcp HTTP transport", () => {
     assert.ok(response.result.recipeRunId.length > 0);
     assert.equal(
       response.result.ast.estimate?.result?.method,
-      "wardley:evolution:write:capacity:s-curve",
+      "wardley:map:climate:position-functional-in-evolution:s-curve",
     );
     const phases = response.result.events.map((e) => e.phase);
     assert.ok(phases.includes("step-start"));

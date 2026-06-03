@@ -27,7 +27,7 @@ function validAst(): WardleyEvolutionAST {
     ],
     reasoning: [
       {
-        by: "wardley:evolution:write:capacity:llm-direct",
+        by: "wardley:map:climate:position-functional-in-evolution:llm-direct",
         text: "Kubernetes is a mature, broadly adopted container orchestration platform. Multiple vendors provide managed services...",
         promptTokens: 320,
         completionTokens: 180,
@@ -36,7 +36,7 @@ function validAst(): WardleyEvolutionAST {
     insights: [
       {
         text: "Container orchestration has reached commodity status; competition is on managed-service ergonomics.",
-        by: "wardley:evolution:write:capacity:llm-direct",
+        by: "wardley:map:climate:position-functional-in-evolution:llm-direct",
         type: "trajectory",
         confidence: 0.85,
       },
@@ -44,7 +44,7 @@ function validAst(): WardleyEvolutionAST {
     result: {
       evolution: 0.78,
       confidence: 0.85,
-      method: "wardley:evolution:write:capacity:llm-direct",
+      method: "wardley:map:climate:position-functional-in-evolution:llm-direct",
     },
   };
 }
@@ -83,13 +83,13 @@ describe("WardleyEvolutionASTSchema (γ form, ARCH-22)", () => {
     const ast = validAst();
     ast.result.consensus = {
       contributingStrategies: [
-        "wardley:evolution:write:capacity:s-curve",
-        "wardley:evolution:write:capacity:llm-direct",
+        "wardley:map:climate:position-functional-in-evolution:s-curve",
+        "wardley:map:climate:position-functional-in-evolution:llm-direct",
       ],
       agreement: 0.92,
       divergence: [
-        { strategy: "wardley:evolution:write:capacity:s-curve", value: 0.81 },
-        { strategy: "wardley:evolution:write:capacity:llm-direct", value: 0.78 },
+        { strategy: "wardley:map:climate:position-functional-in-evolution:s-curve", value: 0.81 },
+        { strategy: "wardley:map:climate:position-functional-in-evolution:llm-direct", value: 0.78 },
       ],
     };
     const parsed = WardleyEvolutionASTSchema.safeParse(ast);
