@@ -28,10 +28,10 @@ describe("labre-daemon boot wiring", () => {
       "wardley:evolution:read:component:identify-capability",
       // evolution anchor (1)
       "wardley:evolution:write:anchor:culture-phase",
-      // chain (3): write + read + emit
-      "wardley:chain:write:map:top-down",
-      "wardley:chain:read:map:owm-parser",
-      "wardley:chain:emit:owm:standard",
+      // map: value-chain generate + render: owm parse/emit (3)
+      "wardley:map:value-chain:generate:top-down",
+      "render:wardley-map:owm:parse:dsl",
+      "render:wardley-map:owm:emit:dsl",
       // common layout (2)
       "common:layout:write:labels:default",
       "common:layout:quality:overlaps:default",

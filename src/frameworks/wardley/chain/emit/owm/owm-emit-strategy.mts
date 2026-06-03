@@ -2,7 +2,7 @@
 //
 // Wraps `generateChainOwmSyntax` (the deterministic AST → OWM DSL pass used
 // by the top-down chain pipeline) so recipes can call it under the methodId
-// `wardley:chain:emit:owm:standard`.
+// `render:wardley-map:owm:emit:dsl` (ast-schema.md v0.1.0).
 //
 // Input is the same `PositionedValueChain` shape the layout strategies
 // operate on; output is the OWM DSL string ready to render or persist.
@@ -18,7 +18,7 @@ import {
   type EmitOwmOptions,
 } from '#frameworks/wardley/chain/_legacy/write/chain/lib/emit/emit-owm.mjs';
 
-const NEW_METHOD_ID_OWM_EMIT = 'wardley:chain:emit:owm:standard';
+const NEW_METHOD_ID_OWM_EMIT = 'render:wardley-map:owm:emit:dsl';
 
 export interface OwmEmitInput {
   chain: PositionedValueChain;

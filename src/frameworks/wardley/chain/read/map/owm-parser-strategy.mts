@@ -2,7 +2,7 @@
 //
 // Wraps the vendored cli-owm parser (src/lib/vendor/cli-owm) to expose it
 // behind the core BaseStrategy contract. Recipes reference this strategy
-// by methodId `wardley:chain:read:map:owm-parser`.
+// by methodId `render:wardley-map:owm:parse:dsl` (ast-schema.md v0.1.0).
 //
 // V1 output is the cli-owm UnifiedWardleyMap with a thin labre-mcp envelope
 // (title, parse errors). A richer mapping to the canonical WardleyChainAST
@@ -16,7 +16,7 @@ import {
 import type { RequestContext } from '#core/context/request-context.mjs';
 import { parse, type UnifiedWardleyMap } from '#lib/vendor/cli-owm/index.mjs';
 
-const NEW_METHOD_ID_OWM_PARSER = 'wardley:chain:read:map:owm-parser';
+const NEW_METHOD_ID_OWM_PARSER = 'render:wardley-map:owm:parse:dsl';
 
 export interface OwmParserInput {
   dsl: string;

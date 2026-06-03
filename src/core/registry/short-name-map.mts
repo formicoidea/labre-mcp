@@ -9,7 +9,10 @@
 // callers that pass an already-canonical methodId pass through unchanged.
 
 export const SHORT_NAME_TO_METHOD_ID: Record<string, string> = {
-  // populated as strategies migrate (CP3-CP6)
+  // CP3 — chain strategies
+  "write-chain": "wardley:map:value-chain:generate:top-down",
+  // CP3 — render-owm strategies (no LLM, no short-name needed but registered
+  // for symmetry; llm.config.json does not reference them).
 };
 
 export const METHOD_ID_TO_SHORT_NAME: Record<string, string> = Object.fromEntries(

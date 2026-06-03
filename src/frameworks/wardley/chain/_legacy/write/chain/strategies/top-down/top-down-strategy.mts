@@ -128,7 +128,7 @@ import type { RequestContext } from '#core/context/request-context.mjs';
 import type { LLMCall } from '#types/llm.mjs';
 import { getStrategyLLM } from '#lib/llm/registry.mjs';
 
-const NEW_METHOD_ID_TOPDOWN = 'wardley:chain:write:map:top-down';
+const NEW_METHOD_ID_TOPDOWN = 'wardley:map:value-chain:generate:top-down';
 
 export class TopDownChainStrategyCore
   extends CoreBaseStrategy<TopDownChainInput, TopDownChainFullResult>

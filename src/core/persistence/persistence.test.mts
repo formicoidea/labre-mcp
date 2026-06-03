@@ -66,7 +66,7 @@ describe("writeArtifact", () => {
         schemaVersion: "1.0",
         recipeRunId: "run-123",
         stepId: "s1",
-        methodId: "wardley:chain:write:map:top-down",
+        methodId: "wardley:map:value-chain:generate:top-down",
         phase: "step-end",
         timestamp: "2026-05-10T14:23:00Z",
       },
@@ -112,7 +112,7 @@ describe("attachArtifactWriter (core listener)", () => {
       schemaVersion: "1.0",
       recipeRunId: "run-end-test",
       stepId: "step1",
-      methodId: "wardley:chain:write:map:top-down",
+      methodId: "wardley:map:value-chain:generate:top-down",
       phase: "step-end",
       timestamp: "2026-05-10T14:23:00Z",
     });

@@ -55,13 +55,13 @@ describe('chain registry — registration surface', () => {
     const registry = new StrategyRegistry<BaseStrategy>();
     registerChainStrategies(registry);
     assert.equal(registry.size(), 3);
-    assert.equal(registry.has('wardley:chain:write:map:top-down'), true);
-    assert.equal(registry.has('wardley:chain:read:map:owm-parser'), true);
-    assert.equal(registry.has('wardley:chain:emit:owm:standard'), true);
+    assert.equal(registry.has('wardley:map:value-chain:generate:top-down'), true);
+    assert.equal(registry.has('render:wardley-map:owm:parse:dsl'), true);
+    assert.equal(registry.has('render:wardley-map:owm:emit:dsl'), true);
   });
 
   it('TopDownChainStrategyCore.method returns the 5-segment id', () => {
-    assert.equal(TopDownChainStrategyCore.method, 'wardley:chain:write:map:top-down');
+    assert.equal(TopDownChainStrategyCore.method, 'wardley:map:value-chain:generate:top-down');
   });
 });
 
