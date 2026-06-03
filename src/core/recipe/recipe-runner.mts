@@ -61,7 +61,11 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
       recipeRunId,
       sessionId: options.context.sessionId,
       stepId: "__run__",
-      methodId: `${options.recipe.domain}:${options.recipe.tool}:recipe:${options.recipe.name}`,
+      // The run-end event needs a methodId that respects the 5-segment
+      // grammar (ast-schema.md v0.1.0). The recipe name itself is already
+      // carried by recipeRunId; this synthetic id only identifies the event
+      // origin as "the recipe runner of this domain".
+      methodId: `${options.recipe.domain}:recipe:orchestration:run:default`,
       phase: "run-end",
       timestamp: new Date().toISOString(),
     });
