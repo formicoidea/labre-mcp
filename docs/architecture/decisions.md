@@ -10,7 +10,7 @@ Format: ADR (Architecture Decision Record).
 
 ## ARCH-01 — Six tools compose the Wardley framework
 
-**Status:** Accepted
+**Status:** Superseded by AST-schema v0.1.0 — the Wardley framework now decomposes into five tools (`map`, `doctrine`, `climate`, `gameplay`, `iteration`). `chain` becomes a subdomain of `map`, `evolution` becomes a subdomain of `map:climate`, `cycle` is renamed `iteration`. See [ast-schema.md](ast-schema.md).
 
 **Context:** Simon Wardley's full strategic study cycle includes more than the value chain map. Distinct deliverables exist for climates (climatic patterns), doctrines (universal organising principles), gameplays (strategic moves), and the strategy cycle that orchestrates the others. A sixth concept, evolution, is dual-natured (both a chain element and a climatic pattern) and warrants its own tool.
 
@@ -22,7 +22,7 @@ Format: ADR (Architecture Decision Record).
 
 ## ARCH-02 — V1 scope is `chain` + `evolution`
 
-**Status:** Accepted
+**Status:** Superseded by AST-schema v0.1.0 — v0.1.0 scope covers the Wardley domain exhaustively (5 tools) plus the `render` domain (OWM and image) plus the transverse `common` domain. See [ast-schema.md](ast-schema.md).
 
 **Context:** The current codebase covers most of `chain` and all of `evolution`. The four other tools (`climate`, `doctrine`, `gameplay`, `cycle`) are V2+. Trying to scaffold all six at once multiplies cost without proportionate validation.
 
@@ -34,7 +34,7 @@ Format: ADR (Architecture Decision Record).
 
 ## ARCH-03 — Strategy identity uses 5 segments
 
-**Status:** Accepted
+**Status:** Amended by AST-schema v0.1.0 — arity preserved (5 mandatory segments), but the grammar becomes `{domain}:{tool}:{sous-domaine}:{command}:{strategie}` (segments 3 and 4 are swapped vs the original). `default` is a canonical strategy name (always present at segment 5). SemVer triplet `@x.y.z` adopted (see ARCH-20 amendment). See [ast-schema.md](ast-schema.md).
 
 **Context:** The current naming `{phase}:{domain}:{strategy}` (e.g. `write:capacity:s-curve`) cannot disambiguate between frameworks or between tools within a framework.
 
@@ -52,7 +52,7 @@ Format: ADR (Architecture Decision Record).
 
 ## ARCH-04 — Four commands: read, write, quality, emit
 
-**Status:** Accepted
+**Status:** Superseded by AST-schema v0.1.0 — the fixed four-command vocabulary is replaced by an open command vocabulary (`generate`, `parse`, `emit`, `audit`, `identify`, `estimate`, `explain`, `guide`, `next-step`, `recommend`, `update`, `classify`, etc.). The `update` command is now allowed as a standalone command operating on the métier JSON (e.g. `wardley:map:output:update:default` is the canonical write-gateway). Listeners are no longer implicit event-bus subscribers — they are explicitly declared in `recipe.listeners[step]`. See [ast-schema.md](ast-schema.md).
 
 **Context:** The current code has `read/` and `write/` namespaces but no formal place for verification or serialisation logic. Layout placement is currently a function, not a strategy.
 
@@ -70,7 +70,7 @@ No `update` command — it is composition (read + write + emit), expressible as 
 
 ## ARCH-05 — WardleyAPI render schema is snapshotted
 
-**Status:** Accepted
+**Status:** Amended by AST-schema v0.1.0 — the snapshot remains valid as an internal data model, but the renderer schema (`wardley-map.schema.json`) is now elevated to **norme de communication** for any input/output crossing a tool boundary in the `wardley` domain. Internal strategies may enrich the model freely; the `render` domain acts as an anti-corruption layer that projects enriched objects back to the renderer schema. See [ast-schema.md](ast-schema.md) § 2.0.
 
 **Context:** The `WardleyAPI/packages/render` package already defines a comprehensive Zod schema for the Wardley map data model (Component, Relation, EvolvesTo, Position, etc.). Re-implementing this in labre-mcp would guarantee divergence.
 
@@ -82,7 +82,7 @@ No `update` command — it is composition (read + write + emit), expressible as 
 
 ## ARCH-06 — Recipes are tool-scoped
 
-**Status:** Accepted
+**Status:** Amended by AST-schema v0.1.0 — recipes may now traverse multiple tools within a single domain (e.g. a recipe combining `wardley:iteration:purpose:generate:default` + `wardley:map:value-chain:generate:top-down` + `wardley:map:climate:position-value-chain-in-evolution:default`). Cross-domain orchestration still happens at the skill level. See [ast-schema.md](ast-schema.md) § 1.3.
 
 **Context:** Cross-tool data flows could be expressed as multi-tool recipes or as skill-level orchestration. Mixed scoping makes recipe semantics hard.
 
@@ -134,7 +134,7 @@ User files take precedence by name. Same merge model applies to `llm.config.json
 
 ## ARCH-10 — Event bus is RxJS in-process, async-by-default
 
-**Status:** Accepted
+**Status:** Amended by AST-schema v0.1.0 — the event bus persists as the underlying transport, but listeners are no longer implicit subscribers. Each recipe explicitly declares its listeners per step via `recipe.listeners[stepName]: methodId[]` (cf. § 1.3). Core listeners (degradation tracker, artifact writer, notification emitter) remain non-disablable and continue to subscribe implicitly. See [ast-schema.md](ast-schema.md) § 1.3.
 
 **Context:** Cross-step analysis (a listener observing N strategy outputs to flag suspicious distributions) requires a pub/sub primitive. Distributed brokers (Kafka, Flink) are 4 orders of magnitude over-engineered for our scale.
 
@@ -277,7 +277,7 @@ Reading `process.cwd()` or `process.env.X` outside the daemon boot (top-level co
 
 ## ARCH-20 — Deferred to V1.5+: versioning, agent strategies, cycle tool
 
-**Status:** Accepted
+**Status:** Partially superseded by AST-schema v0.1.0 — SemVer triplet versioning (`@x.y.z`) is adopted from v0.1.0 for both the AST as a whole and individual strategies (no longer deferred). The `cycle` tool is renamed `iteration` and is fully in scope. Agent strategies remain deferred. See [ast-schema.md](ast-schema.md) § 3.2.
 
 **Context:** Ambitions worth tracking but not blocking V1:
 - Strategy versioning (`@v1`, `@v2`) — useful for benchmarks, but no current driver.
@@ -346,3 +346,19 @@ For the evolution tool specifically, the AST is `WardleyEvolutionAST` (γ form):
 The shared type lives in [`src/core/ast/analysis-ref.mts`](../../src/core/ast/analysis-ref.mts) as `AnalysisRefSchema` and `AnalysisRef`. Any tool that links an annotation to an artefact uses this schema.
 
 **Consequences:** Cross-tool navigation (chain → evolution AST → specific reasoning entry) is type-safe. Future tools (climates, doctrines) reuse the same pointer shape when annotating chain components. Migration is non-breaking because no V1 call site has yet written `analysisRef` at runtime.
+
+---
+
+## ARCH-25 — `ast-schema.md` v0.1.0 is the new pivot grammar
+
+**Status:** Accepted
+
+**Context:** The accumulated learning from V1 (chain + evolution migration, recipe runner, post-audit refactor) revealed that the original 5-segment grammar (ARCH-03) and the fixed four-command vocabulary (ARCH-04) did not scale to the full Wardley study cycle (purpose → value-chain → climate → doctrine → gameplay → iteration) plus the rendering domain (OWM, image) plus the listing/introspection domain. The asymmetry `chain` vs `evolution` at the tool level (both are aspects of the same map artefact) became a recurring source of taxonomic friction. The render schema, kept at arm's length under ARCH-05, in practice needed elevation to a communication norm.
+
+**Decision:** [`docs/architecture/ast-schema.md`](ast-schema.md) v0.1.0 is the **single source of truth** for the labre-mcp grammar, the tool/sub-domain hierarchy, the recipe/listener format, the strategy contract, and the SemVer policy. It supersedes or amends ARCH-01, ARCH-02, ARCH-03, ARCH-04, ARCH-05, ARCH-06, ARCH-10, ARCH-20 (see each ADR's status header for the specifics). All future development — strategies, registries, AST schemas, recipes, skills — conforms to `ast-schema.md`. Where this document and an older ADR disagree, `ast-schema.md` wins.
+
+**Consequences:**
+- Every existing methodId in the codebase (e.g. `wardley:chain:write:map:top-down`, `wardley:evolution:write:capacity:llm-direct`) must be migrated to its new form (e.g. `wardley:map:value-chain:generate:top-down`, `wardley:map:climate:position-functional-in-evolution:llm-direct`). See the migration table in [ast-schema.md](ast-schema.md) § 3.3.
+- The strategy contract is formalised in [ast-schema.md](ast-schema.md) § 3.4 — annexe « Contrat de strategy v0.2 » — which reinforces ARCH-22's `{ signals[], reasoning[], insights[], result }` invariant and adds explicit strategy metadata (cost class, confidence baseline, latency class).
+- `JSON-labre` is the canonical artefact shape: a métier sub-tree per `wardley.*` aspect (conformant to its tool schema, the renderer schema in the case of `wardley.map`) plus a transverse `envelope` carrying `context`, `signals`, `reasoning`, `insights`, `trace`, `references` (cf. ARCH-22 + ARCH-24).
+- ADRs are still append-only and immutable; the supersession is marked via the `Status:` header of each impacted ADR. The original decision text is preserved as historical context.
