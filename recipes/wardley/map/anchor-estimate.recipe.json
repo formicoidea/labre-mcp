@@ -2,12 +2,12 @@
   "schemaVersion": "1.0",
   "name": "anchor-estimate",
   "domain": "wardley",
-  "tool": "evolution",
+  "tool": "map",
   "description": "Estimate the consumption-culture phase (1-4) of an anchor. Anchors live at the top of the value chain and follow a distinct evolution model from generic capabilities.",
   "steps": [
     {
       "stepId": "estimate",
-      "tool": "wardley:evolution:write:anchor:culture-phase",
+      "tool": "wardley:map:climate:position-anchor-in-evolution:culture-phase",
       "in": "$.input",
       "out": "$.estimate"
     }

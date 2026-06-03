@@ -2,18 +2,18 @@
   "schemaVersion": "1.0",
   "name": "evaluate-map",
   "domain": "wardley",
-  "tool": "evolution",
+  "tool": "map",
   "description": "Evaluate every component of a chain map. Parses the map, fans out per-component estimation, returns the chain AST annotated with EvolutionAnnotation per component.",
   "steps": [
     {
       "stepId": "parse-map",
-      "tool": "wardley:chain:read:map:owm-parser",
+      "tool": "render:wardley-map:owm:parse:dsl",
       "in": "$.input",
       "out": "$.chain"
     },
     {
       "stepId": "estimate-all",
-      "tool": "wardley:evolution:write:capacity:llm-direct",
+      "tool": "wardley:map:climate:position-functional-in-evolution:llm-direct",
       "over": "$.chain.result.components",
       "out": "$.evaluations"
     }

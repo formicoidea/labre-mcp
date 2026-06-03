@@ -2,18 +2,18 @@
   "schemaVersion": "1.0",
   "name": "estimate-component",
   "domain": "wardley",
-  "tool": "evolution",
+  "tool": "map",
   "description": "Estimate the Wardley evolution position of a single component. Reads the component, routes to a capacity or solution strategy, returns a WardleyEvolutionAST analysis (gamma form: signals/reasoning/insights/result).",
   "steps": [
     {
       "stepId": "identify",
-      "tool": "wardley:evolution:read:component:identify-capability",
+      "tool": "wardley:map:node:identify:default",
       "in": "$.input",
       "out": "$.identified"
     },
     {
       "stepId": "estimate",
-      "tool": "wardley:evolution:write:capacity:llm-direct",
+      "tool": "wardley:map:climate:position-functional-in-evolution:llm-direct",
       "in": "$.identified.result",
       "out": "$.estimate"
     }

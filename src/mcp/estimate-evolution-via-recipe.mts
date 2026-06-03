@@ -68,7 +68,7 @@ export async function handleEstimateEvolutionViaRecipe(
   // when projectRoot points to a different repo.
   const recipe = await loadRecipe({
     framework: 'wardley',
-    tool: 'evolution',
+    tool: 'map',
     name: 'estimate-component',
     shippedRoot: SHIPPED_ROOT,
     projectRoot: context.projectRoot,

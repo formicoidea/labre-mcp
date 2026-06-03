@@ -2,30 +2,30 @@
   "schemaVersion": "1.0",
   "name": "generate",
   "domain": "wardley",
-  "tool": "chain",
-  "description": "Generate a complete Wardley chain map (anchors, components, links, layout) from a natural-language command, then emit it as OWM DSL.",
+  "tool": "map",
+  "description": "Generate a complete Wardley map (anchors, components, links, layout) from a natural-language command, then emit it as OWM DSL.",
   "steps": [
     {
       "stepId": "build",
-      "tool": "wardley:chain:write:map:top-down",
+      "tool": "wardley:map:value-chain:generate:top-down",
       "in": "$.input",
       "out": "$.chain"
     },
     {
       "stepId": "place-labels",
-      "tool": "common:layout:write:labels:default",
+      "tool": "wardley:map:value-chain:prevent-collision:default",
       "in": "$.chain.result",
       "out": "$.laid"
     },
     {
       "stepId": "verify",
-      "tool": "common:layout:quality:overlaps:default",
+      "tool": "wardley:map:value-chain:audit:overlap-check",
       "in": "$.laid.result",
       "out": "$.verified"
     },
     {
       "stepId": "emit",
-      "tool": "wardley:chain:emit:owm:standard",
+      "tool": "render:wardley-map:owm:emit:dsl",
       "in": "$.verified.result",
       "out": "$.output"
     }
