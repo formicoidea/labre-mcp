@@ -15,7 +15,7 @@ const SCURVE_RECIPE = {
   schemaVersion: '1.0',
   name: 'estimate-component',
   domain: 'wardley',
-  tool: 'evolution',
+  tool: 'map',
   description: 'TEST recipe — uses s-curve (deterministic, no LLM) for wiring validation',
   steps: [
     {
@@ -30,8 +30,8 @@ const SCURVE_RECIPE = {
 
 async function setupProjectRoot(): Promise<string> {
   const projectRoot = await mkdtemp(join(tmpdir(), 'labre-m12-'));
-  // Write the override recipe to <projectRoot>/recipes/wardley/evolution/
-  const recipeDir = join(projectRoot, 'recipes', 'wardley', 'evolution');
+  // Write the override recipe to <projectRoot>/recipes/wardley/map/
+  const recipeDir = join(projectRoot, 'recipes', 'wardley', 'map');
   await mkdir(recipeDir, { recursive: true });
   await writeFile(
     join(recipeDir, 'estimate-component.recipe.json'),
