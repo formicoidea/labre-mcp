@@ -1,10 +1,12 @@
 // Generic strategy registry. Concrete strategy registries (capacity, solution,
 // layout, ...) instantiate this with their TStrategy class type. The registry
-// holds a map keyed by 5-segment methodId (ARCH-03) and is populated by
-// framework-level register*Strategies() functions called at daemon boot.
+// holds a map keyed by 5-segment methodId (ast-schema.md v0.1.0, ARCH-25) and
+// is populated by framework-level register*Strategies() functions called at
+// daemon boot.
 //
-// Validation: methodIds must match the 5-segment shape. The kernel does not
-// enforce per-segment values — that is the framework's responsibility.
+// Validation: methodIds must match the 5-segment shape with optional @x.y.z
+// SemVer suffix. The kernel does not enforce per-segment values — that is the
+// framework's responsibility.
 
 import { type BaseStrategy, METHOD_ID_5_SEGMENT_REGEX } from "../ast/base-strategy.mjs";
 
@@ -19,7 +21,7 @@ type StrategyClass<TStrategy extends BaseStrategy = BaseStrategy> = new (
 export function validateMethodId(methodId: string): void {
   if (!METHOD_ID_5_SEGMENT_REGEX.test(methodId)) {
     throw new Error(
-      `Invalid methodId "${methodId}": expected 5 colon-separated segments {framework}:{tool}:{command}:{subdomain}:{strategy}, each lowercase alphanum/dash starting with a letter`,
+      `Invalid methodId "${methodId}": expected 5 colon-separated segments {domain}:{tool}:{sous-domaine}:{command}:{strategie} with optional @x.y.z SemVer suffix, each segment lowercase alphanum/dash starting with a letter`,
     );
   }
 }

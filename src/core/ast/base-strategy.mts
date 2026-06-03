@@ -1,17 +1,20 @@
 // Generic base for every strategy in labre-mcp.
-// Concrete strategies live under src/frameworks/<framework>/<tool>/<command>/<subdomain>/<name>.mts
+// Concrete strategies live under src/frameworks/<domain>/<tool>/<sous-domaine>/<command>/<name>.mts
 // and declare their identity via the static `method` getter following the
-// 5-segment pattern {framework}:{tool}:{command}:{subdomain}:{strategy} (ARCH-03).
+// 5-segment pattern {domain}:{tool}:{sous-domaine}:{command}:{strategie}
+// (ast-schema.md v0.1.0, supersedes ARCH-03 which had segments 3 and 4 swapped).
 
 import { z } from "zod";
 import type { RequestContext } from "../context/request-context.mjs";
 
-// Canonical 5-segment methodId pattern (ARCH-03):
-//   {framework}:{tool}:{command}:{subdomain}:{strategy}
+// Canonical 5-segment methodId pattern (ast-schema.md v0.1.0, ARCH-25):
+//   {domain}:{tool}:{sous-domaine}:{command}:{strategie}[@x.y.z]
 // Each segment starts with a lowercase letter and may contain lowercase
-// alphanumerics or dashes. Anchored end-to-end.
+// alphanumerics or dashes. The `@x.y.z` SemVer triplet suffix is optional —
+// when omitted, the registry resolves to the latest stable version.
+// Anchored end-to-end.
 export const METHOD_ID_5_SEGMENT_REGEX =
-  /^[a-z][a-z0-9-]*(?::[a-z][a-z0-9-]*){4}$/;
+  /^[a-z][a-z0-9-]*(?::[a-z][a-z0-9-]*){4}(?:@\d+\.\d+\.\d+)?$/;
 
 // Zod schema fragment that enforces the 5-segment shape on any methodId
 // field stored inside an AST or a recipe definition.
@@ -19,7 +22,7 @@ export const methodIdSchema = z
   .string()
   .regex(
     METHOD_ID_5_SEGMENT_REGEX,
-    'methodId must be 5 colon-separated segments {framework}:{tool}:{command}:{subdomain}:{strategy}',
+    'methodId must be 5 colon-separated segments {domain}:{tool}:{sous-domaine}:{command}:{strategie} with optional @x.y.z SemVer suffix',
   );
 
 export interface StrategyResult<TResult = unknown> {
