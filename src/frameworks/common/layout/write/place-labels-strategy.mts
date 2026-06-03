@@ -1,11 +1,13 @@
-// Cross-framework label-placement strategy (ARCH-25).
+// Wardley map value-chain label-placement strategy.
 //
 // Wraps the deterministic `placeLabels` function (originally written for the
 // Wardley chain pipeline) under the methodId
-// `common:layout:write:labels:default`. The algorithm is purely topological
-// — it does not depend on any Wardley-specific semantics — so it lives under
-// the `common:` framework for reuse by climates, doctrines, and any future
-// tool that needs to position labels around a 2D node layout.
+// `wardley:map:value-chain:prevent-collision:default` (ast-schema.md v0.1.0).
+// The algorithm itself is purely topological and framework-agnostic — the
+// file location under src/frameworks/common/ is preserved for this checkpoint;
+// physical relocation to src/frameworks/wardley/map/value-chain/ is deferred.
+// If a future tool needs the algorithm cross-framework, it will be extracted
+// to a true common:layout:* entry then.
 
 import {
   BaseStrategy as CoreBaseStrategy,
@@ -15,7 +17,7 @@ import type { RequestContext } from '#core/context/request-context.mjs';
 import type { PositionedValueChain } from '#types/value-chain.mjs';
 import { placeLabels } from '#frameworks/wardley/chain/_legacy/write/chain/lib/layout/place-labels.mjs';
 
-const NEW_METHOD_ID_PLACE_LABELS = 'common:layout:write:labels:default';
+const NEW_METHOD_ID_PLACE_LABELS = 'wardley:map:value-chain:prevent-collision:default';
 
 export interface PlaceLabelsInput {
   chain: PositionedValueChain;

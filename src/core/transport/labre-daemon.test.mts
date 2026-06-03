@@ -32,9 +32,9 @@ describe("labre-daemon boot wiring", () => {
       "wardley:map:value-chain:generate:top-down",
       "render:wardley-map:owm:parse:dsl",
       "render:wardley-map:owm:emit:dsl",
-      // common layout (2)
-      "common:layout:write:labels:default",
-      "common:layout:quality:overlaps:default",
+      // map value-chain layout audit (2) — physically still under common/
+      "wardley:map:value-chain:prevent-collision:default",
+      "wardley:map:value-chain:audit:overlap-check",
     ];
 
     for (const id of expected) {

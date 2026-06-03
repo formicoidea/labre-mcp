@@ -49,12 +49,12 @@ function sampleChain(): PositionedValueChain {
 }
 
 describe('common registry — registration surface', () => {
-  it('registers the layout strategies under common:layout:* methodIds', () => {
+  it('registers the layout strategies under wardley:map:value-chain:* methodIds', () => {
     const registry = new StrategyRegistry<BaseStrategy>();
     registerCommonStrategies(registry);
     assert.equal(registry.size(), 2);
-    assert.equal(registry.has('common:layout:write:labels:default'), true);
-    assert.equal(registry.has('common:layout:quality:overlaps:default'), true);
+    assert.equal(registry.has('wardley:map:value-chain:prevent-collision:default'), true);
+    assert.equal(registry.has('wardley:map:value-chain:audit:overlap-check'), true);
   });
 });
 

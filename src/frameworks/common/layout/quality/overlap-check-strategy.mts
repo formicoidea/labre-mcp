@@ -1,11 +1,14 @@
-// Cross-framework overlap detection strategy (ARCH-25).
+// Wardley map value-chain overlap audit strategy.
 //
 // Wraps the `verifyLayout` pipeline (force-directed labels + component nudge
-// + canonical snap + strict projection) and surfaces just the residual
-// overlap counts under the methodId `common:layout:quality:overlaps:default`.
+// + canonical snap + strict projection) and surfaces residual overlap counts
+// under the methodId `wardley:map:value-chain:audit:overlap-check`
+// (ast-schema.md v0.1.0). Typically attached as a listener of
+// `wardley:map:value-chain:prevent-collision:default` to flag any residual
+// overlaps that the placement pass could not resolve.
 //
-// Like `place-labels`, the underlying geometry is 2D and framework-agnostic
-// — it lives under `common:` so the climate/doctrine tools can reuse it.
+// The algorithm is geometry-only and framework-agnostic; file location
+// preserved for this checkpoint, physical relocation deferred.
 
 import {
   BaseStrategy as CoreBaseStrategy,
@@ -19,7 +22,7 @@ import {
 } from '#frameworks/wardley/chain/_legacy/write/chain/lib/layout/verify-layout.mjs';
 import type { EmitOwmOptions } from '#frameworks/wardley/chain/_legacy/write/chain/lib/emit/emit-owm.mjs';
 
-const NEW_METHOD_ID_OVERLAP_CHECK = 'common:layout:quality:overlaps:default';
+const NEW_METHOD_ID_OVERLAP_CHECK = 'wardley:map:value-chain:audit:overlap-check';
 
 export interface OverlapCheckInput {
   chain: PositionedValueChain;
