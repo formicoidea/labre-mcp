@@ -81,6 +81,14 @@ describe('handleEstimateEvolutionViaRecipe — end-to-end wiring', () => {
     assert.ok(phases.includes('step-end'));
     assert.ok(phases.includes('run-end'));
 
+    // CP9: JSON-labre envelope aggregated from StrategyResults
+    assert.ok(result.envelope, 'envelope returned alongside ast');
+    assert.ok(Array.isArray(result.envelope.signals));
+    assert.ok(result.envelope.signals.length >= 2, 'aggregated signals from s-curve step');
+    assert.ok(Array.isArray(result.envelope.trace));
+    assert.equal(result.envelope.trace.length, 1, 'one trace entry per step');
+    assert.equal(result.envelope.trace[0].command, 'wardley:map:climate:position-functional-in-evolution:s-curve');
+
     // Artefact was written
     assert.ok(result.artifactPath !== null, 'artifact path returned');
     const artifactJson = JSON.parse(await readFile(result.artifactPath as string, 'utf8'));

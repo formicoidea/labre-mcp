@@ -47,6 +47,7 @@ export interface EstimateEvolutionViaRecipeResult {
   artifactPath: string | null;
   // any: events are typed PipelineEvent[] but kept open here for forward compat
   events: unknown[];
+  envelope: import('#core/recipe/recipe-runner.mjs').JsonLabreEnvelope;
 }
 
 /**
@@ -96,6 +97,7 @@ export async function handleEstimateEvolutionViaRecipe(
     ast: outcome.ast,
     artifactPath,
     events: outcome.events,
+    envelope: outcome.envelope,
   };
 }
 

@@ -25,11 +25,32 @@ export interface RunOptions {
   bus?: EventBus;
 }
 
+// JSON-labre envelope shape (ast-schema.md v0.1.0 § 2.0).
+// The runner aggregates signals/reasoning/insights from every step's
+// StrategyResult into a single envelope returned alongside the AST.
+// The wardley.* sub-trees of JSON-labre are assembled by the caller from
+// the AST keys it owns; the envelope is runner-managed.
+export interface JsonLabreEnvelope {
+  context: Record<string, unknown>;
+  signals: StrategyResult["signals"];
+  reasoning: StrategyResult["reasoning"];
+  insights: StrategyResult["insights"];
+  trace: Array<{
+    command: string;
+    stepId: string;
+    durationMs?: number;
+    startedAt: string;
+    completedAt: string;
+  }>;
+  references: Array<{ artifactPath: string; jsonPath?: string }>;
+}
+
 export interface RunOutcome {
   recipeRunId: string;
   ast: Record<string, unknown>;
   events: PipelineEvent[];
   bus: EventBus;
+  envelope: JsonLabreEnvelope;
 }
 
 export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
@@ -37,11 +58,21 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
   const bus = options.bus ?? createEventBus();
 
   // Capture every event into a flat trace so the caller (and the artefact
-  // writer listener in CP8) can serialise them in run order.
+  // writer listener) can serialise them in run order.
   const events: PipelineEvent[] = [];
   const subscription = bus.observe().subscribe((e) => {
     events.push(e);
   });
+
+  // Runner-level envelope accumulator (ast-schema.md v0.1.0 § 2.0).
+  const envelope: JsonLabreEnvelope = {
+    context: {},
+    signals: [],
+    reasoning: [],
+    insights: [],
+    trace: [],
+    references: [],
+  };
 
   try {
     for (const step of options.recipe.steps) {
@@ -53,6 +84,7 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
         bus,
         recipeRunId,
         sessionId: options.context.sessionId,
+        envelope,
       });
     }
 
@@ -73,7 +105,7 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
     subscription.unsubscribe();
   }
 
-  return { recipeRunId, ast: options.ast, events, bus };
+  return { recipeRunId, ast: options.ast, events, bus, envelope };
 }
 
 interface StepExecutionContext {
@@ -84,10 +116,11 @@ interface StepExecutionContext {
   bus: EventBus;
   recipeRunId: string;
   sessionId: string;
+  envelope: JsonLabreEnvelope;
 }
 
 async function executeStep(ctx: StepExecutionContext): Promise<void> {
-  const { step, ast, context, registry, bus, recipeRunId, sessionId } = ctx;
+  const { step, ast, context, registry, bus, recipeRunId, sessionId, envelope } = ctx;
 
   const strategyClass = registry.get(step.tool);
   // any: strategy constructor signature is open by design; framework code is responsible for arg shape
@@ -140,6 +173,29 @@ async function executeStep(ctx: StepExecutionContext): Promise<void> {
     timestamp: new Date(completedAt).toISOString(),
     durationMs: completedAt - startedAt,
     payload: summariseResult(result),
+  });
+
+  // Aggregate this step's StrategyResult into the run-level envelope.
+  // For fanout steps (step.over), each item is its own StrategyResult; for
+  // non-fanout steps the single result is collected.
+  const collect = (sr: unknown): void => {
+    if (!sr || typeof sr !== "object") return;
+    const r = sr as Partial<StrategyResult>;
+    if (Array.isArray(r.signals))   envelope.signals.push(...r.signals);
+    if (Array.isArray(r.reasoning)) envelope.reasoning.push(...r.reasoning);
+    if (Array.isArray(r.insights))  envelope.insights.push(...r.insights);
+  };
+  if (Array.isArray(result)) {
+    for (const item of result) collect(item);
+  } else {
+    collect(result);
+  }
+  envelope.trace.push({
+    command: step.tool,
+    stepId: step.stepId,
+    durationMs: completedAt - startedAt,
+    startedAt: new Date(startedAt).toISOString(),
+    completedAt: new Date(completedAt).toISOString(),
   });
 }
 
