@@ -572,7 +572,7 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
 // Wraps the legacy `PropertiesStrategy` in the core BaseStrategy contract.
 // The legacy class above stays in place (12-property aggregation, auto vs
 // conversational modes, prompt registration). The adapter exposes
-// methodId `wardley:evolution:write:solution:properties` for the core
+// methodId `wardley:map:climate:position-solution-in-evolution:property-assessment` for the core
 // registry and preserves the rich `properties[]` shape inside `result`.
 
 import {
@@ -583,7 +583,7 @@ import type { RequestContext } from '#core/context/request-context.mjs';
 import type { LLMCall } from '#types/llm.mjs';
 import { getStrategyLLM } from '#lib/llm/registry.mjs';
 
-const NEW_METHOD_ID_PROPERTIES = 'wardley:evolution:write:solution:properties';
+const NEW_METHOD_ID_PROPERTIES = 'wardley:map:climate:position-solution-in-evolution:property-assessment';
 
 export class PropertiesStrategyCore extends CoreBaseStrategy<SolutionInput, SolutionEvolutionResult> {
   private readonly _llmCall: LLMCall | null;

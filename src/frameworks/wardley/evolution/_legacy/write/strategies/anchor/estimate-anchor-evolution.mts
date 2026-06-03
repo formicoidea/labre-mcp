@@ -142,7 +142,7 @@ import type { RequestContext } from '#core/context/request-context.mjs';
 import type { LLMCall } from '#types/llm.mjs';
 import { getStrategyLLM } from '#lib/llm/registry.mjs';
 
-const NEW_METHOD_ID_ANCHOR = 'wardley:evolution:write:anchor:culture-phase';
+const NEW_METHOD_ID_ANCHOR = 'wardley:map:climate:position-anchor-in-evolution:culture-phase';
 
 // any: input is the raw MCP arguments bag for anchor evolution
 export interface AnchorEvolutionInput {

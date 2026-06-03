@@ -35,10 +35,11 @@ describe('evolution registry — SCurveStrategy', () => {
     assert.equal(registry.has('wardley:map:climate:position-functional-in-evolution:cpc-evolution'), true);
     assert.equal(registry.has('wardley:map:climate:position-functional-in-evolution:timeline-benchmark'), true);
     assert.equal(registry.has('wardley:map:climate:position-functional-in-evolution:logprob-distribution'), true);
-    assert.equal(registry.has('wardley:evolution:write:solution:properties'), true);
-    assert.equal(registry.has('wardley:evolution:read:component:identify-capability'), true);
-    assert.equal(registry.has('wardley:evolution:write:anchor:culture-phase'), true);
-    assert.equal(registry.size(), 9);
+    assert.equal(registry.has('wardley:map:climate:position-solution-in-evolution:property-assessment'), true);
+    assert.equal(registry.has('wardley:map:node:identify:default'), true);
+    assert.equal(registry.has('wardley:map:climate:position-anchor-in-evolution:default'), true);
+    assert.equal(registry.has('wardley:map:climate:position-anchor-in-evolution:culture-phase'), true);
+    assert.equal(registry.size(), 10);
   });
 
   it('CpcEvolutionStrategyCore.method returns the 5-segment id', () => {

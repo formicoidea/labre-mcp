@@ -38,5 +38,11 @@ export function registerEvolutionStrategies(
   registry.register(LogprobDistributionStrategyCore.method, LogprobDistributionStrategyCore);
   registry.register(PropertiesStrategyCore.method, PropertiesStrategyCore);
   registry.register(IdentifyCapabilityStrategy.method, IdentifyCapabilityStrategy);
+  // Anchor evolution: the existing logic is published under :culture-phase
+  // (its specific perception-model variant) AND aliased under :default so
+  // callers that want "whatever the default anchor positioning is" resolve
+  // to the same implementation. Per ast-schema.md v0.1.0 § 3.3 the two
+  // methodIds are intentionally distinct entries in the catalogue.
   registry.register(EstimateAnchorEvolutionStrategy.method, EstimateAnchorEvolutionStrategy);
+  registry.register('wardley:map:climate:position-anchor-in-evolution:default', EstimateAnchorEvolutionStrategy);
 }

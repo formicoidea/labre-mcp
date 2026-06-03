@@ -20,6 +20,10 @@ export const SHORT_NAME_TO_METHOD_ID: Record<string, string> = {
   "cpc-evolution":        "wardley:map:climate:position-functional-in-evolution:cpc-evolution",
   "timeline-benchmark":   "wardley:map:climate:position-functional-in-evolution:timeline-benchmark",
   "logprob-distribution": "wardley:map:climate:position-functional-in-evolution:logprob-distribution",
+  // CP6 — solution + anchor + identify
+  "properties-strategy": "wardley:map:climate:position-solution-in-evolution:property-assessment",
+  "anchor-evolution":    "wardley:map:climate:position-anchor-in-evolution:culture-phase",
+  "identify-capability": "wardley:map:node:identify:default",
 };
 
 export const METHOD_ID_TO_SHORT_NAME: Record<string, string> = Object.fromEntries(

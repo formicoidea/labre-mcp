@@ -11,8 +11,11 @@ describe("labre-daemon boot wiring", () => {
   it("buildStrategyRegistry populates the core registry with every framework strategy", () => {
     const registry = buildStrategyRegistry();
     const ids = registry.list();
-    // 9 evolution + 3 chain + 2 common = 14 total
-    assert.equal(registry.size(), 14);
+    // map climate position-* (8 = 6 functional + 1 solution + 2 anchor)
+    // + map node identify (1)
+    // + map value-chain (3 = 1 generate + 1 prevent-collision + 1 audit)
+    // + render wardley-map owm (2 = parse + emit) = 15 total
+    assert.equal(registry.size(), 15);
 
     const expected = [
       // map climate: position-functional-in-evolution (6)
@@ -22,12 +25,13 @@ describe("labre-daemon boot wiring", () => {
       "wardley:map:climate:position-functional-in-evolution:cpc-evolution",
       "wardley:map:climate:position-functional-in-evolution:timeline-benchmark",
       "wardley:map:climate:position-functional-in-evolution:logprob-distribution",
-      // evolution solution (1)
-      "wardley:evolution:write:solution:properties",
-      // evolution read (1)
-      "wardley:evolution:read:component:identify-capability",
-      // evolution anchor (1)
-      "wardley:evolution:write:anchor:culture-phase",
+      // map climate: position-solution-in-evolution (1)
+      "wardley:map:climate:position-solution-in-evolution:property-assessment",
+      // map climate: position-anchor-in-evolution (2 = default + culture-phase variant)
+      "wardley:map:climate:position-anchor-in-evolution:default",
+      "wardley:map:climate:position-anchor-in-evolution:culture-phase",
+      // map node: identify (1)
+      "wardley:map:node:identify:default",
       // map: value-chain generate + render: owm parse/emit (3)
       "wardley:map:value-chain:generate:top-down",
       "render:wardley-map:owm:parse:dsl",

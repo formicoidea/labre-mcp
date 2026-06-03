@@ -110,7 +110,7 @@ export async function identifyCapability(component: any, llmCall?: any): Promise
 // Wraps the `identifyCapability` function in the core BaseStrategy contract.
 // The function above stays exported because timeline-benchmark and the
 // legacy dispatcher use it directly. This class lets recipes reference
-// `wardley:evolution:read:component:identify-capability` and dispatch
+// `wardley:map:node:identify:default` and dispatch
 // through the kernel runner.
 
 import {
@@ -121,7 +121,7 @@ import type { RequestContext } from '#core/context/request-context.mjs';
 import type { LLMCall } from '#types/llm.mjs';
 import { getStrategyLLM } from '#lib/llm/registry.mjs';
 
-const NEW_METHOD_ID_IDENT = 'wardley:evolution:read:component:identify-capability';
+const NEW_METHOD_ID_IDENT = 'wardley:map:node:identify:default';
 
 // any: input is the open MCP component shape (name/type/description/context)
 export interface IdentifyCapabilityInput {
