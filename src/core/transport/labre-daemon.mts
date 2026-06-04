@@ -10,6 +10,8 @@ import { ToolRegistry } from "./mcp-handler.mjs";
 import { startHttpServer } from "./http-server.mjs";
 import { ESTIMATE_EVOLUTION_TOOL } from "#mcp/estimate-evolution.tool.mjs";
 import { RUN_COMMAND_TOOL } from "#mcp/run-command.tool.mjs";
+import { registerBootHealthChecks } from "./boot-health-checks.mjs";
+import { runAllHealthChecks } from "#lib/degradation/index.mjs";
 
 // Re-export so existing callers (tests, downstream tooling) can keep
 // importing `buildStrategyRegistry` from this module without churn.
@@ -63,6 +65,19 @@ async function main(): Promise<void> {
   process.stderr.write(
     `[labre-mcp] Strategies registered (${strategies.size()}):\n${strategies.list().map((id) => `  - ${id}`).join("\n")}\n`,
   );
+
+  // Boot health checks (config/env presence only — no network). Never blocks boot.
+  registerBootHealthChecks();
+  const healthEvents = await runAllHealthChecks();
+  if (healthEvents.length === 0) {
+    process.stderr.write("[labre-mcp] Health checks: all dependencies ready\n");
+  } else {
+    process.stderr.write(
+      `[labre-mcp] Health checks — ${healthEvents.length} dependency(ies) degraded:\n${healthEvents
+        .map((e) => `  - ${e.source}: ${e.reason}`)
+        .join("\n")}\n`,
+    );
+  }
 
   const shutdown = async (signal: string) => {
     process.stderr.write(`[labre-mcp] Received ${signal}, shutting down\n`);

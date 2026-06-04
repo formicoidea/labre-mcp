@@ -2,7 +2,7 @@
 
 ## Comprendre `degraded: true` dans une reponse MCP
 
-Toute reponse contient les champs `degraded` (boolean) et `degradationEvents` (array). Quand `degraded === true`, **le resultat est valide mais une ou plusieurs dependances externes etaient inaccessibles** — typiquement le pipeline a utilise des fallbacks neutres et la confiance s'en ressent. Lisez `degradationEvents[]` pour identifier la cause :
+Le dispatch enveloppe **chaque** reponse `tools/call` dans `Degradable<T>` : `{ result, degraded, degradationEvents }`. Le payload metier se lit sous `result.result` ; `result.degraded` (boolean) et `result.degradationEvents` (array) decrivent l'etat. Quand `degraded === true`, **le resultat est valide mais une ou plusieurs dependances externes etaient inaccessibles** — typiquement le pipeline a utilise des fallbacks neutres et la confiance s'en ressent. Lisez `degradationEvents[]` pour identifier la cause :
 
 | `source` | Que verifier |
 |---|---|

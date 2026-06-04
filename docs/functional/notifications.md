@@ -141,7 +141,7 @@ const result = await withLLMErrorLogging(
 
 Pour que les notifications apparaissent dans le chat :
 
-1. Verifiez que `experimental: { 'claude/channel': {} }` est dans les capabilities du serveur (deja configure)
+1. Le serveur declare `logging: {}` + `experimental: { 'claude/channel': {} }` dans `SERVER_CAPABILITIES` (`src/core/transport/mcp-handler.mts`) — annonce au handshake `initialize`. Rien a faire cote serveur.
 2. Lancez Claude Code avec :
    ```bash
    claude --dangerously-load-development-channels server:labre-mcp

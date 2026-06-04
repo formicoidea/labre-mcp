@@ -8,11 +8,13 @@ labre-mcp tourne comme un **daemon HTTP** (`src/core/transport/labre-daemon.mts`
 
 | Outil | Role | Schema Zod |
 |---|---|---|
-| `estimateEvolution` | Estime l'evolution d'un composant (via la recipe `estimate-component`) | `src/schemas/estimate-evolution.schema.mts` |
+| `estimateEvolution` | Estime l'evolution d'un composant (via la recipe `estimate-component-evolution`) | `src/schemas/estimate-evolution.schema.mts` |
 | `runCommand` | Invoque **n'importe quel methodId** directement → `CommandResult` (output + enveloppe JSON-labre) | `src/schemas/command.schema.mts` |
 | `__ping__` | Smoke tool — echo de l'input, valide le transport | (inline) |
 
 Les schemas d'entree exposes au client MCP sont **generes a partir des schemas Zod** (`z.toJSONSchema(schema, { io: 'input' })`). Toute modification d'un schema passe par le fichier `src/schemas/*.schema.mts` correspondant.
+
+> **Enveloppe de reponse `Degradable<T>`** : le dispatch enveloppe **chaque** reponse `tools/call` dans `{ result, degraded, degradationEvents }` (couche de degradation, hard rule #18). Dans tous les exemples ci-dessous, **le payload metier se lit sous `result.result`** (ex. `response.result.result.recipeRunId`). Omis dans les corps JSON pour la lisibilite.
 
 > Les flux nommes `evaluateMap`, `identifyCapability`, `estimateAnchorEvolution` et `generateValueChain` ne sont pas (encore) exposes comme **outils dedies** (roadmap [`../architecture/roadmap.md`](../architecture/roadmap.md) B3). Mais leurs strategies sont **deja appelables directement** via `runCommand` avec le methodId correspondant — voir [Flux appelables via runCommand](#flux-appelables-via-runcommand).
 

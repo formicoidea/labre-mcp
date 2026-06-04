@@ -79,7 +79,7 @@ User recipes take precedence by name. There is no field-level merge — recipes 
 | Recipe | Domain:Tool | Purpose |
 |---|---|---|
 | `generate` | wardley:map | NL → value chain → laid out → emitted OWM (4 steps) |
-| `estimate-component` | wardley:map | Identify capability → estimate evolution (2 steps) |
+| `estimate-component-evolution` | wardley:map | Identify capability → estimate evolution (2 steps) |
 | `evaluate-map` | wardley:map | Parse map → fan out estimation across components (2 steps) |
 
 Each shipped recipe is validated against `RecipeSchema` by [`shipped-recipes-validation.test.mts`](../../src/core/recipe/shipped-recipes-validation.test.mts) — schema drift causes test failure before runtime.

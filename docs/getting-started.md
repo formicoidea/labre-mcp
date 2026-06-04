@@ -73,8 +73,10 @@ curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" \
 # 4. Outil d'écho (chemin tools/call de bout en bout, sans LLM)
 curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"__ping__","arguments":{"message":"hello"}}}'
-# → {"jsonrpc":"2.0","id":3,"result":{"echoed":{"message":"hello"},"daemon":"labre-mcp"}}
+# → {"jsonrpc":"2.0","id":3,"result":{"result":{"echoed":{"message":"hello"},"daemon":"labre-mcp"},"degraded":false,"degradationEvents":[]}}
 ```
+
+> **Enveloppe `Degradable<T>`** : toute réponse `tools/call` est enveloppée par la couche de dégradation (`{ result, degraded, degradationEvents }`). Le **payload métier se lit sous `result.result`**. Les méthodes JSON-RPC `ping`/`tools/list`/`initialize` ne sont pas concernées.
 
 > **Windows / PowerShell** : `curl` est un alias de `Invoke-WebRequest`. Préférer `curl.exe`, et échapper les guillemets internes (`\"`) ou passer le corps JSON via un fichier.
 

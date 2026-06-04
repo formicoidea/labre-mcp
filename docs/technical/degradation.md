@@ -29,10 +29,10 @@ Tout est expose via `src/lib/degradation/index.mts` :
 
 ## Convention obligatoire
 
-**Tout handler d'outil MCP DOIT envelopper son corps dans `withMcpDegradation`** (le dispatch du daemon n'enveloppe pas encore automatiquement — roadmap B6). Le **handler `runCommand`** (`src/mcp/run-command.tool.mts`) est le **premier appelant de production** et sert d'implementation de reference : sa reponse est un `Degradable<CommandResult>` (`{ result, degraded, degradationEvents }`). Par ailleurs :
+**L'enveloppement est central, au dispatch.** `mcp-handler.dispatch` (`src/core/transport/mcp-handler.mts`, branche `tools/call`) enveloppe **chaque** handler dans `withMcpDegradation(toolName, …)` — les handlers ne s'auto-wrappent **pas**. Donc **toute** reponse `tools/call` est un `Degradable<T>` (`{ result, degraded, degradationEvents }`) ; le payload metier se lit sous `result.result`. Par ailleurs :
 
-- Tout appel a un service externe (LLM, BigQuery, web search, fichier reseau) DOIT passer par `tryDegradeAmbient` (pas de `try { ... } catch {}` muet).
-- Toute nouvelle dependance externe DOIT enregistrer un health-check au boot via `registerHealthCheck` (API exposee par `src/lib/degradation/index.mts`).
+- Tout appel a un service externe (LLM, BigQuery, web search, fichier reseau) DOIT passer par `tryDegradeAmbient` (pas de `try { ... } catch {}` muet) — le collector ambient est pose par le dispatch (AsyncLocalStorage).
+- Les health-checks sont enregistres au boot via `registerBootHealthChecks()` (`src/core/transport/boot-health-checks.mts`) et executes par le daemon ; toute nouvelle dependance externe y ajoute son check (`registerHealthCheck`). Verifs de presence config/env uniquement (pas de reseau).
 - Toute strategie / module appele depuis un outil peut acceder au collector via `getCurrentCollector()` — pas besoin de threader le collector dans les signatures.
 
 ## Cycle de vie d'une invocation

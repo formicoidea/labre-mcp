@@ -12,6 +12,7 @@
 
 import type { RequestContext } from "../context/request-context.mjs";
 import { type JsonRpcRequest, type JsonRpcResponse, JsonRpcErrorCode } from "./json-rpc.schema.mjs";
+import { withMcpDegradation } from "#lib/degradation/index.mjs";
 
 export interface ToolDefinition {
   name: string;
@@ -51,6 +52,11 @@ const SERVER_INFO = {
 
 const SERVER_CAPABILITIES = {
   tools: {},
+  // The daemon emits MCP log notifications (`notifications/message`) and the
+  // Claude Code chat channel (`notifications/claude/channel`) — see
+  // src/lib/mcp-notifications.mts. Declare them so strict clients process them.
+  logging: {},
+  experimental: { "claude/channel": {} },
 };
 
 export interface DispatchOptions {
@@ -93,8 +99,14 @@ export async function dispatch(options: DispatchOptions): Promise<JsonRpcRespons
         if (!tool) {
           return error(id, JsonRpcErrorCode.MethodNotFound, `Unknown tool: ${params.name}`);
         }
-        const result = await tool.handler(params.arguments ?? {}, context);
-        return success(id, result);
+        // ARCH-22 / hard rule #18: every tool handler is wrapped here, once,
+        // so each tools/call response is a Degradable<T> envelope and any
+        // tryDegradeAmbient deep in the call tree records into the ambient
+        // collector (AsyncLocalStorage). Handlers must NOT self-wrap.
+        const degradable = await withMcpDegradation(params.name, () =>
+          tool.handler(params.arguments ?? {}, context),
+        );
+        return success(id, degradable);
       }
 
       default:

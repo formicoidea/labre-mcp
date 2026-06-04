@@ -79,9 +79,11 @@ describe("labre-mcp HTTP transport", () => {
       id: 4,
       method: "tools/call",
       params: { name: "__ping__", arguments: { message: "hello" } },
-    })) as { result: { echoed: { message: string }; daemon: string } };
-    assert.equal(response.result.echoed.message, "hello");
-    assert.equal(response.result.daemon, "labre-mcp");
+      // Dispatch wraps every tool result in Degradable<T> ({ result, degraded, degradationEvents }).
+    })) as { result: { result: { echoed: { message: string }; daemon: string }; degraded: boolean } };
+    assert.equal(response.result.degraded, false);
+    assert.equal(response.result.result.echoed.message, "hello");
+    assert.equal(response.result.result.daemon, "labre-mcp");
   });
 
   it("MCP unknown tool returns method-not-found error", async () => {
@@ -119,15 +121,15 @@ describe("labre-mcp HTTP transport", () => {
     // Setup: temp project root with override recipe that uses s-curve only
     // (deterministic, no LLM call required).
     const projectRoot = await mkdtemp(join(tmpdir(), "labre-http-m12-"));
-    const recipeDir = join(projectRoot, "recipes", "wardley", "evolution");
+    const recipeDir = join(projectRoot, "recipes", "wardley", "map");
     await mkdir(recipeDir, { recursive: true });
     await writeFile(
-      join(recipeDir, "estimate-component.recipe.json"),
+      join(recipeDir, "estimate-component-evolution.recipe.json"),
       JSON.stringify({
         schemaVersion: "1.0",
-        name: "estimate-component",
+        name: "estimate-component-evolution",
         domain: "wardley",
-        tool: "evolution",
+        tool: "map",
         description: "TEST override — s-curve only",
         steps: [
           {
@@ -166,29 +168,35 @@ describe("labre-mcp HTTP transport", () => {
       },
     })) as {
       id: number;
+      // Dispatch wraps the handler result in Degradable<T>.
       result: {
-        recipeRunId: string;
-        artifactPath: string | null;
-        ast: { estimate?: { result?: { method: string } } };
-        events: Array<{ phase: string }>;
+        degraded: boolean;
+        result: {
+          recipeRunId: string;
+          artifactPath: string | null;
+          ast: { estimate?: { result?: { method: string } } };
+          events: Array<{ phase: string }>;
+        };
       };
     };
 
     assert.equal(response.id, 100);
-    assert.ok(response.result.recipeRunId.length > 0);
+    assert.equal(response.result.degraded, false);
+    const inner = response.result.result;
+    assert.ok(inner.recipeRunId.length > 0);
     assert.equal(
-      response.result.ast.estimate?.result?.method,
+      inner.ast.estimate?.result?.method,
       "wardley:map:climate:position-functional-in-evolution:s-curve",
     );
-    const phases = response.result.events.map((e) => e.phase);
+    const phases = inner.events.map((e) => e.phase);
     assert.ok(phases.includes("step-start"));
     assert.ok(phases.includes("step-end"));
     assert.ok(phases.includes("run-end"));
 
     // Verify artefact written
-    assert.ok(response.result.artifactPath !== null);
+    assert.ok(inner.artifactPath !== null);
     const artifactJson = JSON.parse(
-      await readFile(response.result.artifactPath as string, "utf8"),
+      await readFile(inner.artifactPath as string, "utf8"),
     );
     assert.equal(artifactJson.projectId, "m12-http");
     assert.equal(artifactJson.sessionId, "s-http-1");

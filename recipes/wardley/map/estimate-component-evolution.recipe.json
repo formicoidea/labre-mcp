@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "name": "estimate-component",
+  "name": "estimate-component-evolution",
   "domain": "wardley",
   "tool": "map",
   "description": "Estimate the Wardley evolution position of a single component. Reads the component, routes to a capacity or solution strategy, returns a WardleyEvolutionAST analysis (gamma form: signals/reasoning/insights/result).",

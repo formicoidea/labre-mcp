@@ -26,7 +26,7 @@ Daemon HTTP `src/core/transport/labre-daemon.mts` (:6767) — **3 outils MCP câ
 
 - **Cible** : la surface complète du cycle d'étude exposée comme outils/recipes.
 - **Livré** : l'outil générique **`runCommand`** est câblé — il invoque **n'importe quel methodId** (réel ou mock) directement et renvoie un `CommandResult` portant l'enveloppe JSON-labre (`src/mcp/run-command.tool.mts`, schémas `src/schemas/command.schema.mts`). Toute commande **unique** est donc appelable sans recette. Les recettes mono-commande (`anchor-estimate`, `parse`) ont été supprimées au profit de `runCommand`.
-- **Reste à faire** : exposer les **recettes multi-étapes** comme outils dédiés. `buildBootRegistry()` enregistre aujourd'hui `__ping__` + `estimateEvolution` (recette `estimate-component`) + `runCommand`. Les flux `evaluateMap` (recette 2 étapes) et `generateValueChain` (recette 4 étapes) restent à câbler (un outil `runRecipe` piloté par nom de recette, ou un outil par flux).
+- **Reste à faire** : exposer les **recettes multi-étapes** comme outils dédiés. `buildBootRegistry()` enregistre aujourd'hui `__ping__` + `estimateEvolution` (recette `estimate-component-evolution`) + `runCommand`. Les flux `evaluateMap` (recette 2 étapes) et `generateValueChain` (recette 4 étapes) restent à câbler (un outil `runRecipe` piloté par nom de recette, ou un outil par flux).
 
 ### B4 — Promotion des mocks → stratégies réelles
 
@@ -39,13 +39,12 @@ Daemon HTTP `src/core/transport/labre-daemon.mts` (:6767) — **3 outils MCP câ
 - **Aujourd'hui** : `package.json` = `1.0.0`, daemon/`/version` = `1.0.0-migration`, [ast-schema.md](ast-schema.md) = `v0.1.0`.
 - **Action** : choisir une source de vérité de version (probablement `package.json`) et l'aligner partout (daemon `SERVER_INFO`, `/version`, AST).
 
-### B6 — Préoccupations transverses déclarées mais non câblées
+### B6 — Préoccupations transverses (FAIT)
 
-Le framework existe sous `src/lib/`, mais n'est pas encore activé sur tout le chemin de dispatch du daemon — alors qu'AGENT.md les pose comme invariants :
-
-- **Dégradation** (hard rule #18) — _progrès partiel_ : le handler `runCommand` (`src/mcp/run-command.tool.mts`) est le **premier appelant de production** de `withMcpDegradation`. **Reste** : envelopper le dispatch générique (`mcp-handler.dispatch`) + le handler `estimateEvolution`, et router les appels externes via `tryDegradeAmbient`.
-- **Health-checks au boot** : `registerHealthCheck` n'a aucun appelant de production (pas de `boot-health-checks`). **Action** : enregistrer les health-checks (bigquery, llm:*, web-search) au boot du daemon.
-- **Capability `claude/channel`** : `SERVER_CAPABILITIES` ne déclare que `{ tools: {} }` ; les notifications channel (`src/lib/mcp-notifications.mts`) ne sont pas annoncées dans `initialize`. **Action** : déclarer la capability si les notifications chat doivent être visibles côté client.
+- **Dégradation** (hard rule #18) — _fait_ : `mcp-handler.dispatch` enveloppe **chaque** handler dans `withMcpDegradation` ; toute réponse `tools/call` est un `Degradable<T>`. Les handlers ne s'auto-wrappent plus.
+- **Health-checks au boot** — _fait_ : `registerBootHealthChecks()` (`src/core/transport/boot-health-checks.mts`) enregistre `bigquery` / `llm` / `web-search` (présence config/env, sans réseau) ; le daemon les exécute au boot et logge les dépendances dégradées.
+- **Capability `claude/channel`** — _fait_ : `SERVER_CAPABILITIES` déclare `logging: {}` + `experimental: { 'claude/channel': {} }`.
+- **Reste (backlog)** : sondes de health-check **live** (réseau) ; router au cas par cas les appels externes des stratégies `_legacy` via `tryDegradeAmbient` (le collector ambient est désormais en place).
 
 ### B7 — Outillage d'évaluation (promptfoo)
 

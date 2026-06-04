@@ -11,7 +11,7 @@
 
 | Élément | État |
 |---|---|
-| Outils MCP câblés | `estimateEvolution` (recette `estimate-component`), `runCommand` (invocation directe de n'importe quel methodId), `__ping__` (smoke). Recettes multi-étapes restantes (evaluateMap, generateValueChain) non encore exposées — roadmap B3. |
+| Outils MCP câblés | `estimateEvolution` (recette `estimate-component-evolution`), `runCommand` (invocation directe de n'importe quel methodId), `__ping__` (smoke). Recettes multi-étapes restantes (evaluateMap, generateValueChain) non encore exposées — roadmap B3. |
 | Stratégies enregistrées | 85 au boot : **15 réelles** + **70 mocks** (`LABRE_DISABLE_MOCKS=1` isole les réelles). Liste des réelles : [ast-schema.md → « État d'implémentation »](../architecture/ast-schema.md). |
 
 ## 2. Points d'entrée
@@ -112,7 +112,7 @@ Partagé : lib/{llm, degradation, prompts, owm, response-formatter, language-det
 
 `recipes/<domain>/<tool>/<name>.recipe.json` (shipped) + override possible sous `<projectRoot>/recipes/…` (ARCH-08). Schéma : `{ schemaVersion, name, domain, tool, steps[{ stepId, tool, in, out }], listeners[] }`.
 
-- `recipes/wardley/map/estimate-component.recipe.json` — `node:identify:default` → `position-functional-in-evolution:llm-direct`
+- `recipes/wardley/map/estimate-component-evolution.recipe.json` — `node:identify:default` → `position-functional-in-evolution:llm-direct`
 - `recipes/wardley/map/evaluate-map.recipe.json`
 - `recipes/wardley/map/generate.recipe.json`
 

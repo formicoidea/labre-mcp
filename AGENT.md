@@ -90,7 +90,7 @@ labre-mcp/
 
 ## MCP & degradation
 
-18. MCP handlers go through `withMcpDegradation`; external calls (LLM, BigQuery, disk) go through `tryDegradeAmbient`; health checks run at boot
+18. Degradation is enforced **centrally at the dispatch**: `mcp-handler.dispatch` wraps every tool handler in `withMcpDegradation`, so every `tools/call` response is a `Degradable<T>` (read the business payload at `result.result`) — handlers must NOT self-wrap. External calls (LLM, BigQuery, disk) go through `tryDegradeAmbient` (ambient collector via AsyncLocalStorage). Health checks register + run at boot via `registerBootHealthChecks()` (config/env presence only)
 19. Under Windows, MCP servers launched via `npx` need a `cmd /c` wrapper in `.mcp.json` or they fail to start
 20. **`process.cwd()` forbidden at runtime** (ARCH-15) — every tool call carries `context.{projectId, projectRoot, sessionId, domain}`. Reading `process.cwd()` or `process.env.X` outside the daemon boot (top-level config loading) is forbidden
 

@@ -16,7 +16,7 @@ qui écoute sur `127.0.0.1:6767`. Le protocole applicatif est JSON-RPC 2.0 sur `
 Au boot, le daemon construit deux registres :
 
 - **Registre d'outils MCP** (`buildBootRegistry()` dans `labre-daemon.mts`) — 3 outils :
-  `__ping__` (smoke), `estimateEvolution` (recette `estimate-component`), et `runCommand`
+  `__ping__` (smoke), `estimateEvolution` (recette `estimate-component-evolution`), et `runCommand`
   (invocation directe de n'importe quel methodId → `CommandResult` + enveloppe). Le câblage des
   recettes multi-étapes restantes (evaluateMap, generateValueChain) est suivi en
   [roadmap.md](../architecture/roadmap.md) (item B3).
@@ -48,13 +48,13 @@ flowchart TD
 
 ## Couche de dégradation
 
-Le framework de dégradation existe sous `src/lib/degradation/` : `withMcpDegradation`
-(wrapper de handler établissant un `DegradationCollector` par invocation via AsyncLocalStorage)
-et `tryDegradeAmbient` (appels externes BigQuery / LLM / web search), invariant posé par AGENT.md
-hard rule #18. **État actuel** : le handler **`runCommand`** (`src/mcp/run-command.tool.mts`) est le
-premier appelant de production — sa réponse est un `Degradable<CommandResult>`. Le **dispatch
-générique** (`mcp-handler.dispatch`) et `estimateEvolution` ne sont pas encore enveloppés — suivi en
-[roadmap.md](../architecture/roadmap.md) (item B6). Voir [degradation.md](degradation.md) pour le framework.
+Le framework de dégradation (`src/lib/degradation/`) est **câblé au dispatch** (AGENT.md hard rule #18) :
+`mcp-handler.dispatch` enveloppe **chaque** handler d'outil dans `withMcpDegradation`, donc toute
+réponse `tools/call` est un `Degradable<T>` (`{ result, degraded, degradationEvents }`) — le payload
+métier se lit sous `result.result`. Un `DegradationCollector` ambient (AsyncLocalStorage) est posé par
+le dispatch, et `tryDegradeAmbient` y route les échecs d'appels externes (BigQuery / LLM / web search).
+Les **health-checks** de présence config/env sont enregistrés et exécutés au boot
+(`src/core/transport/boot-health-checks.mts`), loggés sur stderr. Voir [degradation.md](degradation.md).
 
 ## Parallélisation des appels indépendants
 

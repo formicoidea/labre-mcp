@@ -16,7 +16,7 @@ export const ESTIMATE_EVOLUTION_TOOL: ToolDefinition = {
   name: "estimateEvolution",
   description:
     "Estimate the Wardley Map evolution position of a component via the recipe runner. " +
-    "Dispatches through the canonical estimate-component recipe (read:component:identify-capability → write:capacity:llm-direct). " +
+    "Dispatches through the canonical estimate-component-evolution recipe (node:identify → position-functional-in-evolution:llm-direct). " +
     "Returns recipeRunId, the AST, the events trace, and the artifact path under ~/.labre-mcp/runs/.",
   // any: zod-to-json conversion — the schema is well-typed at the Zod layer
   inputSchema: z.toJSONSchema(EstimateEvolutionInputSchema, { io: "input" }) as Record<string, unknown>,

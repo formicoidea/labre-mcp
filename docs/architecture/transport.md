@@ -42,7 +42,7 @@ The `/mcp` endpoint accepts these MCP methods:
 The canonical entrypoint is the HTTP daemon in [`src/core/transport/labre-daemon.mts`](../../src/core/transport/labre-daemon.mts), launched by `pnpm mcp` (dev) or `pnpm mcp:prod` (post-`pnpm build`). The daemon:
 
 1. Builds the strategy registry via `buildStrategyRegistry()`.
-2. Builds the MCP tool registry via `buildBootRegistry()` — three tools: `__ping__` (smoke), `estimateEvolution` (recipe `estimate-component`), and `runCommand` (generic direct invocation of any 5-segment methodId → `CommandResult`).
+2. Builds the MCP tool registry via `buildBootRegistry()` — three tools: `__ping__` (smoke), `estimateEvolution` (recipe `estimate-component-evolution`), and `runCommand` (generic direct invocation of any 5-segment methodId → `CommandResult`).
 3. Boots the HTTP server on `LABRE_HTTP_PORT` (default `6767`).
 4. Logs the registered tool list and the strategy methodIds.
 

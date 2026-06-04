@@ -14,16 +14,15 @@ const context: RequestContext = {
   artifactDir: path.join(os.tmpdir(), 'labre-run-command-test'),
 };
 
-interface WrappedResult {
-  degraded: boolean;
-  result: {
-    command: string;
-    status: string;
-    output: unknown;
-    envelope?: { signals: unknown[]; trace: unknown[] };
-    errors?: string[];
-    metadata?: { recipeRunId?: string };
-  };
+// The handler now returns a bare CommandResult (the daemon dispatch wraps it
+// in Degradable<T>; calling the handler directly bypasses that wrapping).
+interface CommandResultShape {
+  command: string;
+  status: string;
+  output: unknown;
+  envelope?: { signals: unknown[]; trace: unknown[] };
+  errors?: string[];
+  metadata?: { recipeRunId?: string };
 }
 
 describe('runCommand tool', () => {
@@ -31,22 +30,21 @@ describe('runCommand tool', () => {
     const out = (await RUN_COMMAND_TOOL.handler(
       { command: 'render:wardley-map:owm:parse:dsl', input: { dsl: 'title T\ncomponent A [0.4, 0.4]' } },
       context,
-    )) as WrappedResult;
+    )) as CommandResultShape;
 
-    assert.equal(out.degraded, false);
-    assert.equal(out.result.status, 'ok');
-    assert.equal(out.result.command, 'render:wardley-map:owm:parse:dsl');
-    assert.equal(out.result.envelope?.trace.length, 1);
-    assert.ok(out.result.metadata?.recipeRunId);
+    assert.equal(out.status, 'ok');
+    assert.equal(out.command, 'render:wardley-map:owm:parse:dsl');
+    assert.equal(out.envelope?.trace.length, 1);
+    assert.ok(out.metadata?.recipeRunId);
   });
 
   it('returns a status:error CommandResult for an unknown methodId', async () => {
     const out = (await RUN_COMMAND_TOOL.handler(
       { command: 'wardley:map:nope:identify:default', input: {} },
       context,
-    )) as WrappedResult;
+    )) as CommandResultShape;
 
-    assert.equal(out.result.status, 'error');
-    assert.ok((out.result.errors?.length ?? 0) >= 1);
+    assert.equal(out.status, 'error');
+    assert.ok((out.errors?.length ?? 0) >= 1);
   });
 });

@@ -13,7 +13,7 @@ import { handleEstimateEvolutionViaRecipe } from './estimate-evolution-via-recip
 
 const SCURVE_RECIPE = {
   schemaVersion: '1.0',
-  name: 'estimate-component',
+  name: 'estimate-component-evolution',
   domain: 'wardley',
   tool: 'map',
   description: 'TEST recipe — uses s-curve (deterministic, no LLM) for wiring validation',
@@ -34,7 +34,7 @@ async function setupProjectRoot(): Promise<string> {
   const recipeDir = join(projectRoot, 'recipes', 'wardley', 'map');
   await mkdir(recipeDir, { recursive: true });
   await writeFile(
-    join(recipeDir, 'estimate-component.recipe.json'),
+    join(recipeDir, 'estimate-component-evolution.recipe.json'),
     JSON.stringify(SCURVE_RECIPE),
     'utf8',
   );

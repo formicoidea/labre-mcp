@@ -5,7 +5,7 @@
 //   1. Validate the MCP arguments (same schema as the legacy handler).
 //   2. Build a RequestContext (ARCH-15) — uses caller-supplied _context when
 //      present, falls back to dev-mode defaults otherwise.
-//   3. Load the canonical `estimate-component` recipe (shipped + override).
+//   3. Load the canonical `estimate-component-evolution` recipe (shipped + override).
 //   4. Build the strategy registry by importing every framework's register
 //      function (boot wiring).
 //   5. Attach the artefact writer listener (ARCH-12 core listener).
@@ -68,7 +68,7 @@ export async function handleEstimateEvolutionViaRecipe(
   const recipe = await loadRecipe({
     framework: 'wardley',
     tool: 'map',
-    name: 'estimate-component',
+    name: 'estimate-component-evolution',
     shippedRoot: SHIPPED_ROOT,
     projectRoot: context.projectRoot,
   });
