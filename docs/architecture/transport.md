@@ -45,11 +45,7 @@ The canonical entrypoint is the HTTP daemon in [`src/core/transport/labre-daemon
 2. Boots the HTTP server on `LABRE_HTTP_PORT` (default `6767`).
 3. Logs the registered tool list and the strategy methodIds.
 
-The `.mcp.json` at the repo root declares the labre-mcp server with HTTP transport (`"type": "http"`, `"url": "http://127.0.0.1:6767/mcp"`), so Claude Code connects to the running daemon rather than spawning a fresh stdio server.
-
-### Legacy stdio fallback
-
-[`src/mcp/mcp-server.mts`](../../src/mcp/mcp-server.mts) is the older stdio entrypoint; it bypasses the kernel recipe runner and dispatches via per-tool handlers. Reachable via `pnpm mcp:legacy:stdio` for transition compatibility. Slated for removal in V1.5 once every tool path is migrated to the daemon.
+The `.mcp.json` at the repo root declares the labre-mcp server with HTTP transport (`"type": "http"`, `"url": "http://127.0.0.1:6767/mcp"`), so Claude Code connects to the running daemon rather than spawning a fresh stdio server. There is no stdio entrypoint: the old `src/mcp/mcp-server.mts` was removed during the migration.
 
 ## Configuration
 

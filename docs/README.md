@@ -1,55 +1,51 @@
 # labre-mcp — Documentation
 
-labre-mcp est un serveur MCP (Model Context Protocol) qui estime la position d'evolution des composants sur une Wardley Map. Il expose **4 outils** via JSON-RPC 2.0 sur stdio et route automatiquement entre deux pipelines d'evaluation :
+labre-mcp est un serveur **MCP** (Model Context Protocol) exposé via un **daemon HTTP** (JSON-RPC 2.0, `127.0.0.1:6767`) qui outille les frameworks de pratique stratégique — cartes de Wardley en premier. Les capacités sont adressées par une grammaire de methodId à 5 segments. Projet **TypeScript strict** (`.mts` / ESM) avec **Zod** comme source de vérité runtime.
 
-- **Capability strategies** (7 strategies pluggables, y compris cpc-evolution via BigQuery) pour les capacites abstraites
-- **Solution strategies** (12 proprietes Wardley) pour les produits/solutions nommes
+> **Surface actuelle** : 1 outil MCP métier câblé (`estimateEvolution`) + `__ping__` ; 85 stratégies (15 réelles / 70 mocks). L'écart à la cible est dans [roadmap.md](architecture/roadmap.md).
 
-Le projet est en **TypeScript strict** (`.mts` / ESM) avec **Zod** comme source de verite unique pour les schemas d'entree (types + validation runtime + JSON Schema MCP generes depuis un seul schema).
+## Index
 
-Le routage est transparent : detection automatique via naming, LLM et web search.
-
-## Architecture simplifiee
-
-```mermaid
-flowchart TD
-    MCP["src/mcp/mcp-server.mts\nJSON-RPC 2.0 stdio"]
-    MCP --> EE["estimateEvolution"]
-    MCP --> EM["evaluateMap"]
-    MCP --> IC["identifyCapability"]
-    MCP --> AN["estimateAnchorEvolution"]
-
-    EE & EM & IC & AN --> Z["Zod validation\nsrc/schemas/*.schema.mts"]
-    Z --> CG["Classification Gate\nsocial_good / common_good / economic"]
-    CG --> MR["Mode Router\noneshot / conversational / default"]
-    MR --> SCR["Solution/Capability Router"]
-
-    SCR -->|"solution"| SS["Solution Strategies\n12 proprietes Wardley"]
-    SCR -->|"capability"| CS["Capability Strategies\ns-curve, pub-analysis, timeline,\nllm-direct, logprob, sector-agent"]
-
-    SS & CS --> RF["Response Formatter"]
-    RF --> N["Notifications"]
-```
-
-## Table des matieres
-
+### Pivots & architecture (`architecture/`)
 | Document | Description |
 |---|---|
-| [Demarrage rapide](getting-started.md) | Prerequisites, installation, premier appel |
-| [Architecture](architecture.md) | Pipeline, flux de donnees, modules |
-| [Reference des outils](tools-reference.md) | Les 4 outils MCP (schemas, parametres, exemples) |
-| [Validation (Zod)](validation.md) | Schemas Zod, source de verite unique, lecture des erreurs |
-| [Strategies](strategies.md) | Capability (7 strategies) et Solution (12 proprietes Wardley) |
-| [Gate de classification](classification-gate.md) | Filtrage social_good / common_good / economic |
-| [Configuration](configuration.md) | Variables d'environnement, .mcp.json, channels |
-| [Notifications](notifications.md) | Progression temps reel, i18n, gestion d'erreurs |
-| [Format .wm](wm-format.md) | Syntaxe OWM pour les cartes de Wardley |
-| [Evaluation](evaluation.md) | Framework promptfoo, cas de test, assertions |
-| [Extensibilite](extending.md) | Ajouter une strategie, un outil, un backend LLM |
-| [Depannage](troubleshooting.md) | Erreurs courantes, debug, FAQ |
+| [ast-schema.md](architecture/ast-schema.md) | **Pivot** — grammaire 5 segments, vocabulaire de commande ouvert, JSON-labre, contrat de strategy, état real/mock |
+| [decisions.md](architecture/decisions.md) | **Pivot** — 25 ADRs (ARCH-01..25) |
+| [roadmap.md](architecture/roadmap.md) | Migration en cours (lib/→core, `_legacy/`, câblage outils, mocks→réel) |
+| [transport.md](architecture/transport.md) | Daemon HTTP, dispatch JSON-RPC, contexte, auth |
+| [recipes.md](architecture/recipes.md) | Schéma de recipe, listeners, auto-fanout, loader shipped+override |
+| [strategies.md](architecture/strategies.md) | Registry, contrat BaseStrategy, format `{ signals, reasoning, insights, result }` |
+| [persistence.md](architecture/persistence.md) | Artefacts JSON sous `~/.labre-mcp/runs/`, identité projet |
+
+### Onboarding
+| Document | Description |
+|---|---|
+| [Démarrage rapide](getting-started.md) | Installation, daemon, smoke test HTTP, premier appel |
+
+### Référence fonctionnelle (`functional/`)
+| Document | Description |
+|---|---|
+| [Référence des outils](functional/tools-reference.md) | Outils MCP exposés (schémas, paramètres, exemples HTTP) |
+| [Stratégies](functional/strategies.md) | Pipelines capability / solution, stratégies réelles |
+| [Gate de classification](functional/classification-gate.md) | social_good / common_good / economic |
+| [Notifications](functional/notifications.md) | Progression temps réel, i18n, erreurs |
+| [Format .wm (OWM)](functional/wm-format.md) | Syntaxe OWM des cartes de Wardley |
+| [Évaluation](functional/evaluation.md) | promptfoo : cas de test, assertions |
+
+### Technique (`technical/`)
+| Document | Description |
+|---|---|
+| [tree-map](technical/tree-map.md) | Cartographie de `src/` (source de navigation) |
+| [Architecture](technical/architecture.md) | Vue conceptuelle du pipeline |
+| [Configuration](technical/configuration.md) | Variables d'env, `llm.config.json`, `.mcp.json` |
+| [Validation (Zod)](technical/validation.md) | Schémas Zod, lecture des erreurs |
+| [Dégradation](technical/degradation.md) | Framework `Degradable<T>`, health-checks |
+| [Extensibilité](technical/extending.md) | Ajouter une stratégie, une recipe, un backend LLM |
+| [Convention de namespace](technical/strategy-namespace-convention.md) | → renvoie au pivot ast-schema.md |
+| [Dépannage](technical/troubleshooting.md) | Erreurs courantes, debug, FAQ |
 
 ## Liens utiles
 
-- [onlinewardleymaps.com](https://onlinewardleymaps.com) — Editeur visuel de cartes OWM
-- [docs.onlinewardleymaps.com](https://docs.onlinewardleymaps.com/docs) — Documentation du format OWM
-- [modelcontextprotocol.io](https://modelcontextprotocol.io/specification) — Specification MCP
+- [onlinewardleymaps.com](https://onlinewardleymaps.com) — éditeur visuel OWM
+- [docs.onlinewardleymaps.com](https://docs.onlinewardleymaps.com/docs) — format OWM
+- [modelcontextprotocol.io](https://modelcontextprotocol.io/specification) — spécification MCP

@@ -136,9 +136,9 @@ Visualisez cette carte sur [onlinewardleymaps.com](https://onlinewardleymaps.com
 
 ## Parsing et generation
 
-### Parsing (`evaluate-map.mts`)
+Le DSL OWM est centralise dans `src/lib/owm/owm-dsl.mts` (tout emetteur/parseur passe par ce module). La strategie de parsing est `render:wardley-map:owm:parse:dsl` (`src/frameworks/wardley/chain/read/map/owm-parser-strategy.mts`) ; l'emission est `render:wardley-map:owm:emit:dsl` (`src/frameworks/wardley/chain/emit/owm/owm-emit-strategy.mts`).
 
-La fonction `parseWardleyMap(content)` extrait via regex :
+Le parsing extrait :
 - Title, anchors, components (avec coordonnees)
 - Liens de dependance (`->`, `+>`)
 - Notes, evolve, pipelines

@@ -2,52 +2,56 @@
 
 labre-mcp is an MCP (Model Context Protocol) server that helps the user apply practice frameworks — Wardley Maps first, climates / doctrines / gameplays / cycle next. The targeted horizon for the Wardley framework is the full strategic study cycle (9 phases: prompt → chain → evolution → climates → invest → doctrine → orientation → strategy → close). The server exposes MCP tools backed by a pluggable registry of strategies orchestrated by the kernel recipe runner.
 
-> **V1 status — kernel posed, post-audit refactor in progress.** Architectural decisions are recorded as ADRs in [docs/architecture/decisions.md](/labre-mcp/docs/architecture/decisions.md) (ARCH-01 to ARCH-25). Strategy classes for Wardley currently live under `src/frameworks/wardley/{chain,evolution}/_legacy/` per ARCH-23 (in-place migration). Physical extraction to the canonical `<tool>/<command>/<subdomain>/` layout is scheduled for V1.5 cleanup. Until then, both the new core `StrategyRegistry` and the legacy `loadStrategies()` filesystem walker resolve to the same classes. The repository directory will eventually be renamed `labre-mcp` (the npm package name and `.mcp.json` server name are already aligned).
+> **V1 status — kernel posed, post-audit refactor in progress.** Architectural decisions are recorded as ADRs in [docs/architecture/decisions.md](/labre-mcp/docs/architecture/decisions.md) (ARCH-01 to ARCH-25). Strategy classes for Wardley currently live under `src/frameworks/wardley/{chain,evolution}/_legacy/` per ARCH-23 (in-place migration). Physical extraction to the canonical `<tool>/<command>/<subdomain>/` layout is scheduled for V1.5 cleanup. Until then, both the new core `StrategyRegistry` and the legacy `loadStrategies()` filesystem walker resolve to the same classes. The repository directory will eventually be renamed `labre-mcp` (the npm package name and `.mcp.json` server name are already aligned). **Current surface:** the daemon wires **1 business MCP tool** (`estimateEvolution`) + `__ping__`, and registers **85 strategies (15 real / 70 mock)**. The full gap to the target is tracked in [roadmap.md](/labre-mcp/docs/architecture/roadmap.md).
 
 
-# Architecture (post-migration target)
+# Architecture
 
 Read these first if you're new to the project:
 
-- [decisions.md](/labre-mcp/docs/architecture/decisions.md) — 22 ADRs that ground every other decision
-- [strategies.md](/labre-mcp/docs/architecture/strategies.md) — 5-segment methodIds, 4 commands (read/write/quality/emit), registry, BaseStrategy contract, result format with signals/reasoning/insights
+- [ast-schema.md](/labre-mcp/docs/architecture/ast-schema.md) — **pivot grammar** (5-segment methodIds, open command vocabulary, JSON-labre artefact, strategy contract). Authoritative: supersedes/amends several ADRs (ARCH-25).
+- [decisions.md](/labre-mcp/docs/architecture/decisions.md) — 25 ADRs (ARCH-01..25) that ground every other decision
+- [roadmap.md](/labre-mcp/docs/architecture/roadmap.md) — what is **not yet** done (lib/→core, `_legacy/` extraction, tool wiring, mocks→real). Read this to avoid coding against a structure that does not exist yet.
+- [strategies.md](/labre-mcp/docs/architecture/strategies.md) — registry, BaseStrategy contract, result format with signals/reasoning/insights
 - [recipes.md](/labre-mcp/docs/architecture/recipes.md) — recipe schema, listeners, auto-fanout, shipped+override loader
 - [transport.md](/labre-mcp/docs/architecture/transport.md) — HTTP daemon on localhost, context propagation, auth middleware
 - [persistence.md](/labre-mcp/docs/architecture/persistence.md) — artefact JSON files in `~/.labre-mcp/runs/`, project identity
 
-## High-level shape
+## High-level shape (current)
+
+> Describes the code **as it is today**. The remaining migration to the canonical target is tracked in [roadmap.md](/labre-mcp/docs/architecture/roadmap.md); the detailed `src/` tree lives in [tree-map.md](/labre-mcp/docs/technical/tree-map.md).
 
 ```
 labre-mcp/
-├── src/core/                                # KERNEL — survives across frameworks
-│   ├── registry/    strategy-registry                  (ARCH-03)
-│   ├── recipe/      recipe-runner, recipe.schema, recipe-loader  (ARCH-06, 07, 08)
-│   ├── bus/         event-bus (RxJS Subject)            (ARCH-10)
-│   ├── ast/         base-strategy, base-ast              (ARCH-22)
-│   ├── context/     request-context                      (ARCH-15)
-│   ├── transport/   http-server, json-rpc, auth          (ARCH-14)
-│   ├── listeners/   artifact-writer-listener (core)      (ARCH-12)
-│   ├── persistence/ artifact-writer, project-id          (ARCH-12)
-│   ├── llm/         (post-migration: ex src/lib/llm/)
-│   ├── prompts/     (post-migration: ex src/lib/prompts/)
-│   ├── owm/         (post-migration: ex src/lib/owm/)
-│   └── degradation/ (post-migration: ex src/lib/degradation/)
+├── src/
+│   ├── core/                  # KERNEL — survives across frameworks
+│   │   ├── registry/      strategy-registry                          (ARCH-03)
+│   │   ├── recipe/        recipe-runner, recipe.schema, recipe-loader (ARCH-06/07/08)
+│   │   ├── bus/           event-bus (RxJS Subject)                   (ARCH-10)
+│   │   ├── ast/           base-strategy                              (ARCH-22)
+│   │   ├── context/       request-context                            (ARCH-15)
+│   │   ├── transport/     labre-daemon, http-server, mcp-handler, auth (ARCH-14)
+│   │   ├── listeners/     artifact-writer-listener (core)            (ARCH-12)
+│   │   └── persistence/   artifact-writer, project-id                (ARCH-12)
+│   │
+│   ├── lib/                   # cross-cutting utils — NOT yet under core/ (roadmap B1)
+│   │   └── llm/  prompts/  owm/  degradation/  patent/  vendor/  zod/
+│   │
+│   ├── frameworks/
+│   │   ├── wardley/{map,chain,evolution,climate,doctrine,gameplay,iteration,…}
+│   │   │   └── …/_legacy/   real strategies still live here          (ARCH-23, roadmap B2)
+│   │   ├── common/           cross-framework strategies              (ARCH-25)
+│   │   ├── render/           OWM + image rendering
+│   │   └── mocks-registry.mts  registers the 70 mock strategies
+│   │
+│   ├── mcp/                   estimate-evolution.tool.mts (the one wired MCP tool, roadmap B3)
+│   └── schemas/  types/  session/  tests/
 │
-├── src/frameworks/wardley/
-│   ├── chain/                                 (post-migration: ex src/work-on-value-chain/)
-│   │   ├── ast/    schema-snapshot, wardley-chain-ast
-│   │   ├── read/   {map,component,anchor}/
-│   │   ├── write/  {map,component,layout,...}/
-│   │   ├── quality/{layout,dsl}/
-│   │   └── emit/   {owm,mermaid}/
-│   └── evolution/                             (post-migration: ex src/work-on-evolution/)
-│       ├── ast/    wardley-evolution-ast (γ form: signals/reasoning/insights/result)
-│       ├── read/, write/, quality/, emit/
+├── recipes/                   # shipped canonical recipes (ARCH-08)
+│   ├── wardley/map/*.recipe.json
+│   └── render/wardley-map/parse.recipe.json
 │
-├── recipes/                                   # shipped canonical recipes (ARCH-08)
-│   └── wardley/{chain,evolution}/*.recipe.json
-│
-└── docs/architecture/                         # this directory
+└── docs/architecture/         # ADRs (decisions.md) · pivot (ast-schema.md) · roadmap.md
 ```
 
 
@@ -93,8 +97,8 @@ labre-mcp/
 
 ## Naming
 
-21. Strategy methodIds follow the 5-segment pattern `{framework}:{tool}:{command}:{subdomain}:{strategy}[@version]` (ARCH-03)
-22. The four commands are `read | write | quality | emit` (ARCH-04). `place` is a form of `write`; `verify` belongs to `quality`. No `update` command — updates are recipe-level composition
+21. Strategy methodIds follow the 5-segment pattern `{domain}:{tool}:{sub-domain}:{command}:{strategy}[@version]` — the pivot [ast-schema.md](/labre-mcp/docs/architecture/ast-schema.md) is authoritative (ARCH-03 amended by ARCH-25; note segments 3 and 4 are sub-domain **then** command). Example: `wardley:map:climate:position-functional-in-evolution:s-curve`. `:default` is a canonical strategy at segment 5, never implicit on the wire.
+22. The command vocabulary (segment 4) is **open**, not a fixed set: `generate, parse, emit, audit, identify, estimate, update, …` (ARCH-04 superseded by ARCH-25). `update` is a valid standalone command (write-gateway `wardley:map:output:update:default`)
 23. `context` (business environment, user-supplied only) and `description` (component label, MCP may enrich) are distinct — never fall back from one to the other
 24. Use generic Wardley phase keys `phase1..phase4` for distributions, never `wonder/build/operate/usage` or `genesis/custom/product/commodity` (semantic contamination)
 
@@ -135,6 +139,6 @@ labre-mcp/
 # Map around the code base
 
 1. Migration ADRs and architecture topics live in [/docs/architecture/](/labre-mcp/docs/architecture/)
-2. Functional and historical technical docs live in [/docs/technical/](/labre-mcp/docs/technical/) and [/docs/functional/](/labre-mcp/docs/functional/) — these reflect the **pre-migration** structure until CP9 doc updates land
+2. Functional and technical docs live in [/docs/technical/](/labre-mcp/docs/technical/) and [/docs/functional/](/labre-mcp/docs/functional/) — realigned on the current code. The remaining migration gap is centralised in [/docs/architecture/roadmap.md](/labre-mcp/docs/architecture/roadmap.md)
 3. Plan file: `~/.claude/plans/1-a-2-jolly-octopus.md` (10-checkpoint migration sequence)
 4. Strategies, recipes, transport, persistence — each has a dedicated topic doc under `docs/architecture/`

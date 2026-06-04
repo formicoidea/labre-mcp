@@ -10,13 +10,13 @@ Plus aucune duplication entre interface TS, fonction `validateInput()` manuelle 
 
 ---
 
-## Les 4 familles de schémas
+## Les familles de schémas
 
 Tous les schémas vivent dans `src/schemas/*.schema.mts`.
 
 | Famille | Fichiers | Rôle |
 |---|---|---|
-| **Tool inputs** (4) | `estimate-evolution.schema.mts`, `evaluate-map.schema.mts`, `identify-capability.schema.mts`, `estimate-anchor-evolution.schema.mts` | Entrée des 4 outils MCP — schéma publié au client + parsé à l'appel |
+| **Tool inputs** | `estimate-evolution.schema.mts`, `identify-capability.schema.mts`, `value-chain.schema.mts` | Entrée des outils / stratégies MCP — schéma publié au client + parsé à l'appel |
 | **Inputs** | `inputs.schema.mts` | `ComponentInput`, `SolutionInput`, `PhaseDistribution` + primitives (`CapabilityNature`, `WardleyPhase`, `PhaseLabel`) — objets métier partagés |
 | **Results** | `results.schema.mts` | `EvolutionResult`, `PropertyEvaluation`, `SolutionEvolutionResult` — sorties des stratégies |
 | **Patent** | `patent.schema.mts` | `PatentDataSchema` + 8 sous-shapes. Frontière BigQuery / mock — valide les données entrantes d'une source externe |
@@ -127,8 +127,7 @@ Zod est le mécanisme privilégié pour passer de `unknown` à un type nommé sa
 
 ## Liens
 
-- [extending.md](extending.md#ajouter-un-nouvel-outil-mcp) — ajouter un tool MCP complet (flow Zod en 4 étapes)
-- [tools-reference.md](tools-reference.md) — les schémas Zod des 4 tools MCP
+- [extending.md](extending.md#ajouter-un-nouvel-outil-mcp) — ajouter un tool MCP complet (flow Zod)
 - [architecture.md](architecture.md#typescript-strict--zod) — vue d'ensemble TS + Zod
 - [troubleshooting.md](troubleshooting.md#zoderror-invalid-input) — lire une `ZodError` côté client
 - [Zod 4 docs](https://zod.dev/) — référence officielle

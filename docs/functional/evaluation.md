@@ -6,12 +6,18 @@ labre-mcp utilise [promptfoo](https://www.promptfoo.dev/) pour tester la qualite
 
 Le fichier `promptfooconfig.yaml` a la racine definit les cas de test, les providers LLM et les assertions.
 
-### Providers testes
+### Providers configures
 
-| Provider | Modele | API |
+`promptfooconfig.yaml` declare plusieurs providers ; ceux actifs dans le bloc `providers:` sont :
+
+| Provider | Modele | Endpoint |
 |---|---|---|
-| OpenCode Zen | kimi-k2.5 | opencode.ai/zen/v1 |
-| OpenCode Zen | haiku-4.5 | opencode.ai/zen/v1 |
+| `opencode-zen-kimi-2-5` (https) | `kimi-k2.5` | `https://opencode.ai/zen/v1/chat/completions` |
+| `opencode-zen-haiku-4-5` (https) | `claude-haiku-4-5` | `https://opencode.ai/zen/v1/messages` |
+
+Auth via `OPENCODE_API_KEY` (header `Authorization: Bearer` pour kimi, `x-api-key` pour haiku).
+
+> Le `defaultTest.options.providers` reference `file://scripts/claude-eval.mjs` (label `claude-code`), mais le dossier `scripts/` n'existe plus dans le repo — voir la note sous [Script de transformation](#script-de-transformation).
 
 ### Cas de test (7 cas)
 
@@ -88,7 +94,9 @@ tests:
 
 ## Script de transformation
 
-Le fichier `scripts/s-curve-transform.js` est utilise comme transform dans promptfoo pour convertir les estimations brutes du LLM en scores d'evolution via le modele s-curve.
+Chaque cas de test declare `options.transform: file://scripts/s-curve-transform.js`. Ce transform convertit les estimations brutes du LLM (certitude, ubiquity…) en `scurve_evolution` via le modele s-curve, consomme ensuite par les assertions.
+
+> **Chemin a realigner** : `scripts/s-curve-transform.js` n'existe plus tel quel dans le repo (le dossier `scripts/` a ete supprime lors de la migration). La logique s-curve reelle vit desormais sous `src/frameworks/wardley/evolution/_legacy/write/s-curve/` (`s-curve.mts`) et son artefact compile sous `dist/frameworks/wardley/evolution/_legacy/write/s-curve/s-curve-transform.js`. Le `promptfooconfig.yaml` doit etre repointe vers cet artefact (ou un transform regenere) — gap suivi cote outillage eval.
 
 ## Bonnes pratiques
 

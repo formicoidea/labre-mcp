@@ -105,10 +105,38 @@ Listing **canonique** des commandes spécifiées en v0.1.0. La spécification co
 
 </aside>
 
+### État d'implémentation (real vs mock) — v0.1.0
+
+> Le catalogue ci-dessous décrit la **surface cible** complète. Aujourd'hui, sur les **85 commandes enregistrées** au boot, seules **15** ont une stratégie réellement implémentée ; les **70 autres** sont des **mocks** — des stratégies d'échafaudage enregistrées pour exposer la surface dès le jour 1 (elles retournent un `insight` « `mock strategy for <methodId>` » et aucun `result` métier). Le champ `StrategyMetadata.status` (§ 3.4.3) porte la distinction : `experimental | stable` = réel, `mock` = échafaudage.
+>
+> **Source de vérité** : le daemon imprime au boot la liste des methodId enregistrés (stderr) ; `LABRE_DISABLE_MOCKS=1` ne boote que les 15 réelles. Tenir cette liste à jour à chaque promotion mock → réel (cf. [roadmap.md](roadmap.md) B4).
+
+**Commandes réellement implémentées (15)** :
+
+| methodId | Rôle |
+| --- | --- |
+| `render:wardley-map:owm:parse:dsl` | Parser OWM DSL → JSON-labre |
+| `render:wardley-map:owm:emit:dsl` | Sérialiseur JSON-labre → OWM DSL |
+| `wardley:map:node:identify:default` | Identification capability / nature d'un nœud |
+| `wardley:map:value-chain:generate:top-down` | Génération chaîne de valeur (algorithme top-down) |
+| `wardley:map:value-chain:prevent-collision:default` | Placement des labels (anti-collision) |
+| `wardley:map:value-chain:audit:overlap-check` | Détection de chevauchements (qualité layout) |
+| `wardley:map:climate:position-functional-in-evolution:s-curve` | Position évolution — courbe en S |
+| `wardley:map:climate:position-functional-in-evolution:llm-direct` | Position évolution — estimation LLM directe |
+| `wardley:map:climate:position-functional-in-evolution:cpc-evolution` | Position évolution — classes de brevets (BigQuery) |
+| `wardley:map:climate:position-functional-in-evolution:logprob-distribution` | Position évolution — distribution log-probabilités |
+| `wardley:map:climate:position-functional-in-evolution:publication-analysis` | Position évolution — analyse de publications |
+| `wardley:map:climate:position-functional-in-evolution:timeline-benchmark` | Position évolution — frise chronologique |
+| `wardley:map:climate:position-solution-in-evolution:property-assessment` | Position évolution d'une solution (12 propriétés) |
+| `wardley:map:climate:position-anchor-in-evolution:culture-phase` | Position évolution d'une ancre |
+| `wardley:map:climate:position-anchor-in-evolution:default` | Alias de `:culture-phase` |
+
+Toute autre commande des § 1.2 / § 2 est aujourd'hui `status: mock`. La surface MCP réellement exposée comme **outils** se limite par ailleurs à `estimateEvolution` (+ `__ping__`) — voir [roadmap.md](roadmap.md) B3.
+
 ### Domaine `common` (transverse)
 
 - `common:toolbox:list:emit:default`
-- `common:toolbox:wardley:json-boilerplate`
+- `common:toolbox:wardley:json-boilerplate:default`
 
 ### Domaine `wardley` (exhaustif v0.1.0)
 

@@ -1,6 +1,6 @@
 # Systeme de notifications
 
-Le serveur emet des notifications de progression pendant l'execution des outils. Ces notifications informent l'utilisateur en temps reel sur l'avancement du traitement.
+Le daemon HTTP (`src/core/transport/labre-daemon.mts`) emet des notifications de progression pendant l'execution des outils. Ces notifications informent l'utilisateur en temps reel sur l'avancement du traitement. L'API de notification est exposee par le module `src/lib/mcp-notifications.mts`.
 
 ## Double emission
 
@@ -44,7 +44,7 @@ Chaque notification est emise dans deux formats :
 ## API de notification
 
 ```javascript
-import { logInfo, logDebug, logError, logWarning, setVerbose, isVerbose } from './mcp-notifications.mts';
+import { logInfo, logDebug, logError, logWarning, setVerbose, isVerbose } from './lib/mcp-notifications.mjs';
 
 // Toujours emis
 logInfo('estimateEvolution', 'Starting evaluation for "ERP"');
@@ -80,7 +80,7 @@ Les messages de progression sont automatiquement emis dans la langue de l'utilis
 
 ### Methode de detection
 
-Le module `language-detect.mts` utilise :
+Le module `src/lib/language-detect.mts` utilise :
 - **Empreintes lexicales** : mots distinctifs par langue (ponderation 1 pt) et ambigus (0.3 pt)
 - **Patterns** : expressions regulieres specifiques a une langue (2 pts)
 - **Plages Unicode** : CJK (chinois), Hiragana/Katakana (japonais), Hangul (coreen) — signaux forts
@@ -90,7 +90,7 @@ Fallback : anglais si aucune langue n'est detectee avec suffisamment de confianc
 
 ## Catalogue de messages
 
-Le fichier `progress-messages.mts` contient 40+ messages localises avec interpolation de variables :
+Le fichier `src/lib/progress-messages.mts` contient 40+ messages localises avec interpolation de variables :
 
 ```javascript
 // Exemple de message
@@ -106,7 +106,7 @@ Variables disponibles : `{{tool}}`, `{{component}}`, `{{strategy}}`, `{{evolutio
 
 ## Gestion des erreurs LLM
 
-Le module `llm-error-handler.mts` classe les erreurs LLM en types specifiques :
+Le module `src/lib/llm/llm-error-handler.mts` classe les erreurs LLM en types specifiques :
 
 | Type | Declencheur | Message exemple |
 |---|---|---|
@@ -121,7 +121,7 @@ Le module `llm-error-handler.mts` classe les erreurs LLM en types specifiques :
 ### Utilisation
 
 ```javascript
-import { classifyAndLogLLMError, withLLMErrorLogging } from './llm-error-handler.mts';
+import { classifyAndLogLLMError, withLLMErrorLogging } from './lib/llm/llm-error-handler.mjs';
 
 // Classification manuelle
 try {

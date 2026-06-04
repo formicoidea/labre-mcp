@@ -12,7 +12,7 @@ Toute reponse contient les champs `degraded` (boolean) et `degradationEvents` (a
 | `patent-indicators` | Module non chargeable (probleme de build). Verifier `npm run typecheck`. |
 | `web-search` | Agent SDK non disponible ou rate-limit. Le routing solution/capability bascule sur le defaut `capability`. |
 | `llm:claude` / `llm:opencode` / `llm:identify-capability` / `llm:anchor-evolution` | Erreur LLM (timeout, 401, rate limit, empty response). Voir `detail.error` dans l'event. |
-| `write:capacity:cpc-evolution` | Erreur inattendue dans le pipeline CPC (safety net). Le `detail` contient le message original. |
+| `cpc-evolution` | Erreur inattendue dans le pipeline CPC (safety net). Le `detail` contient le message original. |
 | `evaluateMap:<componentName>` | Une evaluation par-composant a leve une exception. Le composant est marque `skipped` avec la raison. |
 
 Les memes informations apparaissent en notifications MCP (canal `labre-mcp`, niveau `warning`) — affichees en temps reel dans Claude Code. Voir [degradation.md](degradation.md) pour la conception du framework.
@@ -48,7 +48,7 @@ Note : cette cle n'est necessaire que pour les strategies utilisant le backend O
 
 **Solutions** :
 1. Augmenter le timeout dans `.mcp.json`
-2. Utiliser une seule strategie au lieu de `"all"` : `"strategy": "write:capacity:s-curve"`
+2. Utiliser une seule strategie au lieu de `"report"` : `"strategy": "wardley:map:climate:position-functional-in-evolution:s-curve"`
 3. Verifier la connectivite reseau vers `opencode.ai`
 
 ### logprob-distribution error 500
@@ -63,7 +63,7 @@ Note : cette cle n'est necessaire que pour les strategies utilisant le backend O
 
 **Cause** : Appel d'une methode MCP non supportee.
 
-**Methodes supportees** : `initialize`, `tools/list`, `tools/call`, `ping`, `notifications/initialized`
+**Methodes supportees** (sur `POST /mcp`) : `initialize`, `ping`, `tools/list`, `tools/call`, `notifications/*`. Le daemon expose aussi `GET /health` et `GET /version`.
 
 ### ZodError: Invalid input
 
@@ -93,39 +93,34 @@ Note : cette cle n'est necessaire que pour les strategies utilisant le backend O
 ### Activer le mode verbose
 
 ```bash
-# Via variable d'environnement
-WARDLEY_VERBOSE=1 npx tsx --env-file=.env src/mcp/mcp-server.mts
+# Via variable d'environnement, au lancement du daemon
+WARDLEY_VERBOSE=1 pnpm mcp
 
 # Ou dans le fichier .env
 WARDLEY_VERBOSE=1
 ```
 
-### Test manuel du serveur
+### Test manuel du daemon (HTTP)
 
-Envoyer des messages JSON-RPC sur stdin :
+Le transport est HTTP : démarrer le daemon (`pnpm mcp`, écoute sur `127.0.0.1:6767`),
+puis envoyer des requêtes avec `curl`.
 
 ```bash
-# Ping
-echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | npx tsx --env-file=.env src/mcp/mcp-server.mts
+# Health check
+curl http://127.0.0.1:6767/health
+# → {"status":"ok"}
+
+# Ping (JSON-RPC sur POST /mcp)
+curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"ping"}'
 
 # Lister les outils
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | npx tsx --env-file=.env src/mcp/mcp-server.mts
+curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
 
-# Appel complet (initialize + call)
-printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"test","version":"1.0"}}}
-{"jsonrpc":"2.0","method":"notifications/initialized"}
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"estimateEvolution","arguments":{"name":"ERP","strategy":"write:capacity:s-curve","certitude":0.9,"ubiquity":0.85}}}
-' | npx tsx --env-file=.env src/mcp/mcp-server.mts
-```
-
-### Filtrer les notifications
-
-```bash
-# Voir uniquement les notifications de progression
-... | npx tsx --env-file=.env src/mcp/mcp-server.mts | grep "notifications/message"
-
-# Voir uniquement les channel notifications
-... | npx tsx --env-file=.env src/mcp/mcp-server.mts | grep "claude/channel"
+# Appel d'outil (smoke __ping__)
+curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"__ping__","arguments":{"message":"hello"}}}'
 ```
 
 ### Lancer les tests
@@ -135,12 +130,12 @@ printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion
 pnpm test
 
 # Un fichier specifique (via tsx)
-npx tsx --test src/work-on-evolution/write/routing/classification-gate.test.mts
+npx tsx --test src/frameworks/wardley/evolution/_legacy/write/routing/classification-gate.test.mts
 ```
 
 ### Visualiser le modele S-curve
 
-Ouvrir `src/work-on-evolution/write/s-curve/s-curve-visualizer.html` dans un navigateur pour visualiser interactivement le modele dual sigmoide et ajuster les parametres.
+Ouvrir `src/frameworks/wardley/evolution/_legacy/write/s-curve/s-curve-visualizer.html` dans un navigateur pour visualiser interactivement le modele dual sigmoide et ajuster les parametres.
 
 Permet d'ajuster les parametres kUpper, kLower, x0, yMin, yMax, nu du modele.
 
@@ -167,7 +162,7 @@ La detection est automatique avec `mode: "default"` (ou `mode` omis) : si vous f
 
 ### Comment ajouter une strategie ?
 
-Creer un fichier `src/work-on-evolution/write/strategies/capacity/ma-strategy.mts` qui etend `BaseStrategy`. Le registre le decouvre automatiquement. Voir [Extensibilite](extending.md).
+Creer une classe qui etend le `BaseStrategy` du core, lui donner un `methodId` 5 segments, puis l'enregistrer dans le registry du framework concerne (`src/frameworks/.../registry.mts`). Voir [Extensibilite](extending.md).
 
 ### Que signifie "extra-competitif" ?
 

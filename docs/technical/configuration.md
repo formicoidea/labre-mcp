@@ -8,7 +8,8 @@
 | `COPILOT_GITHUB_TOKEN` | `ghp_...` / `gho_...` | *(Optionnel)* Token GitHub, lu uniquement si une strategie route vers un provider `copilot-sdk`. A defaut, le SDK Copilot bascule sur `gh auth login` / `GH_TOKEN` / `GITHUB_TOKEN`. |
 | `WARDLEY_LLM_CONFIG` | chemin absolu ou relatif | Override du fichier de configuration LLM. Par defaut : `<racine>/llm.config.json`. |
 | `WARDLEY_PROMPTS_CONFIG` | chemin absolu ou relatif | Override du fichier de configuration des prompts. Par defaut : `<racine>/prompts.config.json`. |
-| `WARDLEY_TOOL_CONFIG` | chemin absolu ou relatif | Override du fichier de configuration des outils MCP. Par defaut : `<racine>/tool.config.json`. |
+| `LABRE_HTTP_PORT` | entier `1-65535` | Port d'ecoute du daemon HTTP. Par defaut : `6767`. |
+| `LABRE_DISABLE_MOCKS` | `1` | Ne charge que les 15 strategies reelles au boot (exclut les 70 mocks). |
 | `WARDLEY_VERBOSE` | `1`, `true`, `yes` | Active les messages debug dans les notifications. Desactive par defaut. |
 | `WARDLEY_EVAL_MODE` | `exclusive`, `parallel` | Mode de routage solution/capability. `exclusive` (defaut) : un seul pipeline. `parallel` : les deux pipelines, resultats fusionnes. |
 | `_WARDLEY_NESTED` | `1` | **Automatique** — Positionne par le serveur au demarrage. Guard anti-recursion. Ne pas modifier. |
@@ -218,14 +219,14 @@ Regles :
 - Les fins de ligne sont normalisees `\r\n` → `\n` a la lecture (garantit un prompt identique byte-for-byte sous Windows/Linux).
 - La cross-validation avec `llm.config.json` est **souple** : certaines strategies (web-search-verification, solution-classification) sont des prompts techniques consommes via un `llmCall` injecte par un parent — pas besoin d'entree LLM dediee.
 - `getPrompt(strategy, name)` retourne `{ build, parse }`. Le parser est resolu paresseusement — seul `.parse()` exige que le parser soit enregistre.
-- Les parsers sont enregistres au demarrage via `src/lib/prompts/init.mts`, importe en tete de `src/mcp/mcp-server.mts` (`import '../lib/prompts/init.mjs'`). Chaque `parser.id` declare dans `prompts.config.json` doit pointer vers une fonction enregistree ; sinon `.parse()` throw avec un message explicite pointant la clé manquante.
+- Les parsers sont enregistres au demarrage via `src/lib/prompts/init.mts` (`import '#lib/prompts/init.mjs'`), importe sur le chemin de boot du daemon avant le premier `.parse()`. Chaque `parser.id` declare dans `prompts.config.json` doit pointer vers une fonction enregistree ; sinon `.parse()` throw avec un message explicite pointant la clé manquante.
 
 Runtime API cote code :
 
 ```typescript
 import { getPrompt } from './lib/prompts/registry.mjs';
-// init.mjs est importe une fois au demarrage (mcp-server.mts en tete) pour
-// que chaque parser.id du JSON soit enregistre avant le premier .parse().
+// init.mjs est importe une fois au demarrage (sur le chemin de boot du daemon)
+// pour que chaque parser.id du JSON soit enregistre avant le premier .parse().
 
 const p = getPrompt('identify-capability');
 const prompt = p.build({ component, description, context });
@@ -237,52 +238,14 @@ const result = p.parse(response, { name: component, type, context });
 
 `src/lib/prompts/registry-parse-equivalence.test.mts` verifie pour chaque parser enregistre que `getPrompt(...).parse(sample, ctx)` produit la meme valeur que l'appel direct `parseXxx(sample, ctx)`. Lock de non-regression byte-for-byte sur le round-trip registry : toute derive silencieuse du registry (cache, resolution paresseuse, etc.) est capturee immediatement par la CI.
 
-## Configuration des outils — tool.config.json
+## Routage des outils — recipes + strategy registry
 
-`tool.config.json` (a la racine, **versionne**) configure le routing automatique des outils MCP. Aujourd'hui une seule entree : `estimateEvolution`.
-
-Structure :
-
-```json
-{
-  "estimateEvolution": {
-    "auto": {
-      "anchor": "anchor-evolution",
-      "solution": "write:solution:properties",
-      "capability": "write:capacity:llm-direct"
-    },
-    "report": {
-      "anchor": ["anchor-evolution"],
-      "solution": ["write:solution:properties"],
-      "capability": [
-        "write:capacity:s-curve",
-        "write:capacity:publication-analysis",
-        "write:capacity:cpc-evolution"
-      ]
-    }
-  }
-}
-```
-
-Semantique :
-
-- **`auto`** : pour chaque type detecte (`anchor` / `solution` / `capability`), le router lance **une seule** strategie. C'est le mode appele par `evaluateMap` pour traiter une carte entiere (cout O(N)).
-- **`report`** : pour chaque type detecte, le router lance **plusieurs** strategies en parallele et renvoie une map keyed by strategy. Adapte a l'analyse approfondie d'un composant unique.
-
-Surface MCP :
-
-- `estimateEvolution({ name, strategy: "auto" })` → 1 strategie via `auto[<type>]`.
-- `estimateEvolution({ name, strategy: "report" })` → N strategies via `report[<type>]`.
-- `estimateEvolution({ name, strategy: "write:capacity:s-curve" })` → cette strategie precise, by-pass du routing.
-- `estimateEvolution({ name, type: "anchor", strategy: "auto" })` → court-circuit de la classification gate, appel direct a `estimateAnchorEvolution`.
-
-Validation :
-
-- Schema Zod dans `src/lib/tool-config/tool-config.schema.mts`. Les `methodId` sont valides structurellement (regex kebab-case + namespace `write:capacity:` / `write:solution:`). L'existence reelle de la strategie dans le registry est verifiee a l'execution (le router signale une strategie inconnue par une entree `error` dans la map evaluations).
-- Loader : `src/lib/tool-config/loader.mts` (singleton lazy + cache). `WARDLEY_TOOL_CONFIG` permet de pointer un autre fichier (utile pour les tests).
-- Resolver : `src/work-on-evolution/write/routing/strategy-resolver.mts` traduit la valeur surface en plan de dispatch (`{ kind: 'single' | 'multi' | 'specific' }`).
-
-> **Le `'all'` interne de `solution-dispatch.mts`** (= "lance les 12 proprietes de `write:solution:properties`") est conserve. C'est un namespace distinct de la surface MCP : les callers experts qui passent directement par `dispatchSolutionStrategies()` continuent a utiliser `strategy: 'all'` la-bas.
+> **`tool.config.json` et `WARDLEY_TOOL_CONFIG` ont ete supprimes.** Le routing des outils MCP
+> ne passe plus par un fichier de config dedie. Il est desormais decrit par les **recipes**
+> (`recipes/<domain>/<tool>/*.recipe.json`) qui orchestrent des appels de strategies par
+> `methodId` 5 segments, resolus dans le **strategy registry** au boot. Voir
+> [../architecture/recipes.md](../architecture/recipes.md) et
+> [../architecture/strategies.md](../architecture/strategies.md).
 
 ## Fichier .env
 
@@ -310,32 +273,27 @@ Le fichier `.mcp.json` a la racine enregistre le serveur MCP aupres de Claude Co
 }
 ```
 
-Le daemon HTTP se demarre avec `pnpm mcp`. La variante legacy stdio reste disponible via `pnpm mcp:legacy:stdio` (voir docs/architecture/transport.md).
+Le daemon HTTP se demarre avec `pnpm mcp` (`tsx src/core/transport/labre-daemon.mts`). Le transport canonique est HTTP — l'ancien serveur stdio a ete supprime (voir [../architecture/transport.md](../architecture/transport.md)).
 
 | Champ | Description |
 |---|---|
-| `command` | `cmd` sous Windows (wrapper obligatoire pour `npx`). Sous Linux/macOS : `npx` directement. |
-| `args` | Lance tsx avec le `.env` puis execute le serveur (`.mts` compile a la volee) |
-| `cwd` | Repertoire de travail (chemin absolu) |
-| `timeout` | Timeout en secondes (600 = 10 minutes). Necessaire pour les evaluations longues. |
+| `type` | `http` — transport HTTP (le daemon doit etre demarre separement via `pnpm mcp`). |
+| `url` | Endpoint JSON-RPC du daemon : `http://127.0.0.1:6767/mcp`. Port surchargeable via `LABRE_HTTP_PORT`. |
+
+> Le daemon HTTP est un processus long-running lance a part (`pnpm mcp`) : `.mcp.json` ne le spawn pas, il s'y connecte. Plus de champs `command` / `args` / `cwd` (specifiques a l'ancien transport stdio).
 
 ## Channels Claude Code
 
 Pour activer les notifications de progression dans le chat :
 
-### 1. Capability serveur (deja configure)
+### 1. Capability serveur
 
-Le serveur declare la capability channel dans `src/mcp/mcp-server.mts` :
-
-```javascript
-const SERVER_CAPABILITIES = {
-  tools: {},
-  logging: {},
-  experimental: {
-    'claude/channel': {},
-  },
-};
-```
+Les capabilities annoncées au `initialize` sont déclarées dans `SERVER_CAPABILITIES`
+(`src/core/transport/mcp-handler.mts`). Sur la branche de plateformisation, le handler
+n'annonce actuellement que `{ tools: {} }` — la capability expérimentale `claude/channel`
+n'est pas (encore) recâblée sur le transport HTTP. Tant qu'elle ne l'est pas, les channels
+ci-dessous ne sont pas émis. Suivi global de la surface transport en
+[../architecture/roadmap.md](../architecture/roadmap.md).
 
 ### 2. Lancement avec le flag
 
@@ -363,7 +321,7 @@ Le mode verbose controle l'emission des messages `debug` :
 Activation programmatique :
 
 ```javascript
-import { setVerbose } from './mcp-notifications.mts';
+import { setVerbose } from '#lib/mcp-notifications.mjs';
 setVerbose(true);
 ```
 

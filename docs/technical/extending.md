@@ -1,141 +1,132 @@
 # Extensibilite
 
-> **Convention** : chaque `method` suit le format `<mode>:<family>:<strategy>`.
-> Voir [strategy-namespace-convention.md](strategy-namespace-convention.md)
-> pour le detail de `mode` (read / write / analyze) et `family`
-> (capacity / solution / anchor / component / chain).
+> **Convention** : chaque `methodId` suit la grammaire 5 segments
+> `domain:tool:sous-domaine:command:strategie@version`. Référence faisant autorité :
+> [`../architecture/ast-schema.md`](../architecture/ast-schema.md). Pointeur :
+> [strategy-namespace-convention.md](strategy-namespace-convention.md).
 
-## Ajouter une nouvelle strategie capability
+## Ajouter une nouvelle strategie
 
-C'est la forme d'extension la plus simple — aucune modification de code existant n'est necessaire.
+Une stratégie est une classe qui étend le `BaseStrategy` du core
+(`src/core/ast/base-strategy.mts`), expose un `static get method()` au format 5 segments,
+et implémente `evaluate(input, context)`. Elle est ensuite **enregistrée explicitement**
+dans le registry du framework concerné.
 
 ### Etape 1 : Creer le fichier
 
-Creer `src/work-on-evolution/write/strategies/capacity/ma-strategy.mts` :
+Les stratégies réelles d'évolution vivent sous
+`src/frameworks/wardley/evolution/_legacy/write/strategies/…` (le suffixe `_legacy` est
+transitoire — voir [roadmap.md](../architecture/roadmap.md), item B2). Exemple :
+`src/frameworks/wardley/evolution/_legacy/write/strategies/capacity/ma-strategy.mts` :
 
 ```typescript
-import { BaseStrategy } from './base-strategy.mjs';
-import type { ComponentInput, EvolutionResult } from '../../../../types/evolution.mjs';
+import { BaseStrategy, type StrategyResult } from '#core/ast/base-strategy.mjs';
+import type { RequestContext } from '#core/context/request-context.mjs';
+
+const METHOD_ID = 'wardley:map:climate:position-functional-in-evolution:ma-strategy';
 
 export class MaStrategy extends BaseStrategy {
-  // Identifiant unique de la strategie (convention <mode>:<family>:<strategy>)
+  // Identifiant unique (grammaire 5 segments — voir ast-schema.md)
   static get method(): string {
-    return 'write:capacity:ma-strategy';
+    return METHOD_ID;
   }
 
-  // Evaluation du composant
-  async evaluate(component: ComponentInput): Promise<EvolutionResult> {
-    const { name, certitude, ubiquity, description } = component;
-
-    // Votre logique d'evaluation ici
-    const evolution = 0.5;
-    const confidence = 0.7;
-
-    return BaseStrategy.validateResult({
-      evolution,
-      confidence,
-      method: MaStrategy.method,
-    });
+  async evaluate(input: unknown, _context: RequestContext): Promise<StrategyResult> {
+    // Votre logique d'evaluation ici. Retourne la forme gamma de l'AST :
+    // { signals, reasoning, insights, result }.
+    const capturedAt = new Date().toISOString();
+    return {
+      signals:   [{ name: 'evolution', value: 0.5, source: 'computed', capturedAt }],
+      reasoning: [],
+      insights:  [],
+      result:    { evolution: 0.5, confidence: 0.7, method: METHOD_ID },
+    };
   }
 }
 ```
 
-### Etape 2 : C'est tout
+### Etape 2 : Enregistrer dans le registry du framework
 
-Le registre (`src/work-on-evolution/write/strategies/capacity/registry.mts`) decouvre automatiquement tout fichier `*-strategy.mts` dans le dossier. Pas besoin de modifier le registre, le serveur ou les handlers.
+Contrairement à l'ancien système d'auto-découverte, l'enregistrement est **explicite**.
+Ajouter la classe dans le registry concerné :
 
-### Contrat a respecter
+| Framework | Registry |
+|---|---|
+| Évolution (capacity / solution / anchor) | `src/frameworks/wardley/evolution/registry.mts` |
+| Value chain / OWM | `src/frameworks/wardley/chain/registry.mts` |
+| Commun (toolbox, layout) | `src/frameworks/common/registry.mts` |
 
-| Methode | Obligatoire | Description |
-|---|---|---|
-| `static get method()` | Oui | Identifiant unique (string) |
-| `evaluate(component)` | Oui | Retourne `EvolutionResult` |
-
-### EvolutionResult
-
-```javascript
-{
-  evolution: number,    // Position [0-1] ou hors bande
-  confidence: number,   // Score [0-1]
-  method: string,       // Identifiant de la strategie
-  trace: array,         // Etapes de raisonnement (optionnel)
-}
+```typescript
+import { MaStrategy } from './_legacy/write/strategies/capacity/ma-strategy.mjs';
+// ... dans registerEvolutionStrategies(registry) :
+registry.register(MaStrategy.method, MaStrategy);
 ```
 
-### Injection de dependances
+Le boot (`src/core/transport/strategy-registry-boot.mts`) appelle chaque
+`registerXxxStrategies()` au démarrage du daemon.
 
-Si votre strategie a besoin d'un appel LLM, il est injecte via le constructeur ou via les proprietes du composant :
+### Stratégie mock (placeholder I/O)
 
-```javascript
-async evaluate(component) {
-  // L'appel LLM est fourni par l'orchestrateur
-  const llmCall = component.llmCall;
-  if (llmCall) {
-    const response = await llmCall('Mon prompt {{name}}', { name: component.name });
-    // ...
+Pour matérialiser un `methodId` avant son implémentation réelle, créer un fichier
+`*.mock-strategy.mts` et l'enregistrer via `registerMocks` (`src/frameworks/mocks-registry.mts`).
+Les 70 mocks sont désactivables au boot via `LABRE_DISABLE_MOCKS=1`. La promotion d'un mock
+vers une stratégie réelle est suivie en [roadmap.md](../architecture/roadmap.md) (item B4).
+
+```typescript
+// src/frameworks/<...>/default.mock-strategy.mts
+import { BaseStrategy, type StrategyResult } from '#core/ast/base-strategy.mjs';
+import type { RequestContext } from '#core/context/request-context.mjs';
+
+const METHOD_ID = 'common:toolbox:list:emit:default';
+
+export class MockExampleStrategy extends BaseStrategy {
+  static get method(): string { return METHOD_ID; }
+  async evaluate(_input: unknown, _context: RequestContext): Promise<StrategyResult> {
+    const capturedAt = new Date().toISOString();
+    return {
+      signals:   [{ name: 'mock', value: true, source: 'computed', capturedAt }],
+      reasoning: [],
+      insights:  [{ text: `mock strategy for ${METHOD_ID}`, by: METHOD_ID, type: 'other' }],
+      result:    { mock: true, methodId: METHOD_ID },
+    };
   }
 }
 ```
 
 ---
 
-## Ajouter une solution strategy
+## Ajouter une recipe
 
-Meme principe que les capability strategies, mais dans le dossier `src/work-on-evolution/write/strategies/solution/`.
+Une **recipe** orchestre des appels de stratégies par `methodId`. Elle vit dans
+`recipes/<domain>/<tool>/<name>.recipe.json` et suit ce schéma :
 
-### Etape 1 : Creer le fichier
-
-Creer `src/work-on-evolution/write/strategies/solution/ma-strategy.mts` :
-
-```typescript
-import { SolutionBaseStrategy } from './solution-base-strategy.mjs';
-import type { SolutionInput, SolutionEvolutionResult } from '../../../../types/solution.mjs';
-
-export class MaStrategy extends SolutionBaseStrategy {
-  static get method(): string {
-    return 'write:solution:ma-strategy';
-  }
-
-  async evaluate(component: SolutionInput): Promise<SolutionEvolutionResult> {
-    const { name, description } = component;
-
-    // Votre logique d'evaluation ici
-    // Doit retourner un SolutionEvolutionResult
-    return SolutionBaseStrategy.validateSolutionResult({
-      evolution: 0.55,
-      confidence: 0.80,
-      method: MaStrategy.method,
-      properties: [], // detail par propriete (optionnel)
-    });
-  }
-}
-```
-
-### Etape 2 : C'est tout
-
-Le registre (`src/work-on-evolution/write/strategies/solution/registry.mts`) decouvre automatiquement tout fichier `*-strategy.mts` dans le dossier.
-
-### Contrat a respecter
-
-| Methode | Obligatoire | Description |
-|---|---|---|
-| `static get method()` | Oui | Identifiant unique (string) |
-| `evaluate(component)` | Oui | Retourne `SolutionEvolutionResult` |
-
-### SolutionEvolutionResult
-
-Etend `EvolutionResult` avec des champs supplementaires :
-
-```javascript
+```json
 {
-  evolution: number,        // Position [0-1]
-  confidence: number,       // Score [0-1]
-  method: string,           // Identifiant de la strategie
-  properties: array,        // Detail par propriete (optionnel)
-  stage: string,            // Genesis / Custom / Product / Commodity
-  phaseDistribution: object // { 1: n, 2: n, 3: n, 4: n }
+  "schemaVersion": "1.0",
+  "name": "ma-recipe",
+  "domain": "wardley",
+  "tool": "map",
+  "description": "Ce que fait la recipe.",
+  "steps": [
+    {
+      "stepId": "identify",
+      "tool": "wardley:map:node:identify:default",
+      "in": "$.input",
+      "out": "$.identified"
+    },
+    {
+      "stepId": "estimate",
+      "tool": "wardley:map:climate:position-functional-in-evolution:llm-direct",
+      "in": "$.identified.result",
+      "out": "$.estimate"
+    }
+  ],
+  "listeners": []
 }
 ```
+
+Chaque `step.tool` est un `methodId` 5 segments résolu dans le strategy registry au runtime.
+`in` / `out` sont des chemins JSONPath sur l'état partagé de la recipe.
 
 ---
 
@@ -143,7 +134,7 @@ Etend `EvolutionResult` avec des champs supplementaires :
 
 Le flow moderne utilise **Zod comme source de verite unique** — le schema Zod genere a la fois le JSON Schema expose au client MCP, le type TypeScript, et la validation runtime. Plus de duplication entre `inputSchema` literal et fonction `validateInput()` manuelle.
 
-> **Convention obligatoire** : tout handler MCP est automatiquement enveloppe par `withMcpDegradation` au niveau du dispatch (`src/mcp/mcp-server.mts`). En contrepartie, **tout appel a un service externe (LLM, BigQuery, web search, fichier reseau) DOIT passer par `tryDegradeAmbient`** — pas de `try { ... } catch {}` muet. Voir [degradation.md](degradation.md) pour le detail du framework.
+> **Convention obligatoire** : tout handler MCP est automatiquement enveloppe par `withMcpDegradation` au niveau du dispatch. En contrepartie, **tout appel a un service externe (LLM, BigQuery, web search, fichier reseau) DOIT passer par `tryDegradeAmbient`** — pas de `try { ... } catch {}` muet. Voir [degradation.md](degradation.md) pour le detail du framework.
 
 ### Etape 1 : Creer le schema Zod
 
@@ -165,7 +156,7 @@ Les `.describe()` alimentent le champ `description` du JSON Schema genere. `.str
 
 ### Etape 2 : Creer le module tool
 
-Creer `src/mon-outil.mts` :
+Creer `src/mcp/mon-outil.tool.mts` (convention `*.tool.mts`, comme `src/mcp/estimate-evolution.tool.mts`) :
 
 ```typescript
 import { z } from 'zod';
@@ -205,36 +196,28 @@ export async function handleMonOutil(args: Record<string, unknown>): Promise<unk
 }
 ```
 
-> Nouvelle dependance externe ? Enregistrez aussi un health-check au boot dans `src/mcp/boot-health-checks.mts` — voir [degradation.md](degradation.md).
+> Nouvelle dependance externe ? Enregistrez aussi un health-check au boot — voir [degradation.md](degradation.md).
 
-### Etape 3 : Enregistrer dans le serveur
+### Etape 3 : Enregistrer dans le daemon
 
-Modifier `src/mcp/mcp-server.mts` :
-
-```typescript
-import { MON_OUTIL_TOOL, handleMonOutil } from '../mon-outil.mjs';
-
-const REGISTERED_TOOLS: McpToolDefinition[] = [
-  ESTIMATE_EVOLUTION_TOOL,
-  EVALUATE_MAP_TOOL,
-  IDENTIFY_CAPABILITY_TOOL,
-  ESTIMATE_ANCHOR_EVOLUTION_TOOL,
-  MON_OUTIL_TOOL,  // Ajouter ici
-];
-
-const TOOL_HANDLERS: Map<string, ToolHandler> = new Map([
-  // ... existants ...
-  [MON_OUTIL_TOOL.name, handleMonOutil],  // Ajouter ici
-]);
-```
-
-### Etape 4 : Exporter via l'API publique (optionnel)
-
-Si le tool doit etre accessible via l'API programmatique, ajouter dans `src/index.mts` :
+Le câblage d'un outil MCP se fait dans `buildBootRegistry()`, dans
+`src/core/transport/labre-daemon.mts` :
 
 ```typescript
-export { MON_OUTIL_TOOL, handleMonOutil } from './mon-outil.mjs';
+import { MON_OUTIL_TOOL } from '#mcp/mon-outil.tool.mjs';
+
+export function buildBootRegistry(): ToolRegistry {
+  const registry = new ToolRegistry();
+  // ... __ping__, ESTIMATE_EVOLUTION_TOOL ...
+  registry.register(MON_OUTIL_TOOL);  // Ajouter ici
+  return registry;
+}
 ```
+
+Un outil typiquement délègue son traitement à une **recipe** (voir
+[Ajouter une recipe](#ajouter-une-recipe)) plutôt qu'à un handler monolithique. L'élargissement
+de la surface d'outils (au-delà de `__ping__` + `estimateEvolution`) est suivi en
+[roadmap.md](../architecture/roadmap.md) (item B3).
 
 ### Pourquoi Zod plutot qu'un JSON Schema literal
 

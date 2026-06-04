@@ -349,7 +349,7 @@ For the evolution tool specifically, the AST is `WardleyEvolutionAST` (γ form):
 
 **Decision:** `analysisRef` is `{ artifactPath: string; jsonPath?: string } | null`. `artifactPath` resolves to a JSON artefact produced by the artifact-writer listener (relative to the run's artifact dir, or absolute). `jsonPath` is an optional JSONPath into that artefact pointing to the specific node — defaults to `$.result` when omitted. Null means "no detailed analysis produced".
 
-The shared type lives in [`src/core/ast/analysis-ref.mts`](../../src/core/ast/analysis-ref.mts) as `AnalysisRefSchema` and `AnalysisRef`. Any tool that links an annotation to an artefact uses this schema.
+The shared type was specified as `src/core/ast/analysis-ref.mts` (`AnalysisRefSchema` / `AnalysisRef`) — **never written at runtime and removed in the post-v0.1.0 cleanup; see the Status header of ARCH-24 above.** Any tool that links an annotation to an artefact will use this schema once recreated.
 
 **Consequences:** Cross-tool navigation (chain → evolution AST → specific reasoning entry) is type-safe. Future tools (climates, doctrines) reuse the same pointer shape when annotating chain components. Migration is non-breaking because no V1 call site has yet written `analysisRef` at runtime.
 

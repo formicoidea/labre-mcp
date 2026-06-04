@@ -5,21 +5,28 @@ labre-mcp utilise deux pipelines d'evaluation complementaires, selectionnes auto
 - **Capability Strategies** (7 strategies) — pour les capacites abstraites (CRM, container orchestration, data storage)
 - **Solution Strategies** (12 proprietes Wardley) — pour les solutions/produits nommes (Kubernetes, Salesforce, SAP ERP)
 
-Le [routage](architecture.md#detection-solution-vs-capability--pipeline-3-tiers) est transparent : l'utilisateur fournit un nom de composant et le systeme detecte automatiquement le type.
+Le routage est transparent : l'utilisateur fournit un nom de composant et le systeme detecte automatiquement le type. Le fan-out auto/report est decrit dans [`../architecture/recipes.md`](../architecture/recipes.md) (section Auto-fanout).
+
+> **Grammaire des methodId** : tous les identifiants ci-dessous suivent la forme 5 segments `domain:tool:sous-domaine:command:strategie@version`, definie dans [`../architecture/ast-schema.md`](../architecture/ast-schema.md). Le registre / contrat des strategies est documente dans [`../architecture/strategies.md`](../architecture/strategies.md).
+>
+> **Reel vs mock** : 85 strategies sont enregistrees, mais seulement **15 sont reellement implementees** — le reste est du scaffolding `status: mock`. Les strategies reelles sont :
+> `render:wardley-map:owm:parse:dsl`, `render:wardley-map:owm:emit:dsl`, `wardley:map:node:identify:default`, `wardley:map:value-chain:generate:top-down`, `wardley:map:value-chain:prevent-collision:default`, `wardley:map:value-chain:audit:overlap-check`, `wardley:map:climate:position-functional-in-evolution:{s-curve, llm-direct, cpc-evolution, logprob-distribution, publication-analysis, timeline-benchmark}`, `wardley:map:climate:position-solution-in-evolution:property-assessment`, `wardley:map:climate:position-anchor-in-evolution:{culture-phase, default}`.
 
 ---
 
 # Capability Strategies
 
-Les capability strategies evaluent les capacites abstraites via 7 strategies pluggables (s-curve, publication-analysis, timeline-benchmark, llm-direct, logprob-distribution, cpc-evolution, sector-agent). Chaque strategie produit un resultat independant : `{ evolution, confidence, method }`.
+Les capability strategies (famille `wardley:map:climate:position-functional-in-evolution:*`) evaluent les capacites abstraites via 6 strategies pluggables reellement implementees : `s-curve`, `publication-analysis`, `timeline-benchmark`, `llm-direct`, `logprob-distribution`, `cpc-evolution`. Chaque strategie produit un resultat independant : `{ evolution, confidence, method }`.
+
+> `sector-agent` (decrit plus bas pour memoire) fait partie de la surface `mock` et n'est pas dans les 15 strategies reelles.
 
 ## Auto-decouverte
 
-Les strategies sont decouvertes automatiquement au demarrage via `src/work-on-evolution/write/strategies/capacity/registry.mts`. Tout fichier `*-strategy.mts` dans ce dossier est charge et enregistre. Aucune modification du registre n'est necessaire pour ajouter une strategie.
+Les strategies sont decouvertes automatiquement au demarrage via `src/frameworks/wardley/evolution/_legacy/write/strategies/capacity/registry.mts`. Tout fichier `*-strategy.mts` dans ce dossier est charge et enregistre. Aucune modification du registre n'est necessaire pour ajouter une strategie.
 
 ## Interface commune
 
-Chaque strategie etend `BaseStrategy` (`src/work-on-evolution/write/strategies/capacity/base-strategy.mts`) :
+Chaque strategie etend `BaseStrategy` (`src/frameworks/wardley/evolution/_legacy/write/strategies/capacity/base-strategy.mts`) :
 
 ```typescript
 import { BaseStrategy } from './base-strategy.mjs';
@@ -55,7 +62,7 @@ class MaStrategy extends BaseStrategy {
 
 ---
 
-## 1. S-Curve (`write:capacity:s-curve`)
+## 1. S-Curve (`wardley:map:climate:position-functional-in-evolution:s-curve`)
 
 **Principe** : Projette le couple (certitude, ubiquite) sur le modele dual sigmoide pour obtenir une evolution deterministe.
 
@@ -83,11 +90,11 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 **Cas d'usage** : Quand les valeurs de certitude et ubiquite sont connues avec precision.
 
-**Fichiers** : `strategies/s-curve-strategy.mts`, `s-curve.mts`
+**Fichiers** : `strategies/capacity/s-curve-strategy.mts`, `s-curve/s-curve.mts` (tous deux sous `src/frameworks/wardley/evolution/_legacy/write/`)
 
 ---
 
-## 2. Publication Analysis (`write:capacity:publication-analysis`)
+## 2. Publication Analysis (`wardley:map:climate:position-functional-in-evolution:publication-analysis`)
 
 **Principe** : Analyse la distribution des types de publications (wonder/build/operate/usage) pour deduire le stade d'evolution via un centroide pondere.
 
@@ -108,11 +115,11 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 **Fallback** : Si les proportions ne sont pas fournies, appel LLM pour les estimer.
 
-**Fichier** : `strategies/publication-analysis-strategy.mts`
+**Fichier** : `strategies/capacity/publication-analysis-strategy.mts`
 
 ---
 
-## 3. Timeline Benchmark (`write:capacity:timeline-benchmark`)
+## 3. Timeline Benchmark (`wardley:map:climate:position-functional-in-evolution:timeline-benchmark`)
 
 **Principe** : Construit une timeline historique du composant via des appels LLM iteratifs, puis positionne le composant par rapport aux jalons temporels.
 
@@ -126,11 +133,11 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 **Cas d'usage** : Composants avec une histoire connue (technologies, pratiques industrielles).
 
-**Fichier** : `strategies/timeline-benchmark-strategy.mts`
+**Fichier** : `strategies/capacity/timeline-benchmark-strategy.mts`
 
 ---
 
-## 4. LLM Direct (`write:capacity:llm-direct`)
+## 4. LLM Direct (`wardley:map:climate:position-functional-in-evolution:llm-direct`)
 
 **Principe** : Demande directement au LLM d'estimer l'evolution, la certitude et l'ubiquite du composant.
 
@@ -142,11 +149,11 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 **Cas d'usage** : Quand aucune donnee numerique n'est disponible.
 
-**Fichier** : `strategies/llm-direct-strategy.mts`
+**Fichier** : `strategies/capacity/llm-direct-strategy.mts`
 
 ---
 
-## 5. Logprob Distribution (`write:capacity:logprob-distribution`)
+## 5. Logprob Distribution (`wardley:map:climate:position-functional-in-evolution:logprob-distribution`)
 
 **Principe** : Utilise les log-probabilites des tokens du LLM pour analyser la distribution de probabilite sur les 4 stades d'evolution.
 
@@ -164,11 +171,13 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 **Cas d'usage** : Quand on souhaite une mesure d'incertitude basee sur les probabilites du modele.
 
-**Fichier** : `strategies/logprob-distribution-strategy.mts`
+**Fichier** : `strategies/capacity/logprob-distribution-strategy.mts`
 
 ---
 
-## 6. Sector Agent (`sector-agent`)
+## 6. Sector Agent (mock — non implemente)
+
+> Cette strategie ne fait pas partie des 15 strategies reelles. Elle est conservee ici pour memoire conceptuelle. Tant qu'elle n'est pas implementee, elle reste un scaffold `status: mock`.
 
 **Principe** : Agent specialise par secteur industriel qui analyse le composant dans son contexte sectoriel specifique.
 
@@ -195,18 +204,19 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 | timeline-benchmark | name + context | Oui | Non | Richesse timeline | Haute |
 | llm-direct | name + context | Oui | Non | Accord s-curve/LLM | Moyenne |
 | logprob-distribution | name + context | Oui (OpenCode) | Non | Entropie distribution | Moyenne |
-| sector-agent | name + context | Oui | Non | Cross-validation | Haute |
+| cpc-evolution | name + context | Oui (BigQuery brevets) | Non | Couverture brevets | Haute |
+| sector-agent *(mock)* | name + context | Oui | Non | Cross-validation | Haute |
 
 ## Orchestration
 
 Le surface MCP propose deux modes routes :
 
-- **`strategy: "auto"`** (defaut) : le router lit `tool.config.json#estimateEvolution.auto.capability` et execute **une seule** strategie (ex. `write:capacity:llm-direct`). Couteux O(1 appel LLM) — adapte au batch (`evaluateMap`).
-- **`strategy: "report"`** : le router lit `tool.config.json#estimateEvolution.report.capability` et lance **plusieurs** strategies en parallele (`Promise.allSettled` via `evaluateStrategiesInParallel`). Sortie : map keyed by strategy. Adapte a l'analyse approfondie d'un composant unique.
+- **`strategy: "auto"`** (defaut) : le router resout **une seule** strategie par type detecte (ex. `wardley:map:climate:position-functional-in-evolution:llm-direct`). Couteux O(1 appel LLM) — adapte au batch.
+- **`strategy: "report"`** : le router lance **plusieurs** strategies en parallele (`Promise.allSettled` via `evaluateStrategiesInParallel`). Sortie : map keyed by strategy. Adapte a l'analyse approfondie d'un composant unique.
 
-Une `id` specifique (ex. `"write:capacity:s-curve"`) by-pass le routing et execute cette strategie seule — usage expert.
+Un methodId specifique (ex. `"wardley:map:climate:position-functional-in-evolution:s-curve"`) by-pass le routing et execute cette strategie seule — usage expert.
 
-Le `'all'` historique (qui orchestrait phase A enrichment + phase C s-curve) a ete remplace par cette resolution explicite : si tu veux le comportement multi-strategies, utilise `report` et liste les strategies dans `tool.config.json`. Le `'all'` interne reste utilise par `solution-dispatch` pour signifier "lance les 12 proprietes" — c'est un namespace distinct.
+> La configuration du fan-out (quelles strategies pour `auto` vs `report`) est portee par les recipes — voir [`../architecture/recipes.md`](../architecture/recipes.md) (section Auto-fanout). L'ancien `tool.config.json` a ete supprime lors du nettoyage de migration ; les listes de strategies ne sont plus configurees par ce fichier.
 
 ---
 
@@ -232,7 +242,7 @@ Le routage est controle par `WARDLEY_EVAL_MODE` :
 - **`exclusive`** (defaut) : route vers un seul pipeline (solution OU capability)
 - **`parallel`** : route vers les deux pipelines, resultats fusionnes
 
-Voir [architecture.md](architecture.md#detection-solution-vs-capability--pipeline-3-tiers) pour les details du pipeline de detection.
+Voir [`../architecture/strategies.md`](../architecture/strategies.md) (registre + contrat) et [`../architecture/recipes.md`](../architecture/recipes.md) (fan-out) pour les details.
 
 ## Les 12 proprietes d'evolution
 
@@ -253,7 +263,7 @@ Chaque solution est evaluee sur 12 proprietes, chacune classee dans une phase (1
 | 11 | **Efficiency** | Tres basse | En amelioration | Bonne, ROI mesure | Maximale, automatisee |
 | 12 | **Decision driver** | Vision, intuition | Avantage competitif | Feature, TCO, risque | Prix, disponibilite |
 
-Reference complete : `src/solution-strategies/evolution-properties.json`
+Reference complete : `src/frameworks/wardley/evolution/_legacy/write/strategies/solution/evolution-properties.json`
 
 ## Agregation
 
@@ -269,7 +279,7 @@ flowchart LR
 - La phase est convertie en valeur d'evolution via les midpoints
 - La confiance depend du ratio de proprietes evaluees et du mode (auto vs conversationnel)
 
-## Properties Strategy (`write:solution:properties`)
+## Properties Strategy (`wardley:map:climate:position-solution-in-evolution:property-assessment`)
 
 Seule solution strategy actuellement implementee. Supporte deux modes :
 
@@ -288,7 +298,7 @@ Le resultat solution etend `EvolutionResult` avec des champs supplementaires :
 |---|---|---|
 | `evolution` | number [0-1] | Position sur l'axe d'evolution |
 | `confidence` | number [0-1] | Score de confiance |
-| `method` | string | `"write:solution:properties"` |
+| `method` | string | `"wardley:map:climate:position-solution-in-evolution:property-assessment"` |
 | `properties` | array | Detail par propriete (phase, label, confiance) |
 | `stage` | string | Genesis / Custom / Product / Commodity |
 | `meanPhase` | number | Phase moyenne (1-4) |
@@ -297,17 +307,18 @@ Le resultat solution etend `EvolutionResult` avec des champs supplementaires :
 
 ### Auto-decouverte
 
-Les solution strategies suivent le meme pattern que les capability strategies : tout fichier `*-strategy.mts` dans `src/solution-strategies/` est decouvert automatiquement par `solution-strategies/registry.mts`.
+Les solution strategies suivent le meme pattern que les capability strategies : tout fichier `*-strategy.mts` dans `src/frameworks/wardley/evolution/_legacy/write/strategies/solution/` est decouvert automatiquement par le `registry.mts` de ce dossier.
 
 ## Fichiers
 
+Tous sous `src/frameworks/wardley/evolution/_legacy/write/strategies/solution/` :
+
 | Module | Role |
 |---|---|
-| `solution-strategies/registry.mts` | Auto-decouverte et chargement |
-| `solution-strategies/solution-base-strategy.mts` | Classe abstraite (etend `BaseStrategy`) |
-| `solution-strategies/properties-strategy.mts` | Evaluation des 12 proprietes |
-| `solution-strategies/evolution-properties.json` | Reference des 12 proprietes × 4 phases |
-| `solution-strategies/phase-classifier.mts` | Mapping propriete → phase |
-| `solution-strategies/aggregate-properties.mts` | Agregation ponderee en evolution |
-| `solution-strategies/assemble-result.mts` | Enrichissement des resultats |
-| `solution-strategies/solution-evolution-result.mts` | Modele de resultat avec validation |
+| `registry.mts` | Auto-decouverte et chargement |
+| `solution-base-strategy.mts` | Classe abstraite (etend `BaseStrategy`) |
+| `properties-strategy.mts` | Evaluation des 12 proprietes |
+| `evolution-properties.json` | Reference des 12 proprietes × 4 phases |
+| `phase-classifier.mts` | Mapping propriete → phase |
+| `aggregate-properties.mts` | Agregation ponderee en evolution |
+| `solution-evolution-result.mts` | Modele de resultat avec validation |

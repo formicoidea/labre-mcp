@@ -1,46 +1,44 @@
 # Strategies
 
-> Cross-references: [ADR-03](decisions.md#arch-03--strategy-identity-uses-5-segments) (5-segment IDs), [ADR-04](decisions.md#arch-04--four-commands-read-write-quality-emit) (4 commands), [ADR-22](decisions.md#arch-22--strategy-result-format--signals-reasoning-insights-result) (result format).
+> This doc covers the **registry, the BaseStrategy contract, and the StrategyResult shape**.
+> The methodId **grammar** (segments, command vocabulary, version) is owned by the pivot
+> [ast-schema.md](ast-schema.md) — authoritative. See also [ADR-22](decisions.md#arch-22--strategy-result-format--signals-reasoning-insights-result) (result format), [ADR-25](decisions.md).
+> The catalogue of business strategies (real vs mock) lives in [../functional/strategies.md](../functional/strategies.md).
 
 ## Identity
 
-Every strategy in labre-mcp is uniquely identified by a 5-segment methodId:
+Every strategy is identified by the 5-segment methodId defined in [ast-schema.md](ast-schema.md):
 
 ```
-{framework}:{tool}:{command}:{subdomain}:{strategy}[@version]
+domain:tool:sous-domaine:command:strategie[@x.y.z]
 ```
 
-| Segment | Purpose | Examples |
-|---|---|---|
-| `framework` | Practice domain | `wardley`, `cynefin` (future), `common` (cross-framework) |
-| `tool` | Artefact type within a framework | `chain`, `evolution`, `climate` (future), `doctrine` (future), `gameplay` (future), `cycle` (future) |
-| `command` | Direction of the operation | `read` (parse external → AST), `write` (produce AST content), `quality` (validate/score), `emit` (serialise AST → format) |
-| `subdomain` | Part of the AST being acted on | `map`, `component`, `anchor`, `layout`, `dsl`, `cross-step`, … |
-| `strategy` | Named algorithm | `s-curve`, `top-down`, `place-labels`, `overlap-check`, … |
-| `@version` | Optional version tag | `@latest` (implicit default), `@1.2`, `@2.0` |
+Note the order: **sub-domain then command** (segments 3 and 4). The command vocabulary is **open**
+(`generate, parse, emit, audit, identify, estimate, update, …`), not a fixed four-command set
+(ARCH-04 superseded by ARCH-25). `:default` is a canonical strategy at segment 5, never implicit.
 
-**Examples**:
+**Real examples** (registry surface):
 
 ```
-wardley:chain:write:map:top-down               — generate a chain map from NL command
-wardley:chain:read:map:owm-parser              — parse OWM DSL → WardleyChainAST
-wardley:chain:emit:owm:standard                — serialise chain AST → OWM DSL
-wardley:evolution:write:capacity:s-curve       — estimate evolution from certitude+ubiquity
-wardley:evolution:write:capacity:llm-direct    — estimate evolution via direct LLM reasoning
-wardley:evolution:read:component:identify-capability — decode component → underlying capability
-common:layout:write:labels:default             — cross-framework: place labels deterministically
-common:layout:quality:overlaps:default         — cross-framework: detect 2D overlaps
+wardley:map:value-chain:generate:top-down                     — generate a value chain (top-down)
+render:wardley-map:owm:parse:dsl                              — parse OWM DSL → JSON-labre
+render:wardley-map:owm:emit:dsl                               — serialise JSON-labre → OWM DSL
+wardley:map:climate:position-functional-in-evolution:s-curve — evolution from certitude+ubiquity
+wardley:map:climate:position-functional-in-evolution:llm-direct — evolution via direct LLM reasoning
+wardley:map:node:identify:default                            — decode component → underlying capability
+wardley:map:value-chain:prevent-collision:default            — place labels deterministically
+wardley:map:value-chain:audit:overlap-check                  — detect 2D overlaps
 ```
 
 ### Regex shape
 
-Each segment matches `[a-z][a-z0-9-]*` (lowercase letter then lowercase alphanumeric or dash). The full id matches:
+Each segment matches `[a-z][a-z0-9-]*`; the full id (with optional SemVer suffix) matches:
 
 ```
-^[a-z][a-z0-9-]*(:[a-z][a-z0-9-]*){4}$
+^[a-z][a-z0-9-]*(:[a-z][a-z0-9-]*){4}(@\d+\.\d+\.\d+)?$
 ```
 
-Exported as `METHOD_ID_5_SEGMENT_REGEX` and `methodIdSchema` (Zod) from [`src/core/ast/base-strategy.mts`](../../src/core/ast/base-strategy.mts). Every AST schema that stores a methodId reuses this — `EvolutionResult.method`, `EvolutionReasoning.by`, `EvolutionInsight.by`, `EvolutionAnnotation.method`, `EvolutionConsensus.{contributingStrategies, divergence[].strategy}`, `RecipeStep.tool`, `Recipe.listeners[]`. Invalid IDs fail validation before any strategy runs.
+Exported as `methodIdSchema` (Zod) from [`src/core/ast/base-strategy.mts`](../../src/core/ast/base-strategy.mts). Every AST schema that stores a methodId (`RecipeStep.tool`, listener ids, reasoning/insight `by`) reuses it, so invalid IDs fail validation before any strategy runs.
 
 ## Registry
 
@@ -72,25 +70,27 @@ interface StrategyResult<TResult> {
 
 This is the single biggest hygiene change from the previous codebase: where strategies used to return only `{ evolution, confidence, method }`, they now capture the entire reasoning chain so that V2 cross-run analytics has rich material to work with.
 
-## The four commands in practice
+## Command semantics
 
-- **`read`** — turns external input into AST. Examples: OWM parser, component classifier, capability identifier. Their `result` is typically a partial or full AST node.
-- **`write`** — produces or enriches AST content. Includes placement (placing labels is writing layout coordinates). Their `result` mutates or replaces a sub-tree of the AST.
-- **`quality`** — validates, scores, detects cross-step anomalies. Often subscribes to the event bus rather than running as a step. Their `result` is observational (no AST mutation).
-- **`emit`** — serialises an AST to an external format (OWM, Mermaid, SVG, markdown report). Their `result` is typically a string (with attached metadata).
+The command (segment 4) is an **open vocabulary** (ast-schema.md). Common families and the shape of their `result`:
 
-No `update` command exists — updates are composition (read + write + emit), expressed as recipes (see [recipes.md](recipes.md)).
+- **`parse` / `identify`** — turn external input into an AST node (OWM parser, capability identifier).
+- **`generate` / `update`** — produce or enrich AST content. `update` is a valid standalone command (write-gateway `wardley:map:output:update:default`).
+- **`audit`** — validates, scores, detects anomalies. `result` is observational (no AST mutation).
+- **`emit`** — serialises an AST to an external format (OWM, image, markdown). `result` is typically a string with metadata.
+
+Multi-command flows are composition, expressed as recipes (see [recipes.md](recipes.md)).
 
 ## Adding a new strategy
 
-1. Pick the 5-segment methodId.
-2. Create `src/frameworks/<framework>/<tool>/<command>/<subdomain>/<name>-strategy.mts`.
+1. Pick the 5-segment methodId (ast-schema.md grammar).
+2. Create the strategy file. The canonical target layout is `src/frameworks/<domain>/<tool>/<command>/<subdomain>/<name>-strategy.mts`; today the real strategies still live under `…/_legacy/` pending extraction (roadmap B2) — follow the surrounding convention of the framework you extend.
 3. Extend `BaseStrategy<TInput, TResult>` and override `static get method()`.
 4. Implement `evaluate(input, context)` returning `StrategyResult<TResult>`.
-5. Register it in the framework's `register*Strategies(registry)` function (e.g. `src/frameworks/wardley/evolution/registry.mts`).
+5. Register it in the framework's `register*Strategies(registry)` function (e.g. `src/frameworks/wardley/evolution/registry.mts`). For a scaffold, use a `*.mock-strategy.mts` registered via `registerMocks` (see [extending.md](../technical/extending.md)).
 
-Do not omit `signals`, `reasoning`, or `insights` — pass empty arrays if a strategy genuinely has no entries for a category, but capture what is meaningful. The cost is one extra field in the response; the benefit compounds across runs.
+Do not omit `signals`, `reasoning`, or `insights` — pass empty arrays if a strategy genuinely has no entries for a category, but capture what is meaningful.
 
-## Versioning (V1.5+)
+## Versioning
 
-ARCH-20 defers `@vN` versioning. V1 omits the version segment entirely. When the first behaviour-breaking strategy change arises, we introduce `@v1`, `@v2`, with `@latest` resolving to the most recent.
+SemVer `@x.y.z` is adopted from v0.1.0 (per-AST and per-strategy), amending ARCH-20. When omitted on the wire, the latest stable version resolves. See [ast-schema.md § 3.2](ast-schema.md) for the bump/resolution policy.

@@ -1,10 +1,12 @@
-# Demarrage rapide
+# Démarrage rapide
 
-## Prerequisites
+labre-mcp est un serveur **MCP** exposé via un **daemon HTTP** (JSON-RPC 2.0) sur `127.0.0.1:6767`.
 
-- **Node.js** >= 18.0.0 (recommande : 22.x)
-- **pnpm** 10.21.0 (impose par `packageManager` dans package.json)
-- **Cle API OpenCode** (pour le backend kimi-k2.5 et la strategie logprob-distribution)
+## Prérequis
+
+- **Node.js** ≥ 18 (recommandé : 22.x)
+- **pnpm** 10.21.0 (imposé par `packageManager` dans `package.json`)
+- **Clé API OpenCode** — pour le backend kimi-k2.5 et les stratégies LLM (selon `llm.config.json`)
 
 ## Installation
 
@@ -16,126 +18,121 @@ pnpm install
 
 ## Configuration
 
-Creer un fichier `.env` a la racine :
+Créer un fichier `.env` à la racine (voir `.env.example`) :
 
 ```env
-# Cle API OpenCode (obligatoire pour les strategies utilisant kimi-k2.5)
+# Clé API OpenCode (selon les providers activés dans llm.config.json)
 OPENCODE_API_KEY=sk-votre-cle-ici
 
-# Mode verbose — active les messages debug (optionnel)
-# WARDLEY_VERBOSE=1
+# Port du daemon (optionnel, défaut 6767)
+# LABRE_HTTP_PORT=6767
+
+# Ne booter que les 15 stratégies réelles (sans les 70 mocks) (optionnel)
+# LABRE_DISABLE_MOCKS=1
 ```
 
-## Verification
+Copier `llm.config.example.json` vers `llm.config.json` et choisir un profil (voir [configuration.md](technical/configuration.md)).
 
-### Demarrage en dev (via tsx)
+## Démarrer le daemon
 
 ```bash
-pnpm run dev
+pnpm run dev           # tsx src/core/transport/labre-daemon.mts
 ```
 
-Sortie attendue sur stderr :
+Sortie attendue sur **stderr** :
+
 ```
-[labre-mcp] MCP server started. Tools: estimateEvolution, evaluateMap, identifyCapability, estimateAnchorEvolution
+[labre-mcp] HTTP server listening on http://127.0.0.1:6767 (POST /mcp)
+[labre-mcp] Tools registered: __ping__, estimateEvolution
+[labre-mcp] Strategies registered (85):
+  - common:toolbox:list:emit:default
+  - …
 ```
 
-Ctrl+C pour stopper.
+`Ctrl+C` pour stopper. En prod : `pnpm run build && pnpm run mcp:prod` (`node dist/core/transport/labre-daemon.mjs`).
 
-### Build + demarrage en prod (via node dist/)
+## Smoke test (transport — sans LLM, gratuit)
+
+Le daemon doit tourner (terminal séparé). Ces 4 appels valident transport + dispatch sans aucun appel LLM. **Tous vérifiés.**
 
 ```bash
-pnpm run build       # tsc compile src/**/*.mts vers dist/**/*.mjs
-pnpm run mcp:prod    # node dist/mcp/mcp-server.mjs
+# 1. Liveness
+curl http://127.0.0.1:6767/health
+# → {"status":"ok"}
+
+# 2. JSON-RPC ping
+curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"ping"}'
+# → {"jsonrpc":"2.0","id":1,"result":{}}
+
+# 3. Lister les outils exposés
+curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+# → tools: [ __ping__, estimateEvolution ]
+
+# 4. Outil d'écho (chemin tools/call de bout en bout, sans LLM)
+curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"__ping__","arguments":{"message":"hello"}}}'
+# → {"jsonrpc":"2.0","id":3,"result":{"echoed":{"message":"hello"},"daemon":"labre-mcp"}}
 ```
 
-### Test ping du serveur MCP
+> **Windows / PowerShell** : `curl` est un alias de `Invoke-WebRequest`. Préférer `curl.exe`, et échapper les guillemets internes (`\"`) ou passer le corps JSON via un fichier.
+
+## Premier appel métier — `estimateEvolution` (consomme du LLM/quota)
 
 ```bash
-echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | npx tsx --env-file=.env src/mcp/mcp-server.mts
+curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" -d '{
+  "jsonrpc":"2.0","id":4,"method":"tools/call",
+  "params":{
+    "name":"estimateEvolution",
+    "arguments":{
+      "name":"ERP",
+      "context":"Logiciel de gestion intégré pour PME",
+      "certitude":0.9,
+      "ubiquity":0.85,
+      "strategy":"wardley:map:climate:position-functional-in-evolution:s-curve"
+    }
+  }
+}'
 ```
 
-Reponse attendue :
-```json
-{"jsonrpc":"2.0","id":1,"result":{}}
-```
-
-### Lister les outils disponibles
-
-```bash
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | npx tsx --env-file=.env src/mcp/mcp-server.mts
-```
-
-## Premier appel — estimateEvolution
-
-```bash
-printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"test","version":"1.0"}}}
-{"jsonrpc":"2.0","method":"notifications/initialized"}
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"estimateEvolution","arguments":{"name":"ERP","context":"Logiciel de gestion integre pour PME","mode":"oneshot","space":"economic","certitude":0.9,"ubiquity":0.85,"strategy":"write:capacity:s-curve"}}}
-' | npx tsx --env-file=.env src/mcp/mcp-server.mts
-```
+Le paramètre `strategy` accepte `"auto"` (défaut), `"report"`, ou un **methodId 5 segments** précis (grammaire : [ast-schema.md](architecture/ast-schema.md)). La réponse contient `recipeRunId`, l'AST, la trace d'événements et le chemin de l'artefact sous `~/.labre-mcp/runs/`.
 
 ## Utilisation dans Claude Code
 
-Le fichier `.mcp.json` a la racine enregistre le serveur automatiquement :
+`.mcp.json` à la racine enregistre le serveur :
 
 ```json
-{
-  "mcpServers": {
-    "labre-mcp": {
-      "type": "http",
-      "url": "http://127.0.0.1:6767/mcp"
-    }
-  }
-}
+{ "mcpServers": { "labre-mcp": { "type": "http", "url": "http://127.0.0.1:6767/mcp" } } }
 ```
 
-> **Note Windows** : le wrapper `cmd /c` est obligatoire pour que le client MCP puisse invoquer `npx`.
+Le daemon doit tourner (`pnpm run dev`) pour que le client s'y connecte. Les outils apparaissent alors automatiquement.
 
-Quand Claude Code demarre dans ce repertoire, le serveur MCP est disponible et les 4 outils apparaissent automatiquement (`estimateEvolution`, `evaluateMap`, `identifyCapability`, `estimateAnchorEvolution`).
-
-### Activer les notifications dans le chat
-
-Pour voir les messages de progression en temps reel dans le chat Claude Code, lancez avec le flag channels :
+### Notifications dans le chat
 
 ```bash
 claude --dangerously-load-development-channels server:labre-mcp
 ```
 
-Voir [Notifications](notifications.md) pour plus de details.
+Voir [notifications.md](functional/notifications.md).
+
+## Surface actuelle
+
+| | |
+|---|---|
+| Outils MCP câblés | `estimateEvolution` + `__ping__` (les autres flux existent en recipes, pas encore exposés — [roadmap.md](architecture/roadmap.md) B3) |
+| Stratégies | 85 enregistrées : 15 réelles + 70 mocks |
 
 ## Scripts npm
 
 | Script | Commande | Description |
 |---|---|---|
-| `dev` | `pnpm run dev` | Demarre le serveur MCP en dev (tsx, hot-reload des .mts) |
-| `mcp` | `pnpm run mcp` | Alias de `dev` |
-| `build` | `pnpm run build` | Compile `src/**/*.mts` vers `dist/**/*.mjs` via tsc |
-| `mcp:prod` | `pnpm run mcp:prod` | Lance le bundle compile (`node dist/mcp/mcp-server.mjs`) |
-| `typecheck` | `pnpm run typecheck` | Verification TS stricte sans emission de code |
-| `test` | `pnpm test` | Suite de tests unitaires (`tsx --test src/**/*.test.mts`) |
+| `dev` / `mcp` | `tsx src/core/transport/labre-daemon.mts` | Démarre le daemon HTTP (dev, hot des `.mts`) |
+| `build` | `tsc` | Compile `src/**/*.mts` → `dist/**/*.mjs` |
+| `mcp:prod` | `node dist/core/transport/labre-daemon.mjs` | Lance le bundle compilé |
+| `typecheck` | `tsc --noEmit` | Vérification TS stricte |
+| `test` | `tsx --test "src/**/*.test.mts"` | Tests (⚠️ certains appellent un vrai LLM — voir [AGENT.md](../AGENT.md) hard rule #9) |
 
 ## Structure du projet
 
-Voir [REPOTREEMAP.md](REPOTREEMAP.md) pour la cartographie complete. Aperçu :
-
-```
-labre-mcp/
-├── src/
-│   ├── index.mts                        # API programmatique (re-exports)
-│   ├── mcp/                             # Couche MCP (transport JSON-RPC)
-│   ├── schemas/                         # Schemas Zod (source de verite)
-│   ├── types/                           # Re-exports des types inferes
-│   ├── lib/                             # Utilitaires transverses (llm, patent, …)
-│   ├── session/                         # Sessions conversationnelles (mode conversational)
-│   ├── work-on-evolution/               # Outils d'evolution (estimateEvolution, evaluateMap, anchor)
-│   │   ├── strategies/capacity/         # 7 strategies capability pluggables
-│   │   └── strategies/solution/         # Strategies solution (12-property)
-│   └── work-on-value-chain/             # Outils chaîne de valeur (generate, identify)
-├── maps/myMaps/                         # Cartes .wm generees
-├── .claude/skills/                      # Skills Claude Code
-├── .mcp.json                            # Enregistrement serveur MCP
-├── .env                                 # Cles API
-├── tsconfig.json                        # TypeScript strict: true
-├── package.json
-└── promptfooconfig.yaml                 # Configuration d'evaluation
-```
+Voir [tree-map.md](technical/tree-map.md) pour la cartographie complète de `src/`.

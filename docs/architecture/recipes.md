@@ -11,11 +11,11 @@ A recipe is a declarative, quasi-linear DAG of strategy invocations operating on
   "schemaVersion": "1.0",
   "name": "evaluate-map",
   "domain": "wardley",
-  "tool": "evolution",
+  "tool": "map",
   "description": "...",
   "steps": [
-    { "stepId": "parse-map", "tool": "wardley:chain:read:map:owm-parser", "in": "$.input", "out": "$.chain" },
-    { "stepId": "estimate-all", "tool": "wardley:evolution:write:capacity:llm-direct", "over": "$.chain.result.components", "out": "$.evaluations" }
+    { "stepId": "parse-map", "tool": "render:wardley-map:owm:parse:dsl", "in": "$.input", "out": "$.chain" },
+    { "stepId": "estimate-all", "tool": "wardley:map:climate:position-functional-in-evolution:llm-direct", "over": "$.chain.result.components", "out": "$.evaluations" }
   ],
   "listeners": []
 }
