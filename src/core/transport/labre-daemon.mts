@@ -8,15 +8,12 @@
 import { fileURLToPath } from "node:url";
 import { ToolRegistry } from "./mcp-handler.mjs";
 import { startHttpServer } from "./http-server.mjs";
-import { StrategyRegistry } from "../registry/strategy-registry.mjs";
-import type { BaseStrategy } from "../ast/base-strategy.mjs";
-import { registerEvolutionStrategies } from "#frameworks/wardley/evolution/registry.mjs";
-import { registerChainStrategies } from "#frameworks/wardley/chain/registry.mjs";
-import { registerCommonStrategies } from "#frameworks/common/registry.mjs";
-import { registerMocks } from "#frameworks/mocks-registry.mjs";
-import { handleEstimateEvolutionViaRecipe } from "#mcp/estimate-evolution-via-recipe.mjs";
-import { EstimateEvolutionInputSchema } from "#schemas/estimate-evolution.schema.mjs";
-import { z } from "zod";
+import { ESTIMATE_EVOLUTION_TOOL } from "#mcp/estimate-evolution.tool.mjs";
+
+// Re-export so existing callers (tests, downstream tooling) can keep
+// importing `buildStrategyRegistry` from this module without churn.
+export { buildStrategyRegistry } from "./strategy-registry-boot.mjs";
+import { buildStrategyRegistry } from "./strategy-registry-boot.mjs";
 
 const DEFAULT_PORT = 6767;
 
@@ -44,42 +41,7 @@ export function buildBootRegistry(): ToolRegistry {
       return { echoed: args, daemon: "labre-mcp" };
     },
   });
-  registry.register({
-    name: "estimateEvolution",
-    description:
-      "Estimate the Wardley Map evolution position of a component via the recipe runner. " +
-      "Dispatches through the canonical estimate-component recipe (read:component:identify-capability → write:capacity:llm-direct). " +
-      "Returns recipeRunId, the AST, the events trace, and the artifact path under ~/.labre-mcp/runs/.",
-    // any: zod-to-json conversion — the schema is well-typed at the Zod layer
-    inputSchema: z.toJSONSchema(EstimateEvolutionInputSchema, { io: "input" }) as Record<string, unknown>,
-    async handler(args, context) {
-      // any: args is the open MCP arguments envelope; the handler validates internally
-      return handleEstimateEvolutionViaRecipe({
-        ...(args as Record<string, unknown>),
-        _context: context,
-      });
-    },
-  });
-  return registry;
-}
-
-/**
- * Build the strategy registry by importing every framework's register function.
- * Each framework module side-effects-imports its strategy classes at load time;
- * the register function wires them into the shared registry. Idempotent (throws
- * on duplicate methodId — catches accidental double-boot).
- */
-export function buildStrategyRegistry(): StrategyRegistry<BaseStrategy> {
-  const registry = new StrategyRegistry<BaseStrategy>();
-  registerEvolutionStrategies(registry);
-  registerChainStrategies(registry);
-  registerCommonStrategies(registry);
-  // Mocks (CP10) scaffold the rest of the v0.1.0 catalogue. Set
-  // LABRE_DISABLE_MOCKS=1 to skip — useful for prod runs where only real
-  // strategies should be exposed.
-  if (process.env.LABRE_DISABLE_MOCKS !== "1") {
-    registerMocks(registry);
-  }
+  registry.register(ESTIMATE_EVOLUTION_TOOL);
   return registry;
 }
 

@@ -22,7 +22,7 @@ import { dirname, resolve } from 'node:path';
 import { EstimateEvolutionInputSchema } from '../schemas/estimate-evolution.schema.mjs';
 import { loadRecipe } from '#core/recipe/recipe-loader.mjs';
 import { runRecipe } from '#core/recipe/recipe-runner.mjs';
-import { buildStrategyRegistry } from '#core/transport/labre-daemon.mjs';
+import { buildStrategyRegistry } from '#core/transport/strategy-registry-boot.mjs';
 import { attachArtifactWriter } from '#core/listeners/artifact-writer-listener.mjs';
 import { createEventBus } from '#core/bus/event-bus.mjs';
 import { resolveProjectId } from '#core/persistence/project-id-resolver.mjs';
