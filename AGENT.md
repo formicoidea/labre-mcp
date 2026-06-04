@@ -2,7 +2,7 @@
 
 labre-mcp is an MCP (Model Context Protocol) server that helps the user apply practice frameworks — Wardley Maps first, climates / doctrines / gameplays / cycle next. The targeted horizon for the Wardley framework is the full strategic study cycle (9 phases: prompt → chain → evolution → climates → invest → doctrine → orientation → strategy → close). The server exposes MCP tools backed by a pluggable registry of strategies orchestrated by the kernel recipe runner.
 
-> **V1 status — kernel posed, post-audit refactor in progress.** Architectural decisions are recorded as ADRs in [docs/architecture/decisions.md](/labre-mcp/docs/architecture/decisions.md) (ARCH-01 to ARCH-25). Strategy classes for Wardley currently live under `src/frameworks/wardley/{chain,evolution}/_legacy/` per ARCH-23 (in-place migration). Physical extraction to the canonical `<tool>/<command>/<subdomain>/` layout is scheduled for V1.5 cleanup. Until then, both the new core `StrategyRegistry` and the legacy `loadStrategies()` filesystem walker resolve to the same classes. The repository directory will eventually be renamed `labre-mcp` (the npm package name and `.mcp.json` server name are already aligned). **Current surface:** the daemon wires **1 business MCP tool** (`estimateEvolution`) + `__ping__`, and registers **85 strategies (15 real / 70 mock)**. The full gap to the target is tracked in [roadmap.md](/labre-mcp/docs/architecture/roadmap.md).
+> **V1 status — kernel posed, post-audit refactor in progress.** Architectural decisions are recorded as ADRs in [docs/architecture/decisions.md](/labre-mcp/docs/architecture/decisions.md) (ARCH-01 to ARCH-25). Strategy classes for Wardley currently live under `src/frameworks/wardley/{chain,evolution}/_legacy/` per ARCH-23 (in-place migration). Physical extraction to the canonical `<tool>/<command>/<subdomain>/` layout is scheduled for V1.5 cleanup. Until then, both the new core `StrategyRegistry` and the legacy `loadStrategies()` filesystem walker resolve to the same classes. The repository directory will eventually be renamed `labre-mcp` (the npm package name and `.mcp.json` server name are already aligned). **Current surface:** the daemon wires **3 MCP tools** — `estimateEvolution`, `runCommand` (direct invocation of any 5-segment methodId → `CommandResult` + JSON-labre envelope), and `__ping__` — and registers **85 strategies (15 real / 70 mock)**. The full gap to the target is tracked in [roadmap.md](/labre-mcp/docs/architecture/roadmap.md).
 
 
 # Architecture
@@ -111,6 +111,7 @@ labre-mcp/
 27. Recipes are not parameterisable — behavioural variation comes from listener strategies attached to the same recipe
 28. Recipes follow shipped + user override pattern: `<repo>/recipes/<framework>/<tool>/<name>.recipe.json` + `<projectRoot>/recipes/...`. User wins by name; no field-level merge
 29. The only control-flow primitive in recipes is `over: $.path` (auto-fanout). No `if`, no `loop`. If you need control flow, write a strategy
+29b. A recipe must orchestrate **≥ 2 commands** (or 1 command + a value-adding `listeners[]`). A single command is invoked directly via the generic `runCommand` MCP tool — it returns the same JSON-labre envelope. Never ship a single-step recipe with no listener.
 
 ## Event bus (ARCH-10)
 

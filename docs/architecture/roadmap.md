@@ -6,7 +6,7 @@
 
 ## État courant en une ligne
 
-Daemon HTTP `src/core/transport/labre-daemon.mts` (:6767) — **1 outil MCP métier câblé** (`estimateEvolution`) + `__ping__` — **85 stratégies** enregistrées dont **15 réelles** et **70 mocks** — kernel sous `src/core/`, utilitaires encore sous `src/lib/`, stratégies réelles encore sous `_legacy/`.
+Daemon HTTP `src/core/transport/labre-daemon.mts` (:6767) — **3 outils MCP câblés** (`estimateEvolution`, `runCommand`, `__ping__`) — **85 stratégies** enregistrées dont **15 réelles** et **70 mocks** — kernel sous `src/core/`, utilitaires encore sous `src/lib/`, stratégies réelles encore sous `_legacy/`.
 
 ## Chantiers (Famille B)
 
@@ -41,9 +41,9 @@ Daemon HTTP `src/core/transport/labre-daemon.mts` (:6767) — **1 outil MCP mét
 
 ### B6 — Préoccupations transverses déclarées mais non câblées
 
-Le framework existe sous `src/lib/`, mais aucun appelant ne l'active dans le chemin de dispatch du daemon — alors qu'AGENT.md les pose comme invariants :
+Le framework existe sous `src/lib/`, mais n'est pas encore activé sur tout le chemin de dispatch du daemon — alors qu'AGENT.md les pose comme invariants :
 
-- **Dégradation** (hard rule #18) : `withMcpDegradation` / `tryDegradeAmbient` (`src/lib/degradation/`) n'ont aucun appelant de production ; `mcp-handler.dispatch` n'enveloppe pas les handlers. **Action** : envelopper le dispatch et les appels externes.
+- **Dégradation** (hard rule #18) — _progrès partiel_ : le handler `runCommand` (`src/mcp/run-command.tool.mts`) est le **premier appelant de production** de `withMcpDegradation`. **Reste** : envelopper le dispatch générique (`mcp-handler.dispatch`) + le handler `estimateEvolution`, et router les appels externes via `tryDegradeAmbient`.
 - **Health-checks au boot** : `registerHealthCheck` n'a aucun appelant de production (pas de `boot-health-checks`). **Action** : enregistrer les health-checks (bigquery, llm:*, web-search) au boot du daemon.
 - **Capability `claude/channel`** : `SERVER_CAPABILITIES` ne déclare que `{ tools: {} }` ; les notifications channel (`src/lib/mcp-notifications.mts`) ne sont pas annoncées dans `initialize`. **Action** : déclarer la capability si les notifications chat doivent être visibles côté client.
 

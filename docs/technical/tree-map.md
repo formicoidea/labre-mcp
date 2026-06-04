@@ -11,7 +11,7 @@
 
 | Élément | État |
 |---|---|
-| Outils MCP câblés | `estimateEvolution` (métier) + `__ping__` (smoke). Les autres flux existent en recipes/stratégies, non exposés comme outils — roadmap B3. |
+| Outils MCP câblés | `estimateEvolution` (recette `estimate-component`), `runCommand` (invocation directe de n'importe quel methodId), `__ping__` (smoke). Recettes multi-étapes restantes (evaluateMap, generateValueChain) non encore exposées — roadmap B3. |
 | Stratégies enregistrées | 85 au boot : **15 réelles** + **70 mocks** (`LABRE_DISABLE_MOCKS=1` isole les réelles). Liste des réelles : [ast-schema.md → « État d'implémentation »](../architecture/ast-schema.md). |
 
 ## 2. Points d'entrée

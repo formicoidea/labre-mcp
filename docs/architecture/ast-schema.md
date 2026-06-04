@@ -81,6 +81,7 @@ L'AST de labre-mcp est une **grammaire à 5 segments** (plus un suffixe de versi
     ```
     
     Retourne tous les methodId dont l'identifiant commence par `prefix`. Permet l'introspection à n'importe quelle granularité (`wardley:`, `wardley:map:`, `wardley:map:value-chain:`, …) sans polluer la grammaire d'exécution avec des tokens spéciaux.
+- **Invocation directe** : un methodId découvert se lance directement (sans recette) via l'outil MCP **`runCommand`** — `{ command: "<methodId>", input: {…} }` → `CommandResult` portant l'enveloppe JSON-labre. Les recettes restent réservées à l'orchestration de **plusieurs** commandes. Voir [tools-reference](../functional/tools-reference.md).
 - **Version** : `@x.y.z` SemVer triplet. Si omis, la dernière version stable est résolue. Versionning per-AST **et** per-strategy (cf. § 3.2).
 - **Alias inter-domaines** : **interdits en v0.1.0**. Les passerelles passent explicitement par `common`.
 - **Round-trip OWM** : `parse → emit` idempotent à l'octet près sans transformation interposée. **Objectif v0.1.0** plus que invariant figé — toute violation est suivie comme un bug bloquant en § 3.2 gouvernance.
@@ -131,7 +132,7 @@ Listing **canonique** des commandes spécifiées en v0.1.0. La spécification co
 | `wardley:map:climate:position-anchor-in-evolution:culture-phase` | Position évolution d'une ancre |
 | `wardley:map:climate:position-anchor-in-evolution:default` | Alias de `:culture-phase` |
 
-Toute autre commande des § 1.2 / § 2 est aujourd'hui `status: mock`. La surface MCP réellement exposée comme **outils** se limite par ailleurs à `estimateEvolution` (+ `__ping__`) — voir [roadmap.md](roadmap.md) B3.
+Toute autre commande des § 1.2 / § 2 est aujourd'hui `status: mock`. Côté **outils** MCP, la surface câblée est `estimateEvolution`, `runCommand` (invocation directe de n'importe quel methodId, réel ou mock) et `__ping__` — voir [roadmap.md](roadmap.md) B3.
 
 ### Domaine `common` (transverse)
 
@@ -363,6 +364,8 @@ Chaque commande des § 2.1 à 2.3 suit **rigoureusement** ce patron. C'est un in
 ### JSON Schema racine commun
 
 Toutes les commandes héritent d'une enveloppe d'appel et de réponse standardisée.
+
+> **Implémenté.** Ces enveloppes existent en Zod : `CommandCallSchema` / `CommandResultSchema` dans [`src/schemas/command.schema.mts`](../../src/schemas/command.schema.mts), validées à l'appel et exposées par l'outil MCP `runCommand` (la réponse MCP est en plus enveloppée dans `Degradable<T>`).
 
 - JSON Schema — enveloppe d'appel `CommandCall`
     

@@ -79,7 +79,7 @@ The command (segment 4) is an **open vocabulary** (ast-schema.md). Common famili
 - **`audit`** — validates, scores, detects anomalies. `result` is observational (no AST mutation).
 - **`emit`** — serialises an AST to an external format (OWM, image, markdown). `result` is typically a string with metadata.
 
-Multi-command flows are composition, expressed as recipes (see [recipes.md](recipes.md)).
+Multi-command flows are composition, expressed as recipes (see [recipes.md](recipes.md)). A **single** strategy is invoked directly by methodId via the `runCommand` MCP tool (it runs the command as a degenerate 1-step recipe and returns a `CommandResult` with the JSON-labre envelope) — no recipe needed. See [tools-reference.md](../functional/tools-reference.md#runcommand).
 
 ## Adding a new strategy
 

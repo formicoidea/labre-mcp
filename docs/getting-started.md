@@ -68,7 +68,7 @@ curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" \
 # 3. Lister les outils exposés
 curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
-# → tools: [ __ping__, estimateEvolution ]
+# → tools: [ __ping__, estimateEvolution, runCommand ]
 
 # 4. Outil d'écho (chemin tools/call de bout en bout, sans LLM)
 curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" \
@@ -98,6 +98,25 @@ curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" -d '{
 
 Le paramètre `strategy` accepte `"auto"` (défaut), `"report"`, ou un **methodId 5 segments** précis (grammaire : [ast-schema.md](architecture/ast-schema.md)). La réponse contient `recipeRunId`, l'AST, la trace d'événements et le chemin de l'artefact sous `~/.labre-mcp/runs/`.
 
+## Appel direct d'une commande — `runCommand`
+
+`runCommand` invoque **n'importe quel methodId** directement (sans recette) et renvoie un `CommandResult` (sortie + enveloppe JSON-labre). L'exemple ci-dessous (`render:wardley-map:owm:parse:dsl`) est déterministe, **sans LLM** :
+
+```bash
+curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" -d '{
+  "jsonrpc":"2.0","id":5,"method":"tools/call",
+  "params":{
+    "name":"runCommand",
+    "arguments":{
+      "command":"render:wardley-map:owm:parse:dsl",
+      "input":{"dsl":"title Demo\ncomponent Foo [0.5, 0.5]"}
+    }
+  }
+}'
+```
+
+> La réponse MCP est enveloppée dans `Degradable<T>` : le `CommandResult` se lit sous **`result.result`** (`{ status, output, envelope, metadata }`). Un methodId inconnu renvoie `status: "error"`. Voir [tools-reference](functional/tools-reference.md#runcommand).
+
 ## Utilisation dans Claude Code
 
 `.mcp.json` à la racine enregistre le serveur :
@@ -120,7 +139,7 @@ Voir [notifications.md](functional/notifications.md).
 
 | | |
 |---|---|
-| Outils MCP câblés | `estimateEvolution` + `__ping__` (les autres flux existent en recipes, pas encore exposés — [roadmap.md](architecture/roadmap.md) B3) |
+| Outils MCP câblés | `estimateEvolution`, `runCommand` (invocation directe de n'importe quel methodId), `__ping__`. Recettes multi-étapes restantes non encore exposées — [roadmap.md](architecture/roadmap.md) B3 |
 | Stratégies | 85 enregistrées : 15 réelles + 70 mocks |
 
 ## Scripts npm

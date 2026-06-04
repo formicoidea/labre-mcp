@@ -200,6 +200,8 @@ export async function handleMonOutil(args: Record<string, unknown>): Promise<unk
 
 ### Etape 3 : Enregistrer dans le daemon
 
+> La plupart des stratégies n'ont **pas besoin** d'un outil MCP dédié : elles sont déjà invocables par methodId via l'outil générique `runCommand`. Ne créez un outil dédié que pour un flux à API propre (paramètres spécifiques, recette multi-étapes).
+
 Le câblage d'un outil MCP se fait dans `buildBootRegistry()`, dans
 `src/core/transport/labre-daemon.mts` :
 
@@ -208,7 +210,7 @@ import { MON_OUTIL_TOOL } from '#mcp/mon-outil.tool.mjs';
 
 export function buildBootRegistry(): ToolRegistry {
   const registry = new ToolRegistry();
-  // ... __ping__, ESTIMATE_EVOLUTION_TOOL ...
+  // ... __ping__, ESTIMATE_EVOLUTION_TOOL, RUN_COMMAND_TOOL ...
   registry.register(MON_OUTIL_TOOL);  // Ajouter ici
   return registry;
 }

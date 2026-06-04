@@ -42,8 +42,9 @@ The `/mcp` endpoint accepts these MCP methods:
 The canonical entrypoint is the HTTP daemon in [`src/core/transport/labre-daemon.mts`](../../src/core/transport/labre-daemon.mts), launched by `pnpm mcp` (dev) or `pnpm mcp:prod` (post-`pnpm build`). The daemon:
 
 1. Builds the strategy registry via `buildStrategyRegistry()`.
-2. Boots the HTTP server on `LABRE_HTTP_PORT` (default `6767`).
-3. Logs the registered tool list and the strategy methodIds.
+2. Builds the MCP tool registry via `buildBootRegistry()` — three tools: `__ping__` (smoke), `estimateEvolution` (recipe `estimate-component`), and `runCommand` (generic direct invocation of any 5-segment methodId → `CommandResult`).
+3. Boots the HTTP server on `LABRE_HTTP_PORT` (default `6767`).
+4. Logs the registered tool list and the strategy methodIds.
 
 The `.mcp.json` at the repo root declares the labre-mcp server with HTTP transport (`"type": "http"`, `"url": "http://127.0.0.1:6767/mcp"`), so Claude Code connects to the running daemon rather than spawning a fresh stdio server. There is no stdio entrypoint: the old `src/mcp/mcp-server.mts` was removed during the migration.
 

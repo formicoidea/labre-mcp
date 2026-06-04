@@ -29,7 +29,7 @@ Tout est expose via `src/lib/degradation/index.mts` :
 
 ## Convention obligatoire
 
-**Tout nouveau handler d'outil MCP DOIT etre dispatche via `withMcpDegradation`** a la couche dispatch du daemon (`src/core/transport/`) — vous n'avez rien a wrapper vous-meme dans le handler. Mais :
+**Tout handler d'outil MCP DOIT envelopper son corps dans `withMcpDegradation`** (le dispatch du daemon n'enveloppe pas encore automatiquement — roadmap B6). Le **handler `runCommand`** (`src/mcp/run-command.tool.mts`) est le **premier appelant de production** et sert d'implementation de reference : sa reponse est un `Degradable<CommandResult>` (`{ result, degraded, degradationEvents }`). Par ailleurs :
 
 - Tout appel a un service externe (LLM, BigQuery, web search, fichier reseau) DOIT passer par `tryDegradeAmbient` (pas de `try { ... } catch {}` muet).
 - Toute nouvelle dependance externe DOIT enregistrer un health-check au boot via `registerHealthCheck` (API exposee par `src/lib/degradation/index.mts`).

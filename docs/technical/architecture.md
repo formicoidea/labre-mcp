@@ -15,9 +15,11 @@ qui écoute sur `127.0.0.1:6767`. Le protocole applicatif est JSON-RPC 2.0 sur `
 
 Au boot, le daemon construit deux registres :
 
-- **Registre d'outils MCP** (`buildBootRegistry()` dans `labre-daemon.mts`) — actuellement
-  `__ping__` (smoke) + `estimateEvolution`. L'élargissement de cette surface (evaluateMap,
-  identifyCapability, generateValueChain, …) est suivi en [roadmap.md](../architecture/roadmap.md) (item B3).
+- **Registre d'outils MCP** (`buildBootRegistry()` dans `labre-daemon.mts`) — 3 outils :
+  `__ping__` (smoke), `estimateEvolution` (recette `estimate-component`), et `runCommand`
+  (invocation directe de n'importe quel methodId → `CommandResult` + enveloppe). Le câblage des
+  recettes multi-étapes restantes (evaluateMap, generateValueChain) est suivi en
+  [roadmap.md](../architecture/roadmap.md) (item B3).
 - **Registre de stratégies** (`src/core/transport/strategy-registry-boot.mts`) — 85 stratégies
   au boot : 15 réelles + 70 mocks. `LABRE_DISABLE_MOCKS=1` ne charge que les 15 réelles.
 
@@ -48,9 +50,10 @@ flowchart TD
 
 Le framework de dégradation existe sous `src/lib/degradation/` : `withMcpDegradation`
 (wrapper de handler établissant un `DegradationCollector` par invocation via AsyncLocalStorage)
-et `tryDegradeAmbient` (appels externes BigQuery / LLM / web search). C'est l'**invariant visé**
-(AGENT.md hard rule #18). **État actuel** : ce wrapper n'a pas encore d'appelant dans le chemin
-de dispatch du daemon (`mcp-handler.dispatch`) — son câblage est suivi en
+et `tryDegradeAmbient` (appels externes BigQuery / LLM / web search), invariant posé par AGENT.md
+hard rule #18. **État actuel** : le handler **`runCommand`** (`src/mcp/run-command.tool.mts`) est le
+premier appelant de production — sa réponse est un `Degradable<CommandResult>`. Le **dispatch
+générique** (`mcp-handler.dispatch`) et `estimateEvolution` ne sont pas encore enveloppés — suivi en
 [roadmap.md](../architecture/roadmap.md) (item B6). Voir [degradation.md](degradation.md) pour le framework.
 
 ## Parallélisation des appels indépendants
