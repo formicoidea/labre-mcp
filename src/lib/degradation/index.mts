@@ -1,3 +1,10 @@
+// fallow-ignore-file unused-export
+// fallow-ignore-file unused-types
+// This barrel is the documented public API of the degradation framework
+// (mémoire feedback_mcp_degradable.md). Symbols are exposed even when
+// internal callers reach the sub-modules directly — keep the surface
+// stable so external consumers depend on a single entry point.
+//
 // Public surface of the degradation framework.
 //
 // Importers should reach for this barrel rather than the individual files,

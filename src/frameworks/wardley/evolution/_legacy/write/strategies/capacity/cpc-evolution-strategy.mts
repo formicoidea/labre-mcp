@@ -209,7 +209,7 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    * @param {Object} [options]
    * @param {function(string): Promise<string>} [options.llmCall]
    *   Async LLM call for CPC mapper (falls back to hardcoded mappings if absent).
-   * @param {import('../../../lib/patent/patent-data-source.mjs').PatentDataSource} [options.patentSource]
+   * @param {import('#lib/patent/patent-data-source.mjs').PatentDataSource} [options.patentSource]
    *   Patent data source (defaults to BigQueryPatentSource from env vars).
    * @param {import('../../patent/cpc-mapper.mjs').CpcMapper} [options.cpcMapper]
    *   CPC code mapper (defaults to LLM-assisted + hardcoded fallback).

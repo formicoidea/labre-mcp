@@ -54,20 +54,18 @@ export {
 
 import { buildAllQueries } from './bigquery-query-builders.mjs';
 import { toErrorMessage, errorCode } from '../errors.mjs';
-
-// ─── Constants ──────────────────────────────────────────────────────────────
-
-/** Default minimum filing year — limits scan size and cost. */
-export const DEFAULT_MIN_YEAR = 2000;
-
-/** Maximum patent families to scan per query (cost control). */
-export const DEFAULT_MAX_PATENTS = 100_000;
-
-/**
- * Patent term in years (US post-1995 = 20 years from filing).
- * Used by the expiration query to classify expired vs active patents.
- */
-export const PATENT_TERM_YEARS = 20;
+import {
+  DEFAULT_MIN_YEAR,
+  DEFAULT_MAX_PATENTS,
+  PATENT_TERM_YEARS,
+} from './bigquery-patent-constants.mjs';
+// Re-export the shared constants so existing call sites keep their
+// `from '.../bigquery-patent-source.mjs'` imports working.
+export {
+  DEFAULT_MIN_YEAR,
+  DEFAULT_MAX_PATENTS,
+  PATENT_TERM_YEARS,
+};
 
 // ─── Retry configuration ───────────────────────────────────────────────────
 

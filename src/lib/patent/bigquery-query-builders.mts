@@ -17,7 +17,7 @@ import {
   DEFAULT_MIN_YEAR,
   DEFAULT_MAX_PATENTS,
   PATENT_TERM_YEARS,
-} from './bigquery-patent-source.mjs';
+} from './bigquery-patent-constants.mjs';
 
 // ─── Query context typedef ──────────────────────────────────────────────────
 

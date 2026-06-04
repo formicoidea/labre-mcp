@@ -1,3 +1,9 @@
+// fallow-ignore-file unused-export
+// The OWM DSL kit is intentionally over-published as a complete emit-helper
+// surface; future emit strategies will pick the subset they need. Trim with
+// care — these are reference primitives consumed in stages (emit-owm now,
+// climate/doctrine emitters later).
+//
 // Shared catalog of OWM (onlinewardleymaps.com) DSL commands.
 //
 // Single source of truth for emitting OWM syntax across the codebase.
