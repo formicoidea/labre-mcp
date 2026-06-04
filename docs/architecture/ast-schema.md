@@ -1397,7 +1397,7 @@ Chaque strategy publie un objet de métadonnées au moment de son enregistrement
   "properties": {
     "id":                  { "type": "string", "pattern": "^[a-z][a-z0-9-]*(:[a-z][a-z0-9-]*){4}$" },
     "version":             { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
-    "status":              { "enum": ["experimental", "stable", "deprecated", "removed"] },
+    "status":              { "enum": ["experimental", "stable", "deprecated", "removed", "mock"] },
     "costClass":           { "enum": ["cheap", "standard", "expensive"] },
     "confidenceBaseline":  { "type": "number", "minimum": 0, "maximum": 1 },
     "latencyClass":        { "enum": ["sub-second", "seconds", "tens-of-seconds", "minutes"] },

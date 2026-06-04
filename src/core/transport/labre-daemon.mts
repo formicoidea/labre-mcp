@@ -13,6 +13,7 @@ import type { BaseStrategy } from "../ast/base-strategy.mjs";
 import { registerEvolutionStrategies } from "#frameworks/wardley/evolution/registry.mjs";
 import { registerChainStrategies } from "#frameworks/wardley/chain/registry.mjs";
 import { registerCommonStrategies } from "#frameworks/common/registry.mjs";
+import { registerMocks } from "#frameworks/mocks-registry.mjs";
 import { handleEstimateEvolutionViaRecipe } from "#mcp/estimate-evolution-via-recipe.mjs";
 import { EstimateEvolutionInputSchema } from "#schemas/estimate-evolution.schema.mjs";
 import { z } from "zod";
@@ -73,6 +74,12 @@ export function buildStrategyRegistry(): StrategyRegistry<BaseStrategy> {
   registerEvolutionStrategies(registry);
   registerChainStrategies(registry);
   registerCommonStrategies(registry);
+  // Mocks (CP10) scaffold the rest of the v0.1.0 catalogue. Set
+  // LABRE_DISABLE_MOCKS=1 to skip — useful for prod runs where only real
+  // strategies should be exposed.
+  if (process.env.LABRE_DISABLE_MOCKS !== "1") {
+    registerMocks(registry);
+  }
   return registry;
 }
 
