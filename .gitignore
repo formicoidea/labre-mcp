@@ -42,6 +42,10 @@ ehthumbs.db
 .claude/
 .omc/
 
+# ── fallow analysis dumps ─────────────────────
+.fallow-*.json
+.fallow/
+
 # ── Logs & debug ──────────────────────────────
 logs/
 *.log

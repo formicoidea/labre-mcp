@@ -25,7 +25,6 @@ import {
   parseCpcFallback,
 } from '#work-on-evolution/write/patent/cpc-mapper.mjs';
 import { parseCpcSotExtraction } from '#work-on-evolution/write/strategies/capacity/cpc-evolution-strategy.mjs';
-import { parseSolutionDiscoveryResponse } from '#work-on-evolution/write/pipeline/pipeline-enriched.mjs';
 import { parseWebSearchResponse } from '#work-on-value-chain/write/component/lib/verification/web-search-verification.mjs';
 import { parseLLMClassificationResponse } from '#work-on-evolution/write/routing/detect-solution.mjs';
 import {
@@ -45,7 +44,6 @@ registerParser('llmDirect',             parseLLMDirectResponse);
 registerParser('cpcPickClass',          parseCpcPickClass);
 registerParser('cpcPickFromList',       parseCpcPickFromList);
 registerParser('cpcFallback',           parseCpcFallback);
-registerParser('solutionDiscovery',     parseSolutionDiscoveryResponse);
 registerParser('webSearchVerification', parseWebSearchResponse);
 registerParser('solutionClassification', parseLLMClassificationResponse);
 registerParser('propertiesAuto',        parseAutoResponse);

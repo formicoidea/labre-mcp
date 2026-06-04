@@ -18,8 +18,6 @@
   "scripts": {
     "mcp": "tsx src/core/transport/labre-daemon.mts",
     "mcp:prod": "node dist/core/transport/labre-daemon.mjs",
-    "mcp:legacy:stdio": "tsx src/mcp/mcp-server.mts",
-    "mcp:legacy:stdio:prod": "node dist/mcp/mcp-server.mjs",
     "build": "tsc",
     "dev": "tsx src/core/transport/labre-daemon.mts",
     "typecheck": "tsc --noEmit",

@@ -70,7 +70,7 @@ No `update` command — it is composition (read + write + emit), expressible as 
 
 ## ARCH-05 — WardleyAPI render schema is snapshotted
 
-**Status:** Amended by AST-schema v0.1.0 — the snapshot remains valid as an internal data model, but the renderer schema (`wardley-map.schema.json`) is now elevated to **norme de communication** for any input/output crossing a tool boundary in the `wardley` domain. Internal strategies may enrich the model freely; the `render` domain acts as an anti-corruption layer that projects enriched objects back to the renderer schema. See [ast-schema.md](ast-schema.md) § 2.0.
+**Status:** Deferred — the snapshot files (`schema-snapshot.mts`, `wardley-chain-ast.mts`) were drafted in V1 but never wired into any runtime path; they were removed in the post-v0.1.0 cleanup. The renderer schema (`wardley-map.schema.json`) remains the norm de communication per [ast-schema.md](ast-schema.md) § 2.0; an internal AST will be recreated when a concrete consumer needs strongly-typed `Component`/`Relation` shapes beyond what the renderer schema provides.
 
 **Context:** The `WardleyAPI/packages/render` package already defines a comprehensive Zod schema for the Wardley map data model (Component, Relation, EvolvesTo, Position, etc.). Re-implementing this in labre-mcp would guarantee divergence.
 
@@ -336,6 +336,12 @@ For the evolution tool specifically, the AST is `WardleyEvolutionAST` (γ form):
 ---
 
 ## ARCH-24 — `analysisRef` is a structured pointer, not an opaque string
+
+**Status:** Deferred — the `AnalysisRefSchema` was drafted in V1 but never written at runtime; it was removed in the post-v0.1.0 cleanup along with `WardleyChainAST` and `WardleyEvolutionAST`. The structured-pointer shape will be recreated when the recipe runner needs to cross-reference detailed analyses from chain components (currently `envelope.references[]` carries the same intent but is unused).
+
+---
+
+## ARCH-24-ORIGINAL (preserved for history)
 
 **Status:** Accepted
 
