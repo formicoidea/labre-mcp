@@ -16,6 +16,7 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve, isAbsolute, dirname } from 'node:path';
+import { validateOrThrow } from '#lib/zod/validate-or-throw.mjs';
 import {
   PromptsConfigSchema,
   isSplitTemplateFile,
@@ -99,15 +100,7 @@ export function loadPromptsConfig(): LoadedPrompts {
     throw new Error(`Invalid JSON in prompts config at ${path}: ${(err as Error).message}`);
   }
 
-  const result = PromptsConfigSchema.safeParse(parsed);
-  if (!result.success) {
-    const details = result.error.issues
-      .map(i => `  - ${i.path.join('.') || '<root>'}: ${i.message}`)
-      .join('\n');
-    throw new Error(`Prompts config at ${path} failed validation:\n${details}`);
-  }
-
-  const config = result.data;
+  const config = validateOrThrow(PromptsConfigSchema, parsed, `Prompts config at ${path}`);
   const configDir = dirname(path);
   const templates: Record<string, Record<string, ResolvedTemplate>> = {};
 

@@ -8,6 +8,7 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve, isAbsolute } from 'node:path';
+import { validateOrThrow } from '#lib/zod/validate-or-throw.mjs';
 import { LLMConfigSchema, type LLMConfig } from './config.schema.mjs';
 
 let cached: LLMConfig | undefined;
@@ -39,15 +40,7 @@ export function loadLLMConfig(): LLMConfig {
     throw new Error(`Invalid JSON in LLM config at ${path}: ${(err as Error).message}`);
   }
 
-  const result = LLMConfigSchema.safeParse(parsed);
-  if (!result.success) {
-    const details = result.error.issues
-      .map(i => `  - ${i.path.join('.') || '<root>'}: ${i.message}`)
-      .join('\n');
-    throw new Error(`LLM config at ${path} failed validation:\n${details}`);
-  }
-
-  cached = result.data;
+  cached = validateOrThrow(LLMConfigSchema, parsed, `LLM config at ${path}`);
   cachedPath = path;
   return cached;
 }

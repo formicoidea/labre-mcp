@@ -9,6 +9,7 @@
 
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { validateOrThrow } from "#lib/zod/validate-or-throw.mjs";
 import { RecipeSchema, type Recipe } from "./recipe.schema.mjs";
 
 export interface RecipeLookupOptions {
@@ -42,14 +43,7 @@ async function tryReadRecipe(path: string): Promise<Recipe | null> {
   } catch (err) {
     throw new Error(`Invalid JSON in recipe ${path}: ${(err as Error).message}`);
   }
-  const result = RecipeSchema.safeParse(parsed);
-  if (!result.success) {
-    const details = result.error.issues
-      .map((i) => `  - ${i.path.join(".") || "<root>"}: ${i.message}`)
-      .join("\n");
-    throw new Error(`Recipe ${path} failed validation:\n${details}`);
-  }
-  return result.data;
+  return validateOrThrow(RecipeSchema, parsed, `Recipe ${path}`);
 }
 
 export async function loadRecipe(options: RecipeLookupOptions): Promise<Recipe> {
