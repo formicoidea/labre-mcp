@@ -47,9 +47,8 @@ labre-mcp/
 │   ├── mcp/                   estimate-evolution.tool.mts (the one wired MCP tool, roadmap B3)
 │   └── schemas/  types/  session/  tests/
 │
-├── recipes/                   # shipped canonical recipes (ARCH-08)
-│   ├── wardley/map/*.recipe.json
-│   └── render/wardley-map/parse.recipe.json
+├── recipes/                   # shipped canonical recipes, ≥2 steps (ARCH-08)
+│   └── wardley/map/*.recipe.json   # single commands → runCommand tool, not a recipe
 │
 └── docs/architecture/         # ADRs (decisions.md) · pivot (ast-schema.md) · roadmap.md
 ```

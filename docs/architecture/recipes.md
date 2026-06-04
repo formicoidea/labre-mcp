@@ -78,13 +78,13 @@ User recipes take precedence by name. There is no field-level merge — recipes 
 
 | Recipe | Domain:Tool | Purpose |
 |---|---|---|
-| `parse` | wardley:chain | Parse OWM DSL → WardleyChainAST |
-| `generate` | wardley:chain | NL → chain map → laid out → emitted OWM |
-| `estimate-component` | wardley:evolution | Identify capability → estimate evolution |
-| `evaluate-map` | wardley:evolution | Parse map → fan out estimation across components |
-| `anchor-estimate` | wardley:evolution | Estimate anchor's consumption-culture phase |
+| `generate` | wardley:map | NL → value chain → laid out → emitted OWM (4 steps) |
+| `estimate-component` | wardley:map | Identify capability → estimate evolution (2 steps) |
+| `evaluate-map` | wardley:map | Parse map → fan out estimation across components (2 steps) |
 
 Each shipped recipe is validated against `RecipeSchema` by [`shipped-recipes-validation.test.mts`](../../src/core/recipe/shipped-recipes-validation.test.mts) — schema drift causes test failure before runtime.
+
+> **A recipe must orchestrate more than one command.** A recipe whose only value is wrapping a single strategy is redundant with a direct call: invoke the methodId via the `runCommand` MCP tool instead (it returns the same JSON-labre envelope). A 1-step recipe is only justified when it carries a `listeners[]` that adds out-of-path insight. The former single-step recipes `parse` and `anchor-estimate` were removed in favour of `runCommand` (`render:wardley-map:owm:parse:dsl`, `wardley:map:climate:position-anchor-in-evolution:culture-phase`).
 
 ## Authoring a new recipe
 

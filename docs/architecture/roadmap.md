@@ -25,8 +25,8 @@ Daemon HTTP `src/core/transport/labre-daemon.mts` (:6767) — **1 outil MCP mét
 ### B3 — Surface d'outils MCP : 1 → N câblés
 
 - **Cible** : la surface complète du cycle d'étude exposée comme outils/recipes.
-- **Aujourd'hui** : `buildBootRegistry()` n'enregistre que `__ping__` + `estimateEvolution`. Les flux `evaluateMap`, `identifyCapability`, `estimateAnchorEvolution`, `generateValueChain` existent comme **recipes** (`recipes/wardley/map/*.recipe.json`) + stratégies, mais ne sont **pas exposés** comme outils MCP.
-- **Action** : décider l'API d'exposition (un outil générique `runRecipe` / `runCommand` piloté par methodId, vs un outil par flux) puis câbler dans `buildBootRegistry()`.
+- **Livré** : l'outil générique **`runCommand`** est câblé — il invoque **n'importe quel methodId** (réel ou mock) directement et renvoie un `CommandResult` portant l'enveloppe JSON-labre (`src/mcp/run-command.tool.mts`, schémas `src/schemas/command.schema.mts`). Toute commande **unique** est donc appelable sans recette. Les recettes mono-commande (`anchor-estimate`, `parse`) ont été supprimées au profit de `runCommand`.
+- **Reste à faire** : exposer les **recettes multi-étapes** comme outils dédiés. `buildBootRegistry()` enregistre aujourd'hui `__ping__` + `estimateEvolution` (recette `estimate-component`) + `runCommand`. Les flux `evaluateMap` (recette 2 étapes) et `generateValueChain` (recette 4 étapes) restent à câbler (un outil `runRecipe` piloté par nom de recette, ou un outil par flux).
 
 ### B4 — Promotion des mocks → stratégies réelles
 

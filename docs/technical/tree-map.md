@@ -114,9 +114,9 @@ Partagé : lib/{llm, degradation, prompts, owm, response-formatter, language-det
 
 - `recipes/wardley/map/estimate-component.recipe.json` — `node:identify:default` → `position-functional-in-evolution:llm-direct`
 - `recipes/wardley/map/evaluate-map.recipe.json`
-- `recipes/wardley/map/anchor-estimate.recipe.json`
 - `recipes/wardley/map/generate.recipe.json`
-- `recipes/render/wardley-map/parse.recipe.json` — `render:wardley-map:owm:parse:dsl`
+
+> Toutes les recettes livrées ont **≥ 2 étapes** (orchestration). Une commande seule s'appelle directement via l'outil MCP `runCommand` (cf. [tools-reference](../functional/tools-reference.md)) — pas via une recette mono-étape.
 
 ## 6. Fichiers racine de configuration
 

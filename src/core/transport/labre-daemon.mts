@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { ToolRegistry } from "./mcp-handler.mjs";
 import { startHttpServer } from "./http-server.mjs";
 import { ESTIMATE_EVOLUTION_TOOL } from "#mcp/estimate-evolution.tool.mjs";
+import { RUN_COMMAND_TOOL } from "#mcp/run-command.tool.mjs";
 
 // Re-export so existing callers (tests, downstream tooling) can keep
 // importing `buildStrategyRegistry` from this module without churn.
@@ -42,6 +43,7 @@ export function buildBootRegistry(): ToolRegistry {
     },
   });
   registry.register(ESTIMATE_EVOLUTION_TOOL);
+  registry.register(RUN_COMMAND_TOOL);
   return registry;
 }
 

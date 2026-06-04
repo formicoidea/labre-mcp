@@ -16,7 +16,6 @@
 // available for transition; V1.5 cleanup will decide whether to retire it or
 // align it on this recipe-based path.
 
-import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { EstimateEvolutionInputSchema } from '../schemas/estimate-evolution.schema.mjs';
@@ -25,8 +24,7 @@ import { runRecipe } from '#core/recipe/recipe-runner.mjs';
 import { buildStrategyRegistry } from '#core/transport/strategy-registry-boot.mjs';
 import { attachArtifactWriter } from '#core/listeners/artifact-writer-listener.mjs';
 import { createEventBus } from '#core/bus/event-bus.mjs';
-import { resolveProjectId } from '#core/persistence/project-id-resolver.mjs';
-import { type RequestContext, RequestContextSchema } from '#core/context/request-context.mjs';
+import { resolveContext } from './resolve-context.mjs';
 
 // labre-mcp's own install root — where shipped recipes live (ARCH-08).
 //
@@ -98,23 +96,5 @@ export async function handleEstimateEvolutionViaRecipe(
     artifactPath,
     events: outcome.events,
     envelope: outcome.envelope,
-  };
-}
-
-async function resolveContext(rawContext: unknown): Promise<RequestContext> {
-  if (rawContext && typeof rawContext === 'object') {
-    const parsed = RequestContextSchema.safeParse(rawContext);
-    if (parsed.success) return parsed.data;
-  }
-  // Dev-mode fallback: derive projectId from current working dir as a hash.
-  // ARCH-15: process.cwd() is acceptable here only because the daemon
-  // captures it at boot — production callers should always supply _context.
-  const projectRoot = process.cwd();
-  const projectId = await resolveProjectId(projectRoot);
-  return {
-    projectId,
-    projectRoot,
-    sessionId: randomUUID(),
-    domain: 'wardley',
   };
 }

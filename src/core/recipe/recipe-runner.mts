@@ -108,6 +108,52 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
   return { recipeRunId, ast: options.ast, events, bus, envelope };
 }
 
+export interface RunCommandOptions {
+  command: string; // 5-segment methodId
+  // any: input shape is command-specific — passed verbatim to the strategy
+  input: unknown;
+  context: RequestContext;
+  registry: StrategyRegistry;
+  bus?: EventBus;
+  // Optional caller-owned AST object. Pass it when an artefact-writer listener
+  // attached to the same bus needs the live AST reference (it is mutated in
+  // place and read at run-end). The command's input is seeded at `$.input`.
+  ast?: Record<string, unknown>;
+}
+
+// Run a single command (methodId) directly and get a JSON-labre envelope back.
+//
+// A command is modelled as a degenerate 1-step recipe so the exact same
+// machinery applies — envelope assembly, step/run events, and (via the
+// caller-attached listener) artefact persistence. This is what makes a
+// stand-alone command call equivalent to a recipe step: its result carries an
+// envelope just like a recipe run does.
+//
+// The strategy receives `input` (seeded at `$.input`); its StrategyResult is
+// written to `$.result` on the returned `outcome.ast`. `domain`/`tool` for the
+// synthetic recipe derive from the command's first two segments so the
+// run-end event keeps a valid 5-segment methodId.
+export async function runCommand(options: RunCommandOptions): Promise<RunOutcome> {
+  const [domain = 'common', tool = 'command'] = options.command.split('@')[0].split(':');
+  const recipe: Recipe = {
+    schemaVersion: '1.0',
+    name: options.command,
+    domain,
+    tool,
+    steps: [{ stepId: 'command', tool: options.command, in: '$.input', out: '$.result' }],
+    listeners: [],
+  };
+  const ast: Record<string, unknown> = options.ast ?? {};
+  ast.input = options.input;
+  return runRecipe({
+    recipe,
+    ast,
+    context: options.context,
+    registry: options.registry,
+    bus: options.bus,
+  });
+}
+
 interface StepExecutionContext {
   step: RecipeStep;
   ast: Record<string, unknown>;

@@ -4,16 +4,17 @@ labre-mcp tourne comme un **daemon HTTP** (`src/core/transport/labre-daemon.mts`
 
 ## Surface MCP reellement exposee
 
-Seuls **2 outils** sont cables dans `buildBootRegistry()` :
+**3 outils** sont cables dans `buildBootRegistry()` :
 
 | Outil | Role | Schema Zod |
 |---|---|---|
-| `estimateEvolution` | Estime l'evolution d'un composant | `src/schemas/estimate-evolution.schema.mts` |
+| `estimateEvolution` | Estime l'evolution d'un composant (via la recipe `estimate-component`) | `src/schemas/estimate-evolution.schema.mts` |
+| `runCommand` | Invoque **n'importe quel methodId** directement → `CommandResult` (output + enveloppe JSON-labre) | `src/schemas/command.schema.mts` |
 | `__ping__` | Smoke tool — echo de l'input, valide le transport | (inline) |
 
 Les schemas d'entree exposes au client MCP sont **generes a partir des schemas Zod** (`z.toJSONSchema(schema, { io: 'input' })`). Toute modification d'un schema passe par le fichier `src/schemas/*.schema.mts` correspondant.
 
-> Les flux `evaluateMap`, `identifyCapability`, `estimateAnchorEvolution` et `generateValueChain` existent comme **recipes** (`recipes/wardley/map/*.recipe.json`) + strategies, mais **ne sont pas encore exposes comme outils MCP**. Voir la section [Outils non encore cables](#outils-non-encore-cables) et la roadmap [`../architecture/roadmap.md`](../architecture/roadmap.md) (item B3).
+> Les flux nommes `evaluateMap`, `identifyCapability`, `estimateAnchorEvolution` et `generateValueChain` ne sont pas (encore) exposes comme **outils dedies** (roadmap [`../architecture/roadmap.md`](../architecture/roadmap.md) B3). Mais leurs strategies sont **deja appelables directement** via `runCommand` avec le methodId correspondant — voir [Flux appelables via runCommand](#flux-appelables-via-runcommand).
 
 ---
 
@@ -224,13 +225,47 @@ Reponse : `{ "echoed": { "message": "hello" }, "daemon": "labre-mcp" }`.
 
 ---
 
-## Outils non encore cables
+## runCommand
 
-Les flux suivants existent dans le code (recipes `recipes/wardley/map/*.recipe.json` + strategies) mais **ne sont pas exposes comme outils MCP** dans `buildBootRegistry()`. Leur cablage est suivi dans [`../architecture/roadmap.md`](../architecture/roadmap.md) (item B3). Les schemas ci-dessous documentent l'intention fonctionnelle et restent la cible.
+Invoque une **commande unique** par son methodId 5 segments (ast-schema § 3.4.1). Le resultat est un `CommandResult` portant la sortie canonique de la strategie **et** l'enveloppe JSON-labre (`signals`, `reasoning`, `insights`, `trace`) — exactement comme un step de recipe. C'est le remplacant des recettes mono-etape.
 
-### evaluateMap (non cable)
+### Entree (`CommandCall`)
 
-Evalue tous les composants d'un fichier `.wm` existant et met a jour leurs positions d'evolution. Recipe : `recipes/wardley/map/evaluate-map.recipe.json`.
+| Parametre | Type | Requis | Description |
+|---|---|---|---|
+| `command` | string | **oui** | methodId 5 segments `domain:tool:sous-domaine:command:strategie[@x.y.z]` (catalogue : [ast-schema.md](../architecture/ast-schema.md)) |
+| `input` | any | non | Entree passee verbatim a la strategie (forme specifique a la commande) |
+| `metadata` | object | non | `{ requestId?, requestedAt?, callerAgent? }` |
+
+### Sortie (`CommandResult`)
+
+`{ command, status: "ok"|"partial"|"error", output, envelope, warnings?, errors?, metadata }`. La reponse est en plus enveloppee dans `Degradable<T>` (`{ result, degraded, degradationEvents }`, cf. [degradation](../technical/degradation.md)). Un methodId inconnu renvoie `status: "error"`.
+
+### Exemple
+
+```bash
+curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" -d '{
+  "jsonrpc":"2.0","id":1,"method":"tools/call",
+  "params":{ "name":"runCommand", "arguments":{
+    "command":"render:wardley-map:owm:parse:dsl",
+    "input":{ "dsl":"title Demo\ncomponent Foo [0.5, 0.5]" }
+  }}
+}'
+```
+
+> `runCommand` expose toute la surface du catalogue, **mocks compris** (70 stratégies renvoient un insight `mock strategy for <id>`). Les 15 stratégies réelles sont listées dans [ast-schema.md → État d'implémentation](../architecture/ast-schema.md).
+
+---
+
+## Flux non encore exposes comme outils dedies
+
+Ces flux n'ont pas (encore) d'**outil MCP dedie** (roadmap [`../architecture/roadmap.md`](../architecture/roadmap.md) B3). Deux cas :
+- **Strategie unique** → **deja invocable** via `runCommand` avec son methodId (ci-dessous).
+- **Recette multi-etapes** → necessite le cablage d'un outil dedie (runCommand ne lance qu'**une** commande).
+
+### evaluateMap — recette multi-etapes (pas runCommand)
+
+Evalue tous les composants d'un fichier `.wm` existant et met a jour leurs positions d'evolution. Recette 2 etapes `recipes/wardley/map/evaluate-map.recipe.json` (parse → fan-out estimation) → outil dedie a cabler (B3).
 
 | Parametre | Type | Requis | Description |
 |---|---|---|---|
@@ -238,9 +273,9 @@ Evalue tous les composants d'un fichier `.wm` existant et met a jour leurs posit
 | `strategy` | string | non | `"auto"` (defaut) route chaque composant vers une strategie par type. `"report"` fan-out multi-strategies. Un methodId specifique (ex: `"wardley:map:climate:position-functional-in-evolution:s-curve"`) force cette strategie sur tous les composants economiques. Les anchors restent routes vers `wardley:map:climate:position-anchor-in-evolution:default`. |
 | `updateFile` | boolean | non | Met a jour le fichier en place (`true` par defaut) |
 
-### identifyCapability (non cable)
+### identifyCapability — appelable via runCommand
 
-Decode un nom technique (CRM, Kubernetes, Data Warehouse…) en la **capability sous-jacente** qu'il sert, classifiee par nature (activity / practice / knowledge / data). MethodId : `wardley:map:node:identify:default`.
+Decode un nom technique (CRM, Kubernetes, Data Warehouse…) en la **capability sous-jacente** qu'il sert, classifiee par nature (activity / practice / knowledge / data). Appel direct : `runCommand { command: "wardley:map:node:identify:default", input: { name, type?, description?, context? } }`.
 
 | Parametre | Type | Requis | Description |
 |---|---|---|---|
@@ -249,9 +284,9 @@ Decode un nom technique (CRM, Kubernetes, Data Warehouse…) en la **capability 
 | `description` | string | non | Description libre du composant |
 | `context` | string | non | Contexte d'usage dans la chaine de valeur |
 
-### estimateAnchorEvolution (non cable)
+### estimateAnchorEvolution — appelable via runCommand
 
-Estime l'evolution d'un **anchor** (user need, haut de la value chain) via la lentille consumption culture. Retourne une phase discrete 1-4 (Genesis → Commodity). MethodId : `wardley:map:climate:position-anchor-in-evolution:default` (variante `culture-phase`). Recipe : `recipes/wardley/map/anchor-estimate.recipe.json`.
+Estime l'evolution d'un **anchor** (user need, haut de la value chain) via la lentille consumption culture. Retourne une phase discrete 1-4 (Genesis → Commodity). Appel direct : `runCommand { command: "wardley:map:climate:position-anchor-in-evolution:culture-phase", input: { name, context } }` (alias `:default`). _(L'ancienne recette mono-etape `anchor-estimate` a ete supprimee au profit de cet appel direct.)_
 
 | Parametre | Type | Requis | Description |
 |---|---|---|---|
@@ -259,6 +294,6 @@ Estime l'evolution d'un **anchor** (user need, haut de la value chain) via la le
 | `context` | string | **oui** | Contexte metier (requis — l'evaluation d'un anchor est hautement dependante du contexte) |
 | `phase` | integer [1-4] | non | Phase pre-evaluee. Si omise, le LLM l'estime. `1`=Genesis, `2`=Custom, `3`=Product, `4`=Commodity. |
 
-### generateValueChain (non cable)
+### generateValueChain — recette multi-etapes (pas runCommand)
 
-Genere une chaine de valeur (layout pour lisibilite, jamais maturite d'evolution). MethodId : `wardley:map:value-chain:generate:top-down`. Recipe : `recipes/wardley/map/generate.recipe.json`.
+Genere une chaine de valeur (layout pour lisibilite, jamais maturite d'evolution). Recette 4 etapes `recipes/wardley/map/generate.recipe.json` (`value-chain:generate:top-down` → `prevent-collision` → `audit:overlap-check` → `owm:emit`) → outil dedie a cabler (B3). L'etape de generation seule reste appelable via `runCommand { command: "wardley:map:value-chain:generate:top-down" }`.
