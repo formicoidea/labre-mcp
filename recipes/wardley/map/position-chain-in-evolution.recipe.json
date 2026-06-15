@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.0",
+  "name": "position-chain-in-evolution",
+  "domain": "wardley",
+  "tool": "map",
+  "description": "Position an already-built value chain in evolution. Routes each node to its per-type strategy (functional / solution / anchor) via the mass positioner, then renders the positioned map as SVG. Input is the JSON-labre map from draw-value-chain (an external OWM map is pre-parsed via runCommand render:wardley-map:owm:parse:dsl). A listener surfaces pipeline opportunities revealed once evolution is known.",
+  "steps": [
+    {
+      "stepId": "position",
+      "tool": "wardley:map:climate:position-value-chain-in-evolution:default",
+      "in": "$.input",
+      "out": "$.positioned"
+    },
+    {
+      "stepId": "render-svg",
+      "tool": "render:wardley-map:image:emit:svg",
+      "in": "$.positioned.result",
+      "out": "$.output"
+    }
+  ],
+  "listeners": {
+    "position": ["wardley:map:value-chain:read:pipeline-opportunity"]
+  }
+}

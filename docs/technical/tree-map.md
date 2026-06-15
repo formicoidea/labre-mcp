@@ -62,23 +62,29 @@ src/
 │
 ├── frameworks/               ── Domaines métier
 │   ├── wardley/
-│   │   ├── map/               sous-domaines mock (basemap, config, node, climate, zonage…)
-│   │   ├── chain/            registry.mts (réel : top-down, owm parse/emit) ; read/, emit/ ;
+│   │   ├── map/               basemap/generate (réel), value-chain/{generate/top-down, organized-y-position} (réels, WardleyMap→WardleyMap) ; config, node, climate, zonage… (mock)
+│   │   ├── chain/            registry.mts (réel : basemap + value-chain generate/organized-y + owm parse/emit) ; read/, emit/ ;
 │   │   │                     _legacy/write/{chain,component}/  ← stratégies réelles (roadmap B2)
 │   │   ├── evolution/        registry.mts (réel : capacity + solution + anchor) ;
 │   │   │                     _legacy/write/{strategies,routing,pipeline,patent,s-curve}/
 │   │   ├── climate/  doctrine/  gameplay/  iteration/   mock-strategies (surface AST exposée)
-│   ├── common/               registry.mts (réel : place-labels, overlap-check) ; layout/, toolbox/
-│   ├── render/               wardley-map/{owm,image}/  (owm parse/emit réels, image mock)
-│   ├── mocks-registry.mts    enregistre les 70 *.mock-strategy.mts
+│   ├── common/               registry.mts (réel : place-labels, overlap-check — I/O canonique WardleyMap) ; layout/, toolbox/
+│   ├── render/               wardley-map/{owm,image}/  (owm parse/emit réels, image/emit/svg réel = renderToSVG)
+│   │   └── wardley-map/acl/  anti-corruption layer : WardleyMap ↔ PositionedValueChain (inverse la convention de visibilité : legacy 0.95=haut ↔ renderer 0=haut)
+│   ├── mocks-registry.mts    enregistre les 67 *.mock-strategy.mts
 │
-├── mcp/                      ── Wrapper du seul outil métier câblé
+├── mcp/                      ── Wrappers des outils MCP câblés
 │   ├── estimate-evolution.tool.mts        ToolDefinition estimateEvolution
-│   └── estimate-evolution-via-recipe.mts  dispatch via le recipe runner
+│   ├── estimate-evolution-via-recipe.mts  dispatch via le recipe runner
+│   ├── run-command.tool.mts               ToolDefinition runCommand (methodId direct)
+│   ├── run-recipe.tool.mts                ToolDefinition runRecipe (recette par nom)
+│   ├── shipped-root.mts                   résolution SHIPPED_ROOT (partagé)
+│   └── resolve-context.mts                résolution RequestContext (partagé)
 │
 ├── schemas/                  ── Schémas Zod (source de vérité runtime)
 │   └── estimate-evolution, evaluate-map, identify-capability, estimate-anchor-evolution,
-│       generate-value-chain, value-chain, inputs, results, patent, parsed-llm
+│       generate-value-chain, value-chain, command, run-recipe, inputs, results, patent, parsed-llm,
+│       wardley-map (ré-export du schéma du package @formicoidea/wardley-map-renderer), json-labre (artefact root)
 │
 └── types/                    ── Re-exports typés (z.infer<…>)
     └── value-chain, solution, routing, pipeline, patent, llm, evolution, classification, index

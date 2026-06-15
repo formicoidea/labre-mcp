@@ -65,9 +65,11 @@ describe("shipped recipes validate against RecipeSchema", () => {
           unresolved.push({ recipe: path, field: `steps[${i}].tool`, tool: step.tool });
         }
       }
-      for (const [i, listener] of parsed.listeners.entries()) {
-        if (!knownIds.has(listener)) {
-          unresolved.push({ recipe: path, field: `listeners[${i}]`, tool: listener });
+      for (const [stepId, ids] of Object.entries(parsed.listeners)) {
+        for (const [k, listener] of ids.entries()) {
+          if (!knownIds.has(listener)) {
+            unresolved.push({ recipe: path, field: `listeners.${stepId}[${k}]`, tool: listener });
+          }
         }
       }
     }

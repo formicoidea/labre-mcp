@@ -18,5 +18,5 @@
       "out": "$.evaluations"
     }
   ],
-  "listeners": []
+  "listeners": {}
 }

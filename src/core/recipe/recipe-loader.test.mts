@@ -15,7 +15,7 @@ function validRecipeBody(name: string): Recipe {
     steps: [
       { stepId: "s1", tool: "wardley:map:climate:position-functional-in-evolution:s-curve" },
     ],
-    listeners: [],
+    listeners: {},
   };
 }
 

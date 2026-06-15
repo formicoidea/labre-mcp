@@ -20,13 +20,31 @@ export const RecipeStepSchema = z.object({
 });
 export type RecipeStep = z.infer<typeof RecipeStepSchema>;
 
-export const RecipeSchema = z.object({
-  schemaVersion: z.literal("1.0"),
-  name: z.string().min(1), // canonical name e.g. "evaluate-map"
-  domain: z.string().min(1), // e.g. "wardley"
-  tool: z.string().min(1), // e.g. "evolution"
-  description: z.string().optional(),
-  steps: z.array(RecipeStepSchema).min(1),
-  listeners: z.array(methodIdSchema).default([]), // 5-segment methodIds of listener strategies
-});
+export const RecipeSchema = z
+  .object({
+    schemaVersion: z.literal("1.0"),
+    name: z.string().min(1), // canonical name e.g. "evaluate-map"
+    domain: z.string().min(1), // e.g. "wardley"
+    tool: z.string().min(1), // e.g. "evolution"
+    description: z.string().optional(),
+    steps: z.array(RecipeStepSchema).min(1),
+    // Listeners are step-attached: each key is a stepId of `steps`, mapped to
+    // the 5-segment methodIds of the listener strategies observing that step.
+    // They run after the main path completes, in parallel, and only contribute
+    // insights to the envelope (ARCH-10) — see recipe-runner.
+    listeners: z.record(z.string(), z.array(methodIdSchema)).default({}),
+  })
+  .superRefine((recipe, ctx) => {
+    // A listener can only attach to a step that exists in this recipe.
+    const stepIds = new Set(recipe.steps.map((s) => s.stepId));
+    for (const stepId of Object.keys(recipe.listeners)) {
+      if (!stepIds.has(stepId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["listeners", stepId],
+          message: `listeners key "${stepId}" does not match any step.stepId (${[...stepIds].join(", ")})`,
+        });
+      }
+    }
+  });
 export type Recipe = z.infer<typeof RecipeSchema>;

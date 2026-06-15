@@ -14,14 +14,13 @@ import type { BaseStrategy } from '#core/ast/base-strategy.mjs';
 
 import { MockCommonToolboxListEmitDefaultStrategy } from './common/toolbox/list/emit/default.mock-strategy.mjs';
 import { MockCommonToolboxWardleyJsonBoilerplateDefaultStrategy } from './common/toolbox/wardley/json-boilerplate/default.mock-strategy.mjs';
-import { MockWardleyMapBasemapGenerateDefaultStrategy } from './wardley/map/basemap/generate/default.mock-strategy.mjs';
 import { MockWardleyMapConfigXAxisStandardStrategy } from './wardley/map/config/x-axis/standard.mock-strategy.mjs';
 import { MockWardleyMapConfigXAxisCustomStrategy } from './wardley/map/config/x-axis/custom.mock-strategy.mjs';
 import { MockWardleyMapConfigYAxisStandardStrategy } from './wardley/map/config/y-axis/standard.mock-strategy.mjs';
 import { MockWardleyMapConfigYAxisCustomStrategy } from './wardley/map/config/y-axis/custom.mock-strategy.mjs';
 import { MockWardleyMapValueChainGenerateDefaultStrategy } from './wardley/map/value-chain/generate/default.mock-strategy.mjs';
 import { MockWardleyMapValueChainAuditDefaultStrategy } from './wardley/map/value-chain/audit/default.mock-strategy.mjs';
-import { MockWardleyMapValueChainOrganizedYPositionDefaultStrategy } from './wardley/map/value-chain/organized-y-position/default.mock-strategy.mjs';
+// organized-y-position promoted to a real strategy (registered in chain/registry).
 import { MockWardleyMapValueChainReadPipelineOpportunityStrategy } from './wardley/map/value-chain/read/pipeline-opportunity.mock-strategy.mjs';
 import { MockWardleyMapNodeGeneratePipelineFromComponentDefaultStrategy } from './wardley/map/node/generate-pipeline-from-component/default.mock-strategy.mjs';
 import { MockWardleyMapNodeGenerateNodeFromPipelineDefaultStrategy } from './wardley/map/node/generate-node-from-pipeline/default.mock-strategy.mjs';
@@ -78,7 +77,6 @@ import { MockWardleyIterationPurposeAuditPurposeQualityDefaultStrategy } from '.
 import { MockRenderWardleyMapOwmConfigDslStrategy } from './render/wardley-map/owm/config/dsl.mock-strategy.mjs';
 import { MockRenderWardleyMapImageParseSvgStrategy } from './render/wardley-map/image/parse/svg.mock-strategy.mjs';
 import { MockRenderWardleyMapImageParsePngStrategy } from './render/wardley-map/image/parse/png.mock-strategy.mjs';
-import { MockRenderWardleyMapImageEmitSvgStrategy } from './render/wardley-map/image/emit/svg.mock-strategy.mjs';
 import { MockRenderWardleyMapImageEmitPngStrategy } from './render/wardley-map/image/emit/png.mock-strategy.mjs';
 import { MockRenderWardleyMapImageConfigSvgStrategy } from './render/wardley-map/image/config/svg.mock-strategy.mjs';
 import { MockRenderWardleyMapImageConfigPngStrategy } from './render/wardley-map/image/config/png.mock-strategy.mjs';
@@ -86,14 +84,12 @@ import { MockRenderWardleyMapImageConfigPngStrategy } from './render/wardley-map
 export function registerMocks(registry: StrategyRegistry<BaseStrategy>): void {
   registry.register(MockCommonToolboxListEmitDefaultStrategy.method, MockCommonToolboxListEmitDefaultStrategy);
   registry.register(MockCommonToolboxWardleyJsonBoilerplateDefaultStrategy.method, MockCommonToolboxWardleyJsonBoilerplateDefaultStrategy);
-  registry.register(MockWardleyMapBasemapGenerateDefaultStrategy.method, MockWardleyMapBasemapGenerateDefaultStrategy);
   registry.register(MockWardleyMapConfigXAxisStandardStrategy.method, MockWardleyMapConfigXAxisStandardStrategy);
   registry.register(MockWardleyMapConfigXAxisCustomStrategy.method, MockWardleyMapConfigXAxisCustomStrategy);
   registry.register(MockWardleyMapConfigYAxisStandardStrategy.method, MockWardleyMapConfigYAxisStandardStrategy);
   registry.register(MockWardleyMapConfigYAxisCustomStrategy.method, MockWardleyMapConfigYAxisCustomStrategy);
   registry.register(MockWardleyMapValueChainGenerateDefaultStrategy.method, MockWardleyMapValueChainGenerateDefaultStrategy);
   registry.register(MockWardleyMapValueChainAuditDefaultStrategy.method, MockWardleyMapValueChainAuditDefaultStrategy);
-  registry.register(MockWardleyMapValueChainOrganizedYPositionDefaultStrategy.method, MockWardleyMapValueChainOrganizedYPositionDefaultStrategy);
   registry.register(MockWardleyMapValueChainReadPipelineOpportunityStrategy.method, MockWardleyMapValueChainReadPipelineOpportunityStrategy);
   registry.register(MockWardleyMapNodeGeneratePipelineFromComponentDefaultStrategy.method, MockWardleyMapNodeGeneratePipelineFromComponentDefaultStrategy);
   registry.register(MockWardleyMapNodeGenerateNodeFromPipelineDefaultStrategy.method, MockWardleyMapNodeGenerateNodeFromPipelineDefaultStrategy);
@@ -150,7 +146,6 @@ export function registerMocks(registry: StrategyRegistry<BaseStrategy>): void {
   registry.register(MockRenderWardleyMapOwmConfigDslStrategy.method, MockRenderWardleyMapOwmConfigDslStrategy);
   registry.register(MockRenderWardleyMapImageParseSvgStrategy.method, MockRenderWardleyMapImageParseSvgStrategy);
   registry.register(MockRenderWardleyMapImageParsePngStrategy.method, MockRenderWardleyMapImageParsePngStrategy);
-  registry.register(MockRenderWardleyMapImageEmitSvgStrategy.method, MockRenderWardleyMapImageEmitSvgStrategy);
   registry.register(MockRenderWardleyMapImageEmitPngStrategy.method, MockRenderWardleyMapImageEmitPngStrategy);
   registry.register(MockRenderWardleyMapImageConfigSvgStrategy.method, MockRenderWardleyMapImageConfigSvgStrategy);
   registry.register(MockRenderWardleyMapImageConfigPngStrategy.method, MockRenderWardleyMapImageConfigPngStrategy);

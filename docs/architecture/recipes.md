@@ -17,9 +17,11 @@ A recipe is a declarative, quasi-linear DAG of strategy invocations operating on
     { "stepId": "parse-map", "tool": "render:wardley-map:owm:parse:dsl", "in": "$.input", "out": "$.chain" },
     { "stepId": "estimate-all", "tool": "wardley:map:climate:position-functional-in-evolution:llm-direct", "over": "$.chain.result.components", "out": "$.evaluations" }
   ],
-  "listeners": []
+  "listeners": {}
 }
 ```
+
+`listeners` is a **map keyed by `stepId`** — each key maps to an array of listener methodIds observing that step. Example: `"listeners": { "build": ["wardley:map:value-chain:audit:default"], "place-labels": ["wardley:map:value-chain:audit:overlap-check"] }`. A key must match an existing `steps[].stepId` (validated by the schema).
 
 ## Step semantics
 
@@ -56,14 +58,16 @@ A recipe never invokes another recipe. No sub-recipes.
 
 ## Listeners
 
-Each recipe may declare a `listeners` array of strategy methodIds. The runner instantiates each listener at run start; the listener subscribes to the event bus and reacts to step-start, step-end, and run-end events.
+A recipe declares opt-in listeners as a **map `stepId → [methodId]`**. Each listener observes its parent step.
+
+**Execution contract** (implemented in [`recipe-runner.mts`](../../src/core/recipe/recipe-runner.mts)): listeners do **not** run inline after their step. The main path runs all steps `1..N` first; then, once the run completes, **every** listener (across all steps) is launched **together, in parallel** (`Promise.allSettled`). Each listener receives its parent step's business result (the value at `<step.out>.result`, symmetric with how downstream steps consume `$.x.result`) and contributes only to the JSON-labre envelope: its `signals`/`reasoning`/`insights` are folded into `envelope`, plus a `trace` entry attributed to the parent step. A listener failure is **isolated** — it never affects the main path or the returned AST (ARCH-10).
 
 Two categories of listener:
 
-- **Core** — always active, non-disablable. Defined in `src/core/listeners/`. Examples: `degradation-tracker`, `artifact-writer`, `notification-emitter`.
-- **Opt-in** — declared in the recipe's `listeners` array. Examples (V1.5+): `phase-distribution-analyser`, `confidence-drift-detector`.
+- **Core** — always active, non-disablable. Defined in `src/core/listeners/`. Examples: `degradation-tracker`, `artifact-writer`, `notification-emitter`. These subscribe to the event bus.
+- **Opt-in** — declared in the recipe's `listeners` map, keyed by parent `stepId`. They run as described above (post-run, parallel, envelope-only). Examples: `wardley:iteration:purpose:audit-purpose-quality:default`, `wardley:map:value-chain:read:pipeline-opportunity`.
 
-Listeners cannot inject new steps into the running recipe (V1). They can only observe and emit notifications. Reactive intervention is V3+.
+Limit (V1): opt-in listeners do not emit bus events and cannot inject new steps into the running recipe. They only observe their parent step's output and emit insights into the envelope. Reactive intervention is V3+.
 
 ## Shipped + user override (ARCH-08)
 

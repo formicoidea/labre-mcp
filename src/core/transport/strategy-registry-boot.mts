@@ -14,6 +14,7 @@ import type { BaseStrategy } from "../ast/base-strategy.mjs";
 import { registerEvolutionStrategies } from "#frameworks/wardley/evolution/registry.mjs";
 import { registerChainStrategies } from "#frameworks/wardley/chain/registry.mjs";
 import { registerCommonStrategies } from "#frameworks/common/registry.mjs";
+import { registerRenderStrategies } from "#frameworks/render/registry.mjs";
 import { registerMocks } from "#frameworks/mocks-registry.mjs";
 
 /**
@@ -32,6 +33,7 @@ export function buildStrategyRegistry(): StrategyRegistry<BaseStrategy> {
   registerEvolutionStrategies(registry);
   registerChainStrategies(registry);
   registerCommonStrategies(registry);
+  registerRenderStrategies(registry);
   if (process.env.LABRE_DISABLE_MOCKS !== "1") {
     registerMocks(registry);
   }

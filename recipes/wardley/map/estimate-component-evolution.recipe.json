@@ -18,5 +18,5 @@
       "out": "$.estimate"
     }
   ],
-  "listeners": []
+  "listeners": {}
 }
