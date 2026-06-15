@@ -51,13 +51,16 @@ function sampleChain(): PositionedValueChain {
 }
 
 describe('chain registry — registration surface', () => {
-  it('registers the three chain strategies under their 5-segment methodIds', () => {
+  it('registers the chain strategies under their 5-segment methodIds', () => {
     const registry = new StrategyRegistry<BaseStrategy>();
     registerChainStrategies(registry);
-    assert.equal(registry.size(), 3);
-    assert.equal(registry.has('wardley:map:value-chain:generate:top-down'), true);
+    assert.equal(registry.size(), 6);
     assert.equal(registry.has('render:wardley-map:owm:parse:dsl'), true);
     assert.equal(registry.has('render:wardley-map:owm:emit:dsl'), true);
+    assert.equal(registry.has('wardley:map:basemap:generate:default'), true);
+    assert.equal(registry.has('wardley:map:value-chain:generate:top-down'), true);
+    assert.equal(registry.has('wardley:map:value-chain:organized-y-position:default'), true);
+    assert.equal(registry.has('wardley:map:value-chain:select-by-type:component'), true);
   });
 
   it('TopDownChainStrategyCore.method returns the 5-segment id', () => {

@@ -88,6 +88,20 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
       });
     }
 
+    // Listeners (ARCH-10, opt-in): run AFTER the whole main path completes,
+    // all in parallel. Each listener observes its parent step by reading that
+    // step's business result from the AST. They only contribute to the
+    // envelope; a listener failure is isolated and never affects the main path
+    // or the returned AST. Placed before the run-end event so the envelope is
+    // complete when the artefact writer serialises the run.
+    await runListeners({
+      recipe: options.recipe,
+      ast: options.ast,
+      context: options.context,
+      registry: options.registry,
+      envelope,
+    });
+
     bus.emit({
       schemaVersion: "1.0",
       recipeRunId,
@@ -141,7 +155,7 @@ export async function runCommand(options: RunCommandOptions): Promise<RunOutcome
     domain,
     tool,
     steps: [{ stepId: 'command', tool: options.command, in: '$.input', out: '$.result' }],
-    listeners: [],
+    listeners: {},
   };
   const ast: Record<string, unknown> = options.ast ?? {};
   ast.input = options.input;
@@ -224,17 +238,10 @@ async function executeStep(ctx: StepExecutionContext): Promise<void> {
   // Aggregate this step's StrategyResult into the run-level envelope.
   // For fanout steps (step.over), each item is its own StrategyResult; for
   // non-fanout steps the single result is collected.
-  const collect = (sr: unknown): void => {
-    if (!sr || typeof sr !== "object") return;
-    const r = sr as Partial<StrategyResult>;
-    if (Array.isArray(r.signals))   envelope.signals.push(...r.signals);
-    if (Array.isArray(r.reasoning)) envelope.reasoning.push(...r.reasoning);
-    if (Array.isArray(r.insights))  envelope.insights.push(...r.insights);
-  };
   if (Array.isArray(result)) {
-    for (const item of result) collect(item);
+    for (const item of result) collectEnvelope(envelope, item);
   } else {
-    collect(result);
+    collectEnvelope(envelope, result);
   }
   envelope.trace.push({
     command: step.tool,
@@ -243,6 +250,76 @@ async function executeStep(ctx: StepExecutionContext): Promise<void> {
     startedAt: new Date(startedAt).toISOString(),
     completedAt: new Date(completedAt).toISOString(),
   });
+}
+
+// Fold a StrategyResult's analytical channels (signals/reasoning/insights)
+// into the run-level envelope (ARCH-22). Shared by main-path steps and
+// opt-in listeners. Non-StrategyResult values are ignored.
+function collectEnvelope(envelope: JsonLabreEnvelope, sr: unknown): void {
+  if (!sr || typeof sr !== "object") return;
+  const r = sr as Partial<StrategyResult>;
+  if (Array.isArray(r.signals))   envelope.signals.push(...r.signals);
+  if (Array.isArray(r.reasoning)) envelope.reasoning.push(...r.reasoning);
+  if (Array.isArray(r.insights))  envelope.insights.push(...r.insights);
+}
+
+interface ListenerInvocation {
+  parentStepId: string;
+  methodId: string;
+  parentOut: string;
+}
+
+// Execute every opt-in listener declared on the recipe, AFTER the main path,
+// all in parallel (hard rule #15). A listener observes its parent step by
+// reading that step's business result from the AST (`<step.out>.result`,
+// symmetric with how downstream steps consume `$.x.result`). Listeners only
+// contribute to the envelope (signals/reasoning/insights + a trace entry);
+// a listener failure is isolated (Promise.allSettled) and never affects the
+// main path or the returned AST (ARCH-10).
+async function runListeners(opts: {
+  recipe: Recipe;
+  ast: Record<string, unknown>;
+  context: RequestContext;
+  registry: StrategyRegistry;
+  envelope: JsonLabreEnvelope;
+}): Promise<void> {
+  const { recipe, ast, context, registry, envelope } = opts;
+
+  const outByStep = new Map(recipe.steps.map((s) => [s.stepId, s.out ?? "$.lastResult"]));
+  const invocations: ListenerInvocation[] = [];
+  for (const [parentStepId, methodIds] of Object.entries(recipe.listeners)) {
+    const parentOut = outByStep.get(parentStepId);
+    if (!parentOut) continue; // schema guarantees the stepId exists; defensive
+    for (const methodId of methodIds) {
+      invocations.push({ parentStepId, methodId, parentOut });
+    }
+  }
+  if (invocations.length === 0) return;
+
+  const settled = await Promise.allSettled(
+    invocations.map(async (inv) => {
+      const startedAt = Date.now();
+      const strategyClass = registry.get(inv.methodId);
+      // any: strategy constructor signature is open by design (mirrors executeStep)
+      const strategy = new (strategyClass as unknown as new () => BaseStrategy)();
+      const parentResult = readPath(ast, `${inv.parentOut}.result`);
+      const result = await strategy.evaluate(parentResult, context);
+      return { inv, result, startedAt, completedAt: Date.now() };
+    }),
+  );
+
+  for (const s of settled) {
+    if (s.status !== "fulfilled") continue; // isolation: failure never affects the run
+    const { inv, result, startedAt, completedAt } = s.value;
+    collectEnvelope(envelope, result);
+    envelope.trace.push({
+      command: inv.methodId,
+      stepId: inv.parentStepId,
+      durationMs: completedAt - startedAt,
+      startedAt: new Date(startedAt).toISOString(),
+      completedAt: new Date(completedAt).toISOString(),
+    });
+  }
 }
 
 // Keep the bus payload light — full results live on the AST. The summary

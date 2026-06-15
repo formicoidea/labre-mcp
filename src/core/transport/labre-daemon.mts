@@ -10,6 +10,7 @@ import { ToolRegistry } from "./mcp-handler.mjs";
 import { startHttpServer } from "./http-server.mjs";
 import { ESTIMATE_EVOLUTION_TOOL } from "#mcp/estimate-evolution.tool.mjs";
 import { RUN_COMMAND_TOOL } from "#mcp/run-command.tool.mjs";
+import { RUN_RECIPE_TOOL } from "#mcp/run-recipe.tool.mjs";
 import { registerBootHealthChecks } from "./boot-health-checks.mjs";
 import { runAllHealthChecks } from "#lib/degradation/index.mjs";
 
@@ -46,6 +47,7 @@ export function buildBootRegistry(): ToolRegistry {
   });
   registry.register(ESTIMATE_EVOLUTION_TOOL);
   registry.register(RUN_COMMAND_TOOL);
+  registry.register(RUN_RECIPE_TOOL);
   return registry;
 }
 

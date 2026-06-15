@@ -82,7 +82,7 @@ No `update` command — it is composition (read + write + emit), expressible as 
 
 ## ARCH-06 — Recipes are tool-scoped
 
-**Status:** Amended by AST-schema v0.1.0 — recipes may now traverse multiple tools within a single domain (e.g. a recipe combining `wardley:iteration:purpose:generate:default` + `wardley:map:value-chain:generate:top-down` + `wardley:map:climate:position-value-chain-in-evolution:default`). Cross-domain orchestration still happens at the skill level. See [ast-schema.md](ast-schema.md) § 1.3.
+**Status:** Amended by AST-schema v0.1.0 — recipes may now traverse multiple tools within a single domain (e.g. a recipe combining `wardley:iteration:purpose:generate:default` + `wardley:map:value-chain:generate:top-down` + `wardley:map:value-chain:select-by-type:component`). Cross-domain orchestration still happens at the skill level. See [ast-schema.md](ast-schema.md) § 1.3.
 
 **Context:** Cross-tool data flows could be expressed as multi-tool recipes or as skill-level orchestration. Mixed scoping makes recipe semantics hard.
 

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0",
+  "name": "draw-value-chain",
+  "domain": "wardley",
+  "tool": "map",
+  "description": "Draw a Wardley value chain from a natural-language prompt WITHOUT positioning it in evolution (X is a readability layout, never maturity). Generates a basemap skeleton, fills the value chain top-down, optimises Y for readability, places labels collision-free, and renders an SVG. Listeners audit the context quality and residual label overlaps.",
+  "steps": [
+    {
+      "stepId": "basemap",
+      "tool": "wardley:map:basemap:generate:default",
+      "in": "$.input",
+      "out": "$.draft"
+    },
+    {
+      "stepId": "build",
+      "tool": "wardley:map:value-chain:generate:top-down",
+      "in": "$.draft.result",
+      "out": "$.chain"
+    },
+    {
+      "stepId": "layout-y",
+      "tool": "wardley:map:value-chain:organized-y-position:default",
+      "in": "$.chain.result",
+      "out": "$.laidY"
+    },
+    {
+      "stepId": "place-labels",
+      "tool": "wardley:map:value-chain:prevent-collision:default",
+      "in": "$.laidY.result",
+      "out": "$.laid"
+    },
+    {
+      "stepId": "render-svg",
+      "tool": "render:wardley-map:image:emit:svg",
+      "in": "$.laid.result",
+      "out": "$.output"
+    }
+  ],
+  "listeners": {
+    "basemap": ["wardley:iteration:purpose:audit-purpose-quality:default"],
+    "place-labels": ["wardley:map:value-chain:audit:overlap-check"]
+  }
+}

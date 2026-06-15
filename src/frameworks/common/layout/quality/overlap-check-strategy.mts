@@ -15,22 +15,20 @@ import {
   type StrategyResult,
 } from '#core/ast/base-strategy.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
-import type { PositionedValueChain } from '#types/value-chain.mjs';
+import { WardleyMapSchema, type WardleyMap } from '#schemas/wardley-map.schema.mjs';
+import {
+  fromPositionedValueChain,
+  toPositionedValueChain,
+} from '#frameworks/render/wardley-map/acl/value-chain.mjs';
 import {
   verifyLayout,
   type VerifyReport,
 } from '#frameworks/wardley/chain/_legacy/write/chain/lib/layout/verify-layout.mjs';
-import type { EmitOwmOptions } from '#frameworks/wardley/chain/_legacy/write/chain/lib/emit/emit-owm.mjs';
 
 const NEW_METHOD_ID_OVERLAP_CHECK = 'wardley:map:value-chain:audit:overlap-check';
 
-export interface OverlapCheckInput {
-  chain: PositionedValueChain;
-  emit?: EmitOwmOptions;
-}
-
 export interface OverlapCheckResult {
-  chain: PositionedValueChain;
+  map: WardleyMap;
   unresolvedHard: number;
   unresolvedSpacing: number;
   unresolvedEdge: number;
@@ -38,20 +36,32 @@ export interface OverlapCheckResult {
   iterations: number;
 }
 
-export class OverlapCheckStrategy extends CoreBaseStrategy<OverlapCheckInput, OverlapCheckResult> {
+export class OverlapCheckStrategy extends CoreBaseStrategy<unknown, OverlapCheckResult | null> {
   static get method(): string {
     return NEW_METHOD_ID_OVERLAP_CHECK;
   }
 
   async evaluate(
-    input: OverlapCheckInput,
+    input: unknown,
     _context: RequestContext,
-  ): Promise<StrategyResult<OverlapCheckResult>> {
-    if (!input?.chain) {
-      throw new Error('OverlapCheckStrategy: requires a `chain` input');
-    }
-    const { chain, report } = verifyLayout(input.chain, input.emit ?? {});
+  ): Promise<StrategyResult<OverlapCheckResult | null>> {
     const capturedAt = new Date().toISOString();
+
+    const parsed = WardleyMapSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        signals: [{ name: 'input-valid', value: false, source: 'computed', capturedAt }],
+        reasoning: [],
+        insights: [
+          { text: 'overlap-check skipped: input is not a canonical WardleyMap', by: NEW_METHOD_ID_OVERLAP_CHECK, type: 'other' },
+        ],
+        result: null,
+      };
+    }
+
+    // Overlap geometry is orientation-invariant, so the ACL round-trip (which
+    // flips visibility) does not affect the residual counts.
+    const { chain, report } = verifyLayout(toPositionedValueChain(parsed.data), {});
     const totals: VerifyReport = report;
     const totalSoft = totals.unresolvedSpacing + totals.unresolvedEdge + totals.unresolvedAxis;
     const insights = totals.unresolvedHard > 0
@@ -69,13 +79,14 @@ export class OverlapCheckStrategy extends CoreBaseStrategy<OverlapCheckInput, Ov
         : [];
     return {
       signals: [
-        { name: 'component-count', value: input.chain.components.length, source: 'computed', capturedAt },
+        { name: 'componentCount', value: parsed.data.components.length, source: 'computed', capturedAt },
         { name: 'iterations', value: report.iterations, source: 'computed', capturedAt },
+        { name: 'unresolvedHard', value: report.unresolvedHard, source: 'computed', capturedAt },
       ],
       reasoning: [],
       insights,
       result: {
-        chain,
+        map: fromPositionedValueChain(chain),
         unresolvedHard: report.unresolvedHard,
         unresolvedSpacing: report.unresolvedSpacing,
         unresolvedEdge: report.unresolvedEdge,

@@ -34,6 +34,32 @@ class SumStrategy extends BaseStrategy<number, number> {
   }
 }
 
+// Listener that observes its parent step's business result and emits an
+// insight echoing it — used to assert listener wiring + envelope folding.
+class InsightListener extends BaseStrategy<number, null> {
+  static get method(): string {
+    return "wardley:chain:audit:capacity:listen";
+  }
+  async evaluate(input: number): Promise<StrategyResult<null>> {
+    return {
+      signals: [],
+      reasoning: [],
+      insights: [{ text: `observed ${input}`, by: InsightListener.method, type: "other" }],
+      result: null,
+    };
+  }
+}
+
+// Listener that always throws — used to assert failure isolation.
+class ThrowingListener extends BaseStrategy<unknown, null> {
+  static get method(): string {
+    return "wardley:chain:audit:capacity:boom";
+  }
+  async evaluate(): Promise<StrategyResult<null>> {
+    throw new Error("listener boom");
+  }
+}
+
 const ctx: RequestContext = {
   projectId: "p1",
   projectRoot: "/tmp/p1",
@@ -56,7 +82,7 @@ describe("runRecipe", () => {
         { stepId: "double", tool: DoubleStrategy.method, in: "$.value", out: "$.doubled" },
         { stepId: "sum", tool: SumStrategy.method, in: "$.doubled.result", out: "$.summed" },
       ],
-      listeners: [],
+      listeners: {},
     };
 
     const ast: Record<string, unknown> = { value: 5 };
@@ -82,7 +108,7 @@ describe("runRecipe", () => {
       steps: [
         { stepId: "double", tool: DoubleStrategy.method, over: "$.values", out: "$.results" },
       ],
-      listeners: [],
+      listeners: {},
     };
 
     const ast: Record<string, unknown> = { values: [1, 2, 3] };
@@ -103,7 +129,7 @@ describe("runRecipe", () => {
       domain: "wardley",
       tool: "chain",
       steps: [{ stepId: "x", tool: DoubleStrategy.method, in: "$.v" }],
-      listeners: [],
+      listeners: {},
     };
 
     const ast: Record<string, unknown> = { v: 7 };
@@ -111,5 +137,64 @@ describe("runRecipe", () => {
 
     const phases = events.map((e) => e.phase);
     assert.deepEqual(phases, ["step-start", "step-end", "run-end"]);
+  });
+
+  it("runs listeners after the main path and folds their insights into the envelope", async () => {
+    const registry = new StrategyRegistry();
+    registry.register(DoubleStrategy.method, DoubleStrategy);
+    registry.register(InsightListener.method, InsightListener);
+
+    const recipe: Recipe = {
+      schemaVersion: "1.0",
+      name: "double-with-listener",
+      domain: "wardley",
+      tool: "chain",
+      steps: [{ stepId: "double", tool: DoubleStrategy.method, in: "$.value", out: "$.doubled" }],
+      listeners: { double: [InsightListener.method] },
+    };
+
+    const ast: Record<string, unknown> = { value: 5 };
+    const outcome = await runRecipe({ recipe, ast, context: ctx, registry });
+
+    assert.equal((ast.doubled as { result: number }).result, 10);
+    // The listener observed its parent step's business result ($.doubled.result = 10).
+    const insight = outcome.envelope.insights.find((i) => i.by === InsightListener.method);
+    assert.ok(insight, "listener insight should be in the envelope");
+    assert.equal(insight?.text, "observed 10");
+    // A trace entry is recorded for the listener, attributed to its parent step.
+    assert.ok(
+      outcome.envelope.trace.some(
+        (t) => t.command === InsightListener.method && t.stepId === "double",
+      ),
+    );
+  });
+
+  it("isolates a failing listener — the main path still succeeds", async () => {
+    const registry = new StrategyRegistry();
+    registry.register(DoubleStrategy.method, DoubleStrategy);
+    registry.register(ThrowingListener.method, ThrowingListener);
+    registry.register(InsightListener.method, InsightListener);
+
+    const recipe: Recipe = {
+      schemaVersion: "1.0",
+      name: "double-with-failing-listener",
+      domain: "wardley",
+      tool: "chain",
+      steps: [{ stepId: "double", tool: DoubleStrategy.method, in: "$.value", out: "$.doubled" }],
+      listeners: { double: [ThrowingListener.method, InsightListener.method] },
+    };
+
+    const ast: Record<string, unknown> = { value: 8 };
+    const outcome = await runRecipe({ recipe, ast, context: ctx, registry });
+
+    // Main path intact despite the throwing listener.
+    assert.equal((ast.doubled as { result: number }).result, 16);
+    // The surviving listener still contributed; the throwing one left no trace.
+    assert.ok(
+      outcome.envelope.insights.some(
+        (i) => i.by === InsightListener.method && i.text === "observed 16",
+      ),
+    );
+    assert.ok(!outcome.envelope.trace.some((t) => t.command === ThrowingListener.method));
   });
 });

@@ -139,7 +139,7 @@ describe("labre-mcp HTTP transport", () => {
             out: "$.estimate",
           },
         ],
-        listeners: [],
+        listeners: {},
       }),
       "utf8",
     );

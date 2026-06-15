@@ -17,11 +17,12 @@ describe("labre-daemon boot wiring", () => {
     const registry = buildStrategyRegistry();
     process.env.LABRE_DISABLE_MOCKS = prevDisable ?? "";
     const ids = registry.list();
-    // map climate position-* (8 = 6 functional + 1 solution + 2 anchor)
+    // map climate position-* (9 = 6 functional + 1 solution + 2 anchor)
     // + map node identify (1)
-    // + map value-chain (3 = 1 generate + 1 prevent-collision + 1 audit)
-    // + render wardley-map owm (2 = parse + emit) = 15 total real strategies
-    assert.equal(registry.size(), 15);
+    // + map basemap generate (1)
+    // + map value-chain (5 = 1 generate + 1 organized-y-position + 1 select-by-type + 1 prevent-collision + 1 audit)
+    // + render wardley-map (3 = owm parse + owm emit + image emit svg) = 19 total real strategies
+    assert.equal(registry.size(), 19);
 
     const expected = [
       // map climate: position-functional-in-evolution (6)
@@ -38,10 +39,16 @@ describe("labre-daemon boot wiring", () => {
       "wardley:map:climate:position-anchor-in-evolution:culture-phase",
       // map node: identify (1)
       "wardley:map:node:identify:default",
-      // map: value-chain generate + render: owm parse/emit (3)
+      // map basemap generate (1)
+      "wardley:map:basemap:generate:default",
+      // map: value-chain generate + Y layout + select-by-type engine (3)
       "wardley:map:value-chain:generate:top-down",
+      "wardley:map:value-chain:organized-y-position:default",
+      "wardley:map:value-chain:select-by-type:component",
+      // render: owm parse/emit + image emit svg (3)
       "render:wardley-map:owm:parse:dsl",
       "render:wardley-map:owm:emit:dsl",
+      "render:wardley-map:image:emit:svg",
       // map value-chain layout audit (2) — physically still under common/
       "wardley:map:value-chain:prevent-collision:default",
       "wardley:map:value-chain:audit:overlap-check",
@@ -69,7 +76,8 @@ describe("labre-daemon boot wiring", () => {
 
   it("buildStrategyRegistry exposes the full v0.1.0 catalogue (real + mocks)", () => {
     const registry = buildStrategyRegistry();
-    // 15 real strategies (CP3-CP6) + 70 mock strategies (CP10) = 85 total.
+    // 19 real strategies (CP3-CP6 + basemap/Y-layout/svg + value-chain select-by-type engine)
+    // + 66 mock strategies (CP10) = 85 total.
     assert.equal(registry.size(), 85);
     // Every registered id is a valid 5-segment methodId.
     for (const id of registry.list()) {

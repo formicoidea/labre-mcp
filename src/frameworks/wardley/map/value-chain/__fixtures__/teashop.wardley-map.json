@@ -1,0 +1,662 @@
+{
+  "title": "Value chain of an online tea shop selling loose-leaf tea to home consumers",
+  "components": [
+    {
+      "id": "home-consumer",
+      "label": {
+        "name": "Home consumer",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "anchor",
+      "position": {
+        "evolution": {
+          "scalar": 0.45
+        },
+        "visibility": {
+          "scalar": 0.05
+        }
+      },
+      "description": "End customer buying loose-leaf tea for home use"
+    },
+    {
+      "id": "tea-assortment",
+      "label": {
+        "name": "Tea assortment",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "userNeed",
+      "position": {
+        "evolution": {
+          "scalar": 0.3
+        },
+        "visibility": {
+          "scalar": 0.213
+        }
+      },
+      "description": "Curated selection of loose-leaf teas offered for sale"
+    },
+    {
+      "id": "digital-storefront",
+      "label": {
+        "name": "Digital storefront",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "userNeed",
+      "position": {
+        "evolution": {
+          "scalar": 0.45
+        },
+        "visibility": {
+          "scalar": 0.238
+        }
+      },
+      "description": "Online shop interface for browsing and purchasing"
+    },
+    {
+      "id": "home-delivery",
+      "label": {
+        "name": "Home delivery",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "userNeed",
+      "position": {
+        "evolution": {
+          "scalar": 0.6
+        },
+        "visibility": {
+          "scalar": 0.213
+        }
+      },
+      "description": "Shipment of orders to the customer's address"
+    },
+    {
+      "id": "product-guidance",
+      "label": {
+        "name": "Product guidance",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "userNeed",
+      "position": {
+        "evolution": {
+          "scalar": 0.75
+        },
+        "visibility": {
+          "scalar": 0.263
+        }
+      },
+      "description": "Information and advice on teas and brewing"
+    },
+    {
+      "id": "customer-support",
+      "label": {
+        "name": "Customer support",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "userNeed",
+      "position": {
+        "evolution": {
+          "scalar": 0.9
+        },
+        "visibility": {
+          "scalar": 0.238
+        }
+      },
+      "description": "Assistance before, during, and after purchase"
+    },
+    {
+      "id": "manage-tea-inventory",
+      "label": {
+        "name": "Manage tea inventory",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "nature": "activity",
+      "position": {
+        "evolution": {
+          "scalar": 0.3
+        },
+        "visibility": {
+          "scalar": 0.425
+        }
+      },
+      "description": "Track stock levels, storage conditions, and availability"
+    },
+    {
+      "id": "perform-quality-control",
+      "label": {
+        "name": "Perform quality control",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "nature": "activity",
+      "position": {
+        "evolution": {
+          "scalar": 0.3
+        },
+        "visibility": {
+          "scalar": 0.475
+        }
+      },
+      "description": "Inspect, cup, and certify tea quality and freshness"
+    },
+    {
+      "id": "source-tea",
+      "label": {
+        "name": "Source tea",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "nature": "activity",
+      "position": {
+        "evolution": {
+          "scalar": 0.15
+        },
+        "visibility": {
+          "scalar": 0.638
+        }
+      },
+      "description": "Procure loose-leaf tea from producers and wholesalers"
+    },
+    {
+      "id": "supplier-network",
+      "label": {
+        "name": "Supplier network",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "position": {
+        "evolution": {
+          "scalar": 0.17
+        },
+        "visibility": {
+          "scalar": 0.85
+        }
+      },
+      "description": "Relationships with tea growers, importers, and distributors"
+    },
+    {
+      "id": "operate-e-commerce-platform",
+      "label": {
+        "name": "Operate e-commerce platform",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "nature": "activity",
+      "position": {
+        "evolution": {
+          "scalar": 0.45
+        },
+        "visibility": {
+          "scalar": 0.45
+        }
+      },
+      "description": "Run the software powering the online store"
+    },
+    {
+      "id": "host-website",
+      "label": {
+        "name": "Host website",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "nature": "activity",
+      "position": {
+        "evolution": {
+          "scalar": 0.3
+        },
+        "visibility": {
+          "scalar": 0.663
+        }
+      },
+      "description": "Provide web infrastructure and uptime for the storefront"
+    },
+    {
+      "id": "manage-product-catalog",
+      "label": {
+        "name": "Manage product catalog",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "nature": "activity",
+      "position": {
+        "evolution": {
+          "scalar": 0.45
+        },
+        "visibility": {
+          "scalar": 0.475
+        }
+      },
+      "description": "Maintain product listings, descriptions, and pricing"
+    },
+    {
+      "id": "process-payments",
+      "label": {
+        "name": "Process payments",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "nature": "activity",
+      "position": {
+        "evolution": {
+          "scalar": 0.47
+        },
+        "visibility": {
+          "scalar": 0.45
+        }
+      },
+      "description": "Handle customer transactions and authorization"
+    },
+    {
+      "id": "payment-gateway",
+      "label": {
+        "name": "Payment gateway",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "position": {
+        "evolution": {
+          "scalar": 0.77
+        },
+        "visibility": {
+          "scalar": 0.663
+        }
+      },
+      "description": "External service for secure card and digital payment processing"
+    },
+    {
+      "id": "manage-orders",
+      "label": {
+        "name": "Manage orders",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "nature": "activity",
+      "position": {
+        "evolution": {
+          "scalar": 0.6
+        },
+        "visibility": {
+          "scalar": 0.425
+        }
+      },
+      "description": "Receive, validate, and route customer orders"
+    },
+    {
+      "id": "package-orders",
+      "label": {
+        "name": "Package orders",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "nature": "activity",
+      "position": {
+        "evolution": {
+          "scalar": 0.45
+        },
+        "visibility": {
+          "scalar": 0.638
+        }
+      },
+      "description": "Pick, weigh, pack, and label tea orders for shipment"
+    },
+    {
+      "id": "packaging-materials",
+      "label": {
+        "name": "Packaging materials",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "position": {
+        "evolution": {
+          "scalar": 0.15
+        },
+        "visibility": {
+          "scalar": 0.85
+        }
+      },
+      "description": "Tins, pouches, labels, and protective shipping supplies"
+    },
+    {
+      "id": "ship-orders",
+      "label": {
+        "name": "Ship orders",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "nature": "activity",
+      "position": {
+        "evolution": {
+          "scalar": 0.6
+        },
+        "visibility": {
+          "scalar": 0.45
+        }
+      },
+      "description": "Hand over parcels to carrier and track delivery"
+    },
+    {
+      "id": "logistics-carrier",
+      "label": {
+        "name": "Logistics carrier",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "position": {
+        "evolution": {
+          "scalar": 0.75
+        },
+        "visibility": {
+          "scalar": 0.663
+        }
+      },
+      "description": "Third-party postal or courier service for transport"
+    },
+    {
+      "id": "create-product-content",
+      "label": {
+        "name": "Create product content",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "nature": "activity",
+      "position": {
+        "evolution": {
+          "scalar": 0.75
+        },
+        "visibility": {
+          "scalar": 0.475
+        }
+      },
+      "description": "Write tasting notes, origins, and brewing instructions"
+    },
+    {
+      "id": "tea-brewing-knowledge",
+      "label": {
+        "name": "Tea brewing knowledge",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "nature": "knowledge",
+      "position": {
+        "evolution": {
+          "scalar": 0.6
+        },
+        "visibility": {
+          "scalar": 0.475
+        }
+      },
+      "description": "Expertise on optimal preparation and steeping parameters"
+    },
+    {
+      "id": "provide-customer-support",
+      "label": {
+        "name": "Provide customer support",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "nature": "activity",
+      "position": {
+        "evolution": {
+          "scalar": 0.9
+        },
+        "visibility": {
+          "scalar": 0.45
+        }
+      },
+      "description": "Answer inquiries and resolve issues via chat or email"
+    },
+    {
+      "id": "support-tools-system",
+      "label": {
+        "name": "Support tools/system",
+        "position": {
+          "dx": 0,
+          "dy": 0
+        }
+      },
+      "type": "component",
+      "subtype": "functional",
+      "position": {
+        "evolution": {
+          "scalar": 0.79
+        },
+        "visibility": {
+          "scalar": 0.663
+        }
+      },
+      "description": "Helpdesk software and CRM for managing tickets"
+    }
+  ],
+  "relations": [
+    {
+      "id": "rel-1",
+      "consumer": "home-consumer",
+      "supplier": "tea-assortment",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-2",
+      "consumer": "home-consumer",
+      "supplier": "digital-storefront",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-3",
+      "consumer": "home-consumer",
+      "supplier": "home-delivery",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-4",
+      "consumer": "home-consumer",
+      "supplier": "product-guidance",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-5",
+      "consumer": "home-consumer",
+      "supplier": "customer-support",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-6",
+      "consumer": "tea-assortment",
+      "supplier": "manage-tea-inventory",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-7",
+      "consumer": "tea-assortment",
+      "supplier": "perform-quality-control",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-8",
+      "consumer": "manage-tea-inventory",
+      "supplier": "source-tea",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-9",
+      "consumer": "source-tea",
+      "supplier": "supplier-network",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-10",
+      "consumer": "digital-storefront",
+      "supplier": "operate-e-commerce-platform",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-11",
+      "consumer": "digital-storefront",
+      "supplier": "manage-product-catalog",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-12",
+      "consumer": "digital-storefront",
+      "supplier": "process-payments",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-13",
+      "consumer": "operate-e-commerce-platform",
+      "supplier": "host-website",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-14",
+      "consumer": "process-payments",
+      "supplier": "payment-gateway",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-15",
+      "consumer": "home-delivery",
+      "supplier": "manage-orders",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-16",
+      "consumer": "home-delivery",
+      "supplier": "ship-orders",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-17",
+      "consumer": "manage-orders",
+      "supplier": "package-orders",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-18",
+      "consumer": "package-orders",
+      "supplier": "packaging-materials",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-19",
+      "consumer": "ship-orders",
+      "supplier": "logistics-carrier",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-20",
+      "consumer": "product-guidance",
+      "supplier": "create-product-content",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-21",
+      "consumer": "product-guidance",
+      "supplier": "tea-brewing-knowledge",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-22",
+      "consumer": "customer-support",
+      "supplier": "provide-customer-support",
+      "type": "DependsOn"
+    },
+    {
+      "id": "rel-23",
+      "consumer": "provide-customer-support",
+      "supplier": "support-tools-system",
+      "type": "DependsOn"
+    }
+  ],
+  "context": "Archetype: an online tea shop selling loose-leaf tea directly to home consumers. The map is drawn to visualize the value chain structure and identify how value flows from sourcing to the end customer."
+}

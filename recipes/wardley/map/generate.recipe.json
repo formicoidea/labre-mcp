@@ -30,5 +30,5 @@
       "out": "$.output"
     }
   ],
-  "listeners": []
+  "listeners": {}
 }

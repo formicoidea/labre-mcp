@@ -16,8 +16,6 @@
 // available for transition; V1.5 cleanup will decide whether to retire it or
 // align it on this recipe-based path.
 
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
 import { EstimateEvolutionInputSchema } from '../schemas/estimate-evolution.schema.mjs';
 import { loadRecipe } from '#core/recipe/recipe-loader.mjs';
 import { runRecipe } from '#core/recipe/recipe-runner.mjs';
@@ -25,19 +23,7 @@ import { buildStrategyRegistry } from '#core/transport/strategy-registry-boot.mj
 import { attachArtifactWriter } from '#core/listeners/artifact-writer-listener.mjs';
 import { createEventBus } from '#core/bus/event-bus.mjs';
 import { resolveContext } from './resolve-context.mjs';
-
-// labre-mcp's own install root — where shipped recipes live (ARCH-08).
-//
-// Resolution order:
-//   1. `LABRE_SHIPPED_ROOT` env var (required when running from a bundled
-//      single-file build where the source layout is flattened).
-//   2. Auto-detection from `import.meta.url`: src/mcp/<file>.mts → up 2
-//      levels = repo root. Works for `tsx src/...` (dev) and
-//      `node dist/.../...` (prod) where the layout matches.
-const __filename = fileURLToPath(import.meta.url);
-const SHIPPED_ROOT =
-  process.env.LABRE_SHIPPED_ROOT ??
-  resolve(dirname(__filename), '..', '..');
+import { SHIPPED_ROOT } from './shipped-root.mjs';
 
 export interface EstimateEvolutionViaRecipeResult {
   recipeRunId: string;

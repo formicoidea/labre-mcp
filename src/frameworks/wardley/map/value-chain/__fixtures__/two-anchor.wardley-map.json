@@ -1,0 +1,313 @@
+{
+  "title": "Two value chains — consumer & merchant, joined at payment and delivery",
+  "components": [
+    {
+      "id": "hc",
+      "label": {
+        "name": "Home consumer"
+      },
+      "type": "anchor",
+      "position": {
+        "evolution": {
+          "scalar": 0.3
+        },
+        "visibility": {
+          "scalar": 0.5
+        }
+      }
+    },
+    {
+      "id": "tm",
+      "label": {
+        "name": "Tea merchant"
+      },
+      "type": "anchor",
+      "position": {
+        "evolution": {
+          "scalar": 0.7
+        },
+        "visibility": {
+          "scalar": 0.5
+        }
+      }
+    },
+    {
+      "id": "browse",
+      "label": {
+        "name": "Browse catalog"
+      },
+      "type": "component",
+      "subtype": "userNeed",
+      "position": {
+        "evolution": {
+          "scalar": 0.18
+        },
+        "visibility": {
+          "scalar": 0.5
+        }
+      }
+    },
+    {
+      "id": "place",
+      "label": {
+        "name": "Place order"
+      },
+      "type": "component",
+      "subtype": "userNeed",
+      "position": {
+        "evolution": {
+          "scalar": 0.34
+        },
+        "visibility": {
+          "scalar": 0.5
+        }
+      }
+    },
+    {
+      "id": "track",
+      "label": {
+        "name": "Track delivery"
+      },
+      "type": "component",
+      "subtype": "userNeed",
+      "position": {
+        "evolution": {
+          "scalar": 0.48
+        },
+        "visibility": {
+          "scalar": 0.5
+        }
+      }
+    },
+    {
+      "id": "catalog",
+      "label": {
+        "name": "Product catalog"
+      },
+      "type": "component",
+      "subtype": "functional",
+      "position": {
+        "evolution": {
+          "scalar": 0.15
+        },
+        "visibility": {
+          "scalar": 0.5
+        }
+      }
+    },
+    {
+      "id": "ordermgmt",
+      "label": {
+        "name": "Order management"
+      },
+      "type": "component",
+      "subtype": "functional",
+      "position": {
+        "evolution": {
+          "scalar": 0.4
+        },
+        "visibility": {
+          "scalar": 0.5
+        }
+      }
+    },
+    {
+      "id": "inv",
+      "label": {
+        "name": "Manage inventory"
+      },
+      "type": "component",
+      "subtype": "userNeed",
+      "position": {
+        "evolution": {
+          "scalar": 0.82
+        },
+        "visibility": {
+          "scalar": 0.5
+        }
+      }
+    },
+    {
+      "id": "sales",
+      "label": {
+        "name": "Process sales"
+      },
+      "type": "component",
+      "subtype": "userNeed",
+      "position": {
+        "evolution": {
+          "scalar": 0.6
+        },
+        "visibility": {
+          "scalar": 0.5
+        }
+      }
+    },
+    {
+      "id": "fulfill",
+      "label": {
+        "name": "Fulfill orders"
+      },
+      "type": "component",
+      "subtype": "userNeed",
+      "position": {
+        "evolution": {
+          "scalar": 0.72
+        },
+        "visibility": {
+          "scalar": 0.5
+        }
+      }
+    },
+    {
+      "id": "warehouse",
+      "label": {
+        "name": "Warehouse"
+      },
+      "type": "component",
+      "subtype": "functional",
+      "position": {
+        "evolution": {
+          "scalar": 0.88
+        },
+        "visibility": {
+          "scalar": 0.5
+        }
+      }
+    },
+    {
+      "id": "stockdb",
+      "label": {
+        "name": "Stock database"
+      },
+      "type": "component",
+      "subtype": "functional",
+      "position": {
+        "evolution": {
+          "scalar": 0.92
+        },
+        "visibility": {
+          "scalar": 0.5
+        }
+      }
+    },
+    {
+      "id": "pay",
+      "label": {
+        "name": "Payment platform"
+      },
+      "type": "component",
+      "subtype": "functional",
+      "position": {
+        "evolution": {
+          "scalar": 0.46
+        },
+        "visibility": {
+          "scalar": 0.5
+        }
+      }
+    },
+    {
+      "id": "delivery",
+      "label": {
+        "name": "Delivery network"
+      },
+      "type": "component",
+      "subtype": "functional",
+      "position": {
+        "evolution": {
+          "scalar": 0.56
+        },
+        "visibility": {
+          "scalar": 0.5
+        }
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "e1",
+      "consumer": "hc",
+      "supplier": "browse",
+      "type": "DependsOn"
+    },
+    {
+      "id": "e2",
+      "consumer": "hc",
+      "supplier": "place",
+      "type": "DependsOn"
+    },
+    {
+      "id": "e3",
+      "consumer": "hc",
+      "supplier": "track",
+      "type": "DependsOn"
+    },
+    {
+      "id": "e4",
+      "consumer": "browse",
+      "supplier": "catalog",
+      "type": "DependsOn"
+    },
+    {
+      "id": "e5",
+      "consumer": "place",
+      "supplier": "pay",
+      "type": "DependsOn"
+    },
+    {
+      "id": "e6",
+      "consumer": "place",
+      "supplier": "ordermgmt",
+      "type": "DependsOn"
+    },
+    {
+      "id": "e7",
+      "consumer": "track",
+      "supplier": "delivery",
+      "type": "DependsOn"
+    },
+    {
+      "id": "e8",
+      "consumer": "tm",
+      "supplier": "inv",
+      "type": "DependsOn"
+    },
+    {
+      "id": "e9",
+      "consumer": "tm",
+      "supplier": "sales",
+      "type": "DependsOn"
+    },
+    {
+      "id": "e10",
+      "consumer": "tm",
+      "supplier": "fulfill",
+      "type": "DependsOn"
+    },
+    {
+      "id": "e11",
+      "consumer": "sales",
+      "supplier": "pay",
+      "type": "DependsOn"
+    },
+    {
+      "id": "e12",
+      "consumer": "fulfill",
+      "supplier": "delivery",
+      "type": "DependsOn"
+    },
+    {
+      "id": "e13",
+      "consumer": "fulfill",
+      "supplier": "warehouse",
+      "type": "DependsOn"
+    },
+    {
+      "id": "e14",
+      "consumer": "inv",
+      "supplier": "stockdb",
+      "type": "DependsOn"
+    }
+  ]
+}

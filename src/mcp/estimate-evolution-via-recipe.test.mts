@@ -25,7 +25,7 @@ const SCURVE_RECIPE = {
       out: '$.estimate',
     },
   ],
-  listeners: [],
+  listeners: {},
 };
 
 async function setupProjectRoot(): Promise<string> {
