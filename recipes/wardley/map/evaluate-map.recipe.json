@@ -3,7 +3,7 @@
   "name": "evaluate-map",
   "domain": "wardley",
   "tool": "map",
-  "description": "Evaluate every component of a chain map. Parses the map, fans out per-component estimation, returns the chain AST annotated with EvolutionAnnotation per component.",
+  "description": "Evaluate every component of a chain map (scatter model). Parses the map, then fans out two independent per-component passes: positions each component in evolution via the llm-direct strategy (primary), and surfaces the underlying capability of each component via identify (observation, envelope-only). Returns the chain AST annotated with EvolutionAnnotation per component. (All per-component work is parallel fan-out steps; listeners do not fan out, so a once-per-run observer such as property-assessment belongs on a transformative-flow recipe, not here.)",
   "steps": [
     {
       "stepId": "parse-map",
@@ -16,6 +16,12 @@
       "tool": "wardley:map:climate:position-functional-in-evolution:llm-direct",
       "over": "$.chain.result.components",
       "out": "$.evaluations"
+    },
+    {
+      "stepId": "identify-all",
+      "tool": "wardley:map:node:identify:default",
+      "over": "$.chain.result.components",
+      "out": "$.identified"
     }
   ],
   "listeners": {}

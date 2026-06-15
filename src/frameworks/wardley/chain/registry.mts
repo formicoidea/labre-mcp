@@ -16,6 +16,8 @@ import { WardleyMapBasemapGenerateDefaultStrategy } from '#frameworks/wardley/ma
 // Canonical value-chain generation + Y layout (WardleyMap → WardleyMap).
 import { WardleyMapValueChainGenerateTopDownStrategy } from '#frameworks/wardley/map/value-chain/generate/top-down.mjs';
 import { WardleyMapValueChainOrganizedYPositionDefaultStrategy } from '#frameworks/wardley/map/value-chain/organized-y-position/default.mjs';
+// Selector engine: builds the array of type:'component' nodes for per-component fan-out.
+import { WardleyMapValueChainSelectByTypeComponentStrategy } from '#frameworks/wardley/map/value-chain/select-by-type/component.mjs';
 
 /**
  * Register every chain strategy on the provided core registry.
@@ -36,5 +38,9 @@ export function registerChainStrategies(
   registry.register(
     WardleyMapValueChainOrganizedYPositionDefaultStrategy.method,
     WardleyMapValueChainOrganizedYPositionDefaultStrategy,
+  );
+  registry.register(
+    WardleyMapValueChainSelectByTypeComponentStrategy.method,
+    WardleyMapValueChainSelectByTypeComponentStrategy,
   );
 }

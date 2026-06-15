@@ -28,17 +28,18 @@ describe('runRecipe tool', () => {
   it('runs a shipped recipe by name and returns its envelope', async () => {
     const out = (await RUN_RECIPE_TOOL.handler(
       {
-        recipe: 'wardley:map:position-chain-in-evolution',
-        input: { wardley: { map: { components: [] } } },
+        recipe: 'wardley:map:estimate-chain-components',
+        input: { title: 'empty', components: [], relations: [] },
       },
       context,
     )) as RunRecipeResultShape;
 
     assert.equal(out.status, 'ok');
-    assert.equal(out.recipe, 'wardley:map:position-chain-in-evolution');
+    assert.equal(out.recipe, 'wardley:map:estimate-chain-components');
     assert.ok(out.recipeRunId, 'recipeRunId should be present');
-    // Two steps (position, render-svg) each leave a trace entry; mock strategies
-    // and the pipeline-opportunity listener contribute insights.
+    // Two steps (select, estimate-all) each leave a trace entry; the selector
+    // contributes a "selected N/M" insight. Empty map → 0 components selected,
+    // so estimate-all fans out over an empty array (no LLM call).
     assert.ok((out.envelope?.trace.length ?? 0) >= 2);
     assert.ok((out.envelope?.insights.length ?? 0) >= 1);
   });

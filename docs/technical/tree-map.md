@@ -62,8 +62,8 @@ src/
 │
 ├── frameworks/               ── Domaines métier
 │   ├── wardley/
-│   │   ├── map/               basemap/generate (réel), value-chain/{generate/top-down, organized-y-position} (réels, WardleyMap→WardleyMap) ; config, node, climate, zonage… (mock)
-│   │   ├── chain/            registry.mts (réel : basemap + value-chain generate/organized-y + owm parse/emit) ; read/, emit/ ;
+│   │   ├── map/               basemap/generate (réel), value-chain/{generate/top-down, organized-y-position, select-by-type/component} (réels, WardleyMap→…) ; config, node, climate, zonage… (mock)
+│   │   ├── chain/            registry.mts (réel : basemap + value-chain generate/organized-y/select-by-type + owm parse/emit) ; read/, emit/ ;
 │   │   │                     _legacy/write/{chain,component}/  ← stratégies réelles (roadmap B2)
 │   │   ├── evolution/        registry.mts (réel : capacity + solution + anchor) ;
 │   │   │                     _legacy/write/{strategies,routing,pipeline,patent,s-curve}/
@@ -121,6 +121,8 @@ Partagé : lib/{llm, degradation, prompts, owm, response-formatter, language-det
 - `recipes/wardley/map/estimate-component-evolution.recipe.json` — `node:identify:default` → `position-functional-in-evolution:llm-direct`
 - `recipes/wardley/map/evaluate-map.recipe.json`
 - `recipes/wardley/map/generate.recipe.json`
+- `recipes/wardley/map/draw-value-chain.recipe.json` — prompt → chaîne de valeur (X = lisibilité, **pas** d'évolution) → SVG
+- `recipes/wardley/map/estimate-chain-components.recipe.json` — `select-by-type:component` (anchors exclus) → fan-out `llm-direct` per-composant → annotations d'évolution (pas de rendu)
 
 > Toutes les recettes livrées ont **≥ 2 étapes** (orchestration). Une commande seule s'appelle directement via l'outil MCP `runCommand` (cf. [tools-reference](../functional/tools-reference.md)) — pas via une recette mono-étape.
 

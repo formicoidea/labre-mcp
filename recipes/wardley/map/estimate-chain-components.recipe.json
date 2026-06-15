@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0",
+  "name": "estimate-chain-components",
+  "domain": "wardley",
+  "tool": "map",
+  "description": "Estimate the evolution of every type:'component' node of a canonical value-chain WardleyMap. A selector engine (select-by-type:component) builds the array of component nodes — anchors and other types are excluded — and the recipe fans out the single-component positioner (llm-direct) over that array. Output is per-component evolution annotations: positioning here is a pointwise per-component analysis, NOT a bulk map transform, and produces no rendered map.",
+  "steps": [
+    {
+      "stepId": "select",
+      "tool": "wardley:map:value-chain:select-by-type:component",
+      "in": "$.input",
+      "out": "$.selected"
+    },
+    {
+      "stepId": "estimate-all",
+      "tool": "wardley:map:climate:position-functional-in-evolution:llm-direct",
+      "over": "$.selected.result",
+      "out": "$.evaluations"
+    }
+  ],
+  "listeners": {}
+}

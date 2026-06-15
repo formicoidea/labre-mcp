@@ -32,7 +32,8 @@ import { MockWardleyMapNodeIdentifyMethodBuyPolicyStrategy } from './wardley/map
 import { MockWardleyMapClimateIdentifyDefaultStrategy } from './wardley/map/climate/identify/default.mock-strategy.mjs';
 import { MockWardleyMapClimateIdentifyMethodIssuesDefaultStrategy } from './wardley/map/climate/identify-method-issues/default.mock-strategy.mjs';
 import { MockWardleyMapClimateInertiaIdentificationDefaultStrategy } from './wardley/map/climate/inertia-identification/default.mock-strategy.mjs';
-import { MockWardleyMapClimatePositionValueChainInEvolutionDefaultStrategy } from './wardley/map/climate/position-value-chain-in-evolution/default.mock-strategy.mjs';
+// position-value-chain-in-evolution removed: bulk map positioning is now expressed as a
+// recipe fan-out (select-by-type:component → llm-direct), not a single strategy.
 import { MockWardleyMapDoctrineOrientPathWhereToInvestDefaultStrategy } from './wardley/map/doctrine/orient-path-where-to-invest/default.mock-strategy.mjs';
 import { MockWardleyMapDoctrineIdentifyTheMethodDefaultStrategy } from './wardley/map/doctrine/identify-the-method/default.mock-strategy.mjs';
 import { MockWardleyMapOutputReadWhereToInvestStrategy } from './wardley/map/output/read/where-to-invest.mock-strategy.mjs';
@@ -101,7 +102,6 @@ export function registerMocks(registry: StrategyRegistry<BaseStrategy>): void {
   registry.register(MockWardleyMapClimateIdentifyDefaultStrategy.method, MockWardleyMapClimateIdentifyDefaultStrategy);
   registry.register(MockWardleyMapClimateIdentifyMethodIssuesDefaultStrategy.method, MockWardleyMapClimateIdentifyMethodIssuesDefaultStrategy);
   registry.register(MockWardleyMapClimateInertiaIdentificationDefaultStrategy.method, MockWardleyMapClimateInertiaIdentificationDefaultStrategy);
-  registry.register(MockWardleyMapClimatePositionValueChainInEvolutionDefaultStrategy.method, MockWardleyMapClimatePositionValueChainInEvolutionDefaultStrategy);
   registry.register(MockWardleyMapDoctrineOrientPathWhereToInvestDefaultStrategy.method, MockWardleyMapDoctrineOrientPathWhereToInvestDefaultStrategy);
   registry.register(MockWardleyMapDoctrineIdentifyTheMethodDefaultStrategy.method, MockWardleyMapDoctrineIdentifyTheMethodDefaultStrategy);
   registry.register(MockWardleyMapOutputReadWhereToInvestStrategy.method, MockWardleyMapOutputReadWhereToInvestStrategy);
