@@ -1,44 +1,97 @@
 # labre-mcp
 
-Serveur MCP (Model Context Protocol) pour l'estimation de la position d'evolution des composants sur les cartes de Wardley. Route automatiquement entre deux pipelines d'evaluation — **capability strategies** (6 strategies pluggables) pour les capacites abstraites et **solution strategies** (12 proprietes Wardley) pour les produits nommes — avec gate de classification economique et modes oneshot/conversationnel.
+An [MCP](https://modelcontextprotocol.io) server for applying strategy **practice frameworks** — Wardley Maps first (value chain, evolution, climates, doctrines, the full study cycle). It exposes a small set of MCP tools backed by a pluggable **strategy registry** orchestrated by a **recipe runner**.
 
-## Demarrage rapide
+It runs as a local server that an MCP client — Claude Code / the Claude Agent SDK, or any MCP-capable client — launches over **stdio**. An HTTP daemon transport is also available (SaaS-ready by design).
 
-```bash
-pnpm install
-# Configurer OPENCODE_API_KEY dans .env
+## Requirements
 
-# Dev (charge les sources .mts via tsx)
-pnpm run dev
+- **Node.js ≥ 20**
+- An **LLM provider** configured via `llm.config.json` (see [LLM configuration](#llm-configuration)). Most tools call an LLM; without a provider they degrade rather than crash, but produce no analysis.
 
-# Prod (consomme dist/ apres build)
-pnpm run build && pnpm run mcp:prod
+## Install & use with Claude Code (stdio)
+
+Add the server to your project's `.mcp.json` (or `~/.claude.json`). Claude Code spawns the process itself — there is no daemon to keep running:
+
+```json
+{
+  "mcpServers": {
+    "labre-mcp": {
+      "command": "npx",
+      "args": ["-y", "labre-mcp"],
+      "env": {
+        "WARDLEY_LLM_CONFIG": "C:\\path\\to\\your\\llm.config.json"
+      }
+    }
+  }
+}
 ```
 
-Le serveur est automatiquement disponible dans Claude Code via `.mcp.json`.
+> **Windows note:** if `npx` fails to start the server, wrap it as `"command": "cmd"`, `"args": ["/c", "npx", "-y", "labre-mcp"]`.
 
-> **Note Windows** : `.mcp.json` utilise `cmd /c npx tsx ...` — le wrapper `cmd /c` est requis sous Windows pour exécuter `npx` depuis un client MCP.
+The `WARDLEY_LLM_CONFIG` env var is optional — if omitted, the server looks for `llm.config.json` in the client's working directory (your workspace root).
 
-## Outils MCP
+## Tools
 
-| Outil | Description |
+| Tool | Purpose |
 |---|---|
-| `estimateEvolution` | Estime la position d'evolution d'un composant |
-| `evaluateMap` | Evalue tous les composants d'un fichier .wm |
-| `generateValueChain` | Genere une carte Wardley a partir d'une description metier |
+| `estimateEvolution` | Estimate the Wardley evolution position of a component (runs the `estimate-component-evolution` recipe). |
+| `runCommand` | Invoke a single strategy directly by its 5-segment methodId → `CommandResult` + JSON-labre envelope. |
+| `runRecipe` | Run a multi-step recipe by `<domain>:<tool>:<name>` reference → JSON-labre envelope + final AST + artifact path. |
+| `__ping__` | Smoke tool — echoes its input. Validates the transport. |
 
-## Documentation
+The full methodId catalogue lives in [docs/architecture/ast-schema.md](docs/architecture/ast-schema.md); recipes in [docs/architecture/recipes.md](docs/architecture/recipes.md).
 
-La documentation complete est disponible dans le dossier [`docs/`](docs/README.md) :
+## LLM configuration
 
-- [Demarrage rapide](docs/getting-started.md)
-- [Architecture](docs/architecture.md)
-- [Reference des outils](docs/tools-reference.md)
-- [Strategies d'evaluation](docs/strategies.md) (capability + solution)
-- [Gate de classification](docs/classification-gate.md)
-- [Configuration](docs/configuration.md)
-- [Notifications](docs/notifications.md)
-- [Format .wm](docs/wm-format.md)
-- [Evaluation (promptfoo)](docs/evaluation.md)
-- [Extensibilite](docs/extending.md)
-- [Depannage](docs/troubleshooting.md)
+Copy [`llm.config.example.json`](llm.config.example.json) to `llm.config.json` and point `WARDLEY_LLM_CONFIG` at it (or place it in your workspace root). Three provider kinds are supported:
+
+- `agent-sdk` — the Claude Agent SDK (`claude`).
+- `http-api` — an OpenAI-compatible gateway (e.g. OpenCode/Kimi with logprobs).
+- `copilot-sdk` — GitHub Copilot.
+
+Per-strategy provider/model/effort overrides are declared under `strategies` in the same file.
+
+### Optional capabilities
+
+Some strategies use external services and degrade gracefully when their config is absent:
+
+- **BigQuery patent analysis** (CPC evolution): `BIGQUERY_PROJECT_ID`, `GOOGLE_APPLICATION_CREDENTIALS`.
+- **Web search** (Agent SDK): `ANTHROPIC_API_KEY`.
+
+## Artifacts
+
+Each recipe run writes a verbose, analysis-ready JSON artifact to `~/.labre-mcp/runs/<projectId>/<runId>.json`.
+
+## HTTP daemon (alternative transport)
+
+For local development or a SaaS-style deployment, the server can run as an HTTP daemon instead of stdio:
+
+```bash
+npm run build
+npm run mcp:prod          # node dist/core/transport/labre-daemon.mjs
+```
+
+It listens on `127.0.0.1:6767` (override with `LABRE_HTTP_PORT`). Point the client at it with:
+
+```json
+{ "mcpServers": { "labre-mcp": { "type": "http", "url": "http://127.0.0.1:6767/mcp" } } }
+```
+
+See [docs/architecture/transport.md](docs/architecture/transport.md) for the transport model.
+
+## Development
+
+```bash
+npm install
+npm run mcp:stdio         # stdio server via tsx (dev)
+npm run mcp               # HTTP daemon via tsx (dev)
+npm run typecheck
+npm run test              # unit tests (some integration tests call real LLMs — see AGENT.md)
+```
+
+Architecture and decision records are under [docs/architecture/](docs/architecture/) — start with [ast-schema.md](docs/architecture/ast-schema.md) and [decisions.md](docs/architecture/decisions.md).
+
+## License
+
+ISC

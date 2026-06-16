@@ -6,18 +6,19 @@
 // resolve methodIds at call time.
 
 import { fileURLToPath } from "node:url";
-import { ToolRegistry } from "./mcp-handler.mjs";
+import type { ToolRegistry } from "./mcp-handler.mjs";
 import { startHttpServer } from "./http-server.mjs";
-import { ESTIMATE_EVOLUTION_TOOL } from "#mcp/estimate-evolution.tool.mjs";
-import { RUN_COMMAND_TOOL } from "#mcp/run-command.tool.mjs";
-import { RUN_RECIPE_TOOL } from "#mcp/run-recipe.tool.mjs";
 import { registerBootHealthChecks } from "./boot-health-checks.mjs";
 import { runAllHealthChecks } from "#lib/degradation/index.mjs";
 
 // Re-export so existing callers (tests, downstream tooling) can keep
-// importing `buildStrategyRegistry` from this module without churn.
+// importing `buildStrategyRegistry` / `buildBootRegistry` from this module
+// without churn. The tool registry is now built in the transport-agnostic
+// boot-tool-registry module, shared with the stdio entrypoint.
 export { buildStrategyRegistry } from "./strategy-registry-boot.mjs";
+export { buildBootRegistry } from "./boot-tool-registry.mjs";
 import { buildStrategyRegistry } from "./strategy-registry-boot.mjs";
+import { buildBootRegistry } from "./boot-tool-registry.mjs";
 
 const DEFAULT_PORT = 6767;
 
@@ -31,29 +32,9 @@ function readPort(): number {
   return parsed;
 }
 
-export function buildBootRegistry(): ToolRegistry {
-  const registry = new ToolRegistry();
-  registry.register({
-    name: "__ping__",
-    description: "Smoke tool — returns the input echoed back. Used to validate transport.",
-    inputSchema: {
-      type: "object",
-      properties: { message: { type: "string" } },
-    },
-    async handler(args) {
-      // any: smoke tool accepts arbitrary args, echoes them back
-      return { echoed: args, daemon: "labre-mcp" };
-    },
-  });
-  registry.register(ESTIMATE_EVOLUTION_TOOL);
-  registry.register(RUN_COMMAND_TOOL);
-  registry.register(RUN_RECIPE_TOOL);
-  return registry;
-}
-
 async function main(): Promise<void> {
   const port = readPort();
-  const tools = buildBootRegistry();
+  const tools: ToolRegistry = buildBootRegistry();
   const strategies = buildStrategyRegistry();
 
   const server = await startHttpServer({ port, tools });
