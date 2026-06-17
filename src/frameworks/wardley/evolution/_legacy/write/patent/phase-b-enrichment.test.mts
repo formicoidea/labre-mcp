@@ -144,7 +144,7 @@ async function main() {
     assert.ok('evolution' in result);
     assert.ok('confidence' in result);
     assert.ok('method' in result);
-    assert.equal(result.method, 'cpc-evolution');
+    assert.equal(result.method, 'write:capacity:cpc-evolution');
   });
 
   // ── 2. Phase B filter compatibility ──────────────────────────────────

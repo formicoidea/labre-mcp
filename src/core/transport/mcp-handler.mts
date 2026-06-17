@@ -13,6 +13,7 @@
 import type { RequestContext } from "../context/request-context.mjs";
 import { type JsonRpcRequest, type JsonRpcResponse, JsonRpcErrorCode } from "./json-rpc.schema.mjs";
 import { withMcpDegradation } from "#lib/degradation/index.mjs";
+import type { Degradable } from "#lib/degradation/types.mjs";
 
 export interface ToolDefinition {
   name: string;
@@ -20,6 +21,16 @@ export interface ToolDefinition {
   // any: per-tool input shape — opaque at the dispatcher level (handler validates)
   inputSchema: Record<string, unknown>;
   handler: (args: unknown, context: RequestContext) => Promise<unknown>;
+}
+
+interface TextContentBlock {
+  type: "text";
+  text: string;
+}
+
+interface CallToolResult {
+  content: TextContentBlock[];
+  structuredContent: unknown;
 }
 
 export class ToolRegistry {
@@ -106,7 +117,7 @@ export async function dispatch(options: DispatchOptions): Promise<JsonRpcRespons
         const degradable = await withMcpDegradation(params.name, () =>
           tool.handler(params.arguments ?? {}, context),
         );
-        return success(id, degradable);
+        return success(id, toCallToolResult(degradable));
       }
 
       default:
@@ -119,6 +130,13 @@ export async function dispatch(options: DispatchOptions): Promise<JsonRpcRespons
 
 function success(id: string | number | null, result: unknown): JsonRpcResponse {
   return { jsonrpc: "2.0", id, result };
+}
+
+function toCallToolResult<T>(degradable: Degradable<T>): CallToolResult {
+  return {
+    content: [{ type: "text", text: JSON.stringify(degradable) }],
+    structuredContent: degradable,
+  };
 }
 
 function error(

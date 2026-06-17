@@ -269,7 +269,7 @@ async function main() {
     assert.ok(steps.includes('patent-count'), 'trace missing patent-count step');
     assert.ok(steps.includes('aggregated') || steps.includes('certitude-indicators'),
       'trace missing aggregation/indicator step');
-    assert.ok(steps.includes('write:capacity:s-curve'), 'trace missing s-curve step');
+    assert.ok(steps.includes('s-curve'), 'trace missing s-curve step');
     assert.ok(steps.includes('confidence'), 'trace missing confidence step');
   });
 
@@ -387,7 +387,7 @@ async function main() {
       cpcMapper: mockCpcMapper,
     });
     const result = await strategy.evaluate(COMPONENT_FULL);
-    const scurveStep = result.trace.find(t => t.step === 'write:capacity:s-curve');
+    const scurveStep = result.trace.find(t => t.step === 's-curve');
 
     assert.ok(scurveStep, 'trace must have s-curve step');
     assert.ok('evolution' in scurveStep, 's-curve step missing evolution');

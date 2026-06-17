@@ -74,6 +74,25 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
     references: [],
   };
 
+  let runEndEmitted = false;
+  const emitRunEnd = () => {
+    if (runEndEmitted) return;
+    runEndEmitted = true;
+    bus.emit({
+      schemaVersion: "1.0",
+      recipeRunId,
+      sessionId: options.context.sessionId,
+      stepId: "__run__",
+      // The run-end event needs a methodId that respects the 5-segment
+      // grammar (ast-schema.md v0.1.0). The recipe name itself is already
+      // carried by recipeRunId; this synthetic id only identifies the event
+      // origin as "the recipe runner of this domain".
+      methodId: `${options.recipe.domain}:recipe:orchestration:run:default`,
+      phase: "run-end",
+      timestamp: new Date().toISOString(),
+    });
+  };
+
   try {
     for (const step of options.recipe.steps) {
       await executeStep({
@@ -101,20 +120,10 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
       registry: options.registry,
       envelope,
     });
-
-    bus.emit({
-      schemaVersion: "1.0",
-      recipeRunId,
-      sessionId: options.context.sessionId,
-      stepId: "__run__",
-      // The run-end event needs a methodId that respects the 5-segment
-      // grammar (ast-schema.md v0.1.0). The recipe name itself is already
-      // carried by recipeRunId; this synthetic id only identifies the event
-      // origin as "the recipe runner of this domain".
-      methodId: `${options.recipe.domain}:recipe:orchestration:run:default`,
-      phase: "run-end",
-      timestamp: new Date().toISOString(),
-    });
+    emitRunEnd();
+  } catch (err) {
+    emitRunEnd();
+    throw err;
   } finally {
     subscription.unsubscribe();
   }
@@ -209,15 +218,25 @@ async function executeStep(ctx: StepExecutionContext): Promise<void> {
         `Step "${step.stepId}" has 'over: ${step.over}' but the path did not resolve to an array (got ${typeof items})`,
       );
     }
-    const settled = await Promise.allSettled(
-      items.map((item) => strategy.evaluate(item, context)),
-    );
-    result = settled.map((s) =>
-      s.status === "fulfilled" ? s.value : { error: String(s.reason) },
-    );
+    try {
+      const settled = await Promise.allSettled(
+        items.map((item) => strategy.evaluate(item, context)),
+      );
+      result = settled.map((s) =>
+        s.status === "fulfilled" ? s.value : { error: String(s.reason) },
+      );
+    } catch (err) {
+      emitStepError({ bus, recipeRunId, sessionId, step, startedAt, err });
+      throw err;
+    }
   } else {
     const input = readPath(ast, inputPath);
-    result = await strategy.evaluate(input, context);
+    try {
+      result = await strategy.evaluate(input, context);
+    } catch (err) {
+      emitStepError({ bus, recipeRunId, sessionId, step, startedAt, err });
+      throw err;
+    }
   }
 
   writePath(ast, outputPath, result);
@@ -249,6 +268,28 @@ async function executeStep(ctx: StepExecutionContext): Promise<void> {
     durationMs: completedAt - startedAt,
     startedAt: new Date(startedAt).toISOString(),
     completedAt: new Date(completedAt).toISOString(),
+  });
+}
+
+function emitStepError(args: {
+  bus: EventBus;
+  recipeRunId: string;
+  sessionId: string;
+  step: RecipeStep;
+  startedAt: number;
+  err: unknown;
+}): void {
+  const completedAt = Date.now();
+  args.bus.emit({
+    schemaVersion: "1.0",
+    recipeRunId: args.recipeRunId,
+    sessionId: args.sessionId,
+    stepId: args.step.stepId,
+    methodId: args.step.tool,
+    phase: "step-error",
+    timestamp: new Date(completedAt).toISOString(),
+    durationMs: completedAt - args.startedAt,
+    payload: { error: (args.err as Error)?.message ?? String(args.err) },
   });
 }
 

@@ -490,7 +490,7 @@ async function main() {
 
     // Extract components from trace
     const patentCountStep = result.trace.find(t => t.step === 'patent-count');
-    const scurveStep = result.trace.find(t => t.step === 'write:capacity:s-curve');
+    const scurveStep = result.trace.find(t => t.step === 's-curve');
 
     // Recompute dataQuality from patent count
     const dq = computeDataQuality(patentCountStep.value);

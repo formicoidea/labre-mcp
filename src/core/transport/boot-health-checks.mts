@@ -11,6 +11,7 @@
 import { registerHealthCheck } from "#lib/degradation/index.mjs";
 import { checkEnvironment as checkBigQueryEnv } from "#lib/patent/bigquery-client.mjs";
 import { loadLLMConfig } from "#lib/llm/config.loader.mjs";
+import { checkCopilotCliAvailable } from "#lib/llm/copilot-sdk-call.mjs";
 
 /**
  * Register every boot health check. Idempotent (the registry overwrites by
@@ -33,6 +34,24 @@ export function registerBootHealthChecks(): void {
     } catch (err) {
       return { ready: false, reason: (err as Error).message };
     }
+  });
+
+  // Copilot SDK: the npm SDK shells out to the Copilot CLI package at runtime.
+  // Check only local package availability here; auth/network probing stays out
+  // of boot so startup remains fast and deterministic.
+  registerHealthCheck("copilot-sdk", () => {
+    let cfg;
+    try {
+      cfg = loadLLMConfig();
+    } catch {
+      return { ready: true };
+    }
+    const usesCopilot = Object.values(cfg.providers).some((provider) => provider.kind === "copilot-sdk");
+    if (!usesCopilot) return { ready: true };
+    const cli = checkCopilotCliAvailable();
+    return cli.ready
+      ? { ready: true }
+      : { ready: false, reason: cli.reason };
   });
 
   // Web search (Agent SDK): needs an Anthropic credential in the environment.

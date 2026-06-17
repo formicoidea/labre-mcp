@@ -84,10 +84,11 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
         artifactPath,
       };
     } catch (err) {
-      await artifactHandle.detach();
+      const artifactPath = await artifactHandle.artifactPath;
       return {
         recipe: call.recipe,
         status: 'error',
+        artifactPath,
         errors: [(err as Error)?.message ?? String(err)],
       };
     }

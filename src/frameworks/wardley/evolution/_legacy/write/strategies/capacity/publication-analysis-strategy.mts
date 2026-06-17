@@ -110,9 +110,10 @@ export class PublicationAnalysisStrategy extends CoreBaseStrategy<ComponentInput
     component: ComponentInput,
     _context: RequestContext,
   ): Promise<StrategyResult<EvolutionResult>> {
-    // any: getStrategyLLM returns an LLM call function — type intentionally open
-    const llmCall: LLMCall =
-      this._llmCall ?? (await getStrategyLLM('publication-analysis') as LLMCall);
+    const llmCall: LLMCall | null = component.phaseDistribution
+      ? null
+      // any: getStrategyLLM returns an LLM call function — type intentionally open
+      : this._llmCall ?? (await getStrategyLLM('publication-analysis') as LLMCall);
 
     const { distribution, llmResponse } = await obtainDistribution(component, llmCall);
     const evolution = centroidEvolution(distribution);

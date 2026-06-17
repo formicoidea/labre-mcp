@@ -646,8 +646,8 @@ describe('end-to-end: toggling indicators affects evaluate()', () => {
     // Both produce valid results
     assert.equal(typeof resultAll.evolution, 'number');
     assert.equal(typeof resultSingle.evolution, 'number');
-    assert.equal(resultAll.method, 'cpc-evolution');
-    assert.equal(resultSingle.method, 'cpc-evolution');
+    assert.equal(resultAll.method, 'write:capacity:cpc-evolution');
+    assert.equal(resultSingle.method, 'write:capacity:cpc-evolution');
 
     // Certitude values should differ (different weighting)
     // (they may be equal in degenerate cases, but the trace should differ)
@@ -680,8 +680,8 @@ describe('end-to-end: toggling indicators affects evaluate()', () => {
     const result2 = await strategy.evaluate(component);
 
     // Both valid
-    assert.equal(result1.method, 'cpc-evolution');
-    assert.equal(result2.method, 'cpc-evolution');
+    assert.equal(result1.method, 'write:capacity:cpc-evolution');
+    assert.equal(result2.method, 'write:capacity:cpc-evolution');
 
     // Trace should show different weight counts
     const trace1Cert = result1.trace.find(t => t.step === 'certitude-indicators');

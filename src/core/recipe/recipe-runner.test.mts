@@ -60,6 +60,15 @@ class ThrowingListener extends BaseStrategy<unknown, null> {
   }
 }
 
+class ThrowingStrategy extends BaseStrategy<unknown, null> {
+  static get method(): string {
+    return "wardley:chain:write:capacity:throw";
+  }
+  async evaluate(): Promise<StrategyResult<null>> {
+    throw new Error("step boom");
+  }
+}
+
 const ctx: RequestContext = {
   projectId: "p1",
   projectRoot: "/tmp/p1",
@@ -137,6 +146,34 @@ describe("runRecipe", () => {
 
     const phases = events.map((e) => e.phase);
     assert.deepEqual(phases, ["step-start", "step-end", "run-end"]);
+  });
+
+  it("emits step-error and run-end before rethrowing a failing step", async () => {
+    const registry = new StrategyRegistry();
+    registry.register(ThrowingStrategy.method, ThrowingStrategy);
+
+    const recipe: Recipe = {
+      schemaVersion: "1.0",
+      name: "failing-step",
+      domain: "wardley",
+      tool: "chain",
+      steps: [{ stepId: "boom", tool: ThrowingStrategy.method, in: "$.v" }],
+      listeners: {},
+    };
+
+    const ast: Record<string, unknown> = { v: 7 };
+    const busEvents: string[] = [];
+    const { createEventBus } = await import("../bus/event-bus.mjs");
+    const bus = createEventBus();
+    const subscription = bus.observe().subscribe((event) => busEvents.push(event.phase));
+
+    await assert.rejects(
+      () => runRecipe({ recipe, ast, context: ctx, registry, bus }),
+      /step boom/,
+    );
+    subscription.unsubscribe();
+
+    assert.deepEqual(busEvents, ["step-start", "step-error", "run-end"]);
   });
 
   it("runs listeners after the main path and folds their insights into the envelope", async () => {

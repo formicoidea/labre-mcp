@@ -22,6 +22,12 @@ async function rpcCall(app: ReturnType<typeof buildApp>, body: unknown): Promise
   return res.json();
 }
 
+function toolPayload<T>(response: { result: { content: Array<{ type: string; text: string }> } }): T {
+  assert.ok(Array.isArray(response.result.content));
+  assert.equal(response.result.content[0]?.type, "text");
+  return JSON.parse(response.result.content[0].text) as T;
+}
+
 describe("labre-mcp HTTP transport", () => {
   it("GET /health responds ok", async () => {
     const app = buildTestApp();
@@ -79,11 +85,17 @@ describe("labre-mcp HTTP transport", () => {
       id: 4,
       method: "tools/call",
       params: { name: "__ping__", arguments: { message: "hello" } },
-      // Dispatch wraps every tool result in Degradable<T> ({ result, degraded, degradationEvents }).
-    })) as { result: { result: { echoed: { message: string }; daemon: string }; degraded: boolean } };
-    assert.equal(response.result.degraded, false);
-    assert.equal(response.result.result.echoed.message, "hello");
-    assert.equal(response.result.result.daemon, "labre-mcp");
+    })) as { result: { content: Array<{ type: string; text: string }>; structuredContent: unknown } };
+    const payload = toolPayload<{
+      result: { echoed: { message: string }; daemon: string };
+      degraded: boolean;
+      degradationEvents: unknown[];
+    }>(response);
+    assert.deepEqual(response.result.structuredContent, payload);
+    assert.equal(payload.degraded, false);
+    assert.deepEqual(payload.degradationEvents, []);
+    assert.equal(payload.result.echoed.message, "hello");
+    assert.equal(payload.result.daemon, "labre-mcp");
   });
 
   it("MCP unknown tool returns method-not-found error", async () => {
@@ -168,21 +180,25 @@ describe("labre-mcp HTTP transport", () => {
       },
     })) as {
       id: number;
-      // Dispatch wraps the handler result in Degradable<T>.
       result: {
-        degraded: boolean;
-        result: {
-          recipeRunId: string;
-          artifactPath: string | null;
-          ast: { estimate?: { result?: { method: string } } };
-          events: Array<{ phase: string }>;
-        };
+        content: Array<{ type: string; text: string }>;
+        structuredContent: unknown;
       };
     };
 
     assert.equal(response.id, 100);
-    assert.equal(response.result.degraded, false);
-    const inner = response.result.result;
+    const payload = toolPayload<{
+      degraded: boolean;
+      result: {
+        recipeRunId: string;
+        artifactPath: string | null;
+        ast: { estimate?: { result?: { method: string } } };
+        events: Array<{ phase: string }>;
+      };
+    }>(response);
+    assert.deepEqual(response.result.structuredContent, payload);
+    assert.equal(payload.degraded, false);
+    const inner = payload.result;
     assert.ok(inner.recipeRunId.length > 0);
     assert.equal(
       inner.ast.estimate?.result?.method,

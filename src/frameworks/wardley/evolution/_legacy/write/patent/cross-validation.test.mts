@@ -414,7 +414,7 @@ async function main() {
     const strategy = createStrategy('B61C', B61C_LOCOMOTIVE_DATA);
     const result = await strategy.evaluate({ name: 'Locomotive Engine' });
 
-    assert.equal(result.method, 'cpc-evolution');
+    assert.equal(result.method, 'write:capacity:cpc-evolution');
     assert.equal(typeof result.evolution, 'number');
     assert.equal(typeof result.confidence, 'number');
     assert.equal(typeof result.certitude, 'number');
@@ -456,7 +456,7 @@ async function main() {
     const strategy = createStrategy('G06N', G06N_AIML_DATA);
     const result = await strategy.evaluate({ name: 'Machine Learning' });
 
-    assert.equal(result.method, 'cpc-evolution');
+    assert.equal(result.method, 'write:capacity:cpc-evolution');
     assert.equal(typeof result.evolution, 'number');
     assert.equal(typeof result.confidence, 'number');
     assert.equal(typeof result.certitude, 'number');
@@ -493,7 +493,7 @@ async function main() {
     const strategy = createStrategy('H10N', H10N_SUPERCONDUCTOR_DATA);
     const result = await strategy.evaluate({ name: 'Room-Temperature Superconductor' });
 
-    assert.equal(result.method, 'cpc-evolution');
+    assert.equal(result.method, 'write:capacity:cpc-evolution');
     assert.equal(typeof result.evolution, 'number');
     assert.equal(typeof result.confidence, 'number');
     assert.equal(typeof result.certitude, 'number');

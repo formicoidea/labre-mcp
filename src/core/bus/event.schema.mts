@@ -11,7 +11,7 @@ export const PipelineEventSchema = z.object({
   sessionId: z.string().optional(),
   stepId: z.string(),
   methodId: z.string(),
-  phase: z.enum(["step-start", "step-end", "listener-insight", "run-end"]),
+  phase: z.enum(["step-start", "step-end", "step-error", "listener-insight", "run-end"]),
   timestamp: z.string(), // ISO 8601
   durationMs: z.number().optional(),
   degraded: z.boolean().optional(),

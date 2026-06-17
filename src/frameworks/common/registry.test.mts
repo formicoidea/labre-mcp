@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { StrategyRegistry } from '#core/registry/strategy-registry.mjs';
 import type { BaseStrategy } from '#core/ast/base-strategy.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
-import type { PositionedValueChain } from '#types/value-chain.mjs';
+import { WardleyMapSchema, type WardleyMap } from '#schemas/wardley-map.schema.mjs';
 import { registerCommonStrategies } from './registry.mjs';
 import { PlaceLabelsStrategy } from './layout/write/place-labels-strategy.mjs';
 import { OverlapCheckStrategy } from './layout/quality/overlap-check-strategy.mjs';
@@ -15,37 +15,26 @@ const ctx: RequestContext = {
   domain: 'wardley',
 };
 
-function sampleChain(): PositionedValueChain {
-  return {
-    metadata: {
-      title: 'Sample chain',
-      angle: '',
-      scope: '',
-      objective: '',
-      imperatives: [],
-      temporality: 'present',
-      contextSummary: '',
-    },
+function sampleMap(): WardleyMap {
+  return WardleyMapSchema.parse({
+    title: 'Sample map',
     components: [
       {
-        name: 'Anchor',
-        type: 'component',
-        role: 'anchor',
-        visibility: 0.95,
-        evolution: 0.5,
-        label: { dx: 0, dy: 0 },
+        id: 'anchor',
+        label: { name: 'Anchor', position: { dx: 0, dy: 0 } },
+        type: 'anchor',
+        position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.05 } },
       },
       {
-        name: 'A',
+        id: 'capability-a',
+        label: { name: 'A', position: { dx: 0, dy: 0 } },
         type: 'component',
-        role: 'capability',
-        visibility: 0.5,
-        evolution: 0.3,
-        label: { dx: 0, dy: 0 },
+        subtype: 'functional',
+        position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.5 } },
       },
     ],
-    links: [{ from: 'Anchor', to: 'A' }],
-  };
+    relations: [{ id: 'r1', consumer: 'anchor', supplier: 'capability-a' }],
+  });
 }
 
 describe('common registry — registration surface', () => {
@@ -60,23 +49,26 @@ describe('common registry — registration surface', () => {
 
 describe('common registry — PlaceLabelsStrategy', () => {
   it('assigns a label offset to every component', async () => {
-    const out = await new PlaceLabelsStrategy().evaluate({ chain: sampleChain() }, ctx);
-    for (const c of out.result.chain.components) {
-      assert.ok(typeof c.label.dx === 'number');
-      assert.ok(typeof c.label.dy === 'number');
+    const out = await new PlaceLabelsStrategy().evaluate(sampleMap(), ctx);
+    const parsed = WardleyMapSchema.parse(out.result);
+    for (const c of parsed.components) {
+      assert.equal(c.label.position, undefined);
     }
-    assert.equal(out.result.chain.components.length, 2);
+    assert.equal(parsed.components.length, 2);
   });
 
-  it('throws on missing chain input', async () => {
+  it('degrades on missing map input', async () => {
     // any: deliberate invalid input to verify the guard
-    await assert.rejects(() => new PlaceLabelsStrategy().evaluate({} as any, ctx));
+    const out = await new PlaceLabelsStrategy().evaluate({} as any, ctx);
+    assert.equal(out.result.components.length, 0);
+    assert.ok(out.insights.some((i) => i.text.includes('not a canonical WardleyMap')));
   });
 });
 
 describe('common registry — OverlapCheckStrategy', () => {
   it('reports unresolved overlap counts for a small chain', async () => {
-    const out = await new OverlapCheckStrategy().evaluate({ chain: sampleChain() }, ctx);
+    const out = await new OverlapCheckStrategy().evaluate(sampleMap(), ctx);
+    assert.ok(out.result);
     assert.equal(typeof out.result.unresolvedHard, 'number');
     assert.equal(typeof out.result.unresolvedSpacing, 'number');
     assert.equal(typeof out.result.unresolvedEdge, 'number');
@@ -84,8 +76,10 @@ describe('common registry — OverlapCheckStrategy', () => {
     assert.equal(typeof out.result.iterations, 'number');
   });
 
-  it('throws on missing chain input', async () => {
+  it('degrades on missing map input', async () => {
     // any: deliberate invalid input to verify the guard
-    await assert.rejects(() => new OverlapCheckStrategy().evaluate({} as any, ctx));
+    const out = await new OverlapCheckStrategy().evaluate({} as any, ctx);
+    assert.equal(out.result, null);
+    assert.ok(out.insights.some((i) => i.text.includes('not a canonical WardleyMap')));
   });
 });

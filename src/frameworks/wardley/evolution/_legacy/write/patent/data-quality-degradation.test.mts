@@ -320,7 +320,7 @@ async function main() {
     assert.equal(typeof result.confidence, 'number');
     assert.ok(result.confidence >= 0.1, 'confidence floor holds with 0 patents');
     assert.ok(result.confidence <= 0.95, 'confidence ceiling holds with 0 patents');
-    assert.equal(result.method, 'cpc-evolution');
+    assert.equal(result.method, 'write:capacity:cpc-evolution');
   });
 
   await runTest('confidence ordering: 500 > 50 > 3 > 0 patents', async () => {
