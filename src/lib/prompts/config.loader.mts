@@ -1,8 +1,15 @@
 // Loader for prompts.config.json.
 //
 // Resolution order:
-//   1. process.env.WARDLEY_PROMPTS_CONFIG (absolute or project-relative path)
-//   2. <project root>/prompts.config.json
+//   1. process.env.WARDLEY_PROMPTS_CONFIG (absolute, or relative to cwd) — the
+//      explicit escape hatch for bundled / relocated layouts.
+//   2. <package root>/prompts.config.json — derived from import.meta.url, NOT
+//      process.cwd(). Prompts are shipped, strategy-internal assets (hard rule
+//      #14): they must always resolve against labre-mcp's own install root so
+//      the loader works identically in dev (tsx src/), prod (node dist/) and
+//      when installed under a consumer's node_modules. Resolving against
+//      process.cwd() would (a) break the npm-installed layout — cwd is the
+//      consumer's workspace, not the package — and (b) violate hard rule #20.
 //
 // For every `template`-kind entry, reads the referenced templateFile from disk,
 // normalizes CRLF → LF (indispensable on Windows so the prompt matches what the
@@ -15,8 +22,16 @@
 // shared infrastructure consumed via injected llmCall by a parent strategy).
 
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { resolve, isAbsolute, dirname } from 'node:path';
 import { validateOrThrow } from '#lib/zod/validate-or-throw.mjs';
+
+// Package root, derived from this module's own location.
+//   src/lib/prompts/config.loader.mts  → up 3 = repo root (dev, tsx)
+//   dist/lib/prompts/config.loader.mjs → up 3 = package root (prod / installed)
+// Reading the layout at module load is the allowed exception to hard rule #20
+// (process.cwd() / env forbidden only at request time, not module load).
+const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 import {
   PromptsConfigSchema,
   isSplitTemplateFile,
@@ -49,7 +64,7 @@ function resolveConfigPath(): string {
   if (override) {
     return isAbsolute(override) ? override : resolve(process.cwd(), override);
   }
-  return resolve(process.cwd(), 'prompts.config.json');
+  return resolve(PACKAGE_ROOT, 'prompts.config.json');
 }
 
 function extractTemplateVars(text: string): string[] {

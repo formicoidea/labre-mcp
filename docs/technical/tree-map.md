@@ -17,9 +17,11 @@
 ## 2. Points d'entrée
 
 - **Daemon HTTP** : `src/core/transport/labre-daemon.mts` — écoute sur `127.0.0.1:6767` (override `LABRE_HTTP_PORT`). Endpoints : `POST /mcp` (JSON-RPC : `initialize`, `ping`, `tools/list`, `tools/call`, `notifications/*`), `GET /health`, `GET /version`.
-- **Boot** : `buildBootRegistry()` enregistre les outils MCP ; `buildStrategyRegistry()` (→ `strategy-registry-boot.mts`) peuple le `StrategyRegistry` via `register{Evolution,Chain,Common}Strategies` + `registerMocks` (sauf `LABRE_DISABLE_MOCKS=1`).
-- **Scripts npm** : `dev`/`mcp` = `tsx src/core/transport/labre-daemon.mts` ; `mcp:prod` = `node dist/core/transport/labre-daemon.mjs` ; `build` = `tsc` ; `typecheck` = `tsc --noEmit` ; `test` = `tsx --test "src/**/*.test.mts"`.
-- **`.mcp.json`** : enregistre le serveur comme `{ "type": "http", "url": "http://127.0.0.1:6767/mcp" }`. Le daemon doit tourner (`pnpm run dev`) pour que le client s'y connecte.
+- **Entrée stdio** : `src/core/transport/labre-stdio.mts` — JSON-RPC newline-delimited sur stdin/stdout, transport que Claude Code / l'Agent SDK lancent directement (`{ "command": "npx", "args": ["-y", "labre-mcp"] }`). Réutilise le même `dispatch` + `buildBootRegistry()` que le daemon ; stdout est réservé au protocole (réponses + notifications), tout le reste va sur stderr.
+- **Boot** : `buildBootRegistry()` (→ `boot-tool-registry.mts`, partagé HTTP + stdio) enregistre les outils MCP ; `buildStrategyRegistry()` (→ `strategy-registry-boot.mts`) peuple le `StrategyRegistry` via `register{Evolution,Chain,Common}Strategies` + `registerMocks` (sauf `LABRE_DISABLE_MOCKS=1`).
+- **Scripts npm** : `dev`/`mcp` = `tsx --conditions development src/core/transport/labre-daemon.mts` ; `mcp:prod` = `node dist/core/transport/labre-daemon.mjs` ; `mcp:stdio` = `tsx --conditions development src/core/transport/labre-stdio.mts` ; `mcp:stdio:prod` = `node dist/core/transport/labre-stdio.mjs` ; `build` = `tsc` ; `typecheck` = `tsc --noEmit` ; `test` = `tsx --conditions development --test "src/**/*.test.mts"`.
+- **Subpath imports conditionnels** : le mapping `#core/*`, `#lib/*`, … (package.json `imports`) est `{ "development": "./src/*", "default": "./dist/*" }`. Le dev passe `--conditions development` (résout vers `src/`, tsx remappe `.mjs`→`.mts`) ; node pur en prod prend `default` (résout vers `dist/`). Sans ça les `.mjs` compilés tentent de résoudre vers `src/*.mjs` inexistant.
+- **`.mcp.json`** : deux modèles possibles — HTTP `{ "type": "http", "url": "http://127.0.0.1:6767/mcp" }` (le daemon doit tourner) ou stdio `{ "command": "npx", "args": ["-y", "labre-mcp"] }` (Claude Code lance le process lui-même, cible de la publication npm).
 - **API programmatique** : `src/index.mts` re-exporte la surface publique.
 
 ## 3. Arbre annoté de `src/`
@@ -35,9 +37,9 @@ src/
 │   ├── bus/                  event-bus RxJS + event.schema                   (ARCH-10)
 │   ├── ast/                  base-strategy (contrat { signals,reasoning,insights,result }) (ARCH-22)
 │   ├── context/              request-context (projectId, projectRoot, sessionId, domain) (ARCH-15)
-│   ├── transport/            labre-daemon, http-server (Hono), mcp-handler (dispatch),
-│   │                         json-rpc.schema, context-extractor, auth-middleware,
-│   │                         strategy-registry-boot                          (ARCH-14)
+│   ├── transport/            labre-daemon (HTTP), labre-stdio (stdio), http-server (Hono),
+│   │                         mcp-handler (dispatch), boot-tool-registry, json-rpc.schema,
+│   │                         context-extractor, auth-middleware, strategy-registry-boot (ARCH-14)
 │   ├── listeners/            artifact-writer-listener (core, toujours actif) (ARCH-12)
 │   └── persistence/          artifact-writer, project-id-resolver            (ARCH-12/13)
 │
