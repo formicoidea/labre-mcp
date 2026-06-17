@@ -38,8 +38,8 @@ export const DEFAULTS = Object.freeze({
   /** BigQuery job location — US for the public patents dataset. */
   location: 'US',
 
-  /** Maximum bytes billed per query (200 GB). Public dataset free tier is 1 TB/month. */
-  maxBytesBilled: String(200 * 1024 * 1024 * 1024), // '214748364800'
+  /** Maximum bytes billed per query (1 GB). Override with BIGQUERY_MAX_BYTES for larger analyses. */
+  maxBytesBilled: String(1 * 1024 * 1024 * 1024), // '1073741824'
 
   /** Query timeout in milliseconds (30 seconds). */
   timeoutMs: 30_000,
