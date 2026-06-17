@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
+import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { RUN_RECIPE_TOOL } from './run-recipe.tool.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
 
@@ -20,6 +21,7 @@ interface RunRecipeResultShape {
   recipe: string;
   status: string;
   recipeRunId?: string;
+  artifactPath?: string | null;
   envelope?: { insights: unknown[]; trace: unknown[] };
   errors?: string[];
 }
@@ -52,5 +54,46 @@ describe('runRecipe tool', () => {
 
     assert.equal(out.status, 'error');
     assert.ok((out.errors?.length ?? 0) >= 1);
+  });
+
+  it('returns an artefact path for a recipe that fails during execution', async () => {
+    const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'labre-failing-recipe-'));
+    const recipeDir = path.join(projectRoot, 'recipes', 'wardley', 'map');
+    const artifactDir = path.join(projectRoot, '.artifacts');
+    await mkdir(recipeDir, { recursive: true });
+    await mkdir(artifactDir, { recursive: true });
+    await writeFile(
+      path.join(recipeDir, 'failing.recipe.json'),
+      JSON.stringify({
+        schemaVersion: '1.0',
+        name: 'failing',
+        domain: 'wardley',
+        tool: 'map',
+        steps: [
+          {
+            stepId: 'missing-strategy',
+            tool: 'wardley:map:value-chain:generate:not-registered',
+            in: '$.input',
+            out: '$.result',
+          },
+        ],
+        listeners: {},
+      }),
+      'utf8',
+    );
+
+    const out = (await RUN_RECIPE_TOOL.handler(
+      { recipe: 'wardley:map:failing', input: { title: 'boom' } },
+      { ...context, projectRoot, artifactDir },
+    )) as RunRecipeResultShape;
+
+    assert.equal(out.status, 'error');
+    assert.ok(out.artifactPath, 'artifactPath should be present for execution failures');
+    const artifact = JSON.parse(await readFile(out.artifactPath as string, 'utf8')) as {
+      events: Array<{ phase: string }>;
+      ast: { input?: unknown };
+    };
+    assert.deepEqual(artifact.ast.input, { title: 'boom' });
+    assert.ok(artifact.events.some((event) => event.phase === 'run-end'));
   });
 });

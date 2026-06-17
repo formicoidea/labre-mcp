@@ -14,6 +14,13 @@ function resultOf(res: JsonRpcResponse | null): Record<string, unknown> {
   return res.result as Record<string, unknown>;
 }
 
+function toolPayload<T>(res: JsonRpcResponse | null): T {
+  const result = resultOf(res) as { content?: Array<{ type: string; text: string }> };
+  assert.ok(Array.isArray(result.content), "expected MCP CallToolResult content array");
+  assert.equal(result.content[0]?.type, "text");
+  return JSON.parse(result.content[0].text) as T;
+}
+
 test("ping returns an empty result with the matching id", async () => {
   const tools = buildBootRegistry();
   const res = await handleLine(
@@ -45,6 +52,28 @@ test("initialize advertises labre-mcp server info", async () => {
   );
   const info = resultOf(res).serverInfo as { name: string };
   assert.equal(info.name, "labre-mcp");
+});
+
+test("tools/call returns MCP content array for the smoke tool", async () => {
+  const tools = buildBootRegistry();
+  const res = await handleLine(
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id: 4,
+      method: "tools/call",
+      params: { name: "__ping__", arguments: { message: "hello" } },
+    }),
+    { tools },
+  );
+  const payload = toolPayload<{
+    result: { echoed: { message: string }; daemon: string };
+    degraded: boolean;
+    degradationEvents: unknown[];
+  }>(res);
+  assert.equal(payload.degraded, false);
+  assert.deepEqual(payload.degradationEvents, []);
+  assert.equal(payload.result.echoed.message, "hello");
+  assert.equal(payload.result.daemon, "labre-mcp");
 });
 
 test("malformed JSON yields a -32700 parse error (id null)", async () => {

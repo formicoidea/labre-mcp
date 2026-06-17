@@ -14,6 +14,7 @@
 
 // any: the public preview of @github/copilot-sdk ships without exported types
 // for session event payloads. We touch only the fields we rely on at runtime.
+import { createRequire } from 'node:module';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import { classifyAndLogLLMError } from './llm-error-handler.mjs';
 import type {
@@ -31,6 +32,8 @@ const RETRYABLE_PATTERNS = [
   'temporarily', 'empty response', 'need retry', 'startup',
   'unknown error',
 ];
+
+const requireFromHere = createRequire(import.meta.url);
 
 function isRetryableError(err: unknown): boolean {
   const msg = String((err as { message?: string })?.message ?? err).toLowerCase();
@@ -70,6 +73,26 @@ export interface CopilotSdkStructuredConfig<T = unknown> extends CopilotSdkTextC
   /** Optional runtime validator. If provided, the parsed JSON is passed through
    *  it; a failure triggers the same single retry as a JSON.parse failure. */
   validate?: (value: unknown) => T;
+}
+
+export interface CopilotCliCheckResult {
+  ready: boolean;
+  reason?: string;
+}
+
+export function checkCopilotCliAvailable(
+  resolvePackage: (specifier: string) => string = (specifier) => requireFromHere.resolve(specifier),
+): CopilotCliCheckResult {
+  try {
+    resolvePackage('@github/copilot/package.json');
+    return { ready: true };
+  } catch (err) {
+    return {
+      ready: false,
+      reason:
+        '@github/copilot CLI package is not installed. Install @github/copilot or choose a different LLM provider.',
+    };
+  }
 }
 
 // ─── Single-turn session runner ─────────────────────────────────────────────
