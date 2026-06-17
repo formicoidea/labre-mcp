@@ -202,7 +202,7 @@ async function main() {
       cpcMapper: mockCpcMapper,
     });
     const result = await strategy.evaluate({ name: 'TCP/IP', capability: 'network protocol' });
-    const scurveStep = result.trace.find(t => t.step === 'write:capacity:s-curve');
+    const scurveStep = result.trace.find(t => t.step === 's-curve');
 
     assert.ok(scurveStep, 'trace must contain s-curve step');
 
@@ -276,7 +276,7 @@ async function main() {
       'evolution must not be blended with any secondary estimate');
 
     // Also verify the phase from trace matches (no phase override)
-    const traceScurve = result.trace.find(t => t.step === 'write:capacity:s-curve');
+    const traceScurve = result.trace.find(t => t.step === 's-curve');
     assert.strictEqual(traceScurve.phase, scurve.phase,
       'phase must come directly from computeEvolution, not overridden');
   });
@@ -291,7 +291,7 @@ async function main() {
       cpcMapper: mockCpcMapper,
     });
     const result = await strategy.evaluate({ name: 'Kubernetes' });
-    const scurveStep = result.trace.find(t => t.step === 'write:capacity:s-curve');
+    const scurveStep = result.trace.find(t => t.step === 's-curve');
 
     // All 5 fields from computeEvolution must be present
     const requiredFields = ['zone', 'evolution', 'phase', 'bandDistance', 'distToCenter'];
