@@ -1,5 +1,5 @@
 {
-  "name": "labre-mcp",
+  "name": "@formicoidea/labre-mcp",
   "version": "0.1.0",
   "description": "MCP server for applying practice frameworks — Wardley Maps first (value chain, evolution, climates, doctrines). Strategy registry + recipe runner, exposed over stdio (Claude Code / Agent SDK) or HTTP.",
   "main": "dist/index.mjs",

@@ -18,7 +18,7 @@ Add the server to your project's `.mcp.json` (or `~/.claude.json`). Claude Code 
   "mcpServers": {
     "labre-mcp": {
       "command": "npx",
-      "args": ["-y", "labre-mcp"],
+      "args": ["-y", "@formicoidea/labre-mcp"],
       "env": {
         "WARDLEY_LLM_CONFIG": "C:\\path\\to\\your\\llm.config.json"
       }
@@ -27,7 +27,7 @@ Add the server to your project's `.mcp.json` (or `~/.claude.json`). Claude Code 
 }
 ```
 
-> **Windows note:** if `npx` fails to start the server, wrap it as `"command": "cmd"`, `"args": ["/c", "npx", "-y", "labre-mcp"]`.
+> **Windows note:** if `npx` fails to start the server, wrap it as `"command": "cmd"`, `"args": ["/c", "npx", "-y", "@formicoidea/labre-mcp"]`.
 
 The `WARDLEY_LLM_CONFIG` env var is optional — if omitted, the server looks for `llm.config.json` in the client's working directory (your workspace root).
 
