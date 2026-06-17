@@ -56,7 +56,7 @@ function assertValidResult(result, context = '') {
   assert.ok(result.confidence >= 0.1 && result.confidence <= 0.95,
     `${prefix}confidence ${result.confidence} must be in [0.1, 0.95]`);
 
-  assert.equal(result.method, 'cpc-evolution', `${prefix}method must be 'cpc-evolution'`);
+  assert.equal(result.method, 'write:capacity:cpc-evolution', `${prefix}method must be 'write:capacity:cpc-evolution'`);
 
   assert.equal(typeof result.certitude, 'number', `${prefix}certitude must be a number`);
   assert.ok(!Number.isNaN(result.certitude), `${prefix}certitude must not be NaN`);
