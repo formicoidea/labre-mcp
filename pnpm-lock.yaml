@@ -12,8 +12,8 @@ importers:
         specifier: ^0.2.87
         version: 0.2.87(zod@4.3.6)
       '@formicoidea/wardley-map-renderer':
-        specifier: file:..\wardley-map-renderer
-        version: file:../wardley-map-renderer
+        specifier: ^1.0.0-beta.0
+        version: 1.0.0-beta.0
       '@github/copilot-sdk':
         specifier: 0.2.2
         version: 0.2.2
@@ -232,8 +232,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@formicoidea/wardley-map-renderer@file:../wardley-map-renderer':
-    resolution: {directory: ../wardley-map-renderer, type: directory}
+  '@formicoidea/wardley-map-renderer@1.0.0-beta.0':
+    resolution: {integrity: sha512-VdFrou9hU1xYMdKX6eNcFFJTyseKk4SbpfKo5wkq948MkHAWENnEJZSq24ufmnQNscR1BfNDEtQ1exl9afZu3A==}
 
   '@github/copilot-darwin-arm64@1.0.34':
     resolution: {integrity: sha512-g94EhSLd3a6fckZ6xb/zP2DZJZEx7kONWdOoDiHXUtSqc4RiZ7OBq1EwT4WrPY1lsmy9sioJIcZSGzJd0C1M7Q==}
@@ -1157,7 +1157,7 @@ snapshots:
   '@esbuild/win32-x64@0.27.7':
     optional: true
 
-  '@formicoidea/wardley-map-renderer@file:../wardley-map-renderer':
+  '@formicoidea/wardley-map-renderer@1.0.0-beta.0':
     dependencies:
       '@resvg/resvg-js': 2.6.2
       zod: 4.3.6
