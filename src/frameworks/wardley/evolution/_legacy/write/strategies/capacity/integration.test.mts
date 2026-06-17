@@ -1,8 +1,8 @@
-// Integration tests: verify all 7 strategies are functional and return
+// Integration tests: verify legacy capacity strategies are functional and return
 // results conforming to the {evolution, confidence, method} interface.
 //
 // Tests cover:
-//   - All 7 strategies discovered by the registry
+//   - Legacy BaseStrategy implementations discovered by the registry
 //   - Each strategy returns a valid EvolutionResult
 //   - BaseStrategy.validateResult passes for every result
 //   - Interface shape: evolution (number), confidence (number 0-1), method (non-empty string)
@@ -12,6 +12,10 @@
 import assert from 'node:assert/strict';
 import { loadStrategies, clearCache, listStrategies, listDisabled } from './registry.mjs';
 import { BaseStrategy } from './base-strategy.mjs';
+
+const CPC_EVOLUTION = 'write:capacity:cpc-evolution';
+const LOGPROB_DISTRIBUTION = 'write:capacity:logprob-distribution';
+const TIMELINE_BENCHMARK = 'write:capacity:timeline-benchmark';
 
 // ── Mock LLM functions ──────────────────────────────────────────────────────
 
@@ -106,23 +110,23 @@ const COMPONENT_MINIMAL = {
 
 const STRATEGY_OPTIONS = {
   'llm-direct':            { llmCall: mockLLMCall },
-  'logprob-distribution':  { llmLogprobCall: mockLLMLogprobCall },
+  [LOGPROB_DISTRIBUTION]:  { llmLogprobCall: mockLLMLogprobCall },
   'publication-analysis':  { llmCall: mockPubLLMCall },
   // Analytical strategies need no special options
   's-curve':               {},
-  'timeline-benchmark':    { llmCall: mockTimelineLLMCall },
+  [TIMELINE_BENCHMARK]:    { llmCall: mockTimelineLLMCall },
   // CPC evolution: no external dependencies required (graceful degradation)
-  'cpc-evolution':         {},
+  [CPC_EVOLUTION]:         {},
 };
 
 // Components that work for each strategy
 const STRATEGY_COMPONENTS = {
   's-curve':               COMPONENT_FULL,        // needs certitude + ubiquity
-  'timeline-benchmark':    COMPONENT_MINIMAL,     // uses LLM (capability identification + history loop)
+  [TIMELINE_BENCHMARK]:    COMPONENT_MINIMAL,     // uses LLM (capability identification + history loop)
   'llm-direct':            COMPONENT_MINIMAL,     // uses LLM
-  'logprob-distribution':  COMPONENT_MINIMAL,     // uses LLM logprobs
+  [LOGPROB_DISTRIBUTION]:  COMPONENT_MINIMAL,     // uses LLM logprobs
   'publication-analysis':  COMPONENT_FULL,        // has pub proportions
-  'cpc-evolution':         COMPONENT_MINIMAL,     // graceful degradation without BigQuery
+  [CPC_EVOLUTION]:         COMPONENT_MINIMAL,     // graceful degradation without BigQuery
 };
 
 // ── Expected strategies ─────────────────────────────────────────────────────
@@ -130,12 +134,9 @@ const STRATEGY_COMPONENTS = {
 // The registry filters disabled entries out of listStrategies(); tests that
 // iterate over "active" strategies should use listStrategies() directly.
 const ALL_KNOWN_STRATEGIES = [
-  's-curve',
-  'timeline-benchmark',
-  'llm-direct',
-  'logprob-distribution',
-  'publication-analysis',
-  'cpc-evolution',
+  CPC_EVOLUTION,
+  LOGPROB_DISTRIBUTION,
+  TIMELINE_BENCHMARK,
 ];
 
 // ── Test helpers ─────────────────────────────────────────────────────────────
@@ -191,7 +192,7 @@ async function runTest(name, fn) {
 }
 
 async function main() {
-  console.log('=== Integration Tests: All 7 Strategies ===\n');
+  console.log('=== Integration Tests: Legacy Capacity Strategies ===\n');
 
   // Reset registry cache
   clearCache();
@@ -261,29 +262,19 @@ async function main() {
   await runTest('analytical strategies return valid results for same component', async () => {
     const strategies = await loadStrategies();
 
-    // s-curve with high certitude/ubiquity — may return extra-competitive (outside band)
-    const sCurve = new (strategies.get('s-curve'))();
-    const sCurveResult = sCurve.evaluate(COMPONENT_FULL);
-    assertEvolutionResult(sCurveResult, 's-curve');
+    const cpc = new (strategies.get(CPC_EVOLUTION))();
+    const cpcResult = await cpc.evaluate(COMPONENT_MINIMAL);
+    assertEvolutionResult(cpcResult, CPC_EVOLUTION);
 
-    // publication-analysis with usage-heavy distribution
-    const pub = new (strategies.get('publication-analysis'))();
-    const pubResult = await pub.evaluate(COMPONENT_FULL);
-    assertEvolutionResult(pubResult, 'publication-analysis');
-
-    // publication-analysis should indicate high evolution (> 0.5) for Cloud Computing
-    // (usage-heavy distribution in COMPONENT_FULL)
-    assert.ok(pubResult.evolution > 0.5,
-      `publication evolution ${pubResult.evolution} should be > 0.5 for Cloud Computing`);
-
-    assert.equal(typeof sCurveResult.evolution, 'number');
-    assert.equal(typeof pubResult.evolution, 'number');
+    const logprob = new (strategies.get(LOGPROB_DISTRIBUTION))({ llmLogprobCall: mockLLMLogprobCall });
+    const logprobResult = await logprob.evaluate(COMPONENT_MINIMAL);
+    assertEvolutionResult(logprobResult, LOGPROB_DISTRIBUTION);
 
     // timeline-benchmark is exercised only when active
-    if (strategies.has('timeline-benchmark')) {
-      const timeline = new (strategies.get('timeline-benchmark'))({ llmCall: mockTimelineLLMCall });
+    if (strategies.has(TIMELINE_BENCHMARK)) {
+      const timeline = new (strategies.get(TIMELINE_BENCHMARK))({ llmCall: mockTimelineLLMCall });
       const timelineResult = await timeline.evaluate(COMPONENT_FULL);
-      assertEvolutionResult(timelineResult, 'timeline-benchmark');
+      assertEvolutionResult(timelineResult, TIMELINE_BENCHMARK);
       assert.ok(timelineResult.trace.length > 0,
         'timeline should have at least one milestone in trace');
       assert.equal(typeof timelineResult.evolution, 'number');
@@ -297,6 +288,10 @@ async function main() {
   await runTest('llm-direct: returns direct evolution estimate', async () => {
     const strategies = await loadStrategies();
     const Cls = strategies.get('llm-direct');
+    if (!Cls) {
+      console.log('    (skipped — llm-direct is registered in the core evolution registry)');
+      return;
+    }
     const instance = new Cls({ llmCall: mockLLMCall });
     const result = await instance.evaluate(COMPONENT_MINIMAL);
     assertEvolutionResult(result, 'llm-direct');
@@ -307,10 +302,10 @@ async function main() {
 
   await runTest('logprob-distribution: computes centroid from mock logprobs', async () => {
     const strategies = await loadStrategies();
-    const Cls = strategies.get('logprob-distribution');
+    const Cls = strategies.get(LOGPROB_DISTRIBUTION);
     const instance = new Cls({ llmLogprobCall: mockLLMLogprobCall });
     const result = await instance.evaluate(COMPONENT_MINIMAL);
-    assertEvolutionResult(result, 'logprob-distribution');
+    assertEvolutionResult(result, LOGPROB_DISTRIBUTION);
     // Product phase has highest logprob, so evolution should lean toward product centroid (0.48)
     assert.ok(result.evolution > 0.3 && result.evolution < 0.7,
       `Logprob evolution should be in product range, got ${result.evolution}`);
@@ -319,6 +314,10 @@ async function main() {
   await runTest('publication-analysis: works with LLM fallback', async () => {
     const strategies = await loadStrategies();
     const Cls = strategies.get('publication-analysis');
+    if (!Cls) {
+      console.log('    (skipped — publication-analysis is registered in the core evolution registry)');
+      return;
+    }
     const instance = new Cls({ llmCall: mockPubLLMCall });
     // Component without pub proportions → triggers LLM fallback
     const result = await instance.evaluate(COMPONENT_MINIMAL);
@@ -327,15 +326,15 @@ async function main() {
 
   await runTest('timeline-benchmark: fallback reaches present when loop stalls', async () => {
     const strategies = await loadStrategies();
-    if (!strategies.has('timeline-benchmark')) {
+    if (!strategies.has(TIMELINE_BENCHMARK)) {
       console.log('    (skipped — timeline-benchmark disabled)');
       return;
     }
     mockTimelineLLMCallStalling._count = 0; // reset counter
-    const Cls = strategies.get('timeline-benchmark');
+    const Cls = strategies.get(TIMELINE_BENCHMARK);
     const instance = new Cls({ llmCall: mockTimelineLLMCallStalling });
     const result = await instance.evaluate({ name: 'Test', description: 'Test capability' });
-    assertEvolutionResult(result, 'timeline-benchmark');
+    assertEvolutionResult(result, TIMELINE_BENCHMARK);
     const lastTrace = result.trace[result.trace.length - 1];
     assert.equal(lastTrace.date, new Date().getFullYear(),
       `Last milestone should be at current year via fallback, got ${lastTrace.date}`);
@@ -360,7 +359,12 @@ async function main() {
 
   await runTest('s-curve: throws on missing certitude/ubiquity', async () => {
     const strategies = await loadStrategies();
-    const instance = new (strategies.get('s-curve'))();
+    const Cls = strategies.get('s-curve');
+    if (!Cls) {
+      console.log('    (skipped — s-curve is registered in the core evolution registry)');
+      return;
+    }
+    const instance = new Cls();
     await assert.rejects(
       async () => instance.evaluate({ name: 'Test' }),
       /certitude|ubiquity/i,
@@ -372,6 +376,10 @@ async function main() {
     const strategies = loadStrategies();
     return strategies.then(s => {
       const Cls = s.get('llm-direct');
+      if (!Cls) {
+        console.log('    (skipped — llm-direct is registered in the core evolution registry)');
+        return;
+      }
       assert.throws(
         () => new Cls({}),
         /llmCall/i,
@@ -382,7 +390,7 @@ async function main() {
 
   await runTest('logprob-distribution: requires llmLogprobCall function', () => {
     return loadStrategies().then(s => {
-      const Cls = s.get('logprob-distribution');
+      const Cls = s.get(LOGPROB_DISTRIBUTION);
       assert.throws(
         () => new Cls({}),
         /llmLogprobCall/i,
@@ -397,7 +405,12 @@ async function main() {
 
   await runTest('s-curve: out-of-band point returns evolution in [0,1] with confidence < 0.90', async () => {
     const strategies = await loadStrategies();
-    const instance = new (strategies.get('s-curve'))();
+    const Cls = strategies.get('s-curve');
+    if (!Cls) {
+      console.log('    (skipped — s-curve is registered in the core evolution registry)');
+      return;
+    }
+    const instance = new Cls();
     // Point clearly above the band (high ubiquity, low certitude)
     const result = instance.evaluate({ name: 'Test', certitude: 0.2, ubiquity: 0.95 });
     assertEvolutionResult(result, 's-curve');
@@ -409,7 +422,12 @@ async function main() {
 
   await runTest('s-curve: in-band point has confidence 0.90, higher than out-of-band', async () => {
     const strategies = await loadStrategies();
-    const instance = new (strategies.get('s-curve'))();
+    const Cls = strategies.get('s-curve');
+    if (!Cls) {
+      console.log('    (skipped — s-curve is registered in the core evolution registry)');
+      return;
+    }
+    const instance = new Cls();
     const inBand = instance.evaluate({ name: 'Test', certitude: 0.63, ubiquity: 0.74 });
     const outBand = instance.evaluate({ name: 'Test', certitude: 0.2, ubiquity: 0.95 });
     assert.strictEqual(inBand.confidence, 0.9,
