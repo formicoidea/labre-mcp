@@ -13,6 +13,8 @@ import { loadRecipe } from '#core/recipe/recipe-loader.mjs';
 import { runRecipe, type JsonLabreEnvelope } from '#core/recipe/recipe-runner.mjs';
 import { buildStrategyRegistry } from '#core/transport/strategy-registry-boot.mjs';
 import { attachArtifactWriter } from '#core/listeners/artifact-writer-listener.mjs';
+import { attachPostHogTelemetry } from '#core/listeners/posthog-telemetry-listener.mjs';
+import { getPostHogFlags } from '#lib/flags/state.mjs';
 import { createEventBus } from '#core/bus/event-bus.mjs';
 import { resolveContext } from './resolve-context.mjs';
 import { SHIPPED_ROOT } from './shipped-root.mjs';
@@ -45,6 +47,29 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
     const call = RunRecipeCallSchema.parse(args);
     // The regex guarantees exactly 3 colon-separated segments.
     const [framework, tool, name] = call.recipe.split(':') as [string, string, string];
+
+    // Feature-flag gate (daemon with PostHog configured only). Flags are
+    // rollout controls, not a security boundary — auth is; the flag module
+    // fails open on any PostHog trouble. When no PostHog is configured
+    // (stdio, local daemon) getPostHogFlags() is undefined and this block
+    // costs nothing: no dynamic import, no network, no await.
+    const flags = getPostHogFlags();
+    if (flags) {
+      const allowed = await flags.isRecipeEnabled(
+        { domain: framework, tool, name },
+        context.auth?.userId ?? 'anonymous',
+      );
+      if (!allowed) {
+        return {
+          recipe: call.recipe,
+          status: 'error',
+          errors: [
+            `Recipe "${call.recipe}" is disabled by feature flag for this user (rollout gate)`,
+          ],
+        };
+      }
+    }
+
     const ctx = await resolveContext(context);
 
     let recipe;
@@ -71,6 +96,17 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
     // (mutated in place by the runner, read at run-end). $.input seeds the recipe.
     const ast: Record<string, unknown> = { input: call.input };
     const artifactHandle = attachArtifactWriter({ bus, context: ctx, getAst: () => ast });
+
+    // Telemetry forwarder (run-end / step-error → PostHog, metadata only).
+    // The bus is per-run, so the boot-installed PostHog instance is attached
+    // here rather than at daemon boot — see posthog-telemetry-listener.mts.
+    if (flags) {
+      attachPostHogTelemetry({
+        bus,
+        flags,
+        distinctId: context.auth?.userId ?? 'daemon',
+      });
+    }
 
     try {
       const outcome = await runRecipe({ recipe, ast, context: ctx, registry, bus });

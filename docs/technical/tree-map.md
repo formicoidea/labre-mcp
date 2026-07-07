@@ -43,7 +43,9 @@ src/
 │   │                         boot-tool-registry, json-rpc.schema, context-extractor,
 │   │                         auth-middleware, supabase-auth (JWT/JWKS), boot-health-checks,
 │   │                         strategy-registry-boot                          (ARCH-14)
-│   ├── listeners/            artifact-writer-listener (core, toujours actif) (ARCH-12)
+│   ├── listeners/            artifact-writer-listener (core, toujours actif) (ARCH-12),
+│   │                         posthog-telemetry-listener (run-end/step-error → capture,
+│   │                         attaché par runRecipe quand PostHog est configuré)
 │   └── persistence/          artifact-writer, project-id-resolver            (ARCH-12/13)
 │
 ├── lib/                      ── Utilitaires transverses (PAS encore sous core/ — roadmap B1)
@@ -59,6 +61,9 @@ src/
 │   │                         avec le JWT de l'appelant (RLS), sha256 + swap atomique
 │   ├── degradation/          Degradable<T>, collector (AsyncLocalStorage),
 │   │                         with-degradation, mcp-wrapper (withMcpDegradation)
+│   ├── flags/                posthog (buildPostHog : gate fail-open + capture + shutdown,
+│   │                         posthog-node en import dynamique), state (singleton posé au boot
+│   │                         du daemon ; clé de flag mcp-recipe-<domain>-<tool>-<name>)
 │   ├── patent/               bigquery-* , patent-data-source, patent-indicators, mock-patent-source
 │   ├── vendor/cli-owm/       cli-owm@4950f330 (GPL-2.0) vendoré + parser/
 │   ├── zod/                  helpers Zod (validateOrThrow…)
@@ -122,7 +127,7 @@ client MCP ──HTTP──▶ core/transport/labre-daemon ──▶ http-server
                           frameworks/wardley/evolution/registry        frameworks/wardley/chain/registry
                           frameworks/common/registry                   frameworks/mocks-registry
 
-Partagé : lib/{llm, degradation, prompts, owm, response-formatter, language-detect, mcp-notifications}
+Partagé : lib/{llm, degradation, flags, prompts, owm, response-formatter, language-detect, mcp-notifications}
 ```
 
 ## 5. Recipes livrées

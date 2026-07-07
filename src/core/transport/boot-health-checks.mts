@@ -54,6 +54,17 @@ export function registerBootHealthChecks(): void {
       : { ready: false, reason: cli.reason };
   });
 
+  // PostHog (recipe feature flags + telemetry): config presence only. Absence
+  // is degraded, never fatal — the gate fails open and telemetry stays off.
+  registerHealthCheck("posthog", () => {
+    return process.env.POSTHOG_API_KEY
+      ? { ready: true }
+      : {
+          ready: false,
+          reason: "POSTHOG_API_KEY not set (recipe flags fail open, telemetry disabled)",
+        };
+  });
+
   // Web search (Agent SDK): needs an Anthropic credential in the environment.
   registerHealthCheck("web-search", () => {
     return process.env.ANTHROPIC_API_KEY
