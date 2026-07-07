@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "0.1",
+  "slug": "evaluate-map-example",
+  "version": "0.1.0",
+  "description": "Dogfood bundle: repackages the shipped evaluate-map recipe under a new slug, with the identify-capability prompt pair, to prove the strategy-bundle v0 format round-trips.",
+  "permissions": ["llm"],
+  "prompts": {
+    "identify-capability": ["default"]
+  }
+}

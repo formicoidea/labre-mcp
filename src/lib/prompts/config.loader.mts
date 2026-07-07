@@ -67,7 +67,10 @@ function resolveConfigPath(): string {
   return resolve(PACKAGE_ROOT, 'prompts.config.json');
 }
 
-function extractTemplateVars(text: string): string[] {
+/** Collect the sorted set of {{var}} placeholder names found in a template.
+ *  Exported so other loaders (e.g. bundle-loader) enforce the same
+ *  "system file is invariant" rule without duplicating the extraction. */
+export function extractTemplateVars(text: string): string[] {
   const found = new Set<string>();
   const re = /\{\{(\w+)\}\}/g;
   let m: RegExpExecArray | null;

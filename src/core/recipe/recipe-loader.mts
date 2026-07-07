@@ -2,11 +2,13 @@
 //
 // Lookup order for recipe name "evaluate-map" in framework "wardley", tool "evolution":
 //   1. <projectRoot>/recipes/wardley/evolution/evaluate-map.recipe.json (user)
-//   2. <shippedRoot>/recipes/wardley/evolution/evaluate-map.recipe.json (built-in)
+//   2. in-memory bundle recipes (registerBundleRecipe — never shadows shipped)
+//   3. <shippedRoot>/recipes/wardley/evolution/evaluate-map.recipe.json (built-in)
 //
 // User recipe takes precedence by name (no field-level merge — recipes are
 // integral declarations). Loader caches per (framework, tool, name).
 
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { validateOrThrow } from "#lib/zod/validate-or-throw.mjs";
@@ -28,6 +30,38 @@ function cacheKey(o: RecipeLookupOptions): string {
 
 function recipePath(root: string, framework: string, tool: string, name: string): string {
   return join(resolve(root), "recipes", framework, tool, `${name}.recipe.json`);
+}
+
+// In-memory registry of bundle-provided recipes, keyed "<domain>:<tool>:<name>".
+// Registered recipes join the same lookup path loadRecipe serves (so runRecipe
+// resolves them by ref), ranked BELOW user overrides and beside shipped ones —
+// a bundle may never shadow a shipped recipe (collision rejected at
+// registration). Populated by lib/bundles/bundle-loader `registerBundle`.
+const bundleRecipes = new Map<string, Recipe>();
+
+export interface RegisterBundleRecipeOptions {
+  /** labre-mcp's own install root — used only for the shipped-collision check. */
+  shippedRoot: string;
+}
+
+/** Make an already-validated bundle recipe resolvable by loadRecipe. */
+export function registerBundleRecipe(recipe: Recipe, options: RegisterBundleRecipeOptions): void {
+  const ref = `${recipe.domain}:${recipe.tool}:${recipe.name}`;
+  const shippedPath = recipePath(options.shippedRoot, recipe.domain, recipe.tool, recipe.name);
+  if (existsSync(shippedPath)) {
+    throw new Error(
+      `Cannot register bundle recipe "${ref}": it collides with the shipped recipe at ${shippedPath}`,
+    );
+  }
+  if (bundleRecipes.has(ref)) {
+    throw new Error(`Cannot register bundle recipe "${ref}": a bundle recipe with this ref is already registered`);
+  }
+  bundleRecipes.set(ref, recipe);
+}
+
+/** Test-only: forget all registered bundle recipes. */
+export function resetBundleRecipes(): void {
+  bundleRecipes.clear();
 }
 
 async function tryReadRecipe(path: string): Promise<Recipe | null> {
@@ -66,7 +100,12 @@ export async function loadRecipe(options: RecipeLookupOptions): Promise<Recipe> 
     }
   }
 
-  // 2. Shipped recipe
+  // 2. Registered bundle recipe (guaranteed not to collide with shipped —
+  //    registration rejects shadowing, so ordering vs. step 3 is inert).
+  const bundleHit = bundleRecipes.get(`${options.framework}:${options.tool}:${options.name}`);
+  if (bundleHit) return bundleHit;
+
+  // 3. Shipped recipe
   const shippedPath = recipePath(options.shippedRoot, options.framework, options.tool, options.name);
   const shipped = await tryReadRecipe(shippedPath);
   if (!shipped) {
