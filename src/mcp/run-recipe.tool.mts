@@ -9,7 +9,7 @@
 import { z } from 'zod';
 import type { ToolDefinition } from '#core/transport/mcp-handler.mjs';
 import { RunRecipeCallSchema } from '#schemas/run-recipe.schema.mjs';
-import { loadRecipe } from '#core/recipe/recipe-loader.mjs';
+import { loadRecipe, getBundlePrompts } from '#core/recipe/recipe-loader.mjs';
 import { runRecipe, type JsonLabreEnvelope } from '#core/recipe/recipe-runner.mjs';
 import { buildStrategyRegistry } from '#core/transport/strategy-registry-boot.mjs';
 import { attachArtifactWriter } from '#core/listeners/artifact-writer-listener.mjs';
@@ -89,6 +89,13 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
       };
     }
 
+    // Bundle recipes carry run-scoped prompt overrides (A/B testing); shipped
+    // and user recipes return undefined here and run with the shipped prompts.
+    // The loaded recipe is passed so a user recipe shadowing a bundle ref
+    // (loadRecipe ranks user overrides above bundle recipes) never inherits
+    // the bundle's prompts.
+    const promptOverrides = getBundlePrompts({ framework, tool, name }, recipe);
+
     const registry = buildStrategyRegistry();
     const bus = createEventBus();
 
@@ -109,7 +116,7 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
     }
 
     try {
-      const outcome = await runRecipe({ recipe, ast, context: ctx, registry, bus });
+      const outcome = await runRecipe({ recipe, ast, context: ctx, registry, bus, promptOverrides });
       const artifactPath = await artifactHandle.artifactPath;
       return {
         recipe: call.recipe,

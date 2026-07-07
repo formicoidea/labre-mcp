@@ -15,6 +15,10 @@ import type { BaseStrategy, StrategyResult } from "../ast/base-strategy.mjs";
 import type { RequestContext } from "../context/request-context.mjs";
 import { createEventBus, type EventBus } from "../bus/event-bus.mjs";
 import type { PipelineEvent } from "../bus/event.schema.mjs";
+import {
+  runWithPromptOverrides,
+  type PromptOverrideStore,
+} from "#lib/prompts/override-context.mjs";
 
 export interface RunOptions {
   recipe: Recipe;
@@ -23,6 +27,11 @@ export interface RunOptions {
   registry: StrategyRegistry;
   // Optional pre-existing bus (e.g. for tests) — otherwise one is created.
   bus?: EventBus;
+  // Optional run-scoped prompt overrides (bundle A/B testing). When present,
+  // the whole step-execution phase runs inside runWithPromptOverrides so every
+  // step's getPrompt() sees the bundle's prompts; absent → default path,
+  // byte-identical to a run without overrides.
+  promptOverrides?: PromptOverrideStore["prompts"];
 }
 
 // JSON-labre envelope shape (ast-schema.md v0.1.0 § 2.0).
@@ -93,7 +102,10 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
     });
   };
 
-  try {
+  // The whole run loop (steps + listeners). Wrapped in the run-scoped prompt
+  // override store when the caller supplies overrides, so every getPrompt()
+  // reachable from a step/listener sees the bundle's prompts for this run only.
+  const runBody = async (): Promise<void> => {
     for (const step of options.recipe.steps) {
       await executeStep({
         step,
@@ -120,6 +132,15 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
       registry: options.registry,
       envelope,
     });
+  };
+
+  try {
+    // Absent overrides → runBody() runs directly (path byte-identical to before).
+    if (options.promptOverrides) {
+      await runWithPromptOverrides({ prompts: options.promptOverrides }, runBody);
+    } else {
+      await runBody();
+    }
     emitRunEnd();
   } catch (err) {
     emitRunEnd();

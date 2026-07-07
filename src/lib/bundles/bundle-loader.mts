@@ -29,6 +29,7 @@ import { join, resolve } from 'node:path';
 import { validateOrThrow } from '#lib/zod/validate-or-throw.mjs';
 import { extractTemplateVars } from '#lib/prompts/config.loader.mjs';
 import type { BundlePromptPair } from '#lib/prompts/override-context.mjs';
+import { assertBundlePromptsOverridable } from '#lib/prompts/override-validation.mjs';
 import {
   StrategyBundleManifestSchema,
   type StrategyBundleManifest,
@@ -184,13 +185,21 @@ export async function loadBundleFromDir(dir: string): Promise<LoadedBundle> {
 
 /**
  * Make a loaded bundle's recipe resolvable through the same lookup path the
- * `runRecipe` MCP tool uses (core/recipe/recipe-loader). Collision with a
- * shipped recipe ref rejects — bundles never shadow shipped recipes.
- * In-memory only; wiring into boot is a later phase.
+ * `runRecipe` MCP tool uses (core/recipe/recipe-loader), carrying the bundle's
+ * prompt overrides alongside it so a run of that recipe layers them over the
+ * shipped prompts (getBundlePrompts + run-scoped override store). Collision
+ * with a shipped recipe ref rejects — bundles never shadow shipped recipes.
+ * Prompt overrides are validated for overridability first (each must shadow a
+ * shipped template prompt) — a bundle failing that check is rejected outright.
+ * In-memory only.
  */
 export function registerBundle(loaded: LoadedBundle, options: RegisterBundleRecipeOptions): void {
+  // The overridability check already prefixes its errors with the bundle label,
+  // so it stays outside the wrap below (which contextualizes registerBundleRecipe's
+  // bare messages) to avoid a doubled "Bundle <dir>:" prefix.
+  assertBundlePromptsOverridable(loaded.prompts, loaded.dir);
   try {
-    registerBundleRecipe(loaded.recipe, options);
+    registerBundleRecipe(loaded.recipe, options, loaded.prompts);
   } catch (err) {
     throw new Error(`Bundle ${loaded.dir}: ${(err as Error).message}`);
   }

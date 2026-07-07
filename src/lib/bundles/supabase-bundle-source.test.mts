@@ -27,7 +27,10 @@ function sha256Hex(text: string): string {
   return createHash('sha256').update(encoder.encode(text)).digest('hex');
 }
 
-/** Minimal valid bundle content (manifest + recipe + one prompt pair). */
+/** Minimal valid bundle content (manifest + recipe + one prompt pair).
+ *  The declared override targets the shipped `identify-capability/default`
+ *  template — the overridability check (CP4) requires overrides to shadow a
+ *  shipped template prompt, so a made-up strategy id would be rejected. */
 function bundleContents(slug: string): Record<string, string> {
   return {
     'manifest.json': JSON.stringify({
@@ -36,7 +39,7 @@ function bundleContents(slug: string): Record<string, string> {
       version: '1.0.0',
       description: `Remote test bundle ${slug}`,
       permissions: ['llm'],
-      prompts: { 'demo-strategy': ['default'] },
+      prompts: { 'identify-capability': ['default'] },
     }),
     'recipe.json': JSON.stringify({
       schemaVersion: '1.0',
@@ -46,8 +49,8 @@ function bundleContents(slug: string): Record<string, string> {
       steps: [{ stepId: 's1', tool: 'wardley:map:node:identify:default' }],
       listeners: {},
     }),
-    'prompts/demo-strategy/default.system.md': 'You are a demo.\n',
-    'prompts/demo-strategy/default.user.md': 'Component: {{component}}\n',
+    'prompts/identify-capability/default.system.md': 'You are a demo.\n',
+    'prompts/identify-capability/default.user.md': 'Component: {{component}}\n',
   };
 }
 
@@ -208,7 +211,7 @@ describe('supabase-bundle-source: refreshIfStale', () => {
 
   it('download failure rejects that bundle only; the others load', async () => {
     const store = makeStore(['remote-alpha', 'remote-beta']);
-    store.missingObjectOf = 'remote-beta:prompts/demo-strategy/default.user.md';
+    store.missingObjectOf = 'remote-beta:prompts/identify-capability/default.user.md';
     const counters = makeCounters();
     const events: DegradationEvent[] = [];
     const source = buildSource(store, counters, events, 300);
@@ -304,6 +307,48 @@ describe('supabase-bundle-source: refreshIfStale', () => {
     assert.equal(events.length, 1);
     assert.match(events[0].reason, /evaluate-map@1\.0\.0/);
     assert.match(events[0].reason, /collides with the shipped recipe/);
+  });
+
+  it('a bundle whose prompt targets an unknown shipped prompt is rejected; the others load', async () => {
+    const store = makeStore(['remote-alpha', 'remote-beta']);
+    // Repoint remote-beta's declared override at a strategy that ships no
+    // prompt — the overridability check (CP4) must reject it. The prompt files
+    // still exist on disk under the new strategy id so the static loader passes
+    // and the failure is specifically the overridability check.
+    store.bundles.set('remote-beta', {
+      'manifest.json': JSON.stringify({
+        schemaVersion: '0.1',
+        slug: 'remote-beta',
+        version: '1.0.0',
+        description: 'Remote test bundle remote-beta',
+        permissions: ['llm'],
+        prompts: { 'no-such-strategy': ['default'] },
+      }),
+      'recipe.json': JSON.stringify({
+        schemaVersion: '1.0',
+        name: 'remote-beta',
+        domain: 'wardley',
+        tool: 'map',
+        steps: [{ stepId: 's1', tool: 'wardley:map:node:identify:default' }],
+        listeners: {},
+      }),
+      'prompts/no-such-strategy/default.system.md': 'You are a demo.\n',
+      'prompts/no-such-strategy/default.user.md': 'Component: {{component}}\n',
+    });
+    const counters = makeCounters();
+    const events: DegradationEvent[] = [];
+    const source = buildSource(store, counters, events, 300);
+
+    await source.refreshIfStale('tok');
+
+    // The valid bundle still resolves; the offending one does not register.
+    assert.equal((await resolveBundleRecipe('remote-alpha')).name, 'remote-alpha');
+    await assert.rejects(resolveBundleRecipe('remote-beta'), /Recipe not found/);
+
+    assert.equal(events.length, 1);
+    assert.match(events[0].reason, /remote-beta@1\.0\.0/, 'degradation names slug@version');
+    assert.match(events[0].reason, /unknown shipped prompt/);
+    assert.equal(events[0].source, 'strategy-bundles');
   });
 
   it('an invalid row is rejected with degradation; the others load', async () => {

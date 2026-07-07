@@ -9,6 +9,7 @@ import {
   loadRecipe,
   resetBundleRecipes,
   resetRecipeCache,
+  getBundlePrompts,
 } from '#core/recipe/recipe-loader.mjs';
 
 // src/lib/bundles/ → up 3 = repo root (shipped recipes + dogfood fixture).
@@ -171,6 +172,43 @@ describe('bundle-loader: registerBundle', () => {
       shippedRoot: REPO_ROOT,
     });
     assert.equal(resolved, loaded.recipe);
+  });
+
+  it('carries the bundle prompts through registration (retrievable by ref)', async () => {
+    const loaded = await loadBundleFromDir(EXAMPLE_BUNDLE_DIR);
+    registerBundle(loaded, { shippedRoot: REPO_ROOT });
+
+    const prompts = getBundlePrompts(
+      { framework: 'wardley', tool: 'map', name: 'evaluate-map-example' },
+      loaded.recipe,
+    );
+    const pair = prompts?.['identify-capability']?.['default'];
+    assert.ok(pair, 'the declared prompt pair survives registration');
+    assert.match(pair.user, /\{\{component\}\}/);
+    assert.doesNotMatch(pair.system, /\{\{\w+\}\}/);
+    // Same object the loader produced — no copy/transform on the way through.
+    assert.equal(prompts, loaded.prompts);
+  });
+
+  it('rejects a bundle whose prompt targets an unknown shipped prompt', async () => {
+    // "demo-strategy" ships no prompt — the override would be unreachable.
+    const dir = await writeTempBundle({
+      manifest: baseManifest({ prompts: { 'demo-strategy': ['default'] } }),
+      files: {
+        'prompts/demo-strategy/default.system.md': 'You are a demo.',
+        'prompts/demo-strategy/default.user.md': 'Do {{thing}}.',
+      },
+    });
+    const loaded = await loadBundleFromDir(dir);
+    assert.throws(
+      () => registerBundle(loaded, { shippedRoot: REPO_ROOT }),
+      /demo-strategy\/default.*unknown shipped prompt/s,
+    );
+    // Rejected before registration — the recipe never became resolvable.
+    assert.equal(
+      getBundlePrompts({ framework: 'wardley', tool: 'map', name: 'demo-bundle' }, loaded.recipe),
+      undefined,
+    );
   });
 
   it('rejects a slug colliding with a shipped recipe name', async () => {

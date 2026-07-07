@@ -19,9 +19,12 @@
 // Statelessness: everything happens in memory (no temp files); a crashed or
 // scaled instance simply reloads on its next authenticated request.
 //
-// Bundle prompts are validated but INERT in v0: they are NOT injected into
-// the prompt registry — only the bundle recipe becomes resolvable. Prompt
-// wiring is a later phase.
+// Bundle prompts are now LIVE: each accepted bundle registers its prompt
+// overrides alongside its recipe (registerBundleRecipe's third argument), so a
+// run of that recipe layers the bundle's prompts over the shipped ones via the
+// run-scoped override store. Overridability is enforced per bundle here (each
+// override must shadow a shipped template prompt) — a bundle failing that check
+// is rejected like any other bad bundle, and the rest still load.
 //
 // @supabase/supabase-js is loaded via dynamic import() inside the default
 // client factory only — the stdio transport and unauthenticated daemons
@@ -35,8 +38,17 @@ import {
   resetBundleRecipes,
 } from '#core/recipe/recipe-loader.mjs';
 import type { Recipe } from '#core/recipe/recipe.schema.mjs';
+import type { BundlePromptPair } from '#lib/prompts/override-context.mjs';
+import { assertBundlePromptsOverridable } from '#lib/prompts/override-validation.mjs';
 import type { DegradationEvent } from '#lib/degradation/index.mjs';
 import { loadBundleFromFiles } from './bundle-loader.mjs';
+
+/** A remote bundle accepted for registration: its recipe plus prompt overrides. */
+interface AcceptedBundle {
+  label: string;
+  recipe: Recipe;
+  prompts: Record<string, Record<string, BundlePromptPair>>;
+}
 
 const TABLE = 'strategy_bundles';
 const BUCKET = 'strategy-bundles';
@@ -211,7 +223,7 @@ export function buildSupabaseBundleSource(
   async function loadOneBundle(
     client: SupabaseBundleClient,
     row: StrategyBundleRow,
-  ): Promise<{ label: string; recipe: Recipe }> {
+  ): Promise<AcceptedBundle> {
     const label = `${row.slug}@${row.version}`;
 
     // All files of a bundle download in parallel; any failure or digest
@@ -246,7 +258,12 @@ export function buildSupabaseBundleSource(
       );
     }
 
-    return { label, recipe: validated.recipe };
+    // Enforce overridability here (same rule as local registerBundle): every
+    // declared prompt override must shadow a shipped template prompt. A bundle
+    // failing this is rejected like any other bad bundle — the others still load.
+    assertBundlePromptsOverridable(validated.prompts, label);
+
+    return { label, recipe: validated.recipe, prompts: validated.prompts };
   }
 
   async function runRefresh(bearerToken: string): Promise<void> {
@@ -305,18 +322,19 @@ export function buildSupabaseBundleSource(
       }),
     );
 
-    const accepted: Array<{ label: string; recipe: Recipe }> = [];
+    const accepted: AcceptedBundle[] = [];
     for (const outcome of outcomes) {
       if (outcome.status === 'fulfilled') accepted.push(outcome.value);
       else degrade((outcome.reason as Error).message);
     }
 
     // Atomic swap: reset + re-register run synchronously (no await between),
-    // so no concurrent loadRecipe lookup ever observes a half-swapped set.
+    // so no concurrent loadRecipe lookup ever observes a half-swapped set. Each
+    // bundle's prompt overrides are re-registered alongside its recipe.
     resetBundleRecipes();
     for (const bundle of accepted) {
       try {
-        registerBundleRecipe(bundle.recipe, { shippedRoot: options.shippedRoot });
+        registerBundleRecipe(bundle.recipe, { shippedRoot: options.shippedRoot }, bundle.prompts);
       } catch (err) {
         // Shipped-recipe collision (or duplicate ref between two bundles):
         // reject this bundle, keep the rest.
