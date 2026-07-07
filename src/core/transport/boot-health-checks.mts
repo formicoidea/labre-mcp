@@ -54,10 +54,41 @@ export function registerBootHealthChecks(): void {
       : { ready: false, reason: cli.reason };
   });
 
+  // PostHog (recipe feature flags + telemetry): config presence only. Absence
+  // is degraded, never fatal — the gate fails open and telemetry stays off.
+  registerHealthCheck("posthog", () => {
+    return process.env.POSTHOG_API_KEY
+      ? { ready: true }
+      : {
+          ready: false,
+          reason: "POSTHOG_API_KEY not set (recipe flags fail open, telemetry disabled)",
+        };
+  });
+
   // Web search (Agent SDK): needs an Anthropic credential in the environment.
   registerHealthCheck("web-search", () => {
     return process.env.ANTHROPIC_API_KEY
       ? { ready: true }
       : { ready: false, reason: "ANTHROPIC_API_KEY not set (Agent SDK web search)" };
+  });
+
+  // Remote strategy bundles (Supabase): CONFIG presence only, no network
+  // probe — the source authenticates with the caller's token at request
+  // time, so there is nothing meaningful to probe at boot anyway.
+  registerHealthCheck("strategy-bundles", () => {
+    if (process.env.LABRE_AUTH !== "supabase") {
+      // Local/noop mode: remote bundles are intentionally out of play.
+      return { ready: true };
+    }
+    const missing: string[] = [];
+    if (!process.env.SUPABASE_URL) missing.push("SUPABASE_URL");
+    if (!process.env.SUPABASE_ANON_KEY) missing.push("SUPABASE_ANON_KEY");
+    return missing.length === 0
+      ? { ready: true }
+      : {
+          ready: false,
+          reason: `remote strategy bundles disabled: missing env: ${missing.join(", ")}`,
+          detail: { missing },
+        };
   });
 }

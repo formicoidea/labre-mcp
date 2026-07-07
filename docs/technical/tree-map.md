@@ -38,11 +38,14 @@ src/
 │   ├── bus/                  event-bus RxJS + event.schema                   (ARCH-10)
 │   ├── ast/                  base-strategy (contrat { signals,reasoning,insights,result }) (ARCH-22)
 │   ├── context/              request-context (projectId, projectRoot, sessionId, domain) (ARCH-15)
-│   ├── transport/            labre-daemon (HTTP), labre-stdio (stdio), http-server (Hono),
-│   │                         mcp-handler (dispatch), boot-tool-registry, json-rpc.schema,
-│   │                         context-extractor, auth-middleware, supabase-auth (JWT/JWKS),
+│   ├── transport/            labre-daemon (HTTP), labre-stdio (stdio), http-server (Hono,
+│   │                         hook onAuthenticated post-auth/pré-dispatch), mcp-handler (dispatch),
+│   │                         boot-tool-registry, json-rpc.schema, context-extractor,
+│   │                         auth-middleware, supabase-auth (JWT/JWKS), boot-health-checks,
 │   │                         strategy-registry-boot                          (ARCH-14)
-│   ├── listeners/            artifact-writer-listener (core, toujours actif) (ARCH-12)
+│   ├── listeners/            artifact-writer-listener (core, toujours actif) (ARCH-12),
+│   │                         posthog-telemetry-listener (run-end/step-error → capture,
+│   │                         attaché par runRecipe quand PostHog est configuré)
 │   └── persistence/          artifact-writer, project-id-resolver            (ARCH-12/13)
 │
 ├── lib/                      ── Utilitaires transverses (PAS encore sous core/ — roadmap B1)
@@ -52,10 +55,15 @@ src/
 │   │                         interpolate, init (split .system.md / .user.md)
 │   ├── owm/                  owm-dsl, render-adapter, cli-owm-adapter,
 │   │                         analytical-geometry, overlap-detector, svg-bbox-parser
-│   ├── bundles/              bundle-loader : chargement local des strategy bundles v0
-│   │                         (manifest + recipe + paires de prompts), registerBundle
+│   ├── bundles/              bundle-loader : validation des strategy bundles v0 (cœur
+│   │                         loadBundleFromFiles en mémoire + wrapper loadBundleFromDir),
+│   │                         registerBundle ; supabase-bundle-source : fetch distant lazy
+│   │                         avec le JWT de l'appelant (RLS), sha256 + swap atomique
 │   ├── degradation/          Degradable<T>, collector (AsyncLocalStorage),
 │   │                         with-degradation, mcp-wrapper (withMcpDegradation)
+│   ├── flags/                posthog (buildPostHog : gate fail-open + capture + shutdown,
+│   │                         posthog-node en import dynamique), state (singleton posé au boot
+│   │                         du daemon ; clé de flag mcp-recipe-<domain>-<tool>-<name>)
 │   ├── patent/               bigquery-* , patent-data-source, patent-indicators, mock-patent-source
 │   ├── vendor/cli-owm/       cli-owm@4950f330 (GPL-2.0) vendoré + parser/
 │   ├── zod/                  helpers Zod (validateOrThrow…)
@@ -119,7 +127,7 @@ client MCP ──HTTP──▶ core/transport/labre-daemon ──▶ http-server
                           frameworks/wardley/evolution/registry        frameworks/wardley/chain/registry
                           frameworks/common/registry                   frameworks/mocks-registry
 
-Partagé : lib/{llm, degradation, prompts, owm, response-formatter, language-detect, mcp-notifications}
+Partagé : lib/{llm, degradation, flags, prompts, owm, response-formatter, language-detect, mcp-notifications}
 ```
 
 ## 5. Recipes livrées
@@ -136,7 +144,9 @@ Partagé : lib/{llm, degradation, prompts, owm, response-formatter, language-det
 
 ### Strategy bundles (v0)
 
-Un **strategy bundle** est un paquet déclaratif data-only (aucun code exécutable) : `manifest.json` (schéma `src/schemas/strategy-bundle.schema.mts`, `schemaVersion: "0.1"`) + `recipe.json` (une seule recette, `name` = `slug` du manifeste) + paires de prompts optionnelles `prompts/<strategyId>/<name>.{system,user}.md`. Chargement local : `src/lib/bundles/bundle-loader.mts` (`loadBundleFromDir` valide dur ; `registerBundle` insère la recette dans le lookup de `core/recipe/recipe-loader` — ordre : override projet > bundles en mémoire > shipped, collision avec une recette shipped rejetée). Fixture de dogfooding : `bundles/examples/evaluate-map-example/`. Le fetch Supabase et le câblage au boot sont des phases ultérieures.
+Un **strategy bundle** est un paquet déclaratif data-only (aucun code exécutable) : `manifest.json` (schéma `src/schemas/strategy-bundle.schema.mts`, `schemaVersion: "0.1"`) + `recipe.json` (une seule recette, `name` = `slug` du manifeste) + paires de prompts optionnelles `prompts/<strategyId>/<name>.{system,user}.md`. Validation : `src/lib/bundles/bundle-loader.mts` (`loadBundleFromFiles` = cœur en mémoire via un lecteur injecté, `loadBundleFromDir` = wrapper local ; `registerBundle` insère la recette dans le lookup de `core/recipe/recipe-loader` — ordre : override projet > bundles en mémoire > shipped, collision avec une recette shipped rejetée). Fixture de dogfooding : `bundles/examples/evaluate-map-example/`.
+
+**Source distante Supabase** (`src/lib/bundles/supabase-bundle-source.mts`) : le daemon ne détient AUCUNE clé Supabase propre (jamais la service-role) — `refreshIfStale(bearerToken)` crée un client éphémère avec le JWT de l'appelant + la clé anon (`@supabase/supabase-js` chargé par `import()` dynamique, jamais côté stdio), RLS autorise. Throttle TTL (défaut 300 s, `LABRE_BUNDLES_TTL_S`) avec sonde légère `max(updated_at)+count` ; chaque fichier re-vérifié sha256 contre le sceau de la table `strategy_bundles` (mismatch/échec de download ⇒ bundle rejeté avec événement de dégradation `slug@version`, les autres passent) ; swap atomique `resetBundleRecipes()` + ré-enregistrement synchrone ; échec total ⇒ l'ancien jeu continue de servir (stale-over-broken), jamais d'erreur dans la requête. Les prompts de bundle sont validés mais **inertes en v0** (pas injectés dans le prompt registry). Câblage : hook `onAuthenticated` de `http-server` monté par `labre-daemon` quand `LABRE_AUTH=supabase` + `SUPABASE_ANON_KEY` ; health check boot `strategy-bundles` (présence de config, pas de sonde réseau). Le token brut n'est jamais stocké ni loggé.
 
 ## 6. Fichiers racine de configuration
 
@@ -146,7 +156,7 @@ Un **strategy bundle** est un paquet déclaratif data-only (aucun code exécutab
 | `llm.config.example.json` | Gabarit (3 profils, voir [configuration.md](configuration.md)) |
 | `prompts.config.json` | Registre des prompts par stratégie (paires `.system.md` / `.user.md`, parser custom/délimité/keyValue) |
 | `prompts/*.{system,user}.md` | Prompts splités — aucun `{{…}}` dans un `.system.md` (vérifié par le loader) |
-| `.env.example` | Variables d'environnement (`OPENCODE_API_KEY`, `WARDLEY_LLM_CONFIG`, `WARDLEY_PROMPTS_CONFIG`, `LABRE_HTTP_PORT`, `LABRE_DISABLE_MOCKS`…) |
+| `.env.example` | Variables d'environnement (`OPENCODE_API_KEY`, `WARDLEY_LLM_CONFIG`, `WARDLEY_PROMPTS_CONFIG`, `LABRE_HTTP_PORT`, `LABRE_DISABLE_MOCKS`, `LABRE_AUTH`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `LABRE_BUNDLES_TTL_S`…) |
 | `.mcp.json` | Enregistrement du serveur HTTP auprès du client MCP |
 | `promptfooconfig.yaml` | Configuration d'évaluation promptfoo (voir [evaluation.md](../functional/evaluation.md)) |
 

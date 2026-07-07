@@ -44,6 +44,24 @@ describe("registerBootHealthChecks", () => {
     assert.equal(event.source, "copilot-sdk");
     assert.match(event.reason, /@github\/copilot CLI package is not installed/);
   });
+
+  it("reports posthog by config presence only", async () => {
+    const original = process.env.POSTHOG_API_KEY;
+    try {
+      delete process.env.POSTHOG_API_KEY;
+      registerBootHealthChecks();
+      const missing = await runHealthCheck("posthog");
+      assert.ok(missing);
+      assert.match(missing.reason, /POSTHOG_API_KEY not set/);
+
+      process.env.POSTHOG_API_KEY = "phc_test";
+      const ready = await runHealthCheck("posthog");
+      assert.equal(ready, null); // ready checks emit no degradation event
+    } finally {
+      if (original === undefined) delete process.env.POSTHOG_API_KEY;
+      else process.env.POSTHOG_API_KEY = original;
+    }
+  });
 });
 
 describe("checkCopilotCliAvailable", () => {

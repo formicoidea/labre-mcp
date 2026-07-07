@@ -59,7 +59,12 @@ export function registerBundleRecipe(recipe: Recipe, options: RegisterBundleReci
   bundleRecipes.set(ref, recipe);
 }
 
-/** Test-only: forget all registered bundle recipes. */
+/**
+ * Forget all registered bundle recipes. Used by tests AND by the Supabase
+ * bundle source's refresh swap: a validated refresh calls this then
+ * re-registers the new set synchronously (no await in between), so lookups
+ * never observe a half-swapped registry.
+ */
 export function resetBundleRecipes(): void {
   bundleRecipes.clear();
 }

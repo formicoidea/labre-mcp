@@ -10,14 +10,26 @@ import type { ServerType } from "@hono/node-server";
 import { dispatch, SERVER_INFO, type ToolRegistry } from "./mcp-handler.mjs";
 import { JsonRpcRequestSchema, JsonRpcErrorCode } from "./json-rpc.schema.mjs";
 import { extractContext } from "./context-extractor.mjs";
+import type { RequestContext } from "../context/request-context.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { noopAuthMiddleware, AuthenticationError } from "./auth-middleware.mjs";
+
+/**
+ * Invoked after successful authentication and before dispatch (e.g. the
+ * Supabase bundle source refreshing with the caller's bearer token). Errors
+ * NEVER fail the request — they are logged to stderr and dispatch proceeds.
+ */
+export type OnAuthenticatedHook = (
+  headers: Record<string, string>,
+  context: RequestContext,
+) => Promise<void>;
 
 export interface HttpServerOptions {
   port: number;
   tools: ToolRegistry;
   auth?: AuthMiddleware;
   hostname?: string;
+  onAuthenticated?: OnAuthenticatedHook;
 }
 
 export interface RunningServer {
@@ -25,7 +37,11 @@ export interface RunningServer {
   port: number;
 }
 
-export function buildApp(options: { tools: ToolRegistry; auth: AuthMiddleware }): Hono {
+export function buildApp(options: {
+  tools: ToolRegistry;
+  auth: AuthMiddleware;
+  onAuthenticated?: OnAuthenticatedHook;
+}): Hono {
   const app = new Hono();
 
   app.get("/health", (c) => c.json({ status: "ok" }));
@@ -77,6 +93,18 @@ export function buildApp(options: { tools: ToolRegistry; auth: AuthMiddleware })
       throw err;
     }
 
+    // Post-auth hook (e.g. lazy remote-bundle refresh with the caller's
+    // token). Best effort: a hook failure must never fail the request.
+    if (options.onAuthenticated) {
+      try {
+        await options.onAuthenticated(headers, context);
+      } catch (err) {
+        process.stderr.write(
+          `[labre-mcp] onAuthenticated hook failed (request continues): ${(err as Error).message}\n`,
+        );
+      }
+    }
+
     const response = await dispatch({
       request: parsed.data,
       context,
@@ -97,6 +125,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
   const app = buildApp({
     tools: options.tools,
     auth: options.auth ?? noopAuthMiddleware,
+    onAuthenticated: options.onAuthenticated,
   });
 
   let server: ServerType | undefined;

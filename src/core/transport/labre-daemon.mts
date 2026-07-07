@@ -8,10 +8,14 @@
 import { fileURLToPath } from "node:url";
 import type { ToolRegistry } from "./mcp-handler.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
-import { startHttpServer } from "./http-server.mjs";
-import { buildSupabaseAuthMiddleware } from "./supabase-auth.mjs";
+import { startHttpServer, type OnAuthenticatedHook } from "./http-server.mjs";
+import { buildSupabaseAuthMiddleware, tryExtractBearerToken } from "./supabase-auth.mjs";
 import { registerBootHealthChecks } from "./boot-health-checks.mjs";
 import { runAllHealthChecks } from "#lib/degradation/index.mjs";
+import { buildSupabaseBundleSource } from "#lib/bundles/supabase-bundle-source.mjs";
+import { SHIPPED_ROOT } from "#mcp/shipped-root.mjs";
+import type { PostHogFlags } from "#lib/flags/posthog.mjs";
+import { setPostHogFlags } from "#lib/flags/state.mjs";
 
 // Re-export so existing callers (tests, downstream tooling) can keep
 // importing `buildStrategyRegistry` / `buildBootRegistry` from this module
@@ -55,13 +59,68 @@ function selectAuthMiddleware(): AuthMiddleware | undefined {
   throw new Error(`Invalid LABRE_AUTH: "${mode}" (expected "supabase" or "none")`);
 }
 
+function readBundlesTtlSeconds(): number | undefined {
+  const raw = process.env.LABRE_BUNDLES_TTL_S;
+  if (!raw) return undefined;
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isNaN(parsed) || parsed < 0) {
+    throw new Error(`Invalid LABRE_BUNDLES_TTL_S: "${raw}" (expected non-negative integer seconds)`);
+  }
+  return parsed;
+}
+
+// Remote strategy bundles ride the supabase auth mode: they refresh with the
+// CALLER's bearer token (RLS authorizes) — the daemon itself holds no Supabase
+// credential beyond the public anon key. Without the anon key the source is
+// simply off and the daemon serves shipped/user recipes only.
+function selectBundleRefreshHook(
+  authed: boolean,
+): { hook?: OnAuthenticatedHook; bootLine: string } {
+  if (!authed) {
+    return { bootLine: "off (requires LABRE_AUTH=supabase)" };
+  }
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+  if (!anonKey) {
+    return { bootLine: "off (SUPABASE_ANON_KEY not set)" };
+  }
+  // selectAuthMiddleware already guaranteed SUPABASE_URL under supabase mode.
+  const supabaseUrl = process.env.SUPABASE_URL as string;
+  const ttlSeconds = readBundlesTtlSeconds();
+  const source = buildSupabaseBundleSource({
+    supabaseUrl,
+    anonKey,
+    ttlSeconds,
+    shippedRoot: SHIPPED_ROOT,
+  });
+  const hook: OnAuthenticatedHook = async (headers) => {
+    // The token is read from the (already authenticated) request headers and
+    // handed straight to the refresh — never stored on the context or logged.
+    const token = tryExtractBearerToken(headers);
+    if (token) await source.refreshIfStale(token);
+  };
+  return { hook, bootLine: `on (lazy, TTL ${ttlSeconds ?? 300}s, caller-token RLS)` };
+}
+
+// Boot-time PostHog selection (env reads at boot only — same exception as
+// auth). Absent POSTHOG_API_KEY → flags gate and telemetry fully disabled;
+// `posthog-node` stays dynamically imported inside buildPostHog, so an
+// unconfigured daemon (and the stdio transport, which never runs this file)
+// never loads the package.
+async function selectPostHog(): Promise<PostHogFlags | undefined> {
+  const apiKey = process.env.POSTHOG_API_KEY;
+  if (!apiKey) return undefined;
+  const { buildPostHog } = await import("#lib/flags/posthog.mjs");
+  return buildPostHog({ apiKey, host: process.env.POSTHOG_HOST });
+}
+
 async function main(): Promise<void> {
   const port = readPort();
   const auth = selectAuthMiddleware();
   const tools: ToolRegistry = buildBootRegistry();
   const strategies = buildStrategyRegistry();
+  const bundles = selectBundleRefreshHook(auth !== undefined);
 
-  const server = await startHttpServer({ port, tools, auth });
+  const server = await startHttpServer({ port, tools, auth, onAuthenticated: bundles.hook });
 
   process.stderr.write(
     `[labre-mcp] HTTP server listening on http://127.0.0.1:${server.port} (POST /mcp)\n`,
@@ -69,11 +128,28 @@ async function main(): Promise<void> {
   process.stderr.write(
     `[labre-mcp] Auth: ${auth ? "supabase JWT (JWKS)" : "none (local dev)"}\n`,
   );
+  process.stderr.write(`[labre-mcp] Remote strategy bundles: ${bundles.bootLine}\n`);
   process.stderr.write(
     `[labre-mcp] Tools registered: ${tools.list().map((t) => t.name).join(", ") || "(none)"}\n`,
   );
   process.stderr.write(
     `[labre-mcp] Strategies registered (${strategies.size()}):\n${strategies.list().map((id) => `  - ${id}`).join("\n")}\n`,
+  );
+
+  // PostHog feature flags + telemetry (daemon only, env at boot only).
+  const posthog = await selectPostHog();
+  if (posthog) {
+    setPostHogFlags(posthog);
+    // Metadata only — no payloads, no user content.
+    posthog.capture("mcp_boot", "daemon", {
+      port: server.port,
+      auth: auth ? "supabase" : "none",
+      tools: tools.list().length,
+      strategies: strategies.size(),
+    });
+  }
+  process.stderr.write(
+    `[labre-mcp] PostHog: ${posthog ? "enabled (recipe flags + telemetry)" : "disabled (POSTHOG_API_KEY not set — flags fail open, no telemetry)"}\n`,
   );
 
   // Boot health checks (config/env presence only — no network). Never blocks boot.
@@ -92,6 +168,8 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string) => {
     process.stderr.write(`[labre-mcp] Received ${signal}, shutting down\n`);
     await server.close();
+    // Flush queued telemetry before exit; shutdown() swallows client errors.
+    if (posthog) await posthog.shutdown();
     process.exit(0);
   };
   process.on("SIGINT", () => void shutdown("SIGINT"));

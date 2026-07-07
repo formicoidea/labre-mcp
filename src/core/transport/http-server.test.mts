@@ -277,6 +277,53 @@ describe("labre-mcp HTTP transport with supabase auth", () => {
     assert.deepEqual(body.result, {});
   });
 
+  it("onAuthenticated hook runs after auth with the raw headers and enriched context", async () => {
+    const seen: Array<{ authorization?: string; userId?: string }> = [];
+    const app = buildApp({
+      tools: buildBootRegistry(),
+      auth: {
+        async authenticate(_headers, context) {
+          return { ...context, auth: { userId: "user-hook-1" } };
+        },
+      },
+      onAuthenticated: async (headers, context) => {
+        seen.push({ authorization: headers["authorization"], userId: context.auth?.userId });
+      },
+    });
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer caller-token",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 10, method: "ping" }),
+    });
+    assert.equal(res.status, 200);
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].authorization, "Bearer caller-token");
+    assert.equal(seen[0].userId, "user-hook-1");
+  });
+
+  it("onAuthenticated hook failure does not fail the request", async () => {
+    const app = buildApp({
+      tools: buildBootRegistry(),
+      auth: noopAuthMiddleware,
+      onAuthenticated: async () => {
+        throw new Error("bundle refresh exploded");
+      },
+    });
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 11, method: "ping" }),
+    });
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as { id: number; result: unknown };
+    assert.equal(body.id, 11);
+    assert.deepEqual(body.result, {});
+  });
+
   it("noop middleware still accepts header-less requests", async () => {
     const app = buildApp({ tools: buildBootRegistry(), auth: noopAuthMiddleware });
     const res = await app.request("/mcp", {
