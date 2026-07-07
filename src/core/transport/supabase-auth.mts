@@ -23,15 +23,30 @@ export interface SupabaseAuthOptions {
 
 const DEFAULT_AUDIENCE = "authenticated";
 
-function extractBearerToken(headers: Record<string, string>): string {
+/**
+ * Best-effort bearer extraction (no throw): returns undefined when the
+ * header is absent or malformed. Shared with the daemon's post-auth hook,
+ * which re-reads the caller's token for the bundle-source refresh WITHOUT
+ * ever storing it on the request context.
+ */
+export function tryExtractBearerToken(headers: Record<string, string>): string | undefined {
   // Header lookup is case-insensitive per RFC 9110; normalize keys.
   const raw = Object.entries(headers).find(
     ([key]) => key.toLowerCase() === "authorization",
   )?.[1];
-  if (!raw) throw new AuthenticationError("missing authorization header");
+  if (!raw) return undefined;
   const match = /^Bearer\s+(\S+)$/i.exec(raw.trim());
-  if (!match) throw new AuthenticationError("malformed authorization header (expected Bearer token)");
-  return match[1];
+  return match?.[1];
+}
+
+function extractBearerToken(headers: Record<string, string>): string {
+  const raw = Object.entries(headers).find(
+    ([key]) => key.toLowerCase() === "authorization",
+  )?.[1];
+  if (!raw) throw new AuthenticationError("missing authorization header");
+  const token = tryExtractBearerToken(headers);
+  if (!token) throw new AuthenticationError("malformed authorization header (expected Bearer token)");
+  return token;
 }
 
 export function buildSupabaseAuthMiddleware(options: SupabaseAuthOptions): AuthMiddleware {
