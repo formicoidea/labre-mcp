@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "labre-mcp": {
-      "type": "http",
-      "url": "http://127.0.0.1:6767/mcp"
+      "command": "node",
+      "args": ["./dist/core/transport/labre-stdio.mjs"]
     }
   }
 }

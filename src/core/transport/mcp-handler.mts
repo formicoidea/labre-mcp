@@ -10,6 +10,7 @@
 // themselves at boot. CP4-CP6 will migrate the existing 5 tools to this
 // registry; CP3 ships with the registry empty (or holding only smoke tools).
 
+import { createRequire } from "node:module";
 import type { RequestContext } from "../context/request-context.mjs";
 import { type JsonRpcRequest, type JsonRpcResponse, JsonRpcErrorCode } from "./json-rpc.schema.mjs";
 import { withMcpDegradation } from "#lib/degradation/index.mjs";
@@ -56,9 +57,16 @@ export class ToolRegistry {
   }
 }
 
-const SERVER_INFO = {
+// Version comes from package.json so a `npm version` bump propagates to what
+// the server advertises (MCP initialize + HTTP /version) with no manual edit.
+// Read at module load — the allowed exception to hard rule #20 (import.meta.url,
+// not cwd). Path resolves to the package root in both dev (src/) and dist/.
+// any: require() of package.json is untyped; we read a single field.
+const pkg = createRequire(import.meta.url)("../../../package.json") as { version: string };
+
+export const SERVER_INFO = {
   name: "labre-mcp",
-  version: "1.0.0-migration",
+  version: pkg.version,
 };
 
 const SERVER_CAPABILITIES = {
