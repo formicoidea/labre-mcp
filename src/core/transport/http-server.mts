@@ -8,10 +8,11 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import type { ServerType } from "@hono/node-server";
 import { dispatch, SERVER_INFO, type ToolRegistry } from "./mcp-handler.mjs";
-import { JsonRpcRequestSchema } from "./json-rpc.schema.mjs";
+import { JsonRpcRequestSchema, JsonRpcErrorCode } from "./json-rpc.schema.mjs";
 import { extractContext } from "./context-extractor.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { noopAuthMiddleware } from "./auth-middleware.mjs";
+import { AuthenticationError } from "./supabase-auth.mjs";
 
 export interface HttpServerOptions {
   port: number;
@@ -56,7 +57,26 @@ export function buildApp(options: { tools: ToolRegistry; auth: AuthMiddleware })
 
     const headers = Object.fromEntries(c.req.raw.headers);
     const initialContext = extractContext(parsed.data.params);
-    const context = await options.auth.authenticate(headers, initialContext);
+
+    // Authenticate BEFORE dispatch; the enriched context (auth claims)
+    // travels with the tool call. Fail closed with 401 — the internal
+    // reason is never leaked to the caller.
+    let context;
+    try {
+      context = await options.auth.authenticate(headers, initialContext);
+    } catch (err) {
+      if (err instanceof AuthenticationError) {
+        return c.json(
+          {
+            jsonrpc: "2.0",
+            id: parsed.data.id ?? null,
+            error: { code: JsonRpcErrorCode.Unauthorized, message: "unauthorized" },
+          },
+          401,
+        );
+      }
+      throw err;
+    }
 
     const response = await dispatch({
       request: parsed.data,

@@ -7,7 +7,9 @@
 
 import { fileURLToPath } from "node:url";
 import type { ToolRegistry } from "./mcp-handler.mjs";
+import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { startHttpServer } from "./http-server.mjs";
+import { buildSupabaseAuthMiddleware } from "./supabase-auth.mjs";
 import { registerBootHealthChecks } from "./boot-health-checks.mjs";
 import { runAllHealthChecks } from "#lib/degradation/index.mjs";
 
@@ -32,15 +34,40 @@ function readPort(): number {
   return parsed;
 }
 
+// Boot-time auth selection (env reads at boot are allowed — ARCH-15 forbids
+// them at request time only). LABRE_AUTH="supabase" requires SUPABASE_URL and
+// fails closed if it is missing; unset or "none" keeps the local noop.
+function selectAuthMiddleware(): AuthMiddleware | undefined {
+  const mode = process.env.LABRE_AUTH;
+  if (mode === undefined || mode === "" || mode === "none") return undefined;
+  if (mode === "supabase") {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    if (!supabaseUrl) {
+      throw new Error(
+        'LABRE_AUTH="supabase" requires SUPABASE_URL to be set (fail-closed: refusing to boot unauthenticated)',
+      );
+    }
+    return buildSupabaseAuthMiddleware({
+      supabaseUrl,
+      audience: process.env.SUPABASE_JWT_AUD,
+    });
+  }
+  throw new Error(`Invalid LABRE_AUTH: "${mode}" (expected "supabase" or "none")`);
+}
+
 async function main(): Promise<void> {
   const port = readPort();
+  const auth = selectAuthMiddleware();
   const tools: ToolRegistry = buildBootRegistry();
   const strategies = buildStrategyRegistry();
 
-  const server = await startHttpServer({ port, tools });
+  const server = await startHttpServer({ port, tools, auth });
 
   process.stderr.write(
     `[labre-mcp] HTTP server listening on http://127.0.0.1:${server.port} (POST /mcp)\n`,
+  );
+  process.stderr.write(
+    `[labre-mcp] Auth: ${auth ? "supabase JWT (JWKS)" : "none (local dev)"}\n`,
   );
   process.stderr.write(
     `[labre-mcp] Tools registered: ${tools.list().map((t) => t.name).join(", ") || "(none)"}\n`,

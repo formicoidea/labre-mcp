@@ -41,4 +41,7 @@ export const JsonRpcErrorCode = {
   MethodNotFound: -32601,
   InvalidParams: -32602,
   InternalError: -32603,
+  // Implementation-defined server error (JSON-RPC 2.0 reserves -32000..-32099):
+  // authentication failed on the HTTP transport.
+  Unauthorized: -32001,
 } as const;

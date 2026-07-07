@@ -39,7 +39,8 @@ src/
 │   ├── context/              request-context (projectId, projectRoot, sessionId, domain) (ARCH-15)
 │   ├── transport/            labre-daemon (HTTP), labre-stdio (stdio), http-server (Hono),
 │   │                         mcp-handler (dispatch), boot-tool-registry, json-rpc.schema,
-│   │                         context-extractor, auth-middleware, strategy-registry-boot (ARCH-14)
+│   │                         context-extractor, auth-middleware, supabase-auth (JWT/JWKS),
+│   │                         strategy-registry-boot                          (ARCH-14)
 │   ├── listeners/            artifact-writer-listener (core, toujours actif) (ARCH-12)
 │   └── persistence/          artifact-writer, project-id-resolver            (ARCH-12/13)
 │
