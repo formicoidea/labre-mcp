@@ -120,6 +120,10 @@ function buildFakeFlags(verdict: boolean): PostHogFlags & {
       flagCalls.push({ ref, userId });
       return verdict;
     },
+    async resolvePromptVariants() {
+      // No prompt experiments in these gate tests → default path (no variants).
+      return {};
+    },
     capture(event, distinctId, properties) {
       captured.push({ event, distinctId, properties });
     },

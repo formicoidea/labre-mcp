@@ -102,31 +102,51 @@ function resolveOverride(
 }
 
 export function getPrompt(strategy: string, name: string = 'default'): ResolvedPrompt {
+  const overrides = getCurrentPromptOverrides();
+
+  // Prompt-experiment variant substitution (A/B testing): when the caller asks
+  // for the DEFAULT prompt and an active variant is selected for this strategy,
+  // redirect resolution to the variant name INSTEAD of 'default'. A variant only
+  // ever redirects the default prompt — explicit non-default names (e.g.
+  // cpc-mapper 'pick-class') are never substituted. If the variant name resolves
+  // NOWHERE (neither a bundle override nor a shipped entry), fall back to
+  // 'default' exactly as if no variant were active — fail-safe, mirroring the
+  // PostHog fail-open contract: a flag naming a nonexistent prompt must never
+  // break a run.
+  let effectiveName = name;
+  const variantName = name === 'default' ? overrides?.activeVariants?.[strategy] : undefined;
+  if (variantName !== undefined && variantName !== 'default') {
+    const loaded = loadPromptsConfig();
+    const variantExists =
+      overrides?.prompts[strategy]?.[variantName] !== undefined ||
+      loaded.config[strategy]?.[variantName] !== undefined;
+    if (variantExists) effectiveName = variantName;
+  }
+
   // Run-scoped override branch: consult the ALS store BEFORE the cache. A
   // matching pair shadows the shipped prompt for this call tree only; the
   // result is never cached (would poison the global cache with run content).
-  const overrides = getCurrentPromptOverrides();
-  const overridePair = overrides?.prompts[strategy]?.[name];
+  const overridePair = overrides?.prompts[strategy]?.[effectiveName];
   if (overridePair) {
-    return resolveOverride(strategy, name, overridePair, loadPromptsConfig());
+    return resolveOverride(strategy, effectiveName, overridePair, loadPromptsConfig());
   }
 
-  const key = cacheKey(strategy, name);
+  const key = cacheKey(strategy, effectiveName);
   const hit = cache.get(key);
   if (hit) return hit;
 
   const loaded = loadPromptsConfig();
-  const entry = loaded.config[strategy]?.[name];
+  const entry = loaded.config[strategy]?.[effectiveName];
   if (!entry) {
-    throw new Error(`Prompt "${strategy}/${name}" not found in prompts.config.json`);
+    throw new Error(`Prompt "${strategy}/${effectiveName}" not found in prompts.config.json`);
   }
 
   let build: (varsOrCtx: any) => BuiltPrompt;
   if (entry.kind === 'template') {
-    const template = loaded.templates[strategy]?.[name];
+    const template = loaded.templates[strategy]?.[effectiveName];
     if (!template) {
       // Defensive — the loader populates templates for every template-kind entry.
-      throw new Error(`Prompt "${strategy}/${name}": template not loaded`);
+      throw new Error(`Prompt "${strategy}/${effectiveName}": template not loaded`);
     }
     const userText = template.text;
     const systemText = template.system;
@@ -142,7 +162,7 @@ export function getPrompt(strategy: string, name: string = 'default'): ResolvedP
     const fn = getBuilder(entry.builderId);
     if (!fn) {
       throw new Error(
-        `Prompt "${strategy}/${name}": builder "${entry.builderId}" is not registered. ` +
+        `Prompt "${strategy}/${effectiveName}": builder "${entry.builderId}" is not registered. ` +
         `Call registerBuilder("${entry.builderId}", fn) before getPrompt().`,
       );
     }
@@ -153,13 +173,13 @@ export function getPrompt(strategy: string, name: string = 'default'): ResolvedP
         return out.system !== undefined ? { system: out.system, user: out.user } : { user: out.user };
       }
       throw new Error(
-        `Prompt "${strategy}/${name}": builder "${entry.builderId}" returned an invalid shape ` +
+        `Prompt "${strategy}/${effectiveName}": builder "${entry.builderId}" returned an invalid shape ` +
         `(expected string or { system?, user: string })`,
       );
     };
   }
 
-  const parse = buildParse(strategy, name, entry.parser);
+  const parse = buildParse(strategy, effectiveName, entry.parser);
 
   const resolved: ResolvedPrompt = { build, parse };
   cache.set(key, resolved);

@@ -12,13 +12,22 @@
 // LLM output, user content) are deliberately NOT forwarded.
 
 import type { EventBus } from "../bus/event-bus.mjs";
-import type { PostHogFlags } from "#lib/flags/posthog.mjs";
+import { type PostHogFlags, promptExperimentFlagKey } from "#lib/flags/posthog.mjs";
 
 export interface AttachPostHogTelemetryOptions {
   bus: EventBus;
   flags: PostHogFlags;
   /** Session-bound user id when the daemon runs authenticated, else "daemon". */
   distinctId: string;
+  /**
+   * Prompt-experiment variant assignment for this run (strategyId → variant
+   * name), as resolved by PostHogFlags.resolvePromptVariants. When non-empty,
+   * each entry is forwarded as a PostHog-native `$feature/mcp-prompt-<strategyId>`
+   * property so captured events attribute to their experiment/variant. Empty or
+   * omitted → no `$feature/` properties (default path unchanged).
+   * PRIVACY: only variant names and strategy ids — still no prompt text.
+   */
+  variants?: Record<string, string>;
 }
 
 export interface PostHogTelemetryHandle {
@@ -28,6 +37,14 @@ export interface PostHogTelemetryHandle {
 export function attachPostHogTelemetry(
   options: AttachPostHogTelemetryOptions,
 ): PostHogTelemetryHandle {
+  // Pre-compute the PostHog-native experiment-attribution properties once (they
+  // are constant for the run). Empty when no variants are assigned, so the
+  // spread below is a no-op on the default path.
+  const featureProps: Record<string, string> = {};
+  for (const [strategyId, variantName] of Object.entries(options.variants ?? {})) {
+    featureProps[`$feature/${promptExperimentFlagKey(strategyId)}`] = variantName;
+  }
+
   const subscription = options.bus
     .observe((event) => event.phase === "run-end" || event.phase === "step-error")
     .subscribe((event) => {
@@ -42,6 +59,7 @@ export function attachPostHogTelemetry(
           methodId: event.methodId,
           durationMs: event.durationMs,
           degraded: event.degraded,
+          ...featureProps,
         },
       );
     });

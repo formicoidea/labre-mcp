@@ -32,6 +32,11 @@ export interface RunOptions {
   // step's getPrompt() sees the bundle's prompts; absent → default path,
   // byte-identical to a run without overrides.
   promptOverrides?: PromptOverrideStore["prompts"];
+  // Optional run-scoped variant assignment (prompt experiments): strategyId →
+  // selected variant name. When present, every step's getPrompt('default')
+  // redirects to the assigned variant. Independent of promptOverrides — either
+  // (or both) triggers the ALS wrap below.
+  activeVariants?: PromptOverrideStore["activeVariants"];
 }
 
 // JSON-labre envelope shape (ast-schema.md v0.1.0 § 2.0).
@@ -135,9 +140,18 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
   };
 
   try {
-    // Absent overrides → runBody() runs directly (path byte-identical to before).
-    if (options.promptOverrides) {
-      await runWithPromptOverrides({ prompts: options.promptOverrides }, runBody);
+    // Wrap the run in the override store when EITHER bundle prompts OR a variant
+    // assignment is present. Absent both → runBody() runs directly (path
+    // byte-identical to a run with no A/B involvement, no ALS frame).
+    const hasPrompts = options.promptOverrides !== undefined
+      && Object.keys(options.promptOverrides).length > 0;
+    const hasVariants = options.activeVariants !== undefined
+      && Object.keys(options.activeVariants).length > 0;
+    if (hasPrompts || hasVariants) {
+      await runWithPromptOverrides(
+        { prompts: options.promptOverrides ?? {}, activeVariants: options.activeVariants },
+        runBody,
+      );
     } else {
       await runBody();
     }
