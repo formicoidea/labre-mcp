@@ -80,6 +80,27 @@ It listens on `127.0.0.1:6767` (override with `LABRE_HTTP_PORT`). Point the clie
 
 See [docs/architecture/transport.md](docs/architecture/transport.md) for the transport model.
 
+### Secured remote deployment (optional)
+
+The daemon can run as a stateless, authenticated server. All features below are
+opt-in via environment variables read **at boot only**; without them the daemon
+behaves exactly like the local dev setup above. The stdio transport is never
+affected.
+
+| Variable | Effect |
+|---|---|
+| `LABRE_AUTH=supabase` | Every `POST /mcp` requires a Supabase JWT (`Authorization: Bearer`), verified against the project JWKS. Fail-closed: invalid/missing token → HTTP 401 (JSON-RPC `-32001`). Requires `SUPABASE_URL`. |
+| `SUPABASE_URL` | Supabase project URL (JWKS endpoint derivation + bundle source). |
+| `SUPABASE_JWT_AUD` | Expected `aud` claim (default `authenticated`). |
+| `SUPABASE_ANON_KEY` | Enables the remote strategy-bundle source: declarative bundles (recipes + prompts, no code) published by the labre admin are fetched lazily **with the caller's own token** (RLS authorizes; the daemon holds no privileged credential) and verified file-by-file against their recorded sha256 before registration. |
+| `LABRE_BUNDLES_TTL_S` | Bundle refresh throttle in seconds (default 300). |
+| `POSTHOG_API_KEY` | Enables recipe rollout flags (`mcp-recipe-<domain>-<tool>-<name>`, fail-open) and metadata-only run telemetry (`mcp_boot`, `mcp_run_end`, `mcp_step_error` — never payloads or prompts). |
+| `POSTHOG_HOST` | PostHog ingestion host (default US cloud). |
+
+Secrets never ship with this package and are never required by the stdio
+transport. The anon key is Supabase's public client key; the service-role key
+is never used by this server.
+
 ## Development
 
 ```bash
