@@ -4,6 +4,18 @@
   "description": "MCP server for applying practice frameworks — Wardley Maps first (value chain, evolution, climates, doctrines). Strategy registry + recipe runner, exposed over stdio (Claude Code / Agent SDK) or HTTP.",
   "main": "dist/index.mjs",
   "types": "dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "development": "./src/index.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./schemas": {
+      "types": "./dist/schemas/index.d.mts",
+      "development": "./src/schemas/index.mts",
+      "default": "./dist/schemas/index.mjs"
+    }
+  },
   "bin": {
     "labre-mcp": "./dist/core/transport/labre-stdio.mjs"
   },
@@ -77,6 +89,7 @@
     "@google-cloud/bigquery": "^8.1.1",
     "@hono/node-server": "^2.0.2",
     "hono": "^4.12.18",
+    "jose": "^6.2.3",
     "jsonpath-plus": "^10.4.0",
     "lodash.merge": "^4.6.2",
     "rxjs": "^7.8.2",

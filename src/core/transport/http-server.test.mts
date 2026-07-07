@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { generateKeyPair, exportJWK, createLocalJWKSet, SignJWT } from "jose";
 import "#lib/prompts/init.mjs";
 import { buildApp } from "./http-server.mjs";
 import { buildBootRegistry } from "./labre-daemon.mjs";
 import { noopAuthMiddleware } from "./auth-middleware.mjs";
+import { buildSupabaseAuthMiddleware } from "./supabase-auth.mjs";
 
 function buildTestApp() {
   return buildApp({ tools: buildBootRegistry(), auth: noopAuthMiddleware });
@@ -216,5 +218,75 @@ describe("labre-mcp HTTP transport", () => {
     );
     assert.equal(artifactJson.projectId, "m12-http");
     assert.equal(artifactJson.sessionId, "s-http-1");
+  });
+});
+
+describe("labre-mcp HTTP transport with supabase auth", () => {
+  async function buildAuthedApp() {
+    const { publicKey, privateKey } = await generateKeyPair("ES256");
+    const publicJwk = await exportJWK(publicKey);
+    const jwks = createLocalJWKSet({ keys: [{ ...publicJwk, alg: "ES256", use: "sig" }] });
+    const app = buildApp({
+      tools: buildBootRegistry(),
+      auth: buildSupabaseAuthMiddleware({ supabaseUrl: "https://test.supabase.co", jwks }),
+    });
+    return { app, privateKey };
+  }
+
+  it("missing token returns 401 with JSON-RPC code -32001", async () => {
+    const { app } = await buildAuthedApp();
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 7, method: "ping" }),
+    });
+    assert.equal(res.status, 401);
+    const body = (await res.json()) as {
+      jsonrpc: string;
+      id: number;
+      error: { code: number; message: string };
+    };
+    assert.equal(body.jsonrpc, "2.0");
+    assert.equal(body.id, 7);
+    assert.equal(body.error.code, -32001);
+    assert.equal(body.error.message, "unauthorized");
+  });
+
+  it("valid token dispatches normally", async () => {
+    const { app, privateKey } = await buildAuthedApp();
+    const now = Math.floor(Date.now() / 1000);
+    const token = await new SignJWT({ role: "authenticated" })
+      .setProtectedHeader({ alg: "ES256" })
+      .setSubject("user-http-1")
+      .setAudience("authenticated")
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .sign(privateKey);
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 8, method: "ping" }),
+    });
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as { id: number; result: unknown };
+    assert.equal(body.id, 8);
+    assert.deepEqual(body.result, {});
+  });
+
+  it("noop middleware still accepts header-less requests", async () => {
+    const app = buildApp({ tools: buildBootRegistry(), auth: noopAuthMiddleware });
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 9, method: "ping" }),
+    });
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as { id: number; result: unknown };
+    assert.equal(body.id, 9);
+    assert.deepEqual(body.result, {});
   });
 });

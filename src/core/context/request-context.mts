@@ -11,6 +11,14 @@ export const RequestContextSchema = z.object({
   sessionId: z.string().min(1),
   domain: z.string().min(1),
   artifactDir: z.string().min(1).optional(),
+  // Populated by the auth middleware (e.g. Supabase JWT) on the HTTP
+  // transport; absent on stdio and unauthenticated local dev.
+  auth: z
+    .object({
+      userId: z.string().min(1),
+      role: z.string().optional(),
+    })
+    .optional(),
 });
 
 export type RequestContext = z.infer<typeof RequestContextSchema>;

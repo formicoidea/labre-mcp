@@ -21,6 +21,7 @@
 - **Boot** : `buildBootRegistry()` (→ `boot-tool-registry.mts`, partagé HTTP + stdio) enregistre les outils MCP ; `buildStrategyRegistry()` (→ `strategy-registry-boot.mts`) peuple le `StrategyRegistry` via `register{Evolution,Chain,Common}Strategies` + `registerMocks` (sauf `LABRE_DISABLE_MOCKS=1`).
 - **Scripts npm** : `dev`/`mcp` = `tsx --conditions development src/core/transport/labre-daemon.mts` ; `mcp:prod` = `node dist/core/transport/labre-daemon.mjs` ; `mcp:stdio` = `tsx --conditions development src/core/transport/labre-stdio.mts` ; `mcp:stdio:prod` = `node dist/core/transport/labre-stdio.mjs` ; `build` = `tsc` ; `typecheck` = `tsc --noEmit` ; `test` = `tsx --conditions development --test "src/**/*.test.mts"`.
 - **Subpath imports conditionnels** : le mapping `#core/*`, `#lib/*`, … (package.json `imports`) est `{ "development": "./src/*", "default": "./dist/*" }`. Le dev passe `--conditions development` (résout vers `src/`, tsx remappe `.mjs`→`.mts`) ; node pur en prod prend `default` (résout vers `dist/`). Sans ça les `.mjs` compilés tentent de résoudre vers `src/*.mjs` inexistant.
+- **Exports npm** : package.json `exports` expose `.` (entrée principale `dist/index.mjs`) et `./schemas` (barrel `src/schemas/index.mts` → `dist/schemas/index.mjs`, même motif conditionnel `development`/`default`). `@formicoidea/labre-mcp/schemas` sert le schéma de manifeste des strategy bundles au frontend d'admin.
 - **`.mcp.json`** : deux modèles possibles — HTTP `{ "type": "http", "url": "http://127.0.0.1:6767/mcp" }` (le daemon doit tourner) ou stdio `{ "command": "npx", "args": ["-y", "labre-mcp"] }` (Claude Code lance le process lui-même, cible de la publication npm).
 - **API programmatique** : `src/index.mts` re-exporte la surface publique.
 
@@ -39,7 +40,8 @@ src/
 │   ├── context/              request-context (projectId, projectRoot, sessionId, domain) (ARCH-15)
 │   ├── transport/            labre-daemon (HTTP), labre-stdio (stdio), http-server (Hono),
 │   │                         mcp-handler (dispatch), boot-tool-registry, json-rpc.schema,
-│   │                         context-extractor, auth-middleware, strategy-registry-boot (ARCH-14)
+│   │                         context-extractor, auth-middleware, supabase-auth (JWT/JWKS),
+│   │                         strategy-registry-boot                          (ARCH-14)
 │   ├── listeners/            artifact-writer-listener (core, toujours actif) (ARCH-12)
 │   └── persistence/          artifact-writer, project-id-resolver            (ARCH-12/13)
 │
@@ -50,6 +52,8 @@ src/
 │   │                         interpolate, init (split .system.md / .user.md)
 │   ├── owm/                  owm-dsl, render-adapter, cli-owm-adapter,
 │   │                         analytical-geometry, overlap-detector, svg-bbox-parser
+│   ├── bundles/              bundle-loader : chargement local des strategy bundles v0
+│   │                         (manifest + recipe + paires de prompts), registerBundle
 │   ├── degradation/          Degradable<T>, collector (AsyncLocalStorage),
 │   │                         with-degradation, mcp-wrapper (withMcpDegradation)
 │   ├── patent/               bigquery-* , patent-data-source, patent-indicators, mock-patent-source
@@ -84,6 +88,8 @@ src/
 │   └── resolve-context.mts                résolution RequestContext (partagé)
 │
 ├── schemas/                  ── Schémas Zod (source de vérité runtime)
+│   ├── index.mts             barrel exporté en npm via `exports["./schemas"]` (surface externe)
+│   ├── strategy-bundle.schema.mts  manifeste des strategy bundles v0 (slug, permissions, prompts)
 │   └── estimate-evolution, evaluate-map, identify-capability, estimate-anchor-evolution,
 │       generate-value-chain, value-chain, command, run-recipe, inputs, results, patent, parsed-llm,
 │       wardley-map (ré-export du schéma du package @formicoidea/wardley-map-renderer), json-labre (artefact root)
@@ -127,6 +133,10 @@ Partagé : lib/{llm, degradation, prompts, owm, response-formatter, language-det
 - `recipes/wardley/map/estimate-chain-components.recipe.json` — `select-by-type:component` (anchors exclus) → fan-out `llm-direct` per-composant → annotations d'évolution (pas de rendu)
 
 > Toutes les recettes livrées ont **≥ 2 étapes** (orchestration). Une commande seule s'appelle directement via l'outil MCP `runCommand` (cf. [tools-reference](../functional/tools-reference.md)) — pas via une recette mono-étape.
+
+### Strategy bundles (v0)
+
+Un **strategy bundle** est un paquet déclaratif data-only (aucun code exécutable) : `manifest.json` (schéma `src/schemas/strategy-bundle.schema.mts`, `schemaVersion: "0.1"`) + `recipe.json` (une seule recette, `name` = `slug` du manifeste) + paires de prompts optionnelles `prompts/<strategyId>/<name>.{system,user}.md`. Chargement local : `src/lib/bundles/bundle-loader.mts` (`loadBundleFromDir` valide dur ; `registerBundle` insère la recette dans le lookup de `core/recipe/recipe-loader` — ordre : override projet > bundles en mémoire > shipped, collision avec une recette shipped rejetée). Fixture de dogfooding : `bundles/examples/evaluate-map-example/`. Le fetch Supabase et le câblage au boot sont des phases ultérieures.
 
 ## 6. Fichiers racine de configuration
 
