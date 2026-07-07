@@ -90,6 +90,7 @@ affected.
 | Variable | Effect |
 |---|---|
 | `LABRE_AUTH=supabase` | Every `POST /mcp` requires a Supabase JWT (`Authorization: Bearer`), verified against the project JWKS. Fail-closed: invalid/missing token → HTTP 401 (JSON-RPC `-32001`). Requires `SUPABASE_URL`. |
+| `LABRE_AUTH=oidc` | Same fail-closed bearer verification against **any OIDC IdP** (Okta, Auth0, Clerk, Entra, Keycloak, …). Requires `AUTH_JWKS_URL` + `AUTH_AUDIENCE`; optional `AUTH_ISSUER` (recommended) and `AUTH_ROLE_CLAIM` (default `role`). GitHub sign-in is supported by federating GitHub *through* the IdP (GitHub's own user tokens are opaque and cannot be JWKS-verified). Remote bundles stay off in this mode (they are Supabase-RLS-bound). |
 | `SUPABASE_URL` | Supabase project URL (JWKS endpoint derivation + bundle source). |
 | `SUPABASE_JWT_AUD` | Expected `aud` claim (default `authenticated`). |
 | `SUPABASE_ANON_KEY` | Enables the remote strategy-bundle source: declarative bundles (recipes + prompts, no code) published by the labre admin are fetched lazily **with the caller's own token** (RLS authorizes; the daemon holds no privileged credential) and verified file-by-file against their recorded sha256 before registration. |

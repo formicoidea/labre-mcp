@@ -10,6 +10,7 @@ import type { ToolRegistry } from "./mcp-handler.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { startHttpServer, type OnAuthenticatedHook } from "./http-server.mjs";
 import { buildSupabaseAuthMiddleware, tryExtractBearerToken } from "./supabase-auth.mjs";
+import { buildJwksAuthMiddleware } from "./jwks-auth.mjs";
 import { registerBootHealthChecks } from "./boot-health-checks.mjs";
 import { runAllHealthChecks } from "#lib/degradation/index.mjs";
 import { buildSupabaseBundleSource } from "#lib/bundles/supabase-bundle-source.mjs";
@@ -39,8 +40,13 @@ function readPort(): number {
 }
 
 // Boot-time auth selection (env reads at boot are allowed — ARCH-15 forbids
-// them at request time only). LABRE_AUTH="supabase" requires SUPABASE_URL and
-// fails closed if it is missing; unset or "none" keeps the local noop.
+// them at request time only). Modes fail closed on missing config:
+//   supabase — Supabase preset; requires SUPABASE_URL.
+//   oidc     — any OIDC IdP (Okta, Auth0, Clerk, Entra, Keycloak, ...);
+//              requires AUTH_JWKS_URL + AUTH_AUDIENCE; optional AUTH_ISSUER,
+//              AUTH_ROLE_CLAIM. GitHub login is federated THROUGH such an IdP
+//              (GitHub's own user tokens are opaque, not JWKS-verifiable).
+//   none/unset — local noop.
 function selectAuthMiddleware(): AuthMiddleware | undefined {
   const mode = process.env.LABRE_AUTH;
   if (mode === undefined || mode === "" || mode === "none") return undefined;
@@ -56,7 +62,22 @@ function selectAuthMiddleware(): AuthMiddleware | undefined {
       audience: process.env.SUPABASE_JWT_AUD,
     });
   }
-  throw new Error(`Invalid LABRE_AUTH: "${mode}" (expected "supabase" or "none")`);
+  if (mode === "oidc") {
+    const jwksUrl = process.env.AUTH_JWKS_URL;
+    const audience = process.env.AUTH_AUDIENCE;
+    if (!jwksUrl || !audience) {
+      throw new Error(
+        'LABRE_AUTH="oidc" requires AUTH_JWKS_URL and AUTH_AUDIENCE to be set (fail-closed: refusing to boot unauthenticated)',
+      );
+    }
+    return buildJwksAuthMiddleware({
+      jwksUrl,
+      audience,
+      issuer: process.env.AUTH_ISSUER,
+      roleClaim: process.env.AUTH_ROLE_CLAIM,
+    });
+  }
+  throw new Error(`Invalid LABRE_AUTH: "${mode}" (expected "supabase", "oidc" or "none")`);
 }
 
 function readBundlesTtlSeconds(): number | undefined {
@@ -118,7 +139,10 @@ async function main(): Promise<void> {
   const auth = selectAuthMiddleware();
   const tools: ToolRegistry = buildBootRegistry();
   const strategies = buildStrategyRegistry();
-  const bundles = selectBundleRefreshHook(auth !== undefined);
+  // Remote bundles are a Supabase feature (RLS + storage): only the supabase
+  // auth mode enables them — an oidc-mode caller token would mean nothing to
+  // the Supabase RLS layer.
+  const bundles = selectBundleRefreshHook(process.env.LABRE_AUTH === "supabase");
 
   const server = await startHttpServer({ port, tools, auth, onAuthenticated: bundles.hook });
 
@@ -126,7 +150,7 @@ async function main(): Promise<void> {
     `[labre-mcp] HTTP server listening on http://127.0.0.1:${server.port} (POST /mcp)\n`,
   );
   process.stderr.write(
-    `[labre-mcp] Auth: ${auth ? "supabase JWT (JWKS)" : "none (local dev)"}\n`,
+    `[labre-mcp] Auth: ${auth ? `${process.env.LABRE_AUTH} JWT (JWKS)` : "none (local dev)"}\n`,
   );
   process.stderr.write(`[labre-mcp] Remote strategy bundles: ${bundles.bootLine}\n`);
   process.stderr.write(

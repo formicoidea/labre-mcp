@@ -41,7 +41,8 @@ src/
 │   ├── transport/            labre-daemon (HTTP), labre-stdio (stdio), http-server (Hono,
 │   │                         hook onAuthenticated post-auth/pré-dispatch), mcp-handler (dispatch),
 │   │                         boot-tool-registry, json-rpc.schema, context-extractor,
-│   │                         auth-middleware, supabase-auth (JWT/JWKS), boot-health-checks,
+│   │                         auth-middleware, jwks-auth (cœur OIDC générique),
+│   │                         supabase-auth (preset), boot-health-checks,
 │   │                         strategy-registry-boot                          (ARCH-14)
 │   ├── listeners/            artifact-writer-listener (core, toujours actif) (ARCH-12),
 │   │                         posthog-telemetry-listener (run-end/step-error → capture,
