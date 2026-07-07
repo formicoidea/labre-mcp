@@ -2,7 +2,7 @@
 
 labre-mcp est un serveur **MCP** (Model Context Protocol) exposé via un **daemon HTTP** (JSON-RPC 2.0, `127.0.0.1:6767`) qui outille les frameworks de pratique stratégique — cartes de Wardley en premier. Les capacités sont adressées par une grammaire de methodId à 5 segments. Projet **TypeScript strict** (`.mts` / ESM) avec **Zod** comme source de vérité runtime.
 
-> **Surface actuelle** : 3 outils MCP câblés — `estimateEvolution`, `runCommand` (invocation directe de n'importe quel methodId) et `__ping__` ; 85 stratégies (15 réelles / 70 mocks). L'écart à la cible est dans [roadmap.md](architecture/roadmap.md).
+> **Surface actuelle** : 4 outils MCP câblés — `estimateEvolution`, `runCommand` (invocation directe de n'importe quel methodId), `runRecipe` (recettes multi-étapes shipped/override/bundle) et `__ping__` ; 85 stratégies (15 réelles / 70 mocks). L'écart à la cible est dans [roadmap.md](architecture/roadmap.md).
 
 ## Index
 
@@ -31,6 +31,7 @@ labre-mcp est un serveur **MCP** (Model Context Protocol) exposé via un **daemo
 | [Notifications](functional/notifications.md) | Progression temps réel, i18n, erreurs |
 | [Format .wm (OWM)](functional/wm-format.md) | Syntaxe OWM des cartes de Wardley |
 | [Évaluation](functional/evaluation.md) | promptfoo : cas de test, assertions |
+| [Expériences de prompts](functional/prompt-experiments.md) | A/B testing : flags multivariés PostHog, variantes, lecture des métriques |
 
 ### Technique (`technical/`)
 | Document | Description |

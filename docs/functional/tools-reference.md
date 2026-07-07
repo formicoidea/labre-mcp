@@ -4,12 +4,13 @@ labre-mcp tourne comme un **daemon HTTP** (`src/core/transport/labre-daemon.mts`
 
 ## Surface MCP reellement exposee
 
-**3 outils** sont cables dans `buildBootRegistry()` :
+**4 outils** sont cables dans `buildBootRegistry()` :
 
 | Outil | Role | Schema Zod |
 |---|---|---|
 | `estimateEvolution` | Estime l'evolution d'un composant (via la recipe `estimate-component-evolution`) | `src/schemas/estimate-evolution.schema.mts` |
 | `runCommand` | Invoque **n'importe quel methodId** directement → `CommandResult` (output + enveloppe JSON-labre) | `src/schemas/command.schema.mts` |
+| `runRecipe` | Lance une **recette multi-etapes** par ref `<domain>:<tool>:<name>` (shipped, override projet ou bundle) → AST final + enveloppe + artefact | `src/schemas/run-recipe.schema.mts` |
 | `__ping__` | Smoke tool — echo de l'input, valide le transport | (inline) |
 
 Les schemas d'entree exposes au client MCP sont **generes a partir des schemas Zod** (`z.toJSONSchema(schema, { io: 'input' })`). Toute modification d'un schema passe par le fichier `src/schemas/*.schema.mts` correspondant.
@@ -259,13 +260,46 @@ curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" -d '{
 
 ---
 
+## runRecipe
+
+Lance une **recette multi-etapes** par sa ref 3 segments `<domain>:<tool>:<name>`. Le loader resout dans l'ordre : override projet (`<projectRoot>/recipes/…`) > recette de **bundle** enregistree en memoire > shipped (cf. [recipes.md](../architecture/recipes.md)). Le resultat porte le `recipeRunId`, l'**AST final**, l'enveloppe JSON-labre (`signals`/`reasoning`/`insights`/`trace`) et le chemin de l'artefact persiste sous `~/.labre-mcp/runs/`.
+
+### Entree (`RunRecipeCall`)
+
+| Parametre | Type | Requis | Description |
+|---|---|---|---|
+| `recipe` | string | **oui** | Ref 3 segments, ex. `wardley:map:draw-value-chain` |
+| `input` | any | non | Seed de la recette, place en `$.input` de l'AST |
+
+### Sortie
+
+`{ recipe, status: "ok"|"error", recipeRunId?, ast?, envelope?, artifactPath?, errors? }` — enveloppe `Degradable<T>` comme les autres outils. Une ref inconnue renvoie `status: "error"`.
+
+### Daemon + PostHog (optionnel)
+
+Quand le daemon est configure avec `POSTHOG_API_KEY`, `runRecipe` est le seul outil gate par flag de rollout (`mcp-recipe-<domain>-<tool>-<name>`, fail-open) et instrumente : telemetrie `mcp_run_end`/`mcp_step_error` (latence, `llmCalls`, tokens, `quality_*`) et **experiences de prompts A/B** (`mcp-prompt-<strategyId>`) — voir [prompt-experiments.md](prompt-experiments.md).
+
+### Exemple
+
+```bash
+curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" -d '{
+  "jsonrpc":"2.0","id":1,"method":"tools/call",
+  "params":{ "name":"runRecipe", "arguments":{
+    "recipe":"wardley:map:estimate-chain-components",
+    "input":{ "title":"Demo", "components":[], "relations":[] }
+  }}
+}'
+```
+
+---
+
 ## Flux non encore exposes comme outils dedies
 
 Ces flux n'ont pas (encore) d'**outil MCP dedie** (roadmap [`../architecture/roadmap.md`](../architecture/roadmap.md) B3). Deux cas :
 - **Strategie unique** → **deja invocable** via `runCommand` avec son methodId (ci-dessous).
-- **Recette multi-etapes** → necessite le cablage d'un outil dedie (runCommand ne lance qu'**une** commande).
+- **Recette multi-etapes** → **deja invocable** via `runRecipe` avec sa ref 3 segments ; l'outil dedie (schema d'entree specifique, ex. `filePath`) reste a cabler (B3).
 
-### evaluateMap — recette multi-etapes (pas runCommand)
+### evaluateMap — recette multi-etapes (via runRecipe)
 
 Evalue tous les composants d'un fichier `.wm` existant et met a jour leurs positions d'evolution. Recette 2 etapes `recipes/wardley/map/evaluate-map.recipe.json` (parse → fan-out estimation) → outil dedie a cabler (B3).
 
@@ -296,6 +330,6 @@ Estime l'evolution d'un **anchor** (user need, haut de la value chain) via la le
 | `context` | string | **oui** | Contexte metier (requis — l'evaluation d'un anchor est hautement dependante du contexte) |
 | `phase` | integer [1-4] | non | Phase pre-evaluee. Si omise, le LLM l'estime. `1`=Genesis, `2`=Custom, `3`=Product, `4`=Commodity. |
 
-### generateValueChain — recette multi-etapes (pas runCommand)
+### generateValueChain — recette multi-etapes (via runRecipe)
 
-Genere une chaine de valeur (layout pour lisibilite, jamais maturite d'evolution). Recette 4 etapes `recipes/wardley/map/generate.recipe.json` (`value-chain:generate:top-down` → `prevent-collision` → `audit:overlap-check` → `owm:emit`) → outil dedie a cabler (B3). L'etape de generation seule reste appelable via `runCommand { command: "wardley:map:value-chain:generate:top-down" }`.
+Genere une chaine de valeur (layout pour lisibilite, jamais maturite d'evolution). Recette 4 etapes `recipes/wardley/map/generate.recipe.json` (`value-chain:generate:top-down` → `prevent-collision` → `audit:overlap-check` → `owm:emit`), invocable via `runRecipe { recipe: "wardley:map:generate" }` ; outil dedie a cabler (B3). L'etape de generation seule reste appelable via `runCommand { command: "wardley:map:value-chain:generate:top-down" }`.

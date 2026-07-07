@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   buildPostHog,
   recipeFlagKey,
+  promptExperimentFlagKey,
+  PROMPT_EXPERIMENT_FLAG_PREFIX,
   type PostHogClientLike,
 } from "./posthog.mjs";
 
@@ -18,16 +20,21 @@ function buildFakeClient(args: {
   failFlags?: boolean;
   failCapture?: boolean;
   failShutdown?: boolean;
+  allFlags?: Record<string, string | boolean> | undefined;
+  failAllFlags?: boolean;
 }): PostHogClientLike & {
   flagCalls: Array<{ key: string; distinctId: string }>;
+  allFlagsCalls: string[];
   captured: CapturedEvent[];
   shutdownCalls: number;
 } {
   const flagCalls: Array<{ key: string; distinctId: string }> = [];
+  const allFlagsCalls: string[] = [];
   const captured: CapturedEvent[] = [];
   const state = { shutdownCalls: 0 };
   return {
     flagCalls,
+    allFlagsCalls,
     captured,
     get shutdownCalls() {
       return state.shutdownCalls;
@@ -36,6 +43,11 @@ function buildFakeClient(args: {
       flagCalls.push({ key, distinctId });
       if (args.failFlags) throw new Error("posthog unreachable");
       return args.verdict;
+    },
+    async getAllFlags(distinctId) {
+      allFlagsCalls.push(distinctId);
+      if (args.failAllFlags) throw new Error("posthog unreachable");
+      return args.allFlags;
     },
     capture(message) {
       if (args.failCapture) throw new Error("capture exploded");
@@ -59,6 +71,91 @@ describe("recipeFlagKey", () => {
     const key = recipeFlagKey({ domain: "a:b", tool: "c", name: "d:e" });
     assert.equal(key, "mcp-recipe-a-b-c-d-e");
     assert.ok(!key.includes(":"));
+  });
+});
+
+describe("promptExperimentFlagKey", () => {
+  it("prefixes the strategyId with mcp-prompt-", () => {
+    assert.equal(promptExperimentFlagKey("evolve-a"), "mcp-prompt-evolve-a");
+    assert.equal(PROMPT_EXPERIMENT_FLAG_PREFIX, "mcp-prompt-");
+  });
+
+  it("never lets a colon through", () => {
+    const key = promptExperimentFlagKey("wardley:iteration:observe");
+    assert.equal(key, "mcp-prompt-wardley-iteration-observe");
+    assert.ok(!key.includes(":"));
+  });
+
+  it("round-trips: slicing the prefix recovers a colon-free strategyId", () => {
+    const key = promptExperimentFlagKey("strat-1");
+    assert.equal(key.slice(PROMPT_EXPERIMENT_FLAG_PREFIX.length), "strat-1");
+  });
+});
+
+describe("buildPostHog.resolvePromptVariants", () => {
+  it("keeps only mcp-prompt- string flags and strips the prefix to recover the strategyId", async () => {
+    const client = buildFakeClient({
+      allFlags: {
+        "mcp-prompt-strat-1": "variant-bold",
+        "mcp-prompt-strat-2": "variant-terse",
+        "mcp-recipe-wardley-map-x": "some-value", // wrong prefix → ignored
+        "unrelated-flag": "nope", // no prefix → ignored
+      },
+    });
+    const flags = buildPostHog({ apiKey: "phc_test", client });
+    const variants = await flags.resolvePromptVariants("user-1");
+    assert.deepEqual(variants, {
+      "strat-1": "variant-bold",
+      "strat-2": "variant-terse",
+    });
+    // getAllFlags is called exactly once, with the distinctId.
+    assert.deepEqual(client.allFlagsCalls, ["user-1"]);
+  });
+
+  it("ignores boolean-valued flags under the prompt prefix (rollout toggles, not variants)", async () => {
+    const client = buildFakeClient({
+      allFlags: {
+        "mcp-prompt-strat-1": true, // boolean → not a variant selector
+        "mcp-prompt-strat-2": false,
+        "mcp-prompt-strat-3": "variant-c",
+      },
+    });
+    const flags = buildPostHog({ apiKey: "phc_test", client });
+    const variants = await flags.resolvePromptVariants("user-1");
+    assert.deepEqual(variants, { "strat-3": "variant-c" });
+  });
+
+  it("recovers the strategyId even when it contains dashes", async () => {
+    const client = buildFakeClient({
+      allFlags: { "mcp-prompt-wardley-iteration-observe": "v1" },
+    });
+    const flags = buildPostHog({ apiKey: "phc_test", client });
+    const variants = await flags.resolvePromptVariants("user-1");
+    assert.deepEqual(variants, { "wardley-iteration-observe": "v1" });
+  });
+
+  it("fails open to {} when getAllFlags returns undefined", async () => {
+    const flags = buildPostHog({
+      apiKey: "phc_test",
+      client: buildFakeClient({ allFlags: undefined }),
+    });
+    assert.deepEqual(await flags.resolvePromptVariants("user-1"), {});
+  });
+
+  it("fails open to {} when the client throws", async () => {
+    const flags = buildPostHog({
+      apiKey: "phc_test",
+      client: buildFakeClient({ failAllFlags: true }),
+    });
+    assert.deepEqual(await flags.resolvePromptVariants("user-1"), {});
+  });
+
+  it("returns {} when there are no prompt flags at all", async () => {
+    const flags = buildPostHog({
+      apiKey: "phc_test",
+      client: buildFakeClient({ allFlags: { "mcp-recipe-a-b-c": true } }),
+    });
+    assert.deepEqual(await flags.resolvePromptVariants("user-1"), {});
   });
 });
 

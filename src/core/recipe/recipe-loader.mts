@@ -12,6 +12,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { validateOrThrow } from "#lib/zod/validate-or-throw.mjs";
+import type { BundlePromptPair } from "#lib/prompts/override-context.mjs";
 import { RecipeSchema, type Recipe } from "./recipe.schema.mjs";
 
 export interface RecipeLookupOptions {
@@ -32,20 +33,38 @@ function recipePath(root: string, framework: string, tool: string, name: string)
   return join(resolve(root), "recipes", framework, tool, `${name}.recipe.json`);
 }
 
+/** A registered bundle recipe plus the prompt overrides it ships (if any).
+ *  `prompts` mirrors the PromptOverrideStore shape (strategyId → name → pair);
+ *  it is empty `{}` for a recipe registered without prompt overrides. */
+interface RegisteredBundle {
+  recipe: Recipe;
+  prompts: Record<string, Record<string, BundlePromptPair>>;
+}
+
 // In-memory registry of bundle-provided recipes, keyed "<domain>:<tool>:<name>".
 // Registered recipes join the same lookup path loadRecipe serves (so runRecipe
 // resolves them by ref), ranked BELOW user overrides and beside shipped ones —
 // a bundle may never shadow a shipped recipe (collision rejected at
-// registration). Populated by lib/bundles/bundle-loader `registerBundle`.
-const bundleRecipes = new Map<string, Recipe>();
+// registration). Populated by lib/bundles/bundle-loader `registerBundle`. Each
+// entry also carries the bundle's prompt overrides so a run of that recipe can
+// layer them over the shipped prompts (see getBundlePrompts).
+const bundleRecipes = new Map<string, RegisteredBundle>();
 
 export interface RegisterBundleRecipeOptions {
   /** labre-mcp's own install root — used only for the shipped-collision check. */
   shippedRoot: string;
 }
 
-/** Make an already-validated bundle recipe resolvable by loadRecipe. */
-export function registerBundleRecipe(recipe: Recipe, options: RegisterBundleRecipeOptions): void {
+/**
+ * Make an already-validated bundle recipe resolvable by loadRecipe.
+ * `prompts` (optional, defaults to `{}`) are the bundle's run-scoped prompt
+ * overrides, retrievable afterwards via getBundlePrompts(ref).
+ */
+export function registerBundleRecipe(
+  recipe: Recipe,
+  options: RegisterBundleRecipeOptions,
+  prompts: Record<string, Record<string, BundlePromptPair>> = {},
+): void {
   const ref = `${recipe.domain}:${recipe.tool}:${recipe.name}`;
   const shippedPath = recipePath(options.shippedRoot, recipe.domain, recipe.tool, recipe.name);
   if (existsSync(shippedPath)) {
@@ -56,7 +75,32 @@ export function registerBundleRecipe(recipe: Recipe, options: RegisterBundleReci
   if (bundleRecipes.has(ref)) {
     throw new Error(`Cannot register bundle recipe "${ref}": a bundle recipe with this ref is already registered`);
   }
-  bundleRecipes.set(ref, recipe);
+  bundleRecipes.set(ref, { recipe, prompts });
+}
+
+/** Ref addressing for a bundle recipe lookup — same 3 segments loadRecipe uses. */
+export interface BundleRef {
+  framework: string;
+  tool: string;
+  name: string;
+}
+
+/**
+ * Return the prompt overrides a bundle recipe registered, or `undefined` when
+ * the ref is not a registered bundle recipe (shipped / user recipes never carry
+ * bundle prompts). A registered bundle with no declared prompts returns `{}`.
+ *
+ * `loaded` must be the Recipe object loadRecipe actually resolved for this ref:
+ * loadRecipe ranks a same-ref USER recipe above the bundle one, and that user
+ * recipe must not inherit the bundle's prompt overrides — only the exact
+ * registered recipe object gets its prompts back (identity check).
+ */
+export function getBundlePrompts(
+  ref: BundleRef,
+  loaded: Recipe,
+): Record<string, Record<string, BundlePromptPair>> | undefined {
+  const hit = bundleRecipes.get(`${ref.framework}:${ref.tool}:${ref.name}`);
+  return hit && hit.recipe === loaded ? hit.prompts : undefined;
 }
 
 /**
@@ -108,7 +152,7 @@ export async function loadRecipe(options: RecipeLookupOptions): Promise<Recipe> 
   // 2. Registered bundle recipe (guaranteed not to collide with shipped —
   //    registration rejects shadowing, so ordering vs. step 3 is inert).
   const bundleHit = bundleRecipes.get(`${options.framework}:${options.tool}:${options.name}`);
-  if (bundleHit) return bundleHit;
+  if (bundleHit) return bundleHit.recipe;
 
   // 3. Shipped recipe
   const shippedPath = recipePath(options.shippedRoot, options.framework, options.tool, options.name);

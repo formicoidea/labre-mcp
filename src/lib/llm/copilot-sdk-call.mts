@@ -17,6 +17,7 @@
 import { createRequire } from 'node:module';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import { classifyAndLogLLMError } from './llm-error-handler.mjs';
+import { recordLlmUsage } from './usage-context.mjs';
 import type {
   LLMCall,
   StructuredLLMCall,
@@ -148,6 +149,12 @@ async function runSingleTurn(
 
   if (errorFromSession) throw errorFromSession;
   if (!fullText) throw new Error('Copilot SDK call returned empty response');
+  // Record the call. The Copilot SDK single-turn flow does not cleanly expose
+  // per-turn input/output token counts: `session.usage_info` reports only
+  // cumulative context-window tokens, and the clean per-model breakdown lives in
+  // `session.shutdown.modelMetrics`, which races the disconnect below. So we
+  // count the call (provider + model) without fabricating token numbers.
+  recordLlmUsage({ provider: 'copilot-sdk', model });
   return fullText;
 }
 

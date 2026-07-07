@@ -3,8 +3,15 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadRecipe, resetRecipeCache } from "./recipe-loader.mjs";
+import {
+  loadRecipe,
+  resetRecipeCache,
+  registerBundleRecipe,
+  resetBundleRecipes,
+  getBundlePrompts,
+} from "./recipe-loader.mjs";
 import type { Recipe } from "./recipe.schema.mjs";
+import type { BundlePromptPair } from "#lib/prompts/override-context.mjs";
 
 function validRecipeBody(name: string): Recipe {
   return {
@@ -144,5 +151,69 @@ describe("recipe-loader (shipped + override)", () => {
       projectRoot,
     });
     assert.equal(first, second);
+  });
+});
+
+describe("recipe-loader — bundle prompts (getBundlePrompts)", () => {
+  let shippedRoot: string;
+
+  beforeEach(async () => {
+    resetRecipeCache();
+    resetBundleRecipes();
+    // Empty shipped root so no bundle ref collides with a shipped recipe.
+    shippedRoot = await mkdtemp(join(tmpdir(), "labre-shipped-"));
+  });
+
+  const pair: BundlePromptPair = { system: "sys", user: "hi {{x}}" };
+  const prompts = { "identify-capability": { default: pair } };
+
+  it("returns the prompts a bundle recipe was registered with", () => {
+    const recipe = validRecipeBody("bundle-a");
+    registerBundleRecipe(recipe, { shippedRoot }, prompts);
+    const got = getBundlePrompts({ framework: "wardley", tool: "evolution", name: "bundle-a" }, recipe);
+    assert.deepEqual(got, prompts);
+  });
+
+  it("returns {} for a bundle recipe registered without prompts (default)", () => {
+    const recipe = validRecipeBody("bundle-b");
+    registerBundleRecipe(recipe, { shippedRoot });
+    const got = getBundlePrompts({ framework: "wardley", tool: "evolution", name: "bundle-b" }, recipe);
+    assert.deepEqual(got, {});
+  });
+
+  it("returns undefined for a ref that is not a registered bundle recipe", () => {
+    const recipe = validRecipeBody("bundle-c");
+    registerBundleRecipe(recipe, { shippedRoot }, prompts);
+    const got = getBundlePrompts({ framework: "wardley", tool: "evolution", name: "no-such" }, recipe);
+    assert.equal(got, undefined);
+  });
+
+  it("returns undefined when a different recipe shadows the bundle ref (user override)", () => {
+    // loadRecipe ranks a same-ref user recipe above the bundle one; that user
+    // recipe (a distinct object) must not inherit the bundle's prompts.
+    const bundleRecipe = validRecipeBody("bundle-e");
+    registerBundleRecipe(bundleRecipe, { shippedRoot }, prompts);
+    const userRecipe = validRecipeBody("bundle-e");
+    const got = getBundlePrompts(
+      { framework: "wardley", tool: "evolution", name: "bundle-e" },
+      userRecipe,
+    );
+    assert.equal(got, undefined);
+  });
+
+  it("makes the bundle recipe resolvable via loadRecipe while carrying prompts", async () => {
+    const recipe = validRecipeBody("bundle-d");
+    registerBundleRecipe(recipe, { shippedRoot }, prompts);
+    const loaded = await loadRecipe({
+      framework: "wardley",
+      tool: "evolution",
+      name: "bundle-d",
+      shippedRoot,
+    });
+    assert.equal(loaded, recipe);
+    assert.deepEqual(
+      getBundlePrompts({ framework: "wardley", tool: "evolution", name: "bundle-d" }, loaded),
+      prompts,
+    );
   });
 });

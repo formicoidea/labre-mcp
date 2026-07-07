@@ -69,14 +69,15 @@ Two categories of listener:
 
 Limit (V1): opt-in listeners do not emit bus events and cannot inject new steps into the running recipe. They only observe their parent step's output and emit insights into the envelope. Reactive intervention is V3+.
 
-## Shipped + user override (ARCH-08)
+## Shipped + user override + bundles (ARCH-08)
 
-Recipes are loaded by [`recipe-loader.mts`](../../src/core/recipe/recipe-loader.mts) in two locations:
+Recipes are resolved by [`recipe-loader.mts`](../../src/core/recipe/recipe-loader.mts) in three ranked sources:
 
 1. **User override** — `<projectRoot>/recipes/<framework>/<tool>/<name>.recipe.json` (if `projectRoot` is supplied in context).
-2. **Shipped** — `<shippedRoot>/recipes/<framework>/<tool>/<name>.recipe.json` (the labre-mcp install root).
+2. **Registered bundle recipe** — in-memory, populated by `registerBundle` (local dir or the remote Supabase source). A bundle may never shadow a shipped recipe (collision rejected at registration), so ranks 2 and 3 never overlap.
+3. **Shipped** — `<shippedRoot>/recipes/<framework>/<tool>/<name>.recipe.json` (the labre-mcp install root).
 
-User recipes take precedence by name. There is no field-level merge — recipes are integral declarations.
+There is no field-level merge — recipes are integral declarations. A bundle recipe additionally carries the bundle's **prompt overrides**, applied only to runs of that exact recipe through a run-scoped store (a same-ref user recipe never inherits them) — see [remote-admin-contracts](../technical/remote-admin-contracts.md).
 
 ## Canonical recipes (V1 shipped)
 

@@ -5,6 +5,42 @@ import { StrategyRegistry } from "../registry/strategy-registry.mjs";
 import { BaseStrategy, type StrategyResult } from "../ast/base-strategy.mjs";
 import type { Recipe } from "./recipe.schema.mjs";
 import type { RequestContext } from "../context/request-context.mjs";
+import { recordLlmUsage } from "#lib/llm/usage-context.mjs";
+
+// Strategy that reports LLM usage into the ambient collector (CP9). Two records
+// per evaluate so a fanout/single run yields a deterministic aggregate.
+class UsageReportingStrategy extends BaseStrategy<number, number> {
+  static get method(): string {
+    return "wardley:chain:write:capacity:usage";
+  }
+  async evaluate(input: number): Promise<StrategyResult<number>> {
+    recordLlmUsage({ provider: "agent-sdk", model: "m", inputTokens: 10, outputTokens: 4 });
+    recordLlmUsage({ provider: "agent-sdk", model: "m", inputTokens: 2, outputTokens: 1 });
+    return { signals: [], reasoning: [], insights: [], result: input };
+  }
+}
+
+// Strategy that emits a mix of numeric and non-numeric signals (CP10). Only the
+// numeric ones must reach the run-end quality map.
+class SignalEmittingStrategy extends BaseStrategy<number, number> {
+  static get method(): string {
+    return "wardley:chain:write:capacity:signals";
+  }
+  async evaluate(input: number): Promise<StrategyResult<number>> {
+    const at = new Date().toISOString();
+    return {
+      signals: [
+        { name: "confidence", value: 0.9, source: "computed", capturedAt: at },
+        { name: "score", value: 42, source: "computed", capturedAt: at },
+        { name: "label", value: "high", source: "computed", capturedAt: at }, // non-numeric: dropped
+        { name: "confidence", value: 0.7, source: "computed", capturedAt: at }, // collision: last wins
+      ],
+      reasoning: [],
+      insights: [],
+      result: input,
+    };
+  }
+}
 
 class DoubleStrategy extends BaseStrategy<number, number> {
   static get method(): string {
@@ -233,5 +269,116 @@ describe("runRecipe", () => {
       ),
     );
     assert.ok(!outcome.envelope.trace.some((t) => t.command === ThrowingListener.method));
+  });
+
+  it("puts the LLM usage aggregate in the run-end payload (CP9)", async () => {
+    const registry = new StrategyRegistry();
+    registry.register(UsageReportingStrategy.method, UsageReportingStrategy);
+
+    const recipe: Recipe = {
+      schemaVersion: "1.0",
+      name: "usage-run",
+      domain: "wardley",
+      tool: "chain",
+      steps: [{ stepId: "u", tool: UsageReportingStrategy.method, in: "$.v" }],
+      listeners: {},
+    };
+
+    const ast: Record<string, unknown> = { v: 1 };
+    const { events } = await runRecipe({ recipe, ast, context: ctx, registry });
+
+    const runEnd = events.find((e) => e.phase === "run-end");
+    const usage = (runEnd?.payload as { usage?: Record<string, number> })?.usage;
+    assert.ok(usage, "run-end payload must carry usage");
+    assert.equal(usage.llmCalls, 2);
+    assert.equal(usage.inputTokens, 12);
+    assert.equal(usage.outputTokens, 5);
+  });
+
+  it("builds the run-end quality map: numeric-only, collision last-wins (CP10)", async () => {
+    const registry = new StrategyRegistry();
+    registry.register(SignalEmittingStrategy.method, SignalEmittingStrategy);
+
+    const recipe: Recipe = {
+      schemaVersion: "1.0",
+      name: "quality-run",
+      domain: "wardley",
+      tool: "chain",
+      steps: [{ stepId: "s", tool: SignalEmittingStrategy.method, in: "$.v" }],
+      listeners: {},
+    };
+
+    const ast: Record<string, unknown> = { v: 1 };
+    const { events } = await runRecipe({ recipe, ast, context: ctx, registry });
+
+    const runEnd = events.find((e) => e.phase === "run-end");
+    const quality = (runEnd?.payload as { quality?: Record<string, number> })?.quality;
+    assert.ok(quality, "run-end payload must carry quality");
+    // Numeric-only: 'label' (string) is absent.
+    assert.deepEqual(Object.keys(quality).sort(), ["confidence", "score"]);
+    // Collision last-wins: 0.7 overwrote 0.9.
+    assert.equal(quality.confidence, 0.7);
+    assert.equal(quality.score, 42);
+  });
+
+  it("caps the quality map at 20 keys (CP10)", async () => {
+    // A strategy emitting 25 distinct numeric signals; only the first 20 keys
+    // may survive the cap.
+    class ManySignalsStrategy extends BaseStrategy<number, number> {
+      static get method(): string {
+        return "wardley:chain:write:capacity:many";
+      }
+      async evaluate(input: number): Promise<StrategyResult<number>> {
+        const at = new Date().toISOString();
+        const signals = Array.from({ length: 25 }, (_v, i) => ({
+          name: `m${i}`,
+          value: i,
+          source: "computed" as const,
+          capturedAt: at,
+        }));
+        return { signals, reasoning: [], insights: [], result: input };
+      }
+    }
+    const registry = new StrategyRegistry();
+    registry.register(ManySignalsStrategy.method, ManySignalsStrategy);
+
+    const recipe: Recipe = {
+      schemaVersion: "1.0",
+      name: "many-run",
+      domain: "wardley",
+      tool: "chain",
+      steps: [{ stepId: "m", tool: ManySignalsStrategy.method, in: "$.v" }],
+      listeners: {},
+    };
+
+    const ast: Record<string, unknown> = { v: 1 };
+    const { events } = await runRecipe({ recipe, ast, context: ctx, registry });
+    const runEnd = events.find((e) => e.phase === "run-end");
+    const quality = (runEnd?.payload as { quality?: Record<string, number> })?.quality;
+    assert.ok(quality);
+    assert.equal(Object.keys(quality).length, 20);
+  });
+
+  it("omits usage/quality from the payload when a run has neither (default path)", async () => {
+    const registry = new StrategyRegistry();
+    registry.register(SumStrategy.method, SumStrategy); // no signals, no usage
+
+    const recipe: Recipe = {
+      schemaVersion: "1.0",
+      name: "plain-run",
+      domain: "wardley",
+      tool: "chain",
+      steps: [{ stepId: "s", tool: SumStrategy.method, in: "$.v" }],
+      listeners: {},
+    };
+
+    const ast: Record<string, unknown> = { v: 1 };
+    const { events } = await runRecipe({ recipe, ast, context: ctx, registry });
+    const runEnd = events.find((e) => e.phase === "run-end");
+    const payload = runEnd?.payload as { usage?: unknown; quality?: unknown } | undefined;
+    // llmCalls is always counted (0 calls here), so usage is present but with
+    // llmCalls: 0 and no token sums; quality is absent (no numeric signals).
+    assert.equal((payload?.usage as { llmCalls?: number })?.llmCalls, 0);
+    assert.equal(payload?.quality, undefined);
   });
 });

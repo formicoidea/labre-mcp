@@ -120,6 +120,10 @@ function buildFakeFlags(verdict: boolean): PostHogFlags & {
       flagCalls.push({ ref, userId });
       return verdict;
     },
+    async resolvePromptVariants() {
+      // No prompt experiments in these gate tests → default path (no variants).
+      return {};
+    },
     capture(event, distinctId, properties) {
       captured.push({ event, distinctId, properties });
     },
@@ -194,11 +198,22 @@ describe('runRecipe tool — PostHog feature-flag gate', () => {
       assert.equal(runEnd.length, 1);
       assert.equal(runEnd[0].distinctId, 'daemon');
       assert.equal(runEnd[0].properties?.recipeRunId, out.recipeRunId);
-      // Privacy: only the fixed metadata keys cross the wire — never payloads.
+      // Privacy: only metadata and run-level NUMBERS cross the wire — never
+      // payloads, prompts or user content. This recipe makes no LLM call
+      // (llmCalls stays 0, no token sums) and its select step emits two
+      // numeric signals harvested into quality_* metrics.
       assert.deepEqual(
         Object.keys(runEnd[0].properties ?? {}).sort(),
-        ['degraded', 'durationMs', 'methodId', 'recipeRunId', 'stepId'],
+        [
+          'degraded', 'durationMs', 'llmCalls', 'methodId',
+          'quality_selectedCount', 'quality_totalComponents',
+          'recipeRunId', 'stepId',
+        ],
       );
+      assert.equal(runEnd[0].properties?.llmCalls, 0);
+      for (const key of ['quality_selectedCount', 'quality_totalComponents']) {
+        assert.equal(typeof runEnd[0].properties?.[key], 'number');
+      }
     } finally {
       setPostHogFlags(undefined);
     }

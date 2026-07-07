@@ -9,7 +9,7 @@
 import { z } from 'zod';
 import type { ToolDefinition } from '#core/transport/mcp-handler.mjs';
 import { RunRecipeCallSchema } from '#schemas/run-recipe.schema.mjs';
-import { loadRecipe } from '#core/recipe/recipe-loader.mjs';
+import { loadRecipe, getBundlePrompts } from '#core/recipe/recipe-loader.mjs';
 import { runRecipe, type JsonLabreEnvelope } from '#core/recipe/recipe-runner.mjs';
 import { buildStrategyRegistry } from '#core/transport/strategy-registry-boot.mjs';
 import { attachArtifactWriter } from '#core/listeners/artifact-writer-listener.mjs';
@@ -54,6 +54,11 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
     // (stdio, local daemon) getPostHogFlags() is undefined and this block
     // costs nothing: no dynamic import, no network, no await.
     const flags = getPostHogFlags();
+    // Prompt-experiment variant assignment (A/B testing). Only meaningful when
+    // PostHog is configured; resolved with the SAME distinctId as the flag gate
+    // so a user buckets consistently across the gate and the experiment. Fails
+    // open to {} on any PostHog trouble (see resolvePromptVariants).
+    let variants: Record<string, string> = {};
     if (flags) {
       const allowed = await flags.isRecipeEnabled(
         { domain: framework, tool, name },
@@ -68,6 +73,7 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
           ],
         };
       }
+      variants = await flags.resolvePromptVariants(context.auth?.userId ?? 'anonymous');
     }
 
     const ctx = await resolveContext(context);
@@ -89,6 +95,13 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
       };
     }
 
+    // Bundle recipes carry run-scoped prompt overrides (A/B testing); shipped
+    // and user recipes return undefined here and run with the shipped prompts.
+    // The loaded recipe is passed so a user recipe shadowing a bundle ref
+    // (loadRecipe ranks user overrides above bundle recipes) never inherits
+    // the bundle's prompts.
+    const promptOverrides = getBundlePrompts({ framework, tool, name }, recipe);
+
     const registry = buildStrategyRegistry();
     const bus = createEventBus();
 
@@ -105,11 +118,14 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
         bus,
         flags,
         distinctId: context.auth?.userId ?? 'daemon',
+        variants,
       });
     }
 
     try {
-      const outcome = await runRecipe({ recipe, ast, context: ctx, registry, bus });
+      const outcome = await runRecipe({
+        recipe, ast, context: ctx, registry, bus, promptOverrides, activeVariants: variants,
+      });
       const artifactPath = await artifactHandle.artifactPath;
       return {
         recipe: call.recipe,
