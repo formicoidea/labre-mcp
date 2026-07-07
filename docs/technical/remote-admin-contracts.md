@@ -86,9 +86,36 @@ Migration `20260707000100_strategy_bundles.sql`:
 - Private Storage bucket `strategy-bundles`: authenticated SELECT, no write
   policies.
 
-## Read model (phase 3, for reference)
+## Read model (wave 2, as built)
 
-Boot: fetch enabled bundles → zod + sha256 → in-memory registry. Per call:
-memory only, zero DB queries. Refresh: one lightweight `max(updated_at)` probe
-per TTL window. Supabase client loaded via dynamic import so the stdio
-transport never pays for it.
+**Zero daemon credentials.** The daemon holds no Supabase key beyond the
+public anon key — never the service-role key, no machine account. Bundles are
+fetched **lazily on the first authenticated request**, with the CALLER's
+bearer token (short-lived per-refresh client; the token is never stored on the
+context, logged, or kept beyond the refresh). RLS authorizes the read.
+
+Per call: memory only, zero DB queries. Refresh: throttled by TTL
+(`LABRE_BUNDLES_TTL_S`, default 300 s) on last *attempt* (an outage costs one
+degraded try per window); change probe = one `max(updated_at)` + `count` query
+(count catches disabled-bundle disappearance). Swap is atomic (no `await`
+between reset and re-registration). Total failure → stale-over-broken. The
+row's `manifest` jsonb is ignored: only the sha256-sealed downloaded
+`manifest.json` is trusted. `storage_prefix` is **bucket-internal**
+(`<slug>/<version>/`) — the bucket name is a constant, never part of the path.
+
+Supabase client via dynamic import — stdio never loads it. Bundle prompts are
+validated but **inert in v0** (not injected into the prompt registry): a v0
+remote bundle contributes recipes composing shipped strategies and prompts.
+
+## Contract 4 — PostHog flags & telemetry (labre-mcp, wave 2)
+
+- Key convention `mcp-recipe-<domain>-<tool>-<name>`; gate on the runRecipe
+  tool with `context.auth?.userId ?? "anonymous"`. **Fail-open** (undefined
+  flag, PostHog outage, or no config → allowed): flags are rollout controls,
+  not a security boundary — auth is.
+- Telemetry: `mcp_boot`, `mcp_run_end`, `mcp_step_error` — metadata only
+  (recipeRunId, stepId, methodId, durationMs, degraded), never payloads,
+  prompts or user content. Fire-and-forget; flush on shutdown.
+- `posthog-node` via dynamic import; `POSTHOG_API_KEY` absent → fully off.
+  There is no global event bus (per-run buses, ARCH-10): boot installs the
+  instance, each run attaches the forwarder to its own bus.
