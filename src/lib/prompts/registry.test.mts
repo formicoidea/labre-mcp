@@ -7,6 +7,7 @@ import { getPrompt, resetPromptRegistryCache } from './registry.mjs';
 import { registerBuilder, resetBuildersRegistry } from './builders-registry.mjs';
 import { registerParser, resetParsersRegistry } from './parsers-registry.mjs';
 import { resetPromptsConfigCache } from './config.loader.mjs';
+import { runWithPromptOverrides, type PromptOverrideStore } from './override-context.mjs';
 
 const tmpRoot = resolve(tmpdir(), `prompts-registry-test-${Date.now()}`);
 
@@ -233,6 +234,107 @@ describe('getPrompt — error paths', () => {
     );
     const p = getPrompt('s');
     assert.throws(() => p.parse('response'), /not yet wired/);
+  });
+});
+
+describe('getPrompt — run-scoped prompt overrides', () => {
+  function overrideStore(user: string): PromptOverrideStore {
+    return { prompts: { s: { default: { system: 'OVERRIDE SYSTEM', user } } } };
+  }
+
+  it('returns bundle text on build() and the SHIPPED parser on parse()', () => {
+    setup(
+      {
+        s: {
+          default: {
+            kind: 'template',
+            templateFile: 't.md',
+            variables: ['name'],
+            parser: { kind: 'custom', id: 'shippedParser' },
+          },
+        },
+      },
+      { 't.md': 'Shipped hello {{name}}' },
+    );
+    registerParser('shippedParser', (response) => `parsed:${response}`);
+
+    runWithPromptOverrides(overrideStore('Override hi {{name}}'), () => {
+      const p = getPrompt('s');
+      // build() uses the bundle's user text + verbatim system, not the shipped template.
+      assert.deepEqual(p.build({ name: 'bob' }), {
+        system: 'OVERRIDE SYSTEM',
+        user: 'Override hi bob',
+      });
+      // parse() still resolves the shipped parser id.
+      assert.equal(p.parse('x'), 'parsed:x');
+    });
+  });
+
+  it('does not poison the global cache — shipped content after the run', () => {
+    setup(
+      {
+        s: {
+          default: {
+            kind: 'template',
+            templateFile: 't.md',
+            variables: ['name'],
+            parser: { kind: 'custom', id: 'p' },
+          },
+        },
+      },
+      { 't.md': 'Shipped {{name}}' },
+    );
+    registerParser('p', () => null);
+
+    runWithPromptOverrides(overrideStore('Override {{name}}'), () => {
+      assert.deepEqual(getPrompt('s').build({ name: 'x' }), {
+        system: 'OVERRIDE SYSTEM',
+        user: 'Override x',
+      });
+    });
+
+    // Same key resolved OUTSIDE the ALS run must yield the shipped content.
+    assert.deepEqual(getPrompt('s').build({ name: 'x' }), { user: 'Shipped x' });
+  });
+
+  it('throws not-found when an override has no shipped entry (parser trust boundary)', () => {
+    setup({
+      s: { default: { kind: 'function', builderId: 'b', parser: { kind: 'custom', id: 'p' } } },
+    });
+    registerBuilder('b', () => '');
+    registerParser('p', () => null);
+
+    const store: PromptOverrideStore = {
+      prompts: { s: { ghost: { system: 'sys', user: 'u' } } },
+    };
+    runWithPromptOverrides(store, () => {
+      assert.throws(() => getPrompt('s', 'ghost'), /not found/);
+    });
+  });
+
+  it('leaves the shipped path byte-identical when no override matches', () => {
+    setup(
+      {
+        s: {
+          default: {
+            kind: 'template',
+            templateFile: 't.md',
+            variables: ['name'],
+            parser: { kind: 'custom', id: 'p' },
+          },
+        },
+      },
+      { 't.md': 'Shipped {{name}}' },
+    );
+    registerParser('p', () => null);
+
+    // Override present for a DIFFERENT strategy → no match → shipped resolution.
+    const store: PromptOverrideStore = {
+      prompts: { other: { default: { system: 's', user: 'u' } } },
+    };
+    runWithPromptOverrides(store, () => {
+      assert.deepEqual(getPrompt('s').build({ name: 'x' }), { user: 'Shipped x' });
+    });
   });
 });
 

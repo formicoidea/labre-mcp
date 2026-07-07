@@ -28,6 +28,7 @@ import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { validateOrThrow } from '#lib/zod/validate-or-throw.mjs';
 import { extractTemplateVars } from '#lib/prompts/config.loader.mjs';
+import type { BundlePromptPair } from '#lib/prompts/override-context.mjs';
 import {
   StrategyBundleManifestSchema,
   type StrategyBundleManifest,
@@ -38,13 +39,10 @@ import {
   type RegisterBundleRecipeOptions,
 } from '#core/recipe/recipe-loader.mjs';
 
-/** One split prompt pair, CRLF-normalized. */
-export interface BundlePromptPair {
-  /** Invariant system message — guaranteed free of {{...}} placeholders. */
-  system: string;
-  /** User message template — {{var}} placeholders allowed. */
-  user: string;
-}
+// BundlePromptPair is declared in the prompts lib (the run-scoped override
+// store consumes it there) and re-exported here for existing bundle callers.
+// Keeps the prompts lib free of any dependency on the bundles lib.
+export type { BundlePromptPair };
 
 /** Fully validated bundle content, independent of where it came from. */
 export interface ValidatedBundle {

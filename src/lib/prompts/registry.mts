@@ -11,11 +11,13 @@
 // The registry is lazy: template text is read once by the config loader and
 // cached; each getPrompt() instance is cached by `${strategy}:${name}`.
 
-import { loadPromptsConfig } from './config.loader.mjs';
+import { loadPromptsConfig, type LoadedPrompts } from './config.loader.mjs';
 import { interpolate } from './interpolate.mjs';
 import { parseDelimitedBlock } from './parsers.mjs';
 import { getBuilder } from './builders-registry.mjs';
 import { getParser } from './parsers-registry.mjs';
+import { getCurrentPromptOverrides } from './override-context.mjs';
+import type { PromptEntry } from './prompts.schema.mjs';
 
 /** Output of build(): a user message (always) and an optional system message.
  *  Callers that need a single string should concatenate them explicitly. */
@@ -37,7 +39,78 @@ function cacheKey(strategy: string, name: string): string {
   return `${strategy}:${name}`;
 }
 
+// Build the parse() function for a resolved prompt from its parser config.
+// Parser resolution is lazy: call-sites that only need build() should not
+// require parser registration. Errors surface on first parse() call instead.
+// Shared between the shipped-config path and the run-scoped override path — an
+// override supplies prompt TEXT only, its parser always comes from the shipped
+// entry (trust boundary: a bundle never selects a parser id).
+function buildParse(
+  strategy: string,
+  name: string,
+  p: PromptEntry['parser'],
+): (response: string, ctx?: any) => any {
+  if (p.kind === 'custom') {
+    return (response: string, ctx?: any) => {
+      const fn = getParser(p.id);
+      if (!fn) {
+        throw new Error(
+          `Prompt "${strategy}/${name}": parser "${p.id}" is not registered. ` +
+          `Call registerParser("${p.id}", fn) before .parse().`,
+        );
+      }
+      return fn(response, ctx);
+    };
+  }
+  if (p.kind === 'delimited') {
+    return (response: string) => parseDelimitedBlock(response, p.startMarker, p.endMarker);
+  }
+  // keyValue — reserved for future generic prompts. Current codebase uses
+  // custom parsers everywhere (each has domain-specific post-processing).
+  return () => {
+    throw new Error(
+      `Prompt "${strategy}/${name}": parser kind "keyValue" requires a schema registry, ` +
+      `not yet wired. Use kind=custom with a registered parser instead.`,
+    );
+  };
+}
+
+// Resolve a run-scoped override prompt: build() interpolates the bundle's user
+// text (mirroring the template branch) with the invariant system attached
+// verbatim; parse() comes from the SHIPPED entry. Never cached — the override
+// is per-run content and must not poison the module-global cache.
+function resolveOverride(
+  strategy: string,
+  name: string,
+  pair: { system: string; user: string },
+  loaded: LoadedPrompts,
+): ResolvedPrompt {
+  const shipped = loaded.config[strategy]?.[name];
+  if (!shipped) {
+    // Same trust boundary as the shipped path: a bundle supplies text only, so
+    // parser selection must exist shipped-side. No shipped entry → not found.
+    throw new Error(`Prompt "${strategy}/${name}" not found in prompts.config.json`);
+  }
+  const userText = pair.user;
+  const systemText = pair.system;
+  const build = (vars: any): BuiltPrompt => {
+    const user = interpolate(userText, vars as Record<string, string>);
+    return { system: systemText, user };
+  };
+  const parse = buildParse(strategy, name, shipped.parser);
+  return { build, parse };
+}
+
 export function getPrompt(strategy: string, name: string = 'default'): ResolvedPrompt {
+  // Run-scoped override branch: consult the ALS store BEFORE the cache. A
+  // matching pair shadows the shipped prompt for this call tree only; the
+  // result is never cached (would poison the global cache with run content).
+  const overrides = getCurrentPromptOverrides();
+  const overridePair = overrides?.prompts[strategy]?.[name];
+  if (overridePair) {
+    return resolveOverride(strategy, name, overridePair, loadPromptsConfig());
+  }
+
   const key = cacheKey(strategy, name);
   const hit = cache.get(key);
   if (hit) return hit;
@@ -86,33 +159,7 @@ export function getPrompt(strategy: string, name: string = 'default'): ResolvedP
     };
   }
 
-  const p = entry.parser;
-  // Parser resolution is lazy: call-sites that only need build() should not
-  // require parser registration. Errors surface on first parse() call instead.
-  let parse: (response: string, ctx?: any) => any;
-  if (p.kind === 'custom') {
-    parse = (response: string, ctx?: any) => {
-      const fn = getParser(p.id);
-      if (!fn) {
-        throw new Error(
-          `Prompt "${strategy}/${name}": parser "${p.id}" is not registered. ` +
-          `Call registerParser("${p.id}", fn) before .parse().`,
-        );
-      }
-      return fn(response, ctx);
-    };
-  } else if (p.kind === 'delimited') {
-    parse = (response: string) => parseDelimitedBlock(response, p.startMarker, p.endMarker);
-  } else {
-    // keyValue — reserved for future generic prompts. Current codebase uses
-    // custom parsers everywhere (each has domain-specific post-processing).
-    parse = () => {
-      throw new Error(
-        `Prompt "${strategy}/${name}": parser kind "keyValue" requires a schema registry, ` +
-        `not yet wired. Use kind=custom with a registered parser instead.`,
-      );
-    };
-  }
+  const parse = buildParse(strategy, name, entry.parser);
 
   const resolved: ResolvedPrompt = { build, parse };
   cache.set(key, resolved);
