@@ -4,6 +4,7 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { interpolate, createOpenCodeCall, createOpenCodeLogprobCall } from './llm-call.mjs';
+import { runWithUsageCollector, type LlmUsageAggregate } from './usage-context.mjs';
 
 describe('interpolate', () => {
   it('replaces {{var}} placeholders', () => {
@@ -184,5 +185,52 @@ describe('createOpenCodeLogprobCall — fetch stubbed', () => {
 
     assert.equal(capturedBody.messages[0].role, 'system');
     assert.equal(capturedBody.messages[0].content, 'classify strictly');
+  });
+});
+
+// ─── CP9: provider records usage from a faked (stubbed) API response ─────────
+// The http-api backend (createOpenCodeCall) reads token usage from the
+// OpenAI-compatible `usage.{prompt_tokens,completion_tokens}` fields. With a
+// stubbed fetch we can assert the record folds into the ambient collector.
+describe('createOpenCodeCall — usage recording (CP9)', () => {
+  let originalFetch: typeof fetch;
+  beforeEach(() => { originalFetch = globalThis.fetch; });
+  afterEach(() => { globalThis.fetch = originalFetch; });
+
+  it('records prompt/completion tokens into the ambient usage collector', async () => {
+    globalThis.fetch = (async () => new Response(
+      JSON.stringify({
+        choices: [{ message: { content: 'ok' } }],
+        usage: { prompt_tokens: 31, completion_tokens: 12 },
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    )) as typeof fetch;
+
+    let agg!: LlmUsageAggregate;
+    await runWithUsageCollector(async () => {
+      const call = createOpenCodeCall({ apiKey: 'k' });
+      await call('hello', {});
+    }, (a) => { agg = a; });
+
+    assert.equal(agg.llmCalls, 1);
+    assert.equal(agg.inputTokens, 31);
+    assert.equal(agg.outputTokens, 12);
+  });
+
+  it('counts the call but leaves token sums undefined when the response omits usage', async () => {
+    globalThis.fetch = (async () => new Response(
+      JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), // no usage field
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    )) as typeof fetch;
+
+    let agg!: LlmUsageAggregate;
+    await runWithUsageCollector(async () => {
+      const call = createOpenCodeCall({ apiKey: 'k' });
+      await call('hello', {});
+    }, (a) => { agg = a; });
+
+    assert.equal(agg.llmCalls, 1);
+    assert.equal(agg.inputTokens, undefined);
+    assert.equal(agg.outputTokens, undefined);
   });
 });

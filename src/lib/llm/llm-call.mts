@@ -14,6 +14,7 @@
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { classifyAndLogLLMError } from './llm-error-handler.mjs';
+import { recordLlmUsage } from './usage-context.mjs';
 import type {
   LLMCall,
   StructuredLLMCall,
@@ -99,10 +100,25 @@ export function createLLMCall(config: ClaudeLLMConfig = {}): LLMCall {
       try {
         let resultText = '';
         for await (const message of query({ prompt: interpolatedPrompt, options } as Parameters<typeof query>[0])) {
-          const msg = message as { type: string; subtype?: string; result?: string; errors?: string[] };
+          // Agent SDK result message: on success it carries the completion text
+          // plus `usage.{input_tokens,output_tokens}` (snake_case, from the SDK's
+          // NonNullableUsage). See node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts.
+          const msg = message as {
+            type: string;
+            subtype?: string;
+            result?: string;
+            errors?: string[];
+            usage?: { input_tokens?: number; output_tokens?: number };
+          };
           if (msg.type === 'result') {
             if (msg.subtype === 'success') {
               resultText = msg.result || '';
+              recordLlmUsage({
+                provider: 'agent-sdk',
+                model,
+                inputTokens: msg.usage?.input_tokens,
+                outputTokens: msg.usage?.output_tokens,
+              });
             } else {
               const errors = msg.errors || [];
               throw new Error(`LLM call failed: ${errors.join(', ') || 'unknown error'}`);
@@ -172,10 +188,24 @@ export function createStructuredLLMCall<T = unknown>(
       try {
         let resultText = '';
         for await (const message of query({ prompt: interpolatedPrompt, options } as Parameters<typeof query>[0])) {
-          const msg = message as { type: string; subtype?: string; result?: string; errors?: string[] };
+          // Same result-message shape as createLLMCall: success carries
+          // `usage.{input_tokens,output_tokens}` (see sdk.d.ts SDKResultSuccess).
+          const msg = message as {
+            type: string;
+            subtype?: string;
+            result?: string;
+            errors?: string[];
+            usage?: { input_tokens?: number; output_tokens?: number };
+          };
           if (msg.type === 'result') {
             if (msg.subtype === 'success') {
               resultText = msg.result || '';
+              recordLlmUsage({
+                provider: 'agent-sdk',
+                model,
+                inputTokens: msg.usage?.input_tokens,
+                outputTokens: msg.usage?.output_tokens,
+              });
             } else {
               const errors = msg.errors || [];
               throw new Error(`Structured LLM call failed: ${errors.join(', ') || 'unknown error'}`);
@@ -261,8 +291,11 @@ export function createOpenCodeCall(config: OpenCodeConfig = {}): LLMCall {
       throw apiErr;
     }
 
+    // OpenAI-compatible chat/completions response: usage carries
+    // `prompt_tokens`/`completion_tokens` (snake_case, OpenAI convention).
     const data = await response.json() as {
       choices?: Array<{ message?: { content?: string } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
     const text = data.choices?.[0]?.message?.content;
 
@@ -271,6 +304,13 @@ export function createOpenCodeCall(config: OpenCodeConfig = {}): LLMCall {
       classifyAndLogLLMError(emptyErr, errorContext);
       throw emptyErr;
     }
+
+    recordLlmUsage({
+      provider: 'http-api',
+      model,
+      inputTokens: data.usage?.prompt_tokens,
+      outputTokens: data.usage?.completion_tokens,
+    });
 
     return text;
   };
@@ -346,8 +386,16 @@ export function createOpenCodeLogprobCall(
           }>;
         };
       }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
     const text = data.choices?.[0]?.message?.content || '';
+
+    recordLlmUsage({
+      provider: 'http-api',
+      model,
+      inputTokens: data.usage?.prompt_tokens,
+      outputTokens: data.usage?.completion_tokens,
+    });
 
     const contentLogprobs = data.choices?.[0]?.logprobs?.content;
     const logprobs: LogprobResult['logprobs'] = [];

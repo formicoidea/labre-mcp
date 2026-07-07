@@ -77,7 +77,7 @@ describe('evolution registry — SCurveStrategy', () => {
     assert.ok(Array.isArray(out.insights));
     assert.equal(out.reasoning.length, 0, 'deterministic strategy has no LLM reasoning');
     assert.equal(out.insights.length, 0);
-    assert.equal(out.signals.length, 2, 'certitude + ubiquity captured as signals');
+    assert.equal(out.signals.length, 3, 'certitude + ubiquity + confidence captured as signals');
 
     assert.equal(typeof out.result.evolution, 'number');
     assert.ok(out.result.evolution >= 0 && out.result.evolution <= 1);
@@ -92,11 +92,18 @@ describe('evolution registry — SCurveStrategy', () => {
       ctx,
     );
     const names = out.signals.map((s) => s.name).sort();
-    assert.deepEqual(names, ['certitude', 'ubiquity']);
+    assert.deepEqual(names, ['certitude', 'confidence', 'ubiquity']);
+    // Input signals carry source = user-input; the computed confidence metric
+    // (CP10) carries source = computed. All signals timestamp their capture.
     for (const sig of out.signals) {
-      assert.equal(sig.source, 'user-input');
+      const expectedSource = sig.name === 'confidence' ? 'computed' : 'user-input';
+      assert.equal(sig.source, expectedSource);
       assert.ok(sig.capturedAt.length > 0, 'capturedAt is ISO timestamp');
     }
+    // The confidence signal is numeric so the run-level quality map can harvest it.
+    const confSig = out.signals.find((s) => s.name === 'confidence');
+    assert.ok(confSig);
+    assert.equal(typeof confSig.value, 'number');
   });
 
   it('SCurveStrategy.evaluate throws when certitude/ubiquity missing', async () => {

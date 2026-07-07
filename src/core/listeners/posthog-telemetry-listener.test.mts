@@ -138,3 +138,99 @@ describe('attachPostHogTelemetry — variant attribution', () => {
     assert.equal(featureKeys(runEnd?.properties).length, 0);
   });
 });
+
+describe('attachPostHogTelemetry — run-end usage + quality (CP9/CP10)', () => {
+  it('forwards LLM usage numbers on run-end', () => {
+    const flags = buildRecordingFlags();
+    const bus = createEventBus();
+    attachPostHogTelemetry({ bus, flags, distinctId: 'user-1' });
+
+    bus.emit({
+      ...runEndEvent(),
+      payload: { usage: { llmCalls: 3, inputTokens: 120, outputTokens: 45 } },
+    });
+
+    const runEnd = flags.captured.find((c) => c.event === 'mcp_run_end');
+    assert.equal(runEnd?.properties?.llmCalls, 3);
+    assert.equal(runEnd?.properties?.inputTokens, 120);
+    assert.equal(runEnd?.properties?.outputTokens, 45);
+  });
+
+  it('omits undefined token fields (counts-only provider)', () => {
+    const flags = buildRecordingFlags();
+    const bus = createEventBus();
+    attachPostHogTelemetry({ bus, flags, distinctId: 'user-1' });
+
+    bus.emit({ ...runEndEvent(), payload: { usage: { llmCalls: 2 } } });
+
+    const runEnd = flags.captured.find((c) => c.event === 'mcp_run_end');
+    assert.equal(runEnd?.properties?.llmCalls, 2);
+    assert.ok(!('inputTokens' in (runEnd?.properties ?? {})));
+    assert.ok(!('outputTokens' in (runEnd?.properties ?? {})));
+  });
+
+  it('forwards numeric quality metrics as quality_<name>', () => {
+    const flags = buildRecordingFlags();
+    const bus = createEventBus();
+    attachPostHogTelemetry({ bus, flags, distinctId: 'user-1' });
+
+    bus.emit({
+      ...runEndEvent(),
+      payload: { quality: { confidence: 0.7, score: 42 } },
+    });
+
+    const runEnd = flags.captured.find((c) => c.event === 'mcp_run_end');
+    assert.equal(runEnd?.properties?.quality_confidence, 0.7);
+    assert.equal(runEnd?.properties?.quality_score, 42);
+  });
+
+  it('sanitizes quality names to [a-zA-Z0-9_]', () => {
+    const flags = buildRecordingFlags();
+    const bus = createEventBus();
+    attachPostHogTelemetry({ bus, flags, distinctId: 'user-1' });
+
+    bus.emit({
+      ...runEndEvent(),
+      // Runner keys can only be numbers here, but the name may contain unsafe
+      // characters — they must all be replaced with '_'.
+      payload: { quality: { 'a.b:c-d e': 1 } },
+    });
+
+    const runEnd = flags.captured.find((c) => c.event === 'mcp_run_end');
+    assert.equal(runEnd?.properties?.['quality_a_b_c_d_e'], 1);
+  });
+
+  it('never forwards non-numeric quality values (privacy)', () => {
+    const flags = buildRecordingFlags();
+    const bus = createEventBus();
+    attachPostHogTelemetry({ bus, flags, distinctId: 'user-1' });
+
+    bus.emit({
+      ...runEndEvent(),
+      // A defensively malformed payload: a string slipped into quality. It must
+      // be dropped, not stringified onto a quality_ property.
+      // any: deliberately malformed payload for the privacy guard test.
+      payload: { quality: { leak: 'secret prompt text', ok: 5 } as any },
+    });
+
+    const runEnd = flags.captured.find((c) => c.event === 'mcp_run_end');
+    assert.equal(runEnd?.properties?.quality_ok, 5);
+    assert.ok(!('quality_leak' in (runEnd?.properties ?? {})));
+    assertNoPromptLikeValues(runEnd?.properties);
+  });
+
+  it('does NOT mine payload on step-error (usage/quality are run-end only)', () => {
+    const flags = buildRecordingFlags();
+    const bus = createEventBus();
+    attachPostHogTelemetry({ bus, flags, distinctId: 'user-1' });
+
+    bus.emit({
+      ...stepErrorEvent(),
+      // any: step-error payload carrying usage should be ignored, not forwarded.
+      payload: { usage: { llmCalls: 9 }, error: 'boom' } as any,
+    });
+
+    const stepErr = flags.captured.find((c) => c.event === 'mcp_step_error');
+    assert.ok(!('llmCalls' in (stepErr?.properties ?? {})));
+  });
+});

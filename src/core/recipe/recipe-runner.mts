@@ -19,6 +19,10 @@ import {
   runWithPromptOverrides,
   type PromptOverrideStore,
 } from "#lib/prompts/override-context.mjs";
+import {
+  runWithUsageCollector,
+  type LlmUsageAggregate,
+} from "#lib/llm/usage-context.mjs";
 
 export interface RunOptions {
   recipe: Recipe;
@@ -88,10 +92,23 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
     references: [],
   };
 
+  // Run-level LLM usage aggregate (CP9), populated by the ALS collector that
+  // wraps the run body. Undefined until the collector's onAggregate fires
+  // (i.e. after the run body completes). Metadata/numbers only — no content.
+  let usage: LlmUsageAggregate | undefined;
+
   let runEndEmitted = false;
   const emitRunEnd = () => {
     if (runEndEmitted) return;
     runEndEmitted = true;
+    // Assemble the run-end payload from run-level performance signals: LLM usage
+    // (CP9) and numeric quality metrics harvested from the envelope (CP10). The
+    // payload stays metadata/numbers only — the telemetry listener forwards
+    // these to PostHog, so no prompt text or model output may enter here.
+    const quality = buildQualityMap(envelope.signals);
+    const payload: { usage?: LlmUsageAggregate; quality?: Record<string, number> } = {};
+    if (usage !== undefined) payload.usage = usage;
+    if (Object.keys(quality).length > 0) payload.quality = quality;
     bus.emit({
       schemaVersion: "1.0",
       recipeRunId,
@@ -104,6 +121,7 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
       methodId: `${options.recipe.domain}:recipe:orchestration:run:default`,
       phase: "run-end",
       timestamp: new Date().toISOString(),
+      ...(Object.keys(payload).length > 0 ? { payload } : {}),
     });
   };
 
@@ -139,10 +157,13 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
     });
   };
 
-  try {
-    // Wrap the run in the override store when EITHER bundle prompts OR a variant
-    // assignment is present. Absent both → runBody() runs directly (path
-    // byte-identical to a run with no A/B involvement, no ALS frame).
+  // Compose the prompt-override wrap (A/B testing) with the usage collector
+  // (CP9). Order is irrelevant — the collector only needs to enclose every LLM
+  // call, and the override store only needs to enclose every getPrompt(); both
+  // sit above the same step-execution tree. The collector always wraps the run
+  // (its overhead is a single ALS frame); the override wrap stays conditional so
+  // the default path is byte-identical to a run with no A/B involvement.
+  const runWithOverrides = async (): Promise<void> => {
     const hasPrompts = options.promptOverrides !== undefined
       && Object.keys(options.promptOverrides).length > 0;
     const hasVariants = options.activeVariants !== undefined
@@ -155,6 +176,12 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
     } else {
       await runBody();
     }
+  };
+
+  try {
+    await runWithUsageCollector(runWithOverrides, (aggregate) => {
+      usage = aggregate;
+    });
     emitRunEnd();
   } catch (err) {
     emitRunEnd();
@@ -337,6 +364,31 @@ function collectEnvelope(envelope: JsonLabreEnvelope, sr: unknown): void {
   if (Array.isArray(r.signals))   envelope.signals.push(...r.signals);
   if (Array.isArray(r.reasoning)) envelope.reasoning.push(...r.reasoning);
   if (Array.isArray(r.insights))  envelope.insights.push(...r.insights);
+}
+
+// Cap on the number of quality metrics forwarded per run (CP10). Guards the
+// telemetry payload (and PostHog property count) against an unbounded set of
+// numeric signals; once reached we simply stop adding more.
+const MAX_QUALITY_KEYS = 20;
+
+// Build the run-level quality map (CP10) from the envelope's accumulated
+// signals. A signal contributes iff its `value` is a finite number; the entry
+// keyed by the signal's `name` takes that number. Collisions resolve last-wins
+// (later signals overwrite earlier ones with the same name). Adds stop once
+// MAX_QUALITY_KEYS distinct keys exist — an update to an existing key is always
+// allowed (it does not grow the key set). Numbers only: string/object signal
+// values are ignored, keeping the downstream telemetry privacy-safe.
+function buildQualityMap(
+  signals: JsonLabreEnvelope["signals"],
+): Record<string, number> {
+  const quality: Record<string, number> = {};
+  for (const signal of signals) {
+    if (typeof signal.value !== "number" || !Number.isFinite(signal.value)) continue;
+    const isNewKey = !(signal.name in quality);
+    if (isNewKey && Object.keys(quality).length >= MAX_QUALITY_KEYS) continue; // cap: stop adding new keys
+    quality[signal.name] = signal.value;
+  }
+  return quality;
 }
 
 interface ListenerInvocation {

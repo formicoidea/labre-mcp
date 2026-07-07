@@ -57,6 +57,10 @@ export class SCurveStrategy extends CoreBaseStrategy<ComponentInput, EvolutionRe
       signals: [
         { name: 'certitude', value: certitude, source: 'user-input', capturedAt },
         { name: 'ubiquity', value: ubiquity, source: 'user-input', capturedAt },
+        // Emit confidence as a numeric signal so the run-level quality map (CP10)
+        // can forward it to telemetry. It already lives in `result.confidence`;
+        // this mirrors it into `signals` where the runner harvests numeric metrics.
+        { name: 'confidence', value: confidence, source: 'computed', capturedAt },
       ],
       // s-curve is deterministic — no LLM reasoning to capture (ARCH-22 progressive)
       reasoning: [],
