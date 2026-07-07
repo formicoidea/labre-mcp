@@ -1,6 +1,6 @@
 {
   "name": "@formicoidea/labre-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server for applying practice frameworks — Wardley Maps first (value chain, evolution, climates, doctrines). Strategy registry + recipe runner, exposed over stdio (Claude Code / Agent SDK) or HTTP.",
   "main": "dist/index.mjs",
   "types": "dist/index.d.mts",
@@ -41,13 +41,34 @@
     "access": "public"
   },
   "imports": {
-    "#core/*": { "development": "./src/core/*", "default": "./dist/core/*" },
-    "#frameworks/*": { "development": "./src/frameworks/*", "default": "./dist/frameworks/*" },
-    "#lib/*": { "development": "./src/lib/*", "default": "./dist/lib/*" },
-    "#types/*": { "development": "./src/types/*", "default": "./dist/types/*" },
-    "#schemas/*": { "development": "./src/schemas/*", "default": "./dist/schemas/*" },
-    "#mcp/*": { "development": "./src/mcp/*", "default": "./dist/mcp/*" },
-    "#session/*": { "development": "./src/session/*", "default": "./dist/session/*" },
+    "#core/*": {
+      "development": "./src/core/*",
+      "default": "./dist/core/*"
+    },
+    "#frameworks/*": {
+      "development": "./src/frameworks/*",
+      "default": "./dist/frameworks/*"
+    },
+    "#lib/*": {
+      "development": "./src/lib/*",
+      "default": "./dist/lib/*"
+    },
+    "#types/*": {
+      "development": "./src/types/*",
+      "default": "./dist/types/*"
+    },
+    "#schemas/*": {
+      "development": "./src/schemas/*",
+      "default": "./dist/schemas/*"
+    },
+    "#mcp/*": {
+      "development": "./src/mcp/*",
+      "default": "./dist/mcp/*"
+    },
+    "#session/*": {
+      "development": "./src/session/*",
+      "default": "./dist/session/*"
+    },
     "#work-on-evolution/*": {
       "development": "./src/frameworks/wardley/evolution/_legacy/*",
       "default": "./dist/frameworks/wardley/evolution/_legacy/*"
