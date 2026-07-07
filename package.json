@@ -92,6 +92,7 @@
     "jose": "^6.2.3",
     "jsonpath-plus": "^10.4.0",
     "lodash.merge": "^4.6.2",
+    "posthog-node": "^5.39.4",
     "rxjs": "^7.8.2",
     "zod": "^4.3.6"
   },

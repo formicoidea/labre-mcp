@@ -5,6 +5,8 @@ import path from 'node:path';
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { RUN_RECIPE_TOOL } from './run-recipe.tool.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
+import { setPostHogFlags } from '#lib/flags/state.mjs';
+import type { PostHogFlags, RecipeRef } from '#lib/flags/posthog.mjs';
 
 // Artefacts go to a temp dir so the test never touches ~/.labre-mcp.
 const context: RequestContext = {
@@ -96,4 +98,112 @@ describe('runRecipe tool', () => {
     assert.deepEqual(artifact.ast.input, { title: 'boom' });
     assert.ok(artifact.events.some((event) => event.phase === 'run-end'));
   });
+});
+
+// Fake PostHogFlags instance — the gate's injection seam is the module-level
+// singleton set at daemon boot (setPostHogFlags), so tests install a fake
+// there and reset it in finally.
+function buildFakeFlags(verdict: boolean): PostHogFlags & {
+  flagCalls: Array<{ ref: RecipeRef; userId: string | undefined }>;
+  captured: Array<{ event: string; distinctId: string; properties?: Record<string, unknown> }>;
+} {
+  const flagCalls: Array<{ ref: RecipeRef; userId: string | undefined }> = [];
+  const captured: Array<{
+    event: string;
+    distinctId: string;
+    properties?: Record<string, unknown>;
+  }> = [];
+  return {
+    flagCalls,
+    captured,
+    async isRecipeEnabled(ref, userId) {
+      flagCalls.push({ ref, userId });
+      return verdict;
+    },
+    capture(event, distinctId, properties) {
+      captured.push({ event, distinctId, properties });
+    },
+    async shutdown() {},
+  };
+}
+
+describe('runRecipe tool — PostHog feature-flag gate', () => {
+  it('refuses a disabled recipe without executing it', async () => {
+    const flags = buildFakeFlags(false);
+    setPostHogFlags(flags);
+    try {
+      const out = (await RUN_RECIPE_TOOL.handler(
+        {
+          recipe: 'wardley:map:estimate-chain-components',
+          input: { title: 'empty', components: [], relations: [] },
+        },
+        { ...context, auth: { userId: 'user-42' } },
+      )) as RunRecipeResultShape;
+
+      // Refusal follows the tool's existing error shape.
+      assert.equal(out.status, 'error');
+      assert.equal(out.recipe, 'wardley:map:estimate-chain-components');
+      assert.ok(out.errors?.[0]?.includes('disabled by feature flag'));
+      // Not executed: no run id, no envelope, no artefact.
+      assert.equal(out.recipeRunId, undefined);
+      assert.equal(out.envelope, undefined);
+      assert.equal(out.artifactPath, undefined);
+      assert.deepEqual(flags.captured, []);
+      // The gate resolved the flag with the authenticated user as distinctId.
+      assert.deepEqual(flags.flagCalls, [
+        {
+          ref: { domain: 'wardley', tool: 'map', name: 'estimate-chain-components' },
+          userId: 'user-42',
+        },
+      ]);
+    } finally {
+      setPostHogFlags(undefined);
+    }
+  });
+
+  it('gates before recipe loading (unknown recipe still refused, not "not found")', async () => {
+    setPostHogFlags(buildFakeFlags(false));
+    try {
+      const out = (await RUN_RECIPE_TOOL.handler(
+        { recipe: 'wardley:map:does-not-exist', input: {} },
+        context,
+      )) as RunRecipeResultShape;
+      assert.equal(out.status, 'error');
+      assert.ok(out.errors?.[0]?.includes('disabled by feature flag'));
+    } finally {
+      setPostHogFlags(undefined);
+    }
+  });
+
+  it('runs an enabled recipe and forwards run-end telemetry (metadata only)', async () => {
+    const flags = buildFakeFlags(true);
+    setPostHogFlags(flags);
+    try {
+      const out = (await RUN_RECIPE_TOOL.handler(
+        {
+          recipe: 'wardley:map:estimate-chain-components',
+          input: { title: 'empty', components: [], relations: [] },
+        },
+        context, // no auth → gate distinctId "anonymous", telemetry "daemon"
+      )) as RunRecipeResultShape;
+
+      assert.equal(out.status, 'ok');
+      assert.deepEqual(flags.flagCalls[0]?.userId, 'anonymous');
+
+      const runEnd = flags.captured.filter((c) => c.event === 'mcp_run_end');
+      assert.equal(runEnd.length, 1);
+      assert.equal(runEnd[0].distinctId, 'daemon');
+      assert.equal(runEnd[0].properties?.recipeRunId, out.recipeRunId);
+      // Privacy: only the fixed metadata keys cross the wire — never payloads.
+      assert.deepEqual(
+        Object.keys(runEnd[0].properties ?? {}).sort(),
+        ['degraded', 'durationMs', 'methodId', 'recipeRunId', 'stepId'],
+      );
+    } finally {
+      setPostHogFlags(undefined);
+    }
+  });
+
+  // No-PostHog behaviour (stdio / unconfigured daemon) is covered by every
+  // other test in this file: the singleton is unset and recipes run as before.
 });
