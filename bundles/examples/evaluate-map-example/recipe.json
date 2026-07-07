@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0",
+  "name": "evaluate-map-example",
+  "domain": "wardley",
+  "tool": "map",
+  "description": "Bundle copy of the shipped evaluate-map recipe (name adjusted to the bundle slug). Evaluate every component of a chain map: parses the map, then fans out two independent per-component passes — positions each component in evolution via the llm-direct strategy (primary) and surfaces the underlying capability of each component via identify (observation, envelope-only).",
+  "steps": [
+    {
+      "stepId": "parse-map",
+      "tool": "render:wardley-map:owm:parse:dsl",
+      "in": "$.input",
+      "out": "$.chain"
+    },
+    {
+      "stepId": "estimate-all",
+      "tool": "wardley:map:climate:position-functional-in-evolution:llm-direct",
+      "over": "$.chain.result.components",
+      "out": "$.evaluations"
+    },
+    {
+      "stepId": "identify-all",
+      "tool": "wardley:map:node:identify:default",
+      "over": "$.chain.result.components",
+      "out": "$.identified"
+    }
+  ],
+  "listeners": {}
+}
