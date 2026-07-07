@@ -7,7 +7,7 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import type { ServerType } from "@hono/node-server";
-import { dispatch, type ToolRegistry } from "./mcp-handler.mjs";
+import { dispatch, SERVER_INFO, type ToolRegistry } from "./mcp-handler.mjs";
 import { JsonRpcRequestSchema } from "./json-rpc.schema.mjs";
 import { extractContext } from "./context-extractor.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
@@ -29,9 +29,7 @@ export function buildApp(options: { tools: ToolRegistry; auth: AuthMiddleware })
   const app = new Hono();
 
   app.get("/health", (c) => c.json({ status: "ok" }));
-  app.get("/version", (c) =>
-    c.json({ name: "labre-mcp", version: "1.0.0-migration" }),
-  );
+  app.get("/version", (c) => c.json(SERVER_INFO));
 
   app.post("/mcp", async (c) => {
     let body: unknown;

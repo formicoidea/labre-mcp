@@ -54,7 +54,9 @@
     "dev": "tsx --conditions development src/core/transport/labre-daemon.mts",
     "typecheck": "tsc --noEmit",
     "test": "tsx --conditions development --test \"src/**/*.test.mts\"",
-    "prepublishOnly": "npm run typecheck && npm run build"
+    "prepublishOnly": "npm run typecheck && npm run build",
+    "ci:version": "npm version patch -m \"release: v%s\"",
+    "ci:publish": "npm publish"
   },
   "keywords": [
     "mcp",
