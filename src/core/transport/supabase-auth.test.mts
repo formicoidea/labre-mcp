@@ -9,7 +9,8 @@ import {
   type CryptoKey,
 } from "jose";
 import type { RequestContext } from "../context/request-context.mjs";
-import { buildSupabaseAuthMiddleware, AuthenticationError } from "./supabase-auth.mjs";
+import { buildSupabaseAuthMiddleware } from "./supabase-auth.mjs";
+import { AuthenticationError } from "./auth-middleware.mjs";
 
 const SUPABASE_URL = "https://test-project.supabase.co";
 const AUDIENCE = "authenticated";

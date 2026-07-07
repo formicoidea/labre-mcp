@@ -11,8 +11,7 @@ import { dispatch, SERVER_INFO, type ToolRegistry } from "./mcp-handler.mjs";
 import { JsonRpcRequestSchema, JsonRpcErrorCode } from "./json-rpc.schema.mjs";
 import { extractContext } from "./context-extractor.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
-import { noopAuthMiddleware } from "./auth-middleware.mjs";
-import { AuthenticationError } from "./supabase-auth.mjs";
+import { noopAuthMiddleware, AuthenticationError } from "./auth-middleware.mjs";
 
 export interface HttpServerOptions {
   port: number;

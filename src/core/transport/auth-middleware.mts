@@ -8,6 +8,17 @@ export interface AuthMiddleware {
   authenticate(headers: Record<string, string>, context: RequestContext): Promise<RequestContext>;
 }
 
+/** Thrown by any AuthMiddleware when a request cannot be authenticated.
+ *  The `reason` is internal diagnostics only — the HTTP layer maps it to a
+ *  plain 401 and must never leak it to the caller. Lives here (not in a
+ *  concrete middleware) so the transport depends only on the interface. */
+export class AuthenticationError extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = "AuthenticationError";
+  }
+}
+
 export const noopAuthMiddleware: AuthMiddleware = {
   async authenticate(_headers, context) {
     return context;

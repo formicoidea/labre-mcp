@@ -9,15 +9,7 @@
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
 import type { RequestContext } from "../context/request-context.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
-
-/** Thrown when a request cannot be authenticated. The `reason` is internal
- *  diagnostics only — the HTTP layer must never leak it to the caller. */
-export class AuthenticationError extends Error {
-  constructor(reason: string) {
-    super(reason);
-    this.name = "AuthenticationError";
-  }
-}
+import { AuthenticationError } from "./auth-middleware.mjs";
 
 export interface SupabaseAuthOptions {
   /** Supabase project URL, e.g. https://xyzcompany.supabase.co */
