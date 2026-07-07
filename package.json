@@ -1,18 +1,18 @@
 {
   "name": "@formicoidea/labre-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "MCP server for applying practice frameworks — Wardley Maps first (value chain, evolution, climates, doctrines). Strategy registry + recipe runner, exposed over stdio (Claude Code / Agent SDK) or HTTP.",
   "main": "dist/index.mjs",
   "types": "dist/index.d.mts",
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
-      "development": "./src/index.mts",
+      "labre-mcp-dev": "./src/index.mts",
       "default": "./dist/index.mjs"
     },
     "./schemas": {
       "types": "./dist/schemas/index.d.mts",
-      "development": "./src/schemas/index.mts",
+      "labre-mcp-dev": "./src/schemas/index.mts",
       "default": "./dist/schemas/index.mjs"
     }
   },
@@ -42,51 +42,51 @@
   },
   "imports": {
     "#core/*": {
-      "development": "./src/core/*",
+      "labre-mcp-dev": "./src/core/*",
       "default": "./dist/core/*"
     },
     "#frameworks/*": {
-      "development": "./src/frameworks/*",
+      "labre-mcp-dev": "./src/frameworks/*",
       "default": "./dist/frameworks/*"
     },
     "#lib/*": {
-      "development": "./src/lib/*",
+      "labre-mcp-dev": "./src/lib/*",
       "default": "./dist/lib/*"
     },
     "#types/*": {
-      "development": "./src/types/*",
+      "labre-mcp-dev": "./src/types/*",
       "default": "./dist/types/*"
     },
     "#schemas/*": {
-      "development": "./src/schemas/*",
+      "labre-mcp-dev": "./src/schemas/*",
       "default": "./dist/schemas/*"
     },
     "#mcp/*": {
-      "development": "./src/mcp/*",
+      "labre-mcp-dev": "./src/mcp/*",
       "default": "./dist/mcp/*"
     },
     "#session/*": {
-      "development": "./src/session/*",
+      "labre-mcp-dev": "./src/session/*",
       "default": "./dist/session/*"
     },
     "#work-on-evolution/*": {
-      "development": "./src/frameworks/wardley/evolution/_legacy/*",
+      "labre-mcp-dev": "./src/frameworks/wardley/evolution/_legacy/*",
       "default": "./dist/frameworks/wardley/evolution/_legacy/*"
     },
     "#work-on-value-chain/*": {
-      "development": "./src/frameworks/wardley/chain/_legacy/*",
+      "labre-mcp-dev": "./src/frameworks/wardley/chain/_legacy/*",
       "default": "./dist/frameworks/wardley/chain/_legacy/*"
     }
   },
   "scripts": {
-    "mcp": "tsx --conditions development src/core/transport/labre-daemon.mts",
+    "mcp": "tsx --conditions labre-mcp-dev src/core/transport/labre-daemon.mts",
     "mcp:prod": "node dist/core/transport/labre-daemon.mjs",
-    "mcp:stdio": "tsx --conditions development src/core/transport/labre-stdio.mts",
+    "mcp:stdio": "tsx --conditions labre-mcp-dev src/core/transport/labre-stdio.mts",
     "mcp:stdio:prod": "node dist/core/transport/labre-stdio.mjs",
     "build": "tsc",
-    "dev": "tsx --conditions development src/core/transport/labre-daemon.mts",
+    "dev": "tsx --conditions labre-mcp-dev src/core/transport/labre-daemon.mts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --conditions development --test \"src/**/*.test.mts\"",
+    "test": "tsx --conditions labre-mcp-dev --test \"src/**/*.test.mts\"",
     "prepublishOnly": "npm run typecheck && npm run build",
     "ci:version": "npm version patch -m \"release: v%s\"",
     "ci:publish": "npm publish"
