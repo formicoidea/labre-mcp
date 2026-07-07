@@ -104,8 +104,15 @@ row's `manifest` jsonb is ignored: only the sha256-sealed downloaded
 (`<slug>/<version>/`) — the bucket name is a constant, never part of the path.
 
 Supabase client via dynamic import — stdio never loads it. Bundle prompts are
-validated but **inert in v0** (not injected into the prompt registry): a v0
-remote bundle contributes recipes composing shipped strategies and prompts.
+**live**: each accepted bundle registers its prompt pairs alongside its recipe,
+and a run of that recipe layers them over the shipped prompts through a
+run-scoped AsyncLocalStorage store (`src/lib/prompts/override-context.mts`) —
+never by mutating the global prompt-registry cache, so concurrent callers are
+isolated. Constraints: a bundle supplies prompt TEXT only (the parser always
+comes from the shipped entry — trust boundary), and only shipped template-kind
+prompts are overridable (`assertBundlePromptsOverridable`; a bundle failing the
+check is rejected like any other bad bundle). A same-ref user recipe never
+inherits a bundle's prompts (identity-checked in `getBundlePrompts`).
 
 ## Contract 4 — PostHog flags & telemetry (labre-mcp, wave 2)
 
@@ -113,9 +120,25 @@ remote bundle contributes recipes composing shipped strategies and prompts.
   tool with `context.auth?.userId ?? "anonymous"`. **Fail-open** (undefined
   flag, PostHog outage, or no config → allowed): flags are rollout controls,
   not a security boundary — auth is.
-- Telemetry: `mcp_boot`, `mcp_run_end`, `mcp_step_error` — metadata only
-  (recipeRunId, stepId, methodId, durationMs, degraded), never payloads,
-  prompts or user content. Fire-and-forget; flush on shutdown.
+- **Prompt experiments (A/B)**: multivariate flags keyed
+  `mcp-prompt-<strategyId>`. The flag's variant key **is** the prompt name by
+  convention (labre-admin creates variants matching prompt names). Assignment
+  happens once per run via `getAllFlags` with the same distinctId as the gate;
+  the run's `getPrompt(strategy)` redirects `default` to the assigned variant
+  (bundle override first, then shipped entry; nonexistent variant → silent
+  fallback to `default`, fail-open). Explicit non-default prompt names are
+  never substituted.
+- Telemetry: `mcp_boot`, `mcp_run_end`, `mcp_step_error` — metadata and
+  numbers only (recipeRunId, stepId, methodId, durationMs, degraded), never
+  payloads, prompts or user content. Fire-and-forget; flush on shutdown.
+  Experiment/performance properties:
+  - `$feature/mcp-prompt-<strategyId>: <variant>` on both run-end and
+    step-error events (PostHog-native experiment attribution).
+  - On `mcp_run_end` only: `llmCalls`, `inputTokens`, `outputTokens` (token
+    sums omitted when the provider exposes none — copilot-sdk counts calls
+    only) and `quality_<name>` — finite-numeric envelope signals harvested at
+    run-end (capped at 20 keys, names sanitized to `[a-zA-Z0-9_]`). Numbers
+    exclusively; string signal values are never forwarded.
 - `posthog-node` via dynamic import; `POSTHOG_API_KEY` absent → fully off.
   There is no global event bus (per-run buses, ARCH-10): boot installs the
   instance, each run attaches the forwarder to its own bus.
