@@ -46,14 +46,22 @@ src/
 │   │                         strategy-registry-boot                          (ARCH-14)
 │   ├── listeners/            artifact-writer-listener (core, toujours actif) (ARCH-12),
 │   │                         posthog-telemetry-listener (run-end/step-error → capture,
-│   │                         attaché par runRecipe quand PostHog est configuré)
+│   │                         attaché par runRecipe quand PostHog est configuré ;
+│   │                         attribution $feature/mcp-prompt-* + llmCalls/tokens/quality_*
+│   │                         sur run-end — nombres uniquement, jamais de texte)
 │   └── persistence/          artifact-writer, project-id-resolver            (ARCH-12/13)
 │
 ├── lib/                      ── Utilitaires transverses (PAS encore sous core/ — roadmap B1)
 │   ├── llm/                  registry, config.loader, llm-call, strategy-ids,
-│   │                         providers/{agent-sdk, http-api, copilot-sdk}, llm-error-handler
-│   ├── prompts/              registry, config.loader, builders/parsers-registry,
-│   │                         interpolate, init (split .system.md / .user.md)
+│   │                         providers/{agent-sdk, http-api, copilot-sdk}, llm-error-handler,
+│   │                         usage-context (collector ALS d'usage LLM par run —
+│   │                         llmCalls + tokens quand le provider les expose)
+│   ├── prompts/              registry (cache global + branche override ALS + substitution
+│   │                         de variante A/B), config.loader, builders/parsers-registry,
+│   │                         interpolate, init (split .system.md / .user.md),
+│   │                         override-context (store ALS run-scoped : prompts de bundle
+│   │                         + activeVariants), override-validation (seuls les prompts
+│   │                         shipped kind template sont shadowables)
 │   ├── owm/                  owm-dsl, render-adapter, cli-owm-adapter,
 │   │                         analytical-geometry, overlap-detector, svg-bbox-parser
 │   ├── bundles/              bundle-loader : validation des strategy bundles v0 (cœur
@@ -62,9 +70,11 @@ src/
 │   │                         avec le JWT de l'appelant (RLS), sha256 + swap atomique
 │   ├── degradation/          Degradable<T>, collector (AsyncLocalStorage),
 │   │                         with-degradation, mcp-wrapper (withMcpDegradation)
-│   ├── flags/                posthog (buildPostHog : gate fail-open + capture + shutdown,
+│   ├── flags/                posthog (buildPostHog : gate fail-open + capture + shutdown +
+│   │                         resolvePromptVariants — flags multivariés mcp-prompt-<strategyId>,
 │   │                         posthog-node en import dynamique), state (singleton posé au boot
-│   │                         du daemon ; clé de flag mcp-recipe-<domain>-<tool>-<name>)
+│   │                         du daemon ; clés mcp-recipe-<domain>-<tool>-<name> et
+│   │                         mcp-prompt-<strategyId>)
 │   ├── patent/               bigquery-* , patent-data-source, patent-indicators, mock-patent-source
 │   ├── vendor/cli-owm/       cli-owm@4950f330 (GPL-2.0) vendoré + parser/
 │   ├── zod/                  helpers Zod (validateOrThrow…)
