@@ -31,6 +31,7 @@ labre-mcp est un serveur **MCP** (Model Context Protocol) exposé via un **daemo
 | [Notifications](functional/notifications.md) | Progression temps réel, i18n, erreurs |
 | [Format .wm (OWM)](functional/wm-format.md) | Syntaxe OWM des cartes de Wardley |
 | [Évaluation](functional/evaluation.md) | promptfoo : cas de test, assertions |
+| [Expériences de prompts](functional/prompt-experiments.md) | A/B testing : flags multivariés PostHog, variantes, lecture des métriques |
 
 ### Technique (`technical/`)
 | Document | Description |
