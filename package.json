@@ -7,12 +7,12 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
-      "labre-dev": "./src/index.mts",
+      "labre-mcp-dev": "./src/index.mts",
       "default": "./dist/index.mjs"
     },
     "./schemas": {
       "types": "./dist/schemas/index.d.mts",
-      "labre-dev": "./src/schemas/index.mts",
+      "labre-mcp-dev": "./src/schemas/index.mts",
       "default": "./dist/schemas/index.mjs"
     }
   },
@@ -42,51 +42,51 @@
   },
   "imports": {
     "#core/*": {
-      "labre-dev": "./src/core/*",
+      "labre-mcp-dev": "./src/core/*",
       "default": "./dist/core/*"
     },
     "#frameworks/*": {
-      "labre-dev": "./src/frameworks/*",
+      "labre-mcp-dev": "./src/frameworks/*",
       "default": "./dist/frameworks/*"
     },
     "#lib/*": {
-      "labre-dev": "./src/lib/*",
+      "labre-mcp-dev": "./src/lib/*",
       "default": "./dist/lib/*"
     },
     "#types/*": {
-      "labre-dev": "./src/types/*",
+      "labre-mcp-dev": "./src/types/*",
       "default": "./dist/types/*"
     },
     "#schemas/*": {
-      "labre-dev": "./src/schemas/*",
+      "labre-mcp-dev": "./src/schemas/*",
       "default": "./dist/schemas/*"
     },
     "#mcp/*": {
-      "labre-dev": "./src/mcp/*",
+      "labre-mcp-dev": "./src/mcp/*",
       "default": "./dist/mcp/*"
     },
     "#session/*": {
-      "labre-dev": "./src/session/*",
+      "labre-mcp-dev": "./src/session/*",
       "default": "./dist/session/*"
     },
     "#work-on-evolution/*": {
-      "labre-dev": "./src/frameworks/wardley/evolution/_legacy/*",
+      "labre-mcp-dev": "./src/frameworks/wardley/evolution/_legacy/*",
       "default": "./dist/frameworks/wardley/evolution/_legacy/*"
     },
     "#work-on-value-chain/*": {
-      "labre-dev": "./src/frameworks/wardley/chain/_legacy/*",
+      "labre-mcp-dev": "./src/frameworks/wardley/chain/_legacy/*",
       "default": "./dist/frameworks/wardley/chain/_legacy/*"
     }
   },
   "scripts": {
-    "mcp": "tsx --conditions labre-dev src/core/transport/labre-daemon.mts",
+    "mcp": "tsx --conditions labre-mcp-dev src/core/transport/labre-daemon.mts",
     "mcp:prod": "node dist/core/transport/labre-daemon.mjs",
-    "mcp:stdio": "tsx --conditions labre-dev src/core/transport/labre-stdio.mts",
+    "mcp:stdio": "tsx --conditions labre-mcp-dev src/core/transport/labre-stdio.mts",
     "mcp:stdio:prod": "node dist/core/transport/labre-stdio.mjs",
     "build": "tsc",
-    "dev": "tsx --conditions labre-dev src/core/transport/labre-daemon.mts",
+    "dev": "tsx --conditions labre-mcp-dev src/core/transport/labre-daemon.mts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --conditions labre-dev --test \"src/**/*.test.mts\"",
+    "test": "tsx --conditions labre-mcp-dev --test \"src/**/*.test.mts\"",
     "prepublishOnly": "npm run typecheck && npm run build",
     "ci:version": "npm version patch -m \"release: v%s\"",
     "ci:publish": "npm publish"
