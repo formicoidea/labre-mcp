@@ -1,15 +1,18 @@
-// Supabase JWT authentication middleware for the HTTP daemon (ARCH-14).
-// Verifies `Authorization: Bearer <jwt>` against the Supabase project JWKS
-// (asymmetric keys, e.g. ES256) via jose. Fail-closed: any verification
-// problem throws AuthenticationError — the HTTP layer maps it to 401.
+// Supabase preset over the generic JWKS middleware (jwks-auth.mts): derives
+// the JWKS endpoint from the project URL and defaults the audience to
+// Supabase's "authenticated". Everything else — extraction, verification,
+// fail-closed semantics, context enrichment — is the provider-neutral core.
 //
 // The stdio transport stays unauthenticated (local, spawned by the client);
-// only the daemon boot (labre-daemon.mts) wires this middleware.
+// only the daemon boot (labre-daemon.mts) wires auth middlewares.
 
-import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
-import type { RequestContext } from "../context/request-context.mjs";
+import type { JWTVerifyGetKey } from "jose";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
-import { AuthenticationError } from "./auth-middleware.mjs";
+import { buildJwksAuthMiddleware } from "./jwks-auth.mjs";
+
+// Re-exported so existing importers (daemon hook, tests) keep working after
+// the extraction of the generic core.
+export { tryExtractBearerToken } from "./jwks-auth.mjs";
 
 export interface SupabaseAuthOptions {
   /** Supabase project URL, e.g. https://xyzcompany.supabase.co */
@@ -23,60 +26,12 @@ export interface SupabaseAuthOptions {
 
 const DEFAULT_AUDIENCE = "authenticated";
 
-/**
- * Best-effort bearer extraction (no throw): returns undefined when the
- * header is absent or malformed. Shared with the daemon's post-auth hook,
- * which re-reads the caller's token for the bundle-source refresh WITHOUT
- * ever storing it on the request context.
- */
-export function tryExtractBearerToken(headers: Record<string, string>): string | undefined {
-  // Header lookup is case-insensitive per RFC 9110; normalize keys.
-  const raw = Object.entries(headers).find(
-    ([key]) => key.toLowerCase() === "authorization",
-  )?.[1];
-  if (!raw) return undefined;
-  const match = /^Bearer\s+(\S+)$/i.exec(raw.trim());
-  return match?.[1];
-}
-
-function extractBearerToken(headers: Record<string, string>): string {
-  const raw = Object.entries(headers).find(
-    ([key]) => key.toLowerCase() === "authorization",
-  )?.[1];
-  if (!raw) throw new AuthenticationError("missing authorization header");
-  const token = tryExtractBearerToken(headers);
-  if (!token) throw new AuthenticationError("malformed authorization header (expected Bearer token)");
-  return token;
-}
-
 export function buildSupabaseAuthMiddleware(options: SupabaseAuthOptions): AuthMiddleware {
-  const audience = options.audience ?? DEFAULT_AUDIENCE;
-  const jwks =
-    options.jwks ??
-    createRemoteJWKSet(new URL(`${options.supabaseUrl}/auth/v1/.well-known/jwks.json`));
-
-  return {
-    async authenticate(headers, context): Promise<RequestContext> {
-      const token = extractBearerToken(headers);
-
-      let payload;
-      try {
-        // jwtVerify checks signature (via JWKS), exp/nbf, and audience.
-        ({ payload } = await jwtVerify(token, jwks, { audience }));
-      } catch (err) {
-        // Fail closed: any verification error (bad signature, expired,
-        // wrong audience, unknown kid, JWKS fetch failure, ...) → 401.
-        throw new AuthenticationError(
-          `token verification failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-
-      if (typeof payload.sub !== "string" || payload.sub.length === 0) {
-        throw new AuthenticationError("token has no subject (sub) claim");
-      }
-
-      const role = typeof payload.role === "string" ? payload.role : undefined;
-      return { ...context, auth: { userId: payload.sub, role } };
-    },
-  };
+  return buildJwksAuthMiddleware({
+    jwksUrl: `${options.supabaseUrl}/auth/v1/.well-known/jwks.json`,
+    jwks: options.jwks,
+    audience: options.audience ?? DEFAULT_AUDIENCE,
+    // Supabase puts the Postgres role in a top-level `role` claim — the
+    // generic default already reads it.
+  });
 }
