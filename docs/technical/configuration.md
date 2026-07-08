@@ -339,28 +339,4 @@ Les skills sont definis dans `.claude/skills/` :
 
 ## Deploiement production (seenode)
 
-Le daemon HTTP se deploie sur [seenode](https://seenode.com) via le lien Git natif : l'application seenode est liee au repo GitHub, chaque push sur `master` declenche un redeploiement automatique. Aucun pipeline GitHub Actions n'est requis.
-
-Modele de branches (identique au repo labre) :
-
-- `staging` — branche par defaut du repo. **Toutes les PR pointent vers `staging`.**
-- `master` — branche de production. Merger `staging` dans `master` = mise en production (seenode redeploie).
-
-Configuration de l'application seenode :
-
-| Champ | Valeur |
-|---|---|
-| Build command | `pnpm install --frozen-lockfile && pnpm run build` (le repo est en pnpm : pas de `package-lock.json`, donc `npm ci` echoue ; pnpm est deja present dans l'image seenode) |
-| Start command | `npm run mcp:prod` (simple `node dist/...` — pnpm inutile au runtime) |
-| Node | >= 20 (champ `engines` du package.json) |
-
-Variables d'environnement a poser dans le dashboard seenode :
-
-| Variable | Valeur |
-|---|---|
-| `LABRE_HTTP_HOST` | `0.0.0.0` — **obligatoire** : sans elle le daemon binde le loopback et le routeur seenode ne peut pas l'atteindre. |
-| `LABRE_HTTP_PORT` | Le port expose par seenode pour l'application. |
-| `LABRE_AUTH` + `SUPABASE_URL` (+ `SUPABASE_ANON_KEY`) | Auth JWT du daemon expose publiquement — voir la section remote du README. Ne jamais exposer un daemon sans auth. |
-| Autres (`OPENCODE_API_KEY`, `POSTHOG_API_KEY`, ...) | Selon les strategies/features activees, comme en local. |
-
-Verification post-deploiement : `GET https://<app>.seenode.app/health` puis pointer un client MCP sur `https://<app>.seenode.app/mcp` (`"type": "http"`).
+Voir le runbook dedie : [deploy.md](deploy.md) — instances prod/staging, configuration de l'app seenode, variables d'environnement, verification et depannage.
