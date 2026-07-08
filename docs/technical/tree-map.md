@@ -16,7 +16,7 @@
 
 ## 2. Points d'entrée
 
-- **Daemon HTTP** : `src/core/transport/labre-daemon.mts` — écoute sur `127.0.0.1:6767` (override `LABRE_HTTP_PORT`). Endpoints : `POST /mcp` (JSON-RPC : `initialize`, `ping`, `tools/list`, `tools/call`, `notifications/*`), `GET /health`, `GET /version`.
+- **Daemon HTTP** : `src/core/transport/labre-daemon.mts` — écoute sur `127.0.0.1:6767` (override `LABRE_HTTP_PORT` / `LABRE_HTTP_HOST`). Endpoints : `POST /mcp` (JSON-RPC : `initialize`, `ping`, `tools/list`, `tools/call`, `notifications/*`), `GET /health`, `GET /version`.
 - **Entrée stdio** : `src/core/transport/labre-stdio.mts` — JSON-RPC newline-delimited sur stdin/stdout, transport que Claude Code / l'Agent SDK lancent directement (`{ "command": "npx", "args": ["-y", "labre-mcp"] }`). Réutilise le même `dispatch` + `buildBootRegistry()` que le daemon ; stdout est réservé au protocole (réponses + notifications), tout le reste va sur stderr.
 - **Boot** : `buildBootRegistry()` (→ `boot-tool-registry.mts`, partagé HTTP + stdio) enregistre les outils MCP ; `buildStrategyRegistry()` (→ `strategy-registry-boot.mts`) peuple le `StrategyRegistry` via `register{Evolution,Chain,Common}Strategies` + `registerMocks` (sauf `LABRE_DISABLE_MOCKS=1`).
 - **Scripts npm** : `dev`/`mcp` = `tsx --conditions labre-mcp-dev src/core/transport/labre-daemon.mts` ; `mcp:prod` = `node dist/core/transport/labre-daemon.mjs` ; `mcp:stdio` = `tsx --conditions labre-mcp-dev src/core/transport/labre-stdio.mts` ; `mcp:stdio:prod` = `node dist/core/transport/labre-stdio.mjs` ; `build` = `tsc` ; `typecheck` = `tsc --noEmit` ; `test` = `tsx --conditions labre-mcp-dev --test "src/**/*.test.mts"`.
@@ -167,7 +167,7 @@ Un **strategy bundle** est un paquet déclaratif data-only (aucun code exécutab
 | `llm.config.example.json` | Gabarit (3 profils, voir [configuration.md](configuration.md)) |
 | `prompts.config.json` | Registre des prompts par stratégie (paires `.system.md` / `.user.md`, parser custom/délimité/keyValue) |
 | `prompts/*.{system,user}.md` | Prompts splités — aucun `{{…}}` dans un `.system.md` (vérifié par le loader) |
-| `.env.example` | Variables d'environnement (`OPENCODE_API_KEY`, `WARDLEY_LLM_CONFIG`, `WARDLEY_PROMPTS_CONFIG`, `LABRE_HTTP_PORT`, `LABRE_DISABLE_MOCKS`, `LABRE_AUTH`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `LABRE_BUNDLES_TTL_S`…) |
+| `.env.example` | Variables d'environnement (`OPENCODE_API_KEY`, `WARDLEY_LLM_CONFIG`, `WARDLEY_PROMPTS_CONFIG`, `LABRE_HTTP_PORT`, `LABRE_HTTP_HOST`, `LABRE_DISABLE_MOCKS`, `LABRE_AUTH`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `LABRE_BUNDLES_TTL_S`…) |
 | `.mcp.json` | Enregistrement du serveur HTTP auprès du client MCP |
 | `promptfooconfig.yaml` | Configuration d'évaluation promptfoo (voir [evaluation.md](../functional/evaluation.md)) |
 

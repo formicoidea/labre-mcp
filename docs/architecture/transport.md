@@ -50,7 +50,7 @@ The `.mcp.json` at the repo root declares the labre-mcp server with HTTP transpo
 
 ## Configuration
 
-The daemon reads the port from `LABRE_HTTP_PORT` (default `6767`). Bind address defaults to `127.0.0.1` (loopback-only — never bind to `0.0.0.0` in V1).
+The daemon reads the port from `LABRE_HTTP_PORT` (default `6767`) and the bind address from `LABRE_HTTP_HOST` (default `127.0.0.1`, loopback-only). Production deployments behind a PaaS router (seenode, ...) set `LABRE_HTTP_HOST=0.0.0.0`; a local daemon stays loopback-only unless explicitly opted in.
 
 ### Shipped recipes location
 

@@ -9,6 +9,7 @@
 | `WARDLEY_LLM_CONFIG` | chemin absolu ou relatif | Override du fichier de configuration LLM. Par defaut : `<racine>/llm.config.json`. |
 | `WARDLEY_PROMPTS_CONFIG` | chemin absolu ou relatif | Override du fichier de configuration des prompts. Par defaut : `<racine>/prompts.config.json`. |
 | `LABRE_HTTP_PORT` | entier `1-65535` | Port d'ecoute du daemon HTTP. Par defaut : `6767`. |
+| `LABRE_HTTP_HOST` | adresse IP | Adresse de bind du daemon HTTP. Par defaut : `127.0.0.1` (loopback, dev local). Mettre `0.0.0.0` derriere un routeur PaaS (seenode, ...). |
 | `LABRE_DISABLE_MOCKS` | `1` | Ne charge que les 15 strategies reelles au boot (exclut les 70 mocks). |
 | `WARDLEY_VERBOSE` | `1`, `true`, `yes` | Active les messages debug dans les notifications. Desactive par defaut. |
 | `WARDLEY_EVAL_MODE` | `exclusive`, `parallel` | Mode de routage solution/capability. `exclusive` (defaut) : un seul pipeline. `parallel` : les deux pipelines, resultats fusionnes. |
@@ -335,3 +336,31 @@ Les skills sont definis dans `.claude/skills/` :
 | `evaluateMap` | `.claude/skills/wardley/map/evaluateMap/SKILL.md` | Evaluation de carte .wm |
 | `eval` | `.claude/skills/eval/SKILL.md` | Lancement d'evaluations promptfoo |
 | `add-eval-case` | `.claude/skills/add-eval-case/SKILL.md` | Ajout de cas de test |
+
+## Deploiement production (seenode)
+
+Le daemon HTTP se deploie sur [seenode](https://seenode.com) via le lien Git natif : l'application seenode est liee au repo GitHub, chaque push sur `master` declenche un redeploiement automatique. Aucun pipeline GitHub Actions n'est requis.
+
+Modele de branches (identique au repo labre) :
+
+- `staging` — branche par defaut du repo. **Toutes les PR pointent vers `staging`.**
+- `master` — branche de production. Merger `staging` dans `master` = mise en production (seenode redeploie).
+
+Configuration de l'application seenode :
+
+| Champ | Valeur |
+|---|---|
+| Build command | `pnpm install --frozen-lockfile && pnpm run build` (le repo est en pnpm : pas de `package-lock.json`, donc `npm ci` echoue ; pnpm est deja present dans l'image seenode) |
+| Start command | `npm run mcp:prod` (simple `node dist/...` — pnpm inutile au runtime) |
+| Node | >= 20 (champ `engines` du package.json) |
+
+Variables d'environnement a poser dans le dashboard seenode :
+
+| Variable | Valeur |
+|---|---|
+| `LABRE_HTTP_HOST` | `0.0.0.0` — **obligatoire** : sans elle le daemon binde le loopback et le routeur seenode ne peut pas l'atteindre. |
+| `LABRE_HTTP_PORT` | Le port expose par seenode pour l'application. |
+| `LABRE_AUTH` + `SUPABASE_URL` (+ `SUPABASE_ANON_KEY`) | Auth JWT du daemon expose publiquement — voir la section remote du README. Ne jamais exposer un daemon sans auth. |
+| Autres (`OPENCODE_API_KEY`, `POSTHOG_API_KEY`, ...) | Selon les strategies/features activees, comme en local. |
+
+Verification post-deploiement : `GET https://<app>.seenode.app/health` puis pointer un client MCP sur `https://<app>.seenode.app/mcp` (`"type": "http"`).
