@@ -144,7 +144,7 @@ async function main(): Promise<void> {
   // the Supabase RLS layer.
   const bundles = selectBundleRefreshHook(process.env.LABRE_AUTH === "supabase");
 
-  // LABRE_HTTP_HOST: "0.0.0.0" behind a PaaS router (seenode, ...); default
+  // LABRE_HTTP_HOST: "0.0.0.0" behind a PaaS router; default
   // stays loopback so a local daemon is never exposed by accident.
   const hostname = process.env.LABRE_HTTP_HOST || "127.0.0.1";
   const server = await startHttpServer({ port, hostname, tools, auth, onAuthenticated: bundles.hook });

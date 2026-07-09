@@ -39,7 +39,6 @@ labre-mcp est un serveur **MCP** (Model Context Protocol) exposé via un **daemo
 | [tree-map](technical/tree-map.md) | Cartographie de `src/` (source de navigation) |
 | [Architecture](technical/architecture.md) | Vue conceptuelle du pipeline |
 | [Configuration](technical/configuration.md) | Variables d'env, `llm.config.json`, `.mcp.json` |
-| [Déploiement](technical/deploy.md) | Runbook seenode : instances prod (`master`) / staging (`staging`), env vars, dépannage |
 | [Validation (Zod)](technical/validation.md) | Schémas Zod, lecture des erreurs |
 | [Dégradation](technical/degradation.md) | Framework `Degradable<T>`, health-checks |
 | [Extensibilité](technical/extending.md) | Ajouter une stratégie, une recipe, un backend LLM |
