@@ -9,7 +9,7 @@
 | `WARDLEY_LLM_CONFIG` | chemin absolu ou relatif | Override du fichier de configuration LLM. Par defaut : `<racine>/llm.config.json`. |
 | `WARDLEY_PROMPTS_CONFIG` | chemin absolu ou relatif | Override du fichier de configuration des prompts. Par defaut : `<racine>/prompts.config.json`. |
 | `LABRE_HTTP_PORT` | entier `1-65535` | Port d'ecoute du daemon HTTP. Par defaut : `6767`. |
-| `LABRE_HTTP_HOST` | adresse IP | Adresse de bind du daemon HTTP. Par defaut : `127.0.0.1` (loopback, dev local). Mettre `0.0.0.0` derriere un routeur PaaS (seenode, ...). |
+| `LABRE_HTTP_HOST` | adresse IP | Adresse de bind du daemon HTTP. Par defaut : `127.0.0.1` (loopback, dev local). Mettre `0.0.0.0` derriere un routeur PaaS. |
 | `LABRE_DISABLE_MOCKS` | `1` | Ne charge que les 15 strategies reelles au boot (exclut les 70 mocks). |
 | `WARDLEY_VERBOSE` | `1`, `true`, `yes` | Active les messages debug dans les notifications. Desactive par defaut. |
 | `WARDLEY_EVAL_MODE` | `exclusive`, `parallel` | Mode de routage solution/capability. `exclusive` (defaut) : un seul pipeline. `parallel` : les deux pipelines, resultats fusionnes. |
@@ -337,6 +337,6 @@ Les skills sont definis dans `.claude/skills/` :
 | `eval` | `.claude/skills/eval/SKILL.md` | Lancement d'evaluations promptfoo |
 | `add-eval-case` | `.claude/skills/add-eval-case/SKILL.md` | Ajout de cas de test |
 
-## Deploiement production (seenode)
+## Deploiement production
 
-Voir le runbook dedie : [deploy.md](deploy.md) — instances prod/staging, configuration de l'app seenode, variables d'environnement, verification et depannage.
+Le runbook de deploiement (hebergeur, instances, variables d'environnement, depannage) est interne — voir la documentation Notion du projet.
