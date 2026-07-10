@@ -58,12 +58,11 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
     // PostHog is configured; resolved with the SAME distinctId as the flag gate
     // so a user buckets consistently across the gate and the experiment. Fails
     // open to {} on any PostHog trouble (see resolvePromptVariants).
+    const distinctId = context.auth?.userId ?? 'anonymous';
     let variants: Record<string, string> = {};
+    let recipeVariant: string | undefined;
     if (flags) {
-      const allowed = await flags.isRecipeEnabled(
-        { domain: framework, tool, name },
-        context.auth?.userId ?? 'anonymous',
-      );
+      const allowed = await flags.isRecipeEnabled({ domain: framework, tool, name }, distinctId);
       if (!allowed) {
         return {
           recipe: call.recipe,
@@ -73,20 +72,37 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
           ],
         };
       }
-      variants = await flags.resolvePromptVariants(context.auth?.userId ?? 'anonymous');
+      // Recipe-experiment variant (A/B): a string-valued mcp-recipe-<ref> flag
+      // selects another recipe of the same domain+tool to run instead. Same
+      // distinctId as the gate so a user buckets consistently.
+      recipeVariant = await flags.resolveRecipeVariant({ domain: framework, tool, name }, distinctId);
+      variants = await flags.resolvePromptVariants(distinctId);
     }
 
     const ctx = await resolveContext(context);
 
+    // Load the effective recipe. A variant swaps the requested name for another
+    // recipe of the same domain+tool, resolved through the SAME loadRecipe path
+    // (so a variant is just another bundle/user/shipped recipe). Fail-open: if
+    // the variant recipe does not resolve, run the REQUESTED recipe — mirrors
+    // the prompt "unknown variant → default" rule. servedVariant tracks what
+    // actually ran, so attribution never credits a variant that didn't run.
+    const load = (recipeName: string) =>
+      loadRecipe({ framework, tool, name: recipeName, shippedRoot: SHIPPED_ROOT, projectRoot: ctx.projectRoot });
+
     let recipe;
+    let servedVariant: string | undefined;
     try {
-      recipe = await loadRecipe({
-        framework,
-        tool,
-        name,
-        shippedRoot: SHIPPED_ROOT,
-        projectRoot: ctx.projectRoot,
-      });
+      if (recipeVariant && recipeVariant !== name) {
+        try {
+          recipe = await load(recipeVariant);
+          servedVariant = recipeVariant;
+        } catch {
+          recipe = await load(name); // variant missing → fall back to requested
+        }
+      } else {
+        recipe = await load(name);
+      }
     } catch (err) {
       return {
         recipe: call.recipe,
@@ -97,10 +113,12 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
 
     // Bundle recipes carry run-scoped prompt overrides (A/B testing); shipped
     // and user recipes return undefined here and run with the shipped prompts.
+    // Look up by the SERVED name so a variant recipe gets ITS bundle prompts.
     // The loaded recipe is passed so a user recipe shadowing a bundle ref
     // (loadRecipe ranks user overrides above bundle recipes) never inherits
     // the bundle's prompts.
-    const promptOverrides = getBundlePrompts({ framework, tool, name }, recipe);
+    const servedName = servedVariant ?? name;
+    const promptOverrides = getBundlePrompts({ framework, tool, name: servedName }, recipe);
 
     const registry = buildStrategyRegistry();
     const bus = createEventBus();
@@ -119,6 +137,9 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
         flags,
         distinctId: context.auth?.userId ?? 'daemon',
         variants,
+        recipeExperiment: servedVariant
+          ? { ref: { domain: framework, tool, name }, servedVariant }
+          : undefined,
       });
     }
 

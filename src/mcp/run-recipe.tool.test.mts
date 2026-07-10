@@ -124,6 +124,10 @@ function buildFakeFlags(verdict: boolean): PostHogFlags & {
       // No prompt experiments in these gate tests → default path (no variants).
       return {};
     },
+    async resolveRecipeVariant() {
+      // No recipe experiments in these gate tests → default path (no variant).
+      return undefined;
+    },
     capture(event, distinctId, properties) {
       captured.push({ event, distinctId, properties });
     },

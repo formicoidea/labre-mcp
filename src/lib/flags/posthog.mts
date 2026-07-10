@@ -49,6 +49,17 @@ export interface PostHogFlags {
   /** Gate: resolve the recipe's rollout flag for a user. Fail-open (see header). */
   isRecipeEnabled(ref: RecipeRef, userId: string | undefined): Promise<boolean>;
   /**
+   * Resolve the recipe-experiment variant selected for a user (A/B testing),
+   * mirroring resolvePromptVariants. A `mcp-recipe-<ref>` flag whose value is a
+   * STRING is a variant selector: the string IS the recipe `name` to run
+   * instead of the requested one (same domain+tool) — by convention that
+   * variant recipe is published as a bundle under that name. Boolean-valued
+   * flags under the same key are the rollout gate (isRecipeEnabled), not
+   * variants, so they yield undefined here. Fail-open: any error / missing
+   * client / no data / non-string value → undefined (run the requested recipe).
+   */
+  resolveRecipeVariant(ref: RecipeRef, distinctId: string): Promise<string | undefined>;
+  /**
    * Resolve every prompt-experiment variant selected for a user in one call.
    * Keeps only `mcp-prompt-<strategyId>` flags whose value is a string variant,
    * strips the prefix, and returns strategyId → variantName (== prompt name by
@@ -125,6 +136,21 @@ export function buildPostHog(options: BuildPostHogOptions): PostHogFlags {
       } catch {
         // PostHog unreachable / client broken → allowed (fail-open).
         return true;
+      }
+    },
+
+    async resolveRecipeVariant(ref, distinctId) {
+      const key = recipeFlagKey(ref);
+      try {
+        const client = await clientPromise;
+        const all = await client.getAllFlags(distinctId);
+        const value = all?.[key];
+        // Only a multivariate (string) value selects a variant; a boolean is
+        // the rollout gate handled by isRecipeEnabled — no variant here.
+        return typeof value === "string" ? value : undefined;
+      } catch {
+        // PostHog unreachable / client broken → no variant (fail-open).
+        return undefined;
       }
     },
 
