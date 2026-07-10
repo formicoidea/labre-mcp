@@ -21,4 +21,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
+      # llm.config.json is gitignored (per-user); a few E2E tests load it.
+      # Same step as the documented install: copy the example profile.
+      - run: cp llm.config.example.json llm.config.json
       - run: pnpm test
