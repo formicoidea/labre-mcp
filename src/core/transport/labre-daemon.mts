@@ -11,6 +11,7 @@ import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { startHttpServer, type OnAuthenticatedHook } from "./http-server.mjs";
 import { buildSupabaseAuthMiddleware, tryExtractBearerToken } from "./supabase-auth.mjs";
 import { buildJwksAuthMiddleware } from "./jwks-auth.mjs";
+import { buildApiKeyAuthMiddleware, routeBearerAuth, API_KEY_PREFIX } from "./api-key-auth.mjs";
 import { registerBootHealthChecks } from "./boot-health-checks.mjs";
 import { runAllHealthChecks } from "#lib/degradation/index.mjs";
 import { buildSupabaseBundleSource } from "#lib/bundles/supabase-bundle-source.mjs";
@@ -57,10 +58,16 @@ function selectAuthMiddleware(): AuthMiddleware | undefined {
         'LABRE_AUTH="supabase" requires SUPABASE_URL to be set (fail-closed: refusing to boot unauthenticated)',
       );
     }
-    return buildSupabaseAuthMiddleware({
+    const jwt = buildSupabaseAuthMiddleware({
       supabaseUrl,
       audience: process.env.SUPABASE_JWT_AUD,
     });
+    // lab_ personal API keys (created in the labre UI) ride the same anon key
+    // as the bundle source. Without it, lab_ bearers fall through to the JWT
+    // middleware and get its 401 — fail closed, never open.
+    const anonKey = process.env.SUPABASE_ANON_KEY;
+    if (!anonKey) return jwt;
+    return routeBearerAuth(jwt, buildApiKeyAuthMiddleware({ supabaseUrl, anonKey }));
   }
   if (mode === "oidc") {
     const jwksUrl = process.env.AUTH_JWKS_URL;
@@ -116,8 +123,10 @@ function selectBundleRefreshHook(
   const hook: OnAuthenticatedHook = async (headers) => {
     // The token is read from the (already authenticated) request headers and
     // handed straight to the refresh — never stored on the context or logged.
+    // lab_ API keys are not JWTs: the bundle RLS layer cannot use them, so
+    // those requests skip the refresh (bundles stay fresh via JWT callers).
     const token = tryExtractBearerToken(headers);
-    if (token) await source.refreshIfStale(token);
+    if (token && !token.startsWith(API_KEY_PREFIX)) await source.refreshIfStale(token);
   };
   return { hook, bootLine: `on (lazy, TTL ${ttlSeconds ?? 300}s, caller-token RLS)` };
 }
@@ -152,8 +161,9 @@ async function main(): Promise<void> {
   process.stderr.write(
     `[labre-mcp] HTTP server listening on http://${hostname}:${server.port} (POST /mcp)\n`,
   );
+  const apiKeysEnabled = process.env.LABRE_AUTH === "supabase" && !!process.env.SUPABASE_ANON_KEY;
   process.stderr.write(
-    `[labre-mcp] Auth: ${auth ? `${process.env.LABRE_AUTH} JWT (JWKS)` : "none (local dev)"}\n`,
+    `[labre-mcp] Auth: ${auth ? `${process.env.LABRE_AUTH} JWT (JWKS)${apiKeysEnabled ? " + lab_ API keys" : ""}` : "none (local dev)"}\n`,
   );
   process.stderr.write(`[labre-mcp] Remote strategy bundles: ${bundles.bootLine}\n`);
   process.stderr.write(
