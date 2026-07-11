@@ -17,6 +17,7 @@ import { attachPostHogTelemetry } from '#core/listeners/posthog-telemetry-listen
 import { getPostHogFlags } from '#lib/flags/state.mjs';
 import { createEventBus } from '#core/bus/event-bus.mjs';
 import { resolveContext } from './resolve-context.mjs';
+import { coerceJsonInput } from './coerce-json-input.mjs';
 import { SHIPPED_ROOT } from './shipped-root.mjs';
 
 export interface RunRecipeResult {
@@ -125,7 +126,7 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
 
     // Caller-owned AST so the artefact-writer listener sees the live object
     // (mutated in place by the runner, read at run-end). $.input seeds the recipe.
-    const ast: Record<string, unknown> = { input: call.input };
+    const ast: Record<string, unknown> = { input: coerceJsonInput(call.input) };
     const artifactHandle = attachArtifactWriter({ bus, context: ctx, getAst: () => ast });
 
     // Telemetry forwarder (run-end / step-error → PostHog, metadata only).
