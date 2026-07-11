@@ -114,7 +114,9 @@ When `LABRE_OAUTH_RESOURCE` + `LABRE_OAUTH_AUTH_SERVER` are set (opt-in), the da
 1. serves `GET /.well-known/oauth-protected-resource` → `{ resource, authorization_servers: [<labre AS>] }` (RFC 9728);
 2. stamps a `WWW-Authenticate: Bearer resource_metadata="<…/.well-known/oauth-protected-resource>"` header on every `401`, so the client discovers the AS.
 
-Discovery flow: client → daemon `/mcp` (401 + WWW-Authenticate) → daemon well-known (finds the labre AS) → labre `/authorize` + `/token` (labre reuses the Supabase session, issues a labre-signed JWT) → daemon `/mcp` with that JWT (validated via labre's JWKS, `LABRE_AUTH=oidc`). Unset → no discovery surface; the static-bearer paths (Supabase JWT, `lab_` keys) are unaffected. The labre-side AS is a separate build (labre repo).
+Discovery flow: client → daemon `/mcp` (401 + WWW-Authenticate) → daemon well-known (finds the labre AS) → labre `/authorize` + `/token` (labre reuses the Supabase session, issues a labre-signed JWT) → daemon `/mcp` with that JWT (validated via labre's JWKS, `LABRE_AUTH=oidc`). Unset → no discovery surface. The labre-side AS is a separate build (labre repo).
+
+**One JWT issuer + `lab_` keys.** For the connector the daemon runs `LABRE_AUTH=oidc` pointed at the labre AS JWKS — a single JWT issuer. `lab_` personal API keys ride alongside EITHER JWT mode (they are validated by RPC, not by the JWT verifier — see `withApiKeys`), so `oidc` accepts *labre-AS JWTs + `lab_` keys*. Raw Supabase **session** tokens are only accepted in the legacy `supabase` mode — not by the connector's `oidc` mode (a deliberate simplification; the MCP is not yet consumed, so the break is free).
 
 ## Synchronous only (ARCH-11)
 

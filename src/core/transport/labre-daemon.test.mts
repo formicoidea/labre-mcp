@@ -5,7 +5,9 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 // Side-effect: registers prompt parsers consumed by some strategies.
 import "#lib/prompts/init.mjs";
-import { buildStrategyRegistry } from "./labre-daemon.mjs";
+import { buildStrategyRegistry, withApiKeys } from "./labre-daemon.mjs";
+import type { AuthMiddleware } from "./auth-middleware.mjs";
+import type { RequestContext } from "../context/request-context.mjs";
 
 describe("labre-daemon boot wiring", () => {
   it("buildStrategyRegistry populates the core registry with every framework strategy", () => {
@@ -84,5 +86,66 @@ describe("labre-daemon boot wiring", () => {
       const segments = id.split(":");
       assert.equal(segments.length, 5, `methodId ${id} not 5-segment`);
     }
+  });
+});
+
+describe("withApiKeys — lab_ keys ride alongside any JWT mode", () => {
+  const marker: AuthMiddleware = {
+    async authenticate(_headers, context) {
+      return { ...context, auth: { userId: "jwt-marker" } };
+    },
+  };
+  const baseCtx: RequestContext = {
+    projectId: "t",
+    projectRoot: "/t",
+    sessionId: "s",
+    domain: "wardley",
+  };
+
+  function withEnv(url: string | undefined, key: string | undefined, fn: () => void): void {
+    const prevUrl = process.env.SUPABASE_URL;
+    const prevKey = process.env.SUPABASE_ANON_KEY;
+    if (url === undefined) delete process.env.SUPABASE_URL;
+    else process.env.SUPABASE_URL = url;
+    if (key === undefined) delete process.env.SUPABASE_ANON_KEY;
+    else process.env.SUPABASE_ANON_KEY = key;
+    try {
+      fn();
+    } finally {
+      if (prevUrl === undefined) delete process.env.SUPABASE_URL;
+      else process.env.SUPABASE_URL = prevUrl;
+      if (prevKey === undefined) delete process.env.SUPABASE_ANON_KEY;
+      else process.env.SUPABASE_ANON_KEY = prevKey;
+    }
+  }
+
+  it("returns the JWT middleware unchanged when SUPABASE_ANON_KEY is absent", () => {
+    withEnv("https://test.supabase.co", undefined, () => {
+      assert.equal(withApiKeys(marker), marker);
+    });
+  });
+
+  it("returns the JWT middleware unchanged when SUPABASE_URL is absent", () => {
+    withEnv(undefined, "anon", () => {
+      assert.equal(withApiKeys(marker), marker);
+    });
+  });
+
+  it("wraps the JWT middleware when both are set, and non-lab_ bearers still reach it", async () => {
+    await new Promise<void>((resolve, reject) => {
+      withEnv("https://test.supabase.co", "anon", () => {
+        const wrapped = withApiKeys(marker);
+        assert.notEqual(wrapped, marker); // a different (routing) middleware
+        // A JWT-shaped bearer is routed to the wrapped middleware (the marker),
+        // never to the lab_ path — so no network call happens here.
+        wrapped
+          .authenticate({ authorization: "Bearer eyJ.jwt.sig" }, baseCtx)
+          .then((ctx) => {
+            assert.equal(ctx.auth?.userId, "jwt-marker");
+            resolve();
+          })
+          .catch(reject);
+      });
+    });
   });
 });

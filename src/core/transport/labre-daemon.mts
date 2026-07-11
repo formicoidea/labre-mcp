@@ -40,13 +40,29 @@ function readPort(): number {
   return parsed;
 }
 
+// lab_ personal API keys (created in the labre UI) are validated against the
+// labre_mcp.validate_api_key RPC with the public anon key — independent of the
+// JWT issuer, so they ride ALONGSIDE any JWT mode (supabase OR oidc). Wraps the
+// given JWT middleware to route lab_ bearers to the API-key path; without
+// SUPABASE_URL + SUPABASE_ANON_KEY, lab_ bearers just fall through to the JWT
+// middleware and get its 401 — fail closed, never open.
+export function withApiKeys(jwt: AuthMiddleware): AuthMiddleware {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !anonKey) return jwt;
+  return routeBearerAuth(jwt, buildApiKeyAuthMiddleware({ supabaseUrl, anonKey }));
+}
+
 // Boot-time auth selection (env reads at boot are allowed — ARCH-15 forbids
-// them at request time only). Modes fail closed on missing config:
-//   supabase — Supabase preset; requires SUPABASE_URL.
-//   oidc     — any OIDC IdP (Okta, Auth0, Clerk, Entra, Keycloak, ...);
-//              requires AUTH_JWKS_URL + AUTH_AUDIENCE; optional AUTH_ISSUER,
-//              AUTH_ROLE_CLAIM. GitHub login is federated THROUGH such an IdP
-//              (GitHub's own user tokens are opaque, not JWKS-verifiable).
+// them at request time only). Modes fail closed on missing config; lab_ API
+// keys ride alongside EITHER JWT mode (see withApiKeys):
+//   oidc     — any OIDC IdP verifiable by JWKS (Okta, Auth0, Clerk, Entra,
+//              Keycloak, AND the labre OAuth AS that fronts the framework-mcp
+//              connector); requires AUTH_JWKS_URL + AUTH_AUDIENCE; optional
+//              AUTH_ISSUER, AUTH_ROLE_CLAIM. This is the mode for the OAuth
+//              connector — the daemon validates AS-issued JWTs via the AS JWKS.
+//   supabase — Supabase preset (JWKS derived from SUPABASE_URL). Legacy path
+//              for raw Supabase session tokens; NOT used by the OAuth connector.
 //   none/unset — local noop.
 function selectAuthMiddleware(): AuthMiddleware | undefined {
   const mode = process.env.LABRE_AUTH;
@@ -58,16 +74,9 @@ function selectAuthMiddleware(): AuthMiddleware | undefined {
         'LABRE_AUTH="supabase" requires SUPABASE_URL to be set (fail-closed: refusing to boot unauthenticated)',
       );
     }
-    const jwt = buildSupabaseAuthMiddleware({
-      supabaseUrl,
-      audience: process.env.SUPABASE_JWT_AUD,
-    });
-    // lab_ personal API keys (created in the labre UI) ride the same anon key
-    // as the bundle source. Without it, lab_ bearers fall through to the JWT
-    // middleware and get its 401 — fail closed, never open.
-    const anonKey = process.env.SUPABASE_ANON_KEY;
-    if (!anonKey) return jwt;
-    return routeBearerAuth(jwt, buildApiKeyAuthMiddleware({ supabaseUrl, anonKey }));
+    return withApiKeys(
+      buildSupabaseAuthMiddleware({ supabaseUrl, audience: process.env.SUPABASE_JWT_AUD }),
+    );
   }
   if (mode === "oidc") {
     const jwksUrl = process.env.AUTH_JWKS_URL;
@@ -77,12 +86,14 @@ function selectAuthMiddleware(): AuthMiddleware | undefined {
         'LABRE_AUTH="oidc" requires AUTH_JWKS_URL and AUTH_AUDIENCE to be set (fail-closed: refusing to boot unauthenticated)',
       );
     }
-    return buildJwksAuthMiddleware({
-      jwksUrl,
-      audience,
-      issuer: process.env.AUTH_ISSUER,
-      roleClaim: process.env.AUTH_ROLE_CLAIM,
-    });
+    return withApiKeys(
+      buildJwksAuthMiddleware({
+        jwksUrl,
+        audience,
+        issuer: process.env.AUTH_ISSUER,
+        roleClaim: process.env.AUTH_ROLE_CLAIM,
+      }),
+    );
   }
   throw new Error(`Invalid LABRE_AUTH: "${mode}" (expected "supabase", "oidc" or "none")`);
 }
@@ -188,7 +199,11 @@ async function main(): Promise<void> {
   process.stderr.write(
     `[labre-mcp] HTTP server listening on http://${hostname}:${server.port} (POST /mcp)\n`,
   );
-  const apiKeysEnabled = process.env.LABRE_AUTH === "supabase" && !!process.env.SUPABASE_ANON_KEY;
+  // lab_ keys ride alongside any JWT mode (withApiKeys), so this is no longer
+  // supabase-specific — it's on whenever a JWT mode is active and the anon key
+  // + URL are set.
+  const apiKeysEnabled =
+    !!auth && !!process.env.SUPABASE_URL && !!process.env.SUPABASE_ANON_KEY;
   process.stderr.write(
     `[labre-mcp] Auth: ${auth ? `${process.env.LABRE_AUTH} JWT (JWKS)${apiKeysEnabled ? " + lab_ API keys" : ""}` : "none (local dev)"}\n`,
   );
