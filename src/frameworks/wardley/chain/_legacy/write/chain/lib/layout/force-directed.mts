@@ -108,6 +108,15 @@ const CLAMP_PASSES = 5;
  *  cascade required ≥ 6 passes to settle. */
 export const PROJECTION_ITERATIONS = 10;
 
+/** Extra clearance (px) added to every separation push so the result
+ *  survives the integer rounding at emit. Separating two rects to
+ *  *exactly touching* leaves a sub-pixel gap that `Math.round` collapses
+ *  back into an overlap — the classic failure for two long labels that
+ *  overlap by a thin band (e.g. 0.5 px tall × 78 px wide = 39 px² of
+ *  "hard" overlap the float pass clears but rounding reintroduces). One
+ *  full pixel of clearance guarantees the rounded labels stay apart. */
+export const PROJECTION_SEPARATION_MARGIN_PX = 2;
+
 // ─── Particle ──────────────────────────────────────────────────────────
 
 interface LabelParticle {
@@ -675,17 +684,21 @@ function computeMinSeparation(a: Bbox, b: Bbox): { dx: number; dy: number } {
   const overlapY = Math.min(aBottom, bBottom) - Math.max(a.y, b.y);
   if (overlapX <= 0 || overlapY <= 0) return { dx: 0, dy: 0 };
 
+  // Add a round-safe clearance so the separation survives the integer
+  // rounding at emit — separating to exactly touching leaves a sub-pixel
+  // gap that Math.round collapses back into an overlap.
+  const m = PROJECTION_SEPARATION_MARGIN_PX;
   if (overlapX < overlapY) {
     // Cheaper to resolve along X.
     const aCenterX = a.x + a.width / 2;
     const bCenterX = b.x + b.width / 2;
     const sign = aCenterX < bCenterX ? -1 : 1;
-    return { dx: sign * overlapX, dy: 0 };
+    return { dx: sign * (overlapX + m), dy: 0 };
   }
   const aCenterY = a.y + a.height / 2;
   const bCenterY = b.y + b.height / 2;
   const sign = aCenterY < bCenterY ? -1 : 1;
-  return { dx: 0, dy: sign * overlapY };
+  return { dx: 0, dy: sign * (overlapY + m) };
 }
 
 /**
