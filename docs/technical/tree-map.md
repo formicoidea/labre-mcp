@@ -48,7 +48,8 @@ src/
 │   ├── listeners/            artifact-writer-listener (core, toujours actif) (ARCH-12),
 │   │                         posthog-telemetry-listener (run-end/step-error → capture,
 │   │                         attaché par runRecipe quand PostHog est configuré ;
-│   │                         attribution $feature/mcp-prompt-* + llmCalls/tokens/quality_*
+│   │                         attribution $feature/mcp-prompt-* + $feature/mcp-recipe-*
+│   │                         (variante servie) + llmCalls/tokens/quality_*
 │   │                         sur run-end — nombres uniquement, jamais de texte)
 │   └── persistence/          artifact-writer, project-id-resolver            (ARCH-12/13)
 │
@@ -72,7 +73,8 @@ src/
 │   ├── degradation/          Degradable<T>, collector (AsyncLocalStorage),
 │   │                         with-degradation, mcp-wrapper (withMcpDegradation)
 │   ├── flags/                posthog (buildPostHog : gate fail-open + capture + shutdown +
-│   │                         resolvePromptVariants — flags multivariés mcp-prompt-<strategyId>,
+│   │                         resolvePromptVariants + resolveRecipeVariant — flags multivariés
+│   │                         mcp-prompt-<strategyId> et mcp-recipe-<ref> (string=variante),
 │   │                         posthog-node en import dynamique), state (singleton posé au boot
 │   │                         du daemon ; clés mcp-recipe-<domain>-<tool>-<name> et
 │   │                         mcp-prompt-<strategyId>)

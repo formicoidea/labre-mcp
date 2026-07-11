@@ -125,6 +125,10 @@ function buildVariantFlags(
     async resolvePromptVariants() {
       return variants;
     },
+    async resolveRecipeVariant() {
+      // Prompt-experiment tests → no recipe variant swap.
+      return undefined;
+    },
     capture(event, distinctId, properties) {
       captured.push({ event, distinctId, properties });
     },

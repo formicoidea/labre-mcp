@@ -195,6 +195,43 @@ describe("buildPostHog.isRecipeEnabled", () => {
   });
 });
 
+describe("buildPostHog.resolveRecipeVariant", () => {
+  it("returns the string variant for a multivariate mcp-recipe- flag", async () => {
+    const client = buildFakeClient({
+      allFlags: { "mcp-recipe-wardley-map-draw-value-chain": "draw-value-chain-b" },
+    });
+    const flags = buildPostHog({ apiKey: "phc_test", client });
+    assert.equal(await flags.resolveRecipeVariant(REF, "user-1"), "draw-value-chain-b");
+    assert.deepEqual(client.allFlagsCalls, ["user-1"]);
+  });
+
+  it("returns undefined for a boolean flag (rollout gate, not a variant)", async () => {
+    const client = buildFakeClient({
+      allFlags: { "mcp-recipe-wardley-map-draw-value-chain": true },
+    });
+    const flags = buildPostHog({ apiKey: "phc_test", client });
+    assert.equal(await flags.resolveRecipeVariant(REF, "user-1"), undefined);
+  });
+
+  it("returns undefined when the flag is absent", async () => {
+    const flags = buildPostHog({ apiKey: "phc_test", client: buildFakeClient({ allFlags: {} }) });
+    assert.equal(await flags.resolveRecipeVariant(REF, "user-1"), undefined);
+  });
+
+  it("fails open to undefined when PostHog returns no data", async () => {
+    const flags = buildPostHog({
+      apiKey: "phc_test",
+      client: buildFakeClient({ allFlags: undefined }),
+    });
+    assert.equal(await flags.resolveRecipeVariant(REF, "user-1"), undefined);
+  });
+
+  it("fails open to undefined when PostHog is unreachable", async () => {
+    const flags = buildPostHog({ apiKey: "phc_test", client: buildFakeClient({ failAllFlags: true }) });
+    assert.equal(await flags.resolveRecipeVariant(REF, "user-1"), undefined);
+  });
+});
+
 describe("buildPostHog.capture", () => {
   it("forwards the event to the client", async () => {
     const client = buildFakeClient({});
