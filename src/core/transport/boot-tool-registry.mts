@@ -3,6 +3,13 @@
 // (labre-stdio.mts) build the exact same four-tool registry from here, so the
 // surface stays identical regardless of how the client connects (ARCH-14).
 
+// Side-effect: register every custom prompt parser (getPrompt().parse()). This
+// import lived in the removed stdio entrypoint (mcp-server.mts) and was lost in
+// the transport migration, so in production NO parser was registered and every
+// parser-backed recipe/strategy (draw-value-chain, estimateEvolution, …) threw
+// "parser 'X' is not registered". Both transports build the registry here, so
+// registering at this shared boot point covers HTTP and stdio alike.
+import "#lib/prompts/init.mjs";
 import { ToolRegistry } from "./mcp-handler.mjs";
 import { ESTIMATE_EVOLUTION_TOOL } from "#mcp/estimate-evolution.tool.mjs";
 import { RUN_COMMAND_TOOL } from "#mcp/run-command.tool.mjs";
