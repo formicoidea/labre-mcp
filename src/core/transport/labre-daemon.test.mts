@@ -23,8 +23,9 @@ describe("labre-daemon boot wiring", () => {
     // + map node identify (1)
     // + map basemap generate (1)
     // + map value-chain (5 = 1 generate + 1 organized-y-position + 1 select-by-type + 1 prevent-collision + 1 audit)
-    // + render wardley-map (3 = owm parse + owm emit + image emit svg) = 19 total real strategies
-    assert.equal(registry.size(), 19);
+    // + render wardley-map (3 = owm parse + owm emit + image emit svg)
+    // + iteration purpose audit-purpose-quality (1) = 20 total real strategies
+    assert.equal(registry.size(), 20);
 
     const expected = [
       // map climate: position-functional-in-evolution (6)
@@ -51,6 +52,8 @@ describe("labre-daemon boot wiring", () => {
       "render:wardley-map:owm:parse:dsl",
       "render:wardley-map:owm:emit:dsl",
       "render:wardley-map:image:emit:svg",
+      // iteration: purpose audit-purpose-quality (1, promoted from mock)
+      "wardley:iteration:purpose:audit-purpose-quality:default",
       // map value-chain layout audit (2) — physically still under common/
       "wardley:map:value-chain:prevent-collision:default",
       "wardley:map:value-chain:audit:overlap-check",
@@ -78,8 +81,9 @@ describe("labre-daemon boot wiring", () => {
 
   it("buildStrategyRegistry exposes the full v0.1.0 catalogue (real + mocks)", () => {
     const registry = buildStrategyRegistry();
-    // 19 real strategies (CP3-CP6 + basemap/Y-layout/svg + value-chain select-by-type engine)
-    // + 66 mock strategies (CP10) = 85 total.
+    // 20 real strategies (CP3-CP6 + basemap/Y-layout/svg + value-chain select-by-type
+    // engine + iteration purpose audit-purpose-quality)
+    // + 65 mock strategies (CP10) = 85 total.
     assert.equal(registry.size(), 85);
     // Every registered id is a valid 5-segment methodId.
     for (const id of registry.list()) {

@@ -17,6 +17,7 @@ export const STRATEGY_CAPABILITIES = {
   'dual-verification':    'text',
   'pipeline-enrichment':  'text',
   'write-chain':          'text',
+  'audit-purpose-quality': 'text',
 } as const satisfies Record<string, LLMCapability>;
 
 export type StrategyId = keyof typeof STRATEGY_CAPABILITIES;
