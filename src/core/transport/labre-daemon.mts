@@ -8,7 +8,7 @@
 import { fileURLToPath } from "node:url";
 import type { ToolRegistry } from "./mcp-handler.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
-import { startHttpServer, type OnAuthenticatedHook } from "./http-server.mjs";
+import { startHttpServer, type OnAuthenticatedHook, type OAuthResourceConfig } from "./http-server.mjs";
 import { buildSupabaseAuthMiddleware, tryExtractBearerToken } from "./supabase-auth.mjs";
 import { buildJwksAuthMiddleware } from "./jwks-auth.mjs";
 import { buildApiKeyAuthMiddleware, routeBearerAuth, API_KEY_PREFIX } from "./api-key-auth.mjs";
@@ -87,6 +87,32 @@ function selectAuthMiddleware(): AuthMiddleware | undefined {
   throw new Error(`Invalid LABRE_AUTH: "${mode}" (expected "supabase", "oidc" or "none")`);
 }
 
+// OAuth protected-resource discovery config (env at boot only — ARCH-15).
+// Both vars required together; either missing → discovery off (the daemon
+// stays a plain-401 resource server, static bearers unaffected). URLs are
+// validated at boot so a typo fails fast instead of serving broken metadata.
+function readOAuthConfig(): OAuthResourceConfig | undefined {
+  const resource = process.env.LABRE_OAUTH_RESOURCE;
+  const authServer = process.env.LABRE_OAUTH_AUTH_SERVER;
+  if (!resource && !authServer) return undefined;
+  if (!resource || !authServer) {
+    throw new Error(
+      "OAuth discovery requires BOTH LABRE_OAUTH_RESOURCE and LABRE_OAUTH_AUTH_SERVER (or neither)",
+    );
+  }
+  for (const [name, value] of [
+    ["LABRE_OAUTH_RESOURCE", resource],
+    ["LABRE_OAUTH_AUTH_SERVER", authServer],
+  ] as const) {
+    try {
+      new URL(value);
+    } catch {
+      throw new Error(`Invalid ${name}: "${value}" (expected an absolute URL)`);
+    }
+  }
+  return { resource, authServer };
+}
+
 function readBundlesTtlSeconds(): number | undefined {
   const raw = process.env.LABRE_BUNDLES_TTL_S;
   if (!raw) return undefined;
@@ -156,7 +182,8 @@ async function main(): Promise<void> {
   // LABRE_HTTP_HOST: "0.0.0.0" behind a PaaS router; default
   // stays loopback so a local daemon is never exposed by accident.
   const hostname = process.env.LABRE_HTTP_HOST || "127.0.0.1";
-  const server = await startHttpServer({ port, hostname, tools, auth, onAuthenticated: bundles.hook });
+  const oauth = readOAuthConfig();
+  const server = await startHttpServer({ port, hostname, tools, auth, onAuthenticated: bundles.hook, oauth });
 
   process.stderr.write(
     `[labre-mcp] HTTP server listening on http://${hostname}:${server.port} (POST /mcp)\n`,
@@ -166,6 +193,9 @@ async function main(): Promise<void> {
     `[labre-mcp] Auth: ${auth ? `${process.env.LABRE_AUTH} JWT (JWKS)${apiKeysEnabled ? " + lab_ API keys" : ""}` : "none (local dev)"}\n`,
   );
   process.stderr.write(`[labre-mcp] Remote strategy bundles: ${bundles.bootLine}\n`);
+  process.stderr.write(
+    `[labre-mcp] OAuth discovery: ${oauth ? `on (resource=${oauth.resource}, AS=${oauth.authServer})` : "off (static bearer only)"}\n`,
+  );
   process.stderr.write(
     `[labre-mcp] Tools registered: ${tools.list().map((t) => t.name).join(", ") || "(none)"}\n`,
   );

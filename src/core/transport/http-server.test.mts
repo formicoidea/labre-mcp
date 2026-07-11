@@ -7,7 +7,7 @@ import { generateKeyPair, exportJWK, createLocalJWKSet, SignJWT } from "jose";
 import "#lib/prompts/init.mjs";
 import { buildApp } from "./http-server.mjs";
 import { buildBootRegistry } from "./labre-daemon.mjs";
-import { noopAuthMiddleware } from "./auth-middleware.mjs";
+import { noopAuthMiddleware, AuthenticationError } from "./auth-middleware.mjs";
 import { buildSupabaseAuthMiddleware } from "./supabase-auth.mjs";
 
 function buildTestApp() {
@@ -335,5 +335,59 @@ describe("labre-mcp HTTP transport with supabase auth", () => {
     const body = (await res.json()) as { id: number; result: unknown };
     assert.equal(body.id, 9);
     assert.deepEqual(body.result, {});
+  });
+});
+
+describe("labre-mcp OAuth protected-resource discovery (RFC 9728)", () => {
+  const OAUTH = {
+    resource: "https://framework-mcp.labre.app/mcp",
+    authServer: "https://labre.app",
+  };
+  const METADATA_URL =
+    "https://framework-mcp.labre.app/.well-known/oauth-protected-resource";
+
+  // A middleware that always rejects, to exercise the 401 WWW-Authenticate path
+  // without needing a real token.
+  const rejectingAuth = {
+    async authenticate(): Promise<never> {
+      throw new AuthenticationError("no token");
+    },
+  };
+
+  it("serves the protected-resource metadata when configured", async () => {
+    const app = buildApp({ tools: buildBootRegistry(), auth: noopAuthMiddleware, oauth: OAUTH });
+    const res = await app.request("/.well-known/oauth-protected-resource");
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as { resource: string; authorization_servers: string[] };
+    assert.equal(body.resource, OAUTH.resource);
+    assert.deepEqual(body.authorization_servers, [OAUTH.authServer]);
+  });
+
+  it("stamps a 401 with WWW-Authenticate pointing at the resource metadata", async () => {
+    const app = buildApp({ tools: buildBootRegistry(), auth: rejectingAuth, oauth: OAUTH });
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+    });
+    assert.equal(res.status, 401);
+    assert.equal(
+      res.headers.get("WWW-Authenticate"),
+      `Bearer resource_metadata="${METADATA_URL}"`,
+    );
+  });
+
+  it("is fully off when unconfigured: no well-known route, plain 401", async () => {
+    const app = buildApp({ tools: buildBootRegistry(), auth: rejectingAuth });
+    const wellKnown = await app.request("/.well-known/oauth-protected-resource");
+    assert.equal(wellKnown.status, 404);
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+    });
+    assert.equal(res.status, 401);
+    assert.equal(res.headers.get("WWW-Authenticate"), null);
   });
 });

@@ -3,6 +3,14 @@
 // Other endpoints:
 //   GET /health → liveness probe
 //   GET /version → server info
+//   GET /.well-known/oauth-protected-resource → OAuth discovery (opt-in)
+//
+// OAuth resource-server role (MCP authorization spec): the daemon stays a pure
+// RESOURCE server — it validates bearer tokens (JWKS, via the auth middleware)
+// but never mints them. When configured, it advertises WHICH authorization
+// server issues its tokens (labre) via RFC 9728 protected-resource metadata,
+// and points 401s at that metadata with a WWW-Authenticate header. The AS
+// itself (authorize/token/registration) lives in the labre app, not here.
 
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
@@ -13,6 +21,21 @@ import { extractContext } from "./context-extractor.mjs";
 import type { RequestContext } from "../context/request-context.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { noopAuthMiddleware, AuthenticationError } from "./auth-middleware.mjs";
+
+/**
+ * OAuth 2.0 protected-resource discovery (RFC 9728), opt-in. When set, the
+ * daemon serves /.well-known/oauth-protected-resource and stamps 401s with a
+ * WWW-Authenticate header so an OAuth-capable MCP client (claude.ai connectors)
+ * discovers the authorization server. Absent → no discovery surface, 401s stay
+ * plain (the lab_/JWT static-bearer path is unaffected).
+ */
+export interface OAuthResourceConfig {
+  /** Canonical resource URL — the public MCP endpoint,
+   *  e.g. https://framework-mcp.labre.app/mcp */
+  resource: string;
+  /** Authorization server base URL (the labre app), e.g. https://labre.app */
+  authServer: string;
+}
 
 /**
  * Invoked after successful authentication and before dispatch (e.g. the
@@ -30,6 +53,7 @@ export interface HttpServerOptions {
   auth?: AuthMiddleware;
   hostname?: string;
   onAuthenticated?: OnAuthenticatedHook;
+  oauth?: OAuthResourceConfig;
 }
 
 export interface RunningServer {
@@ -41,11 +65,30 @@ export function buildApp(options: {
   tools: ToolRegistry;
   auth: AuthMiddleware;
   onAuthenticated?: OnAuthenticatedHook;
+  oauth?: OAuthResourceConfig;
 }): Hono {
   const app = new Hono();
 
   app.get("/health", (c) => c.json({ status: "ok" }));
   app.get("/version", (c) => c.json(SERVER_INFO));
+
+  // OAuth protected-resource discovery (RFC 9728), opt-in. Public metadata —
+  // no auth. Points OAuth-capable clients at labre (the authorization server).
+  // The metadata URL sits at the resource ORIGIN's well-known path; it is also
+  // the value stamped into 401 WWW-Authenticate headers below.
+  const resourceMetadataUrl = options.oauth
+    ? new URL(
+        "/.well-known/oauth-protected-resource",
+        new URL(options.oauth.resource).origin,
+      ).toString()
+    : undefined;
+  if (options.oauth) {
+    const metadata = {
+      resource: options.oauth.resource,
+      authorization_servers: [options.oauth.authServer],
+    };
+    app.get("/.well-known/oauth-protected-resource", (c) => c.json(metadata));
+  }
 
   app.post("/mcp", async (c) => {
     let body: unknown;
@@ -81,6 +124,11 @@ export function buildApp(options: {
       context = await options.auth.authenticate(headers, initialContext);
     } catch (err) {
       if (err instanceof AuthenticationError) {
+        // Point OAuth-capable clients at the AS via RFC 9728 discovery. Only
+        // when configured — otherwise the static-bearer 401 stays plain.
+        if (resourceMetadataUrl) {
+          c.header("WWW-Authenticate", `Bearer resource_metadata="${resourceMetadataUrl}"`);
+        }
         return c.json(
           {
             jsonrpc: "2.0",
@@ -126,6 +174,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
     tools: options.tools,
     auth: options.auth ?? noopAuthMiddleware,
     onAuthenticated: options.onAuthenticated,
+    oauth: options.oauth,
   });
 
   let server: ServerType | undefined;
