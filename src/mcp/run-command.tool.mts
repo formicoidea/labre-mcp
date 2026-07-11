@@ -15,6 +15,7 @@ import { buildStrategyRegistry } from '#core/transport/strategy-registry-boot.mj
 import { attachArtifactWriter } from '#core/listeners/artifact-writer-listener.mjs';
 import { createEventBus } from '#core/bus/event-bus.mjs';
 import { resolveContext } from './resolve-context.mjs';
+import { coerceJsonInput } from './coerce-json-input.mjs';
 
 export const RUN_COMMAND_TOOL: ToolDefinition = {
   name: 'runCommand',
@@ -42,7 +43,7 @@ export const RUN_COMMAND_TOOL: ToolDefinition = {
     try {
       const outcome = await runCommand({
         command: call.command,
-        input: call.input,
+        input: coerceJsonInput(call.input),
         context: ctx,
         registry,
         bus,
