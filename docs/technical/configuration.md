@@ -10,6 +10,8 @@
 | `WARDLEY_PROMPTS_CONFIG` | chemin absolu ou relatif | Override du fichier de configuration des prompts. Par defaut : `<racine>/prompts.config.json`. |
 | `LABRE_HTTP_PORT` | entier `1-65535` | Port d'ecoute du daemon HTTP. Par defaut : `6767`. |
 | `LABRE_HTTP_HOST` | adresse IP | Adresse de bind du daemon HTTP. Par defaut : `127.0.0.1` (loopback, dev local). Mettre `0.0.0.0` derriere un routeur PaaS. |
+| `LABRE_OAUTH_RESOURCE` | URL absolue | *(Opt-in, avec `LABRE_OAUTH_AUTH_SERVER`)* URL publique du daemon (ex. `https://framework-mcp.labre.app/mcp`). Active la decouverte OAuth (RFC 9728) : endpoint `/.well-known/oauth-protected-resource` + en-tete `WWW-Authenticate` sur les 401. Le daemon reste serveur de ressources (ne signe aucun token). |
+| `LABRE_OAUTH_AUTH_SERVER` | URL absolue | *(Opt-in, avec `LABRE_OAUTH_RESOURCE`)* URL du serveur d'autorisation = l'app labre (ex. `https://labre.app`). Les deux vars ensemble ou aucune. |
 | `LABRE_DISABLE_MOCKS` | `1` | Ne charge que les 15 strategies reelles au boot (exclut les 70 mocks). |
 | `WARDLEY_VERBOSE` | `1`, `true`, `yes` | Active les messages debug dans les notifications. Desactive par defaut. |
 | `WARDLEY_EVAL_MODE` | `exclusive`, `parallel` | Mode de routage solution/capability. `exclusive` (defaut) : un seul pipeline. `parallel` : les deux pipelines, resultats fusionnes. |

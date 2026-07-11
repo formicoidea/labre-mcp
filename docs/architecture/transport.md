@@ -27,6 +27,7 @@ Hono app  ────►  auth middleware  ────►  context extractor  
 |---|---|---|
 | `GET` | `/health` | Liveness probe. Returns `{ status: "ok" }`. |
 | `GET` | `/version` | Server info: `{ name: "labre-mcp", version }`. |
+| `GET` | `/.well-known/oauth-protected-resource` | OAuth discovery (RFC 9728), **opt-in**. Present only when `LABRE_OAUTH_RESOURCE` + `LABRE_OAUTH_AUTH_SERVER` are set. Returns `{ resource, authorization_servers: [<labre AS>] }`. |
 | `POST` | `/mcp` | JSON-RPC 2.0 dispatch. Body must conform to [`JsonRpcRequestSchema`](../../src/core/transport/json-rpc.schema.mts). |
 
 The `/mcp` endpoint accepts these MCP methods:
@@ -103,6 +104,17 @@ context = await auth.authenticate(httpHeaders, contextFromBody);
 ```
 
 V3 SaaS replaces `noopAuthMiddleware` with a real implementation (OAuth/API key validation, tenant extraction). No tool handler changes.
+
+## OAuth resource-server role (discovery only)
+
+The daemon can act as an OAuth 2.0 **protected resource** for clients that only speak OAuth (claude.ai custom connectors). It stays a *resource* server — it validates bearer tokens via the auth middleware (JWKS in `oidc`/`supabase` mode) but **never mints them**. The authorization server (authorize / token / registration / consent) lives in the **labre app**, on a different origin — the MCP authorization spec explicitly allows AS and RS to be separate.
+
+When `LABRE_OAUTH_RESOURCE` + `LABRE_OAUTH_AUTH_SERVER` are set (opt-in), the daemon:
+
+1. serves `GET /.well-known/oauth-protected-resource` → `{ resource, authorization_servers: [<labre AS>] }` (RFC 9728);
+2. stamps a `WWW-Authenticate: Bearer resource_metadata="<…/.well-known/oauth-protected-resource>"` header on every `401`, so the client discovers the AS.
+
+Discovery flow: client → daemon `/mcp` (401 + WWW-Authenticate) → daemon well-known (finds the labre AS) → labre `/authorize` + `/token` (labre reuses the Supabase session, issues a labre-signed JWT) → daemon `/mcp` with that JWT (validated via labre's JWKS, `LABRE_AUTH=oidc`). Unset → no discovery surface; the static-bearer paths (Supabase JWT, `lab_` keys) are unaffected. The labre-side AS is a separate build (labre repo).
 
 ## Synchronous only (ARCH-11)
 
