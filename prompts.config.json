@@ -206,5 +206,16 @@
       ],
       "parser": { "kind": "custom", "id": "parsePurposeAudit" }
     }
+  },
+  "purpose-generate": {
+    "default": {
+      "kind": "template",
+      "templateFile": {
+        "system": "prompts/purpose-generate.default.system.md",
+        "user": "prompts/purpose-generate.default.user.md"
+      },
+      "variables": ["topic", "intent"],
+      "parser": { "kind": "custom", "id": "parsePurposeContext" }
+    }
   }
 }
