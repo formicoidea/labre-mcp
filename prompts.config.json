@@ -186,5 +186,25 @@
       "variables": ["metadata", "date"],
       "parser": { "kind": "custom", "id": "parseRawValueChain" }
     }
+  },
+  "audit-purpose-quality": {
+    "default": {
+      "kind": "template",
+      "templateFile": {
+        "system": "prompts/audit-purpose-quality.default.system.md",
+        "user": "prompts/audit-purpose-quality.default.user.md"
+      },
+      "variables": [
+        "raisonDetre",
+        "title",
+        "scope",
+        "angle",
+        "temporality",
+        "granularity",
+        "deliverables",
+        "problematisation"
+      ],
+      "parser": { "kind": "custom", "id": "parsePurposeAudit" }
+    }
   }
 }

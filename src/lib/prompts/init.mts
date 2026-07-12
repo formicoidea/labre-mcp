@@ -33,6 +33,7 @@ import {
 } from '#work-on-evolution/write/strategies/solution/properties-strategy.mjs';
 import { parseChainMetadataResponse } from '#work-on-value-chain/write/chain/lib/llm/extract-metadata.mjs';
 import { parseRawValueChainResponse } from '#work-on-value-chain/write/chain/strategies/top-down/generate-chain.mjs';
+import { parsePurposeAuditResponse } from '#frameworks/wardley/iteration/purpose/audit-purpose-quality/default.mjs';
 
 registerParser('cpcSotExtraction',      parseCpcSotExtraction);
 registerParser('identifyCapability',    parseCapabilityResponse);
@@ -50,3 +51,4 @@ registerParser('propertiesAuto',        parseAutoResponse);
 registerParser('propertiesSingle',      parseSinglePropertyResponse);
 registerParser('extractChainMetadata',  parseChainMetadataResponse);
 registerParser('parseRawValueChain',    parseRawValueChainResponse);
+registerParser('parsePurposeAudit',      parsePurposeAuditResponse);
