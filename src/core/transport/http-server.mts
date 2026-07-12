@@ -21,6 +21,8 @@ import { extractContext } from "./context-extractor.mjs";
 import type { RequestContext } from "../context/request-context.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { noopAuthMiddleware, AuthenticationError } from "./auth-middleware.mjs";
+import { loadLLMConfig } from "#lib/llm/config.loader.mjs";
+import type { LLMConfig } from "#lib/llm/config.schema.mjs";
 
 /**
  * OAuth 2.0 protected-resource discovery (RFC 9728), opt-in. When set, the
@@ -66,11 +68,43 @@ export function buildApp(options: {
   auth: AuthMiddleware;
   onAuthenticated?: OnAuthenticatedHook;
   oauth?: OAuthResourceConfig;
+  // Injectable for tests; defaults to the real cached loader.
+  loadConfig?: () => LLMConfig;
 }): Hono {
   const app = new Hono();
+  const loadConfig = options.loadConfig ?? loadLLMConfig;
 
   app.get("/health", (c) => c.json({ status: "ok" }));
   app.get("/version", (c) => c.json(SERVER_INFO));
+
+  // Read-only ops endpoint for the Labre admin console (Framework-MCP section).
+  // Server-to-server: gated by LABRE_MCP_ADMIN_TOKEN (an ops bearer, distinct
+  // from per-user API-key auth). Returns the live LLM config WITHOUT secret
+  // values — the config only ever names env vars (apiKeyEnv/authEnv); we surface
+  // whether each is set via a boolean `hasKey`, never the value itself.
+  app.get("/config/llm", (c) => {
+    const adminToken = process.env.LABRE_MCP_ADMIN_TOKEN;
+    if (!adminToken) return c.json({ error: "config endpoint disabled" }, 503);
+
+    const header = c.req.header("authorization");
+    if (header !== `Bearer ${adminToken}`) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+
+    const config = loadConfig();
+    const providers = Object.fromEntries(
+      Object.entries(config.providers).map(([name, p]) => {
+        const envName = p.apiKeyEnv ?? p.authEnv;
+        const hasKey = envName ? Boolean(process.env[envName]) : false;
+        return [name, { ...p, hasKey }];
+      }),
+    );
+    return c.json({
+      defaultProvider: config.defaultProvider,
+      providers,
+      strategies: config.strategies,
+    });
+  });
 
   // OAuth protected-resource discovery (RFC 9728), opt-in. Public metadata —
   // no auth. Points OAuth-capable clients at labre (the authorization server).
