@@ -62,6 +62,7 @@ labre-mcp/
 2. All documentation is in english
 3. All variables are in english
 4. All commit messages (subject + body) are in english
+6. All work contents and prompts are in english
 5. Conversations with the assistant stay in the user's preferred language
 
 ## TypeScript
