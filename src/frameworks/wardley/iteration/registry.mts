@@ -11,6 +11,7 @@
 import type { StrategyRegistry } from '#core/registry/strategy-registry.mjs';
 import type { BaseStrategy } from '#core/ast/base-strategy.mjs';
 import { WardleyIterationPurposeAuditPurposeQualityDefaultStrategy } from './purpose/audit-purpose-quality/default.mjs';
+import { WardleyIterationPurposeGenerateDefaultStrategy } from './purpose/generate/default.mjs';
 
 /**
  * Register every real iteration strategy on the provided core registry.
@@ -18,6 +19,10 @@ import { WardleyIterationPurposeAuditPurposeQualityDefaultStrategy } from './pur
 export function registerIterationStrategies(
   registry: StrategyRegistry<BaseStrategy>,
 ): void {
+  registry.register(
+    WardleyIterationPurposeGenerateDefaultStrategy.method,
+    WardleyIterationPurposeGenerateDefaultStrategy,
+  );
   registry.register(
     WardleyIterationPurposeAuditPurposeQualityDefaultStrategy.method,
     WardleyIterationPurposeAuditPurposeQualityDefaultStrategy,

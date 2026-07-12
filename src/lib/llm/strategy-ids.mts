@@ -18,6 +18,7 @@ export const STRATEGY_CAPABILITIES = {
   'pipeline-enrichment':  'text',
   'write-chain':          'text',
   'audit-purpose-quality': 'text',
+  'purpose-generate':      'text',
 } as const satisfies Record<string, LLMCapability>;
 
 export type StrategyId = keyof typeof STRATEGY_CAPABILITIES;
