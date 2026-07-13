@@ -27,6 +27,7 @@ Hono app  ────►  auth middleware  ────►  context extractor  
 |---|---|---|
 | `GET` | `/health` | Liveness probe. Returns `{ status: "ok" }`. |
 | `GET` | `/version` | Server info: `{ name: "labre-mcp", version }`. |
+| `GET` | `/config/llm` | Read-only live LLM config for the Labre admin console, **opt-in**. Present only when `LABRE_MCP_ADMIN_TOKEN` is set (else `503`); requires `Authorization: Bearer <token>` (`401` otherwise). Returns `{ defaultProvider, providers, strategies }` with a per-provider `hasKey` boolean — never secret values. |
 | `GET` | `/.well-known/oauth-protected-resource` | OAuth discovery (RFC 9728), **opt-in**. Present only when `LABRE_OAUTH_RESOURCE` + `LABRE_OAUTH_AUTH_SERVER` are set. Returns `{ resource, authorization_servers: [<labre AS>] }`. |
 | `POST` | `/mcp` | JSON-RPC 2.0 dispatch. Body must conform to [`JsonRpcRequestSchema`](../../src/core/transport/json-rpc.schema.mts). |
 
@@ -52,6 +53,10 @@ The `.mcp.json` at the repo root declares the labre-mcp server with HTTP transpo
 ## Configuration
 
 The daemon reads the port from `LABRE_HTTP_PORT` (default `6767`) and the bind address from `LABRE_HTTP_HOST` (default `127.0.0.1`, loopback-only). Production deployments behind a PaaS router set `LABRE_HTTP_HOST=0.0.0.0`; a local daemon stays loopback-only unless explicitly opted in.
+
+### Ops config endpoint (`GET /config/llm`)
+
+Opt-in, gated by `LABRE_MCP_ADMIN_TOKEN` — a **shared ops secret** held by both the daemon and its sole consumer, the Labre admin console (Framework-MCP section). This is a server-to-server bearer, distinct from the per-user auth on `/mcp` (JWT / `lab_` keys). Unset → the route returns `503` (feature disabled); header missing or mismatched → `401`. On success it returns the config resolved by `loadLLMConfig()` — `{ defaultProvider, providers, strategies }` — augmented with a per-provider `hasKey = Boolean(process.env[apiKeyEnv ?? authEnv])`. The config only ever names env vars, so no secret value is read or emitted; `hasKey` is a boolean ops signal only.
 
 ### Shipped recipes location
 
