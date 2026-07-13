@@ -95,6 +95,7 @@ affected.
 | `SUPABASE_JWT_AUD` | Expected `aud` claim (default `authenticated`). |
 | `SUPABASE_ANON_KEY` | Enables the remote strategy-bundle source: declarative bundles (recipes + prompts, no code) published by the labre admin are fetched lazily **with the caller's own token** (RLS authorizes; the daemon holds no privileged credential) and verified file-by-file against their recorded sha256 before registration. |
 | `LABRE_BUNDLES_TTL_S` | Bundle refresh throttle in seconds (default 300). |
+| `LABRE_MCP_ADMIN_TOKEN` | Enables the read-only `GET /config/llm` ops endpoint (Labre admin console, Framework-MCP section). A **shared ops secret** sent as `Authorization: Bearer <token>`, distinct from the per-user `/mcp` auth above. Unset → endpoint returns `503`; missing/wrong token → `401`. Returns the live LLM config with a per-provider `hasKey` boolean — never secret values. |
 | `POSTHOG_API_KEY` | Enables recipe rollout flags (`mcp-recipe-<domain>-<tool>-<name>`, fail-open) and metadata-only run telemetry (`mcp_boot`, `mcp_run_end`, `mcp_step_error` — never payloads or prompts). |
 | `POSTHOG_HOST` | PostHog ingestion host (default US cloud). |
 
