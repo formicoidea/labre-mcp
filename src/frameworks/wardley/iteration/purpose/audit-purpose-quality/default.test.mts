@@ -34,14 +34,14 @@ const GOOD = {
 describe('deterministicChecks', () => {
   it('flags a missing raison d\'être as a fail on anchor + coherence', () => {
     const out = deterministicChecks(ctx({ ...GOOD, raisonDetre: '' }));
-    assert.equal(out['anchor-raison-detre']?.verdict, 'fail');
+    assert.equal(out['anchor-purpose']?.verdict, 'fail');
     assert.equal(out['objective-coherence']?.verdict, 'fail');
   });
 
   it('fails problematisation when absent, warns when not a question', () => {
-    assert.equal(deterministicChecks(ctx({ ...GOOD, problematisation: '' }))['problematisation']?.verdict, 'fail');
+    assert.equal(deterministicChecks(ctx({ ...GOOD, problematisation: '' }))['problem-definition']?.verdict, 'fail');
     assert.equal(
-      deterministicChecks(ctx({ ...GOOD, problematisation: 'On étudie le modèle.' }))['problematisation']?.verdict,
+      deterministicChecks(ctx({ ...GOOD, problematisation: 'On étudie le modèle.' }))['problem-definition']?.verdict,
       'warn',
     );
   });
@@ -63,9 +63,9 @@ describe('deterministicChecks', () => {
 describe('mergeVerdicts', () => {
   it('deterministic fail wins over an LLM pass (a missing field cannot be rescued)', () => {
     const det = deterministicChecks(ctx({ ...GOOD, raisonDetre: '' }));
-    const llm = { 'anchor-raison-detre': { verdict: 'pass' as const, rationale: 'looks fine' } };
+    const llm = { 'anchor-purpose': { verdict: 'pass' as const, rationale: 'looks fine' } };
     const merged = mergeVerdicts(det, llm);
-    assert.equal(merged.find((d) => d.id === 'anchor-raison-detre')?.verdict, 'fail');
+    assert.equal(merged.find((d) => d.id === 'anchor-purpose')?.verdict, 'fail');
   });
 
   it('prefers the LLM verdict where no deterministic verdict exists', () => {
@@ -77,15 +77,15 @@ describe('mergeVerdicts', () => {
     const merged = mergeVerdicts({}, null);
     assert.equal(merged.length, PURPOSE_AUDIT_DIMENSIONS.length);
     assert.ok(merged.every((d) => d.verdict === 'warn'));
-    assert.ok(merged.every((d) => /dégradé/.test(d.rationale)));
+    assert.ok(merged.every((d) => /degraded/.test(d.rationale)));
   });
 });
 
 describe('parsePurposeAuditResponse', () => {
   it('extracts JSON, keeps known ids, drops unknown ones', () => {
-    const raw = 'Sure!\n{"dimensions":[{"id":"problematisation","verdict":"pass","rationale":"ok"},{"id":"bogus","verdict":"fail","rationale":"x"}]}';
+    const raw = 'Sure!\n{"dimensions":[{"id":"problem-definition","verdict":"pass","rationale":"ok"},{"id":"bogus","verdict":"fail","rationale":"x"}]}';
     const out = parsePurposeAuditResponse(raw);
-    assert.equal(out['problematisation']?.verdict, 'pass');
+    assert.equal(out['problem-definition']?.verdict, 'pass');
     assert.equal(Object.keys(out).length, 1);
   });
 
@@ -105,7 +105,7 @@ describe('strategy.evaluate', () => {
     assert.equal(res.insights.length, PURPOSE_AUDIT_DIMENSIONS.length);
     assert.deepEqual(res.result, res.insights);
     // The missing raison d'être surfaces as a FAIL insight even offline.
-    assert.ok(res.insights.some((i) => /FAIL · Ancrage raison d'être/.test(i.text)));
+    assert.ok(res.insights.some((i) => /FAIL · Purpose anchoring/.test(i.text)));
     assert.equal(res.signals.find((s) => s.name === 'llm-used')?.value, false);
   });
 

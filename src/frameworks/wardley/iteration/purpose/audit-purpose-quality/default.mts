@@ -38,14 +38,14 @@ export interface DimensionResult {
 }
 
 // The six quality dimensions, in report order. Ids are the contract the LLM
-// answers against; labels are human-facing (French, the study language).
+// answers against; labels are human-facing (English).
 export const PURPOSE_AUDIT_DIMENSIONS = [
-  { id: 'anchor-raison-detre',   label: "Ancrage raison d'être" },
-  { id: 'context-legitimation',  label: 'Légitimation par le contexte' },
-  { id: 'objective-coherence',   label: "Cohérence objectif ↔ raison d'être" },
-  { id: 'right-granularity',     label: 'Bon grain (objectif intermédiaire)' },
-  { id: 'concision-tangibility', label: 'Concision & tangibilité' },
-  { id: 'problematisation',      label: 'Problématisation' },
+  { id: 'anchor-purpose',        label: 'Purpose anchoring' },
+  { id: 'context-legitimation',  label: 'Context legitimation' },
+  { id: 'objective-coherence',   label: 'Objective ↔ purpose coherence' },
+  { id: 'right-granularity',     label: 'Right granularity (intermediate objective)' },
+  { id: 'concision-tangibility', label: 'Concision & tangibility' },
+  { id: 'problem-definition',    label: 'Problem definition' },
 ] as const;
 
 export type DimensionId = (typeof PURPOSE_AUDIT_DIMENSIONS)[number]['id'];
@@ -70,25 +70,25 @@ export function deterministicChecks(
   };
 
   if (!has(ctx.raisonDetre)) {
-    mk('anchor-raison-detre', 'fail', "Aucune raison d'être : l'objectif n'est rattaché à rien qui lui donne du sens.");
+    mk('anchor-purpose', 'fail', 'No purpose: the objective is anchored to nothing that gives it meaning.');
     // Coherence to a missing anchor is not judgeable — fail it up front too.
-    mk('objective-coherence', 'fail', "Cohérence non jugeable : pas de raison d'être à laquelle rattacher l'objectif.");
+    mk('objective-coherence', 'fail', 'Coherence not judgeable: no purpose to anchor the objective to.');
   }
 
   if (!has(ctx.scope) && !has(ctx.angle) && !has(ctx.granularity)) {
-    mk('context-legitimation', 'fail', 'Aucun élément de contexte (scope, angle, granularité) pour légitimer l’objectif.');
+    mk('context-legitimation', 'fail', 'No context element (scope, angle, granularity) to legitimise the objective.');
   }
 
   if (!has(ctx.title)) {
-    mk('concision-tangibility', 'fail', "Objectif non formulé.");
+    mk('concision-tangibility', 'fail', 'Objective not stated.');
   } else if (ctx.title.trim().length > MAX_OBJECTIVE_CHARS) {
-    mk('concision-tangibility', 'warn', `Formulation longue (${ctx.title.trim().length} car.) : viser quelques lignes tangibles et faciles à comprendre.`);
+    mk('concision-tangibility', 'warn', `Long wording (${ctx.title.trim().length} chars): aim for a few tangible, easy-to-understand lines.`);
   }
 
   if (!has(ctx.problematisation)) {
-    mk('problematisation', 'fail', "Pas de problématique : le purpose n'ouvre sur aucune question d'étude.");
+    mk('problem-definition', 'fail', 'No problem: the purpose opens onto no study question.');
   } else if (!ctx.problematisation.trim().endsWith('?')) {
-    mk('problematisation', 'warn', 'La problématisation ne se termine pas par une question.');
+    mk('problem-definition', 'warn', 'The problem definition does not end with a question.');
   }
 
   return out;
@@ -154,7 +154,7 @@ export function mergeVerdicts(
       id: d.id,
       label: d.label,
       verdict: 'warn' as const,
-      rationale: llm ? "Non évalué par l'analyse." : 'Non évalué : LLM indisponible (audit dégradé).',
+      rationale: llm ? 'Not assessed by the analysis.' : 'Not assessed: LLM unavailable (degraded audit).',
     };
   });
 }
@@ -217,6 +217,8 @@ export class WardleyIterationPurposeAuditPurposeQualityDefaultStrategy extends B
     if (llmCall) {
       const call = llmCall;
       const p = getPrompt('audit-purpose-quality', 'default');
+      // Prompt-facing keys are the English prompt vocabulary; the values stay
+      // the canonical Context fields (schema unchanged). build() is the seam.
       const built = p.build({
         title: ctx.title,
         scope: ctx.scope,
@@ -224,8 +226,9 @@ export class WardleyIterationPurposeAuditPurposeQualityDefaultStrategy extends B
         temporality: ctx.temporality,
         granularity: ctx.granularity,
         deliverables: ctx.deliverables.join('; '),
-        raisonDetre: ctx.raisonDetre,
-        problematisation: ctx.problematisation,
+        purpose: ctx.raisonDetre,
+        problemDefinition: ctx.problematisation,
+        prompt: ctx.prompt,
       });
       const response = await tryDegradeAmbient<string | null>(
         'llm:audit-purpose-quality',

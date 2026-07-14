@@ -195,14 +195,15 @@
         "user": "prompts/audit-purpose-quality.default.user.md"
       },
       "variables": [
-        "raisonDetre",
+        "purpose",
         "title",
+        "prompt",
         "scope",
         "angle",
         "temporality",
         "granularity",
         "deliverables",
-        "problematisation"
+        "problemDefinition"
       ],
       "parser": { "kind": "custom", "id": "parsePurposeAudit" }
     }

@@ -316,8 +316,7 @@ export class TimelineBenchmarkStrategyCore extends CoreBaseStrategy<ComponentInp
     component: ComponentInput,
     _context: RequestContext,
   ): Promise<StrategyResult<EvolutionResult>> {
-    // any: legacy registry id 'timeline-benchmark' is not in the StrategyId enum yet.
-    const llmCall: LLMCall = this._llmCall ?? (await getStrategyLLM('timeline-benchmark' as any) as LLMCall);
+    const llmCall: LLMCall = this._llmCall ?? getStrategyLLM('timeline-benchmark');
     const legacy = new TimelineBenchmarkStrategy({ llmCall });
     // any: legacy result.trace is the milestone history with open-shape entries.
     type Milestone = { name: string; date: number | string; evolution: number; confidence: number; _fallback?: boolean };
