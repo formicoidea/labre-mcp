@@ -1,10 +1,14 @@
 Audit the quality of this study Context.
 
-Raison d'être: {{raisonDetre}}
-Objectif (titre): {{title}}
-Scope: {{scope}}
-Angle: {{angle}}
-Temporalité: {{temporality}}
-Granularité: {{granularity}}
-Livrables: {{deliverables}}
-Problématisation: {{problematisation}}
+Unstructure data : 
+Title : {{title}}
+Prompt : {{prompt}}
+
+Structure data : 
+- Purpose: {{purpose}}
+- Scope: {{scope}}
+- Angle: {{angle}}
+- Temporality: {{temporality}}
+- Granularity: {{granularity}}
+- Deliverables: {{deliverables}}
+- Problem definition: {{problemDefinition}}

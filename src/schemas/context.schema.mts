@@ -21,6 +21,11 @@ export const PurposeContextSchema = z
   .object({
     // The intermediate objective / title of the study (the map's subject).
     title: z.string().default(''),
+    // The user's original verbatim prompt/brief — the human's request, NOT the
+    // calling agent's reformulation. Unstructured source the structured fields
+    // were distilled from; passed through untouched by purpose:generate (never
+    // LLM-generated), so the audit can judge the extraction against the original.
+    prompt: z.string().default(''),
     // Tangible, easy-to-understand boundary of the study (Wardley: "le champ
     // d'application doit être tangible et facile à comprendre").
     scope: z.string().default(''),
