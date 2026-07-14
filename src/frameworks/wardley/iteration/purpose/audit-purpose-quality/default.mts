@@ -182,7 +182,7 @@ export class WardleyIterationPurposeAuditPurposeQualityDefaultStrategy extends B
 
   async evaluate(
     input: unknown,
-    _context: RequestContext,
+    context: RequestContext,
   ): Promise<StrategyResult<StrategyResult['insights']>> {
     const capturedAt = new Date().toISOString();
 
@@ -228,7 +228,9 @@ export class WardleyIterationPurposeAuditPurposeQualityDefaultStrategy extends B
         deliverables: ctx.deliverables.join('; '),
         purpose: ctx.raisonDetre,
         problemDefinition: ctx.problematisation,
-        prompt: ctx.prompt,
+        // The original user prompt: from the Context (stamped by purpose:generate)
+        // or, for a standalone audit, straight from the ambient RequestContext.
+        prompt: ctx.prompt || context.userPrompt || '',
       });
       const response = await tryDegradeAmbient<string | null>(
         'llm:audit-purpose-quality',
