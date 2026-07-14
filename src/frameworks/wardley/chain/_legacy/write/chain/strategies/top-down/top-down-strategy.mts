@@ -148,8 +148,7 @@ export class TopDownChainStrategyCore
     input: TopDownChainInput,
     _context: RequestContext,
   ): Promise<StrategyResult<TopDownChainFullResult>> {
-    // any: legacy registry id 'write-chain' is not in the StrategyId enum yet.
-    const llmCall: LLMCall = this._llmCall ?? (await getStrategyLLM('write-chain' as any) as LLMCall);
+    const llmCall: LLMCall = this._llmCall ?? getStrategyLLM('write-chain');
     const legacy = new TopDownChainStrategy({ llmCall });
     const result = await legacy.buildFull(input);
 

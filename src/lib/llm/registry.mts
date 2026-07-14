@@ -2,11 +2,19 @@
 //
 // Lookup path:
 //   1. loadLLMConfig() returns the validated LLMConfig
-//   2. validateCapabilities() (called once) ensures every known strategy is
-//      assigned to a provider that supports the required capability
-//   3. getStrategyLLM / getStrategyStructuredLLM / getStrategyLogprobLLM
-//      resolve the strategy entry (falling back to defaultProvider) and
-//      return a cached call instance
+//   2. resolveStrategy() resolves the strategy entry (falling back to
+//      defaultProvider) and instantiates its provider
+//   3. the resolved provider is asserted to support the capability this call
+//      needs — implied by which getter the caller used (text / structured /
+//      logprobs)
+//   4. a cached call instance is returned
+//
+// The (strategy → required capability) contract lives at the CALL SITE: each
+// strategy asks for exactly the capability it needs by calling the matching
+// getter. lib/llm therefore stays domain-agnostic — it never enumerates the
+// business strategy catalogue, it only resolves opaque string ids. Validation
+// is per-strategy and lazy (on first resolution), so a strategy that is never
+// called never blocks, and a misconfigured one fails the moment it is used.
 
 import { loadLLMConfig } from './config.loader.mjs';
 import type { LLMConfig, ProviderConfig, ProviderKind, StrategyConfig } from './config.schema.mjs';
@@ -14,14 +22,12 @@ import { createAgentSdkProvider } from './providers/agent-sdk-provider.mjs';
 import { createHttpApiProvider } from './providers/http-api-provider.mjs';
 import { createCopilotSdkProvider } from './providers/copilot-sdk-provider.mjs';
 import type { LLMCapability, LLMProvider } from './providers/provider.types.mjs';
-import { STRATEGY_CAPABILITIES, type StrategyId } from './strategy-ids.mjs';
 import type { LLMCall, StructuredLLMCall, LogprobLLMCall } from '../../types/llm.mjs';
 
 type CallCacheKey = `${string}:${LLMCapability}`;
 const callCache = new Map<CallCacheKey, unknown>();
 const providerCache = new Map<string, LLMProvider>();
 const testOverrides = new Map<CallCacheKey, unknown>();
-let validated = false;
 
 const PROVIDER_FACTORIES: Record<ProviderKind, (cfg: ProviderConfig) => LLMProvider> = {
   'agent-sdk':   () => createAgentSdkProvider(),
@@ -43,31 +49,17 @@ function instantiateProvider(id: string, cfg: LLMConfig): LLMProvider {
   return provider;
 }
 
-function validateCapabilities(cfg: LLMConfig): void {
-  if (validated) return;
-  for (const [stratId, requiredCap] of Object.entries(STRATEGY_CAPABILITIES)) {
-    const strategy = cfg.strategies[stratId];
-    const providerId = strategy?.provider ?? cfg.defaultProvider;
-    const providerCfg = cfg.providers[providerId];
-    if (!providerCfg) {
-      throw new Error(
-        `Strategy "${stratId}" resolves to unknown provider "${providerId}"`,
-      );
-    }
-    const provider = instantiateProvider(providerId, cfg);
-    if (!provider.supports[requiredCap]) {
-      throw new Error(
-        `Strategy "${stratId}" requires capability "${requiredCap}" but provider "${providerId}" (${providerCfg.kind}) does not support it`,
-      );
-    }
-  }
-  validated = true;
-}
-
-function resolveStrategy(id: StrategyId, cfg: LLMConfig): { strategy: StrategyConfig; provider: LLMProvider } {
+function resolveStrategy(
+  id: string,
+  cfg: LLMConfig,
+): { strategy: StrategyConfig; provider: LLMProvider; providerId: string } {
   const explicit = cfg.strategies[id];
   if (explicit) {
-    return { strategy: explicit, provider: instantiateProvider(explicit.provider, cfg) };
+    return {
+      strategy: explicit,
+      provider: instantiateProvider(explicit.provider, cfg),
+      providerId: explicit.provider,
+    };
   }
   // Fallback on the default provider. Model must be declared somewhere — we
   // require the default provider to either have an entry for every strategy
@@ -77,7 +69,11 @@ function resolveStrategy(id: StrategyId, cfg: LLMConfig): { strategy: StrategyCo
     provider: cfg.defaultProvider,
     model: findDefaultModelFor(cfg.defaultProvider, cfg),
   };
-  return { strategy: fallback, provider: instantiateProvider(cfg.defaultProvider, cfg) };
+  return {
+    strategy: fallback,
+    provider: instantiateProvider(cfg.defaultProvider, cfg),
+    providerId: cfg.defaultProvider,
+  };
 }
 
 function findDefaultModelFor(providerId: string, cfg: LLMConfig): string {
@@ -89,7 +85,24 @@ function findDefaultModelFor(providerId: string, cfg: LLMConfig): string {
   );
 }
 
-function getOrCreate<T>(id: StrategyId, cap: LLMCapability, factory: () => T): T {
+// The resolved provider must support the capability this call needs. Kept here
+// (not in a central per-strategy table) so the check travels with the actual
+// call: the strategy declared its need by choosing this getter.
+function assertSupports(
+  id: string,
+  cap: LLMCapability,
+  providerId: string,
+  cfg: LLMConfig,
+  provider: LLMProvider,
+): void {
+  if (!provider.supports[cap]) {
+    throw new Error(
+      `Strategy "${id}" requires capability "${cap}" but provider "${providerId}" (${cfg.providers[providerId].kind}) does not support it`,
+    );
+  }
+}
+
+function getOrCreate<T>(id: string, cap: LLMCapability, factory: () => T): T {
   const key: CallCacheKey = `${id}:${cap}`;
   const override = testOverrides.get(key);
   if (override !== undefined) return override as T;
@@ -100,40 +113,34 @@ function getOrCreate<T>(id: StrategyId, cap: LLMCapability, factory: () => T): T
   return created;
 }
 
-export function getStrategyLLM(id: StrategyId): LLMCall {
+function callFor<T>(id: string, cap: LLMCapability, make: (s: StrategyConfig, p: LLMProvider) => T): T {
   const cfg = loadLLMConfig();
-  validateCapabilities(cfg);
-  return getOrCreate(id, 'text', () => {
-    const { strategy, provider } = resolveStrategy(id, cfg);
-    return provider.text(strategy);
+  return getOrCreate(id, cap, () => {
+    const { strategy, provider, providerId } = resolveStrategy(id, cfg);
+    assertSupports(id, cap, providerId, cfg, provider);
+    return make(strategy, provider);
   });
+}
+
+export function getStrategyLLM(id: string): LLMCall {
+  return callFor(id, 'text', (strategy, provider) => provider.text(strategy));
 }
 
 export function getStrategyStructuredLLM<T = unknown>(
-  id: StrategyId,
+  id: string,
   schema: Record<string, unknown>,
 ): StructuredLLMCall<T> {
-  const cfg = loadLLMConfig();
-  validateCapabilities(cfg);
-  return getOrCreate(id, 'structured', () => {
-    const { strategy, provider } = resolveStrategy(id, cfg);
-    return provider.structured<T>(strategy, schema);
-  });
+  return callFor(id, 'structured', (strategy, provider) => provider.structured<T>(strategy, schema));
 }
 
-export function getStrategyLogprobLLM(id: StrategyId): LogprobLLMCall {
-  const cfg = loadLLMConfig();
-  validateCapabilities(cfg);
-  return getOrCreate(id, 'logprobs', () => {
-    const { strategy, provider } = resolveStrategy(id, cfg);
-    return provider.logprobs(strategy);
-  });
+export function getStrategyLogprobLLM(id: string): LogprobLLMCall {
+  return callFor(id, 'logprobs', (strategy, provider) => provider.logprobs(strategy));
 }
 
 // ─── Test helpers ───────────────────────────────────────────────────────────
 
 /** Test-only: inject a stub for a given (strategy, capability) pair. */
-export function setLLMCallForTesting(id: StrategyId, cap: LLMCapability, fn: unknown): void {
+export function setLLMCallForTesting(id: string, cap: LLMCapability, fn: unknown): void {
   testOverrides.set(`${id}:${cap}`, fn);
 }
 
@@ -142,5 +149,4 @@ export function resetLLMRegistryCache(): void {
   callCache.clear();
   providerCache.clear();
   testOverrides.clear();
-  validated = false;
 }
