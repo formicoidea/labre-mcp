@@ -369,3 +369,38 @@ The shared type was specified as `src/core/ast/analysis-ref.mts` (`AnalysisRefSc
 - `JSON-labre` is the canonical artefact shape: a métier sub-tree per `wardley.*` aspect (conformant to its tool schema, the renderer schema in the case of `wardley.map`) plus a transverse `envelope` carrying `context`, `signals`, `reasoning`, `insights`, `trace`, `references` (cf. ARCH-22 + ARCH-24).
 - ADRs are still append-only and immutable; the supersession is marked via the `Status:` header of each impacted ADR. The original decision text is preserved as historical context.
 - The `StrategyMetadata.status` enum in [ast-schema.md § 3.4.3](ast-schema.md) includes the value `"mock"` to mark scaffolded I/O contracts that have no real implementation yet. Mock strategies live under `src/frameworks/**/*.mock-strategy.mts` and are registered via `registerMocks(registry)` after the real strategies at daemon boot, so the MCP catalogue exposes the full v0.1.0 surface from day 1.
+
+---
+
+## ARCH-26 — Strategy packages (vertical-slice co-location) + MCP-native auto-discovery
+
+**Status:** Accepted (2026-07-14). Migration is big-bang per ARCH-16.
+
+**Context:** A strategy's definition is scattered across **four sites**: its logic (`frameworks/<domain>/<tool>/<subdomain>/<command>/<name>.mts`), its prompt pair(s) (`prompts/<id>.<name>.{system,user}.md`, a flat directory), its I/O schema (`schemas/*.schema.mts`), and it is **registered twice** — in the framework's `registry.mts` and in `prompts.config.json`. The folder hierarchy (`.../purpose/generate/`) and the flattened prompt id (`purpose-generate`) drift apart. Separately, capability **discovery is doc-based only**: `tools/list` exposes four generic dispatchers (`runCommand`, `runRecipe`, `estimateEvolution`, `__ping__`) whose descriptions point the caller at `ast-schema.md`; `initialize` carries no `instructions`; the designed catalogue emitter `common:toolbox:list:emit:default` is still a mock; and `BaseStrategy` publishes none of the `StrategyMetadata` (status, cost/latency/confidence class) that ast-schema § 3.4.3 specifies — so there is nothing to introspect at runtime. Finally, the bundle system (ARCH-08 + remote-admin) already treats prompts and recipes as remote **data** in Supabase — business knowledge trends toward a DB, not code.
+
+**Decision:**
+
+1. **Strategy package (vertical slice).** Each `(command, strategy)` becomes a self-contained folder `frameworks/<domain>/<tool>/<subdomain>/<command>/<name>/` holding: `strategy.mts` (logic), its prompt pair(s) `*.system.md` / `*.user.md`, `schema.mts` (the I/O the strategy **owns**), and `meta.ts` (the `StrategyMetadata` of ast-schema § 3.4.3 — status, description, version, cost/latency/confidence class). Genuinely transverse contracts (the study `Context`, the JSON-labre envelope, cross-strategy types) stay in a shared `schemas/`: **co-locate what a strategy owns, share what is transverse** (avoids duplicating common contracts — the arbitration validated for `PurposeContext`, shared by `purpose:generate` and `purpose:audit-purpose-quality`).
+2. **Auto-registration by convention.** Boot scans the strategy-package folders and registers logic + prompts + metadata from that single manifest. The hand-maintained framework `registry.mts` lists and the `prompts.config.json` entries are dropped as the source of truth — the folder path **is** the manifest, and the methodId derives from it (removing the flat-id drift).
+3. **Prompts + recipes are business knowledge, DB-first.** The on-disk package files are the **shipped seed / default**; the canonical production store trends to the DB (continuing the bundle model), which resolves overrides by **methodId**, not file path. Stdio and local dev keep running from the seed with no DB. *(Open: DB-vs-seed source-of-truth precedence — deferred to the DB-knowledge workstream.)*
+4. **MCP-native discovery, auto-fed from the registries.** Replace the doc-based affordance with the standard MCP server primitives:
+   - **Resources** — `resources/list` + resource templates (`strategy://{domain}/{tool}/{subdomain}/{command}/{name}`, `recipe://…`) expose the runtime catalogue with per-strategy metadata; supersedes the `common:toolbox:list:emit` mock.
+   - **Prompts** — `prompts/list` / `prompts/get` expose the prompt registry natively.
+   - **Completions** — `completion/complete` autocompletes the `command` / `recipe` argument of the generic tools.
+   - **`initialize.instructions`** — announce the `_context` convention (incl. `userPrompt`) and point at the catalogue.
+   - **`*/list_changed`** — notify when a bundle adds/removes a capability.
+
+   The AST vocabulary is only **cosmetically** aligned to the MCP surface (a strategy's I/O schema surfaced as `inputSchema` / `outputSchema`; the methodId as a resource-template URI; `StrategyMetadata.status` as resource metadata). The internal 5-segment grammar (ARCH-03 / ARCH-25) is unchanged.
+
+**Migration:** big-bang (ARCH-16), executed by a **scripted, deterministic file relocation** of the ~85 strategies + their prompts into packages (not hand edits — to bound token cost), plus a codemod for the import/registration rewiring. Sequence: (a) this ADR; (b) scripted relocation + convention-based auto-registration on a dedicated branch; (c) build the MCP discovery primitives on top. `_legacy/` strategies (ARCH-23) fold into packages in the same pass.
+
+**Consequences:**
+- One place per strategy; the four-site scatter and the double registration disappear.
+- `BaseStrategy` gains the `StrategyMetadata` contract (ast-schema § 3.4.3 becomes real) — the missing input for introspection.
+- Discovery becomes runtime and machine-readable via MCP-standard primitives; callers stop needing to read `ast-schema.md`.
+- The bundle/DB knowledge keeps keying on methodId; the package loader maps methodId → folder, so remote overrides still resolve.
+- The shared-schema rule prevents duplication of transverse contracts.
+- Large one-time churn, mitigated by scripting and by the pre-1.0, mock-heavy state (cheapest it will ever be — cf. ARCH-16).
+- `ast-schema.md` is updated so its catalogue/introspection section (the `common:toolbox:list` design) points to the MCP resources model; where they disagree, this ADR + the MCP primitives win for the discovery surface.
+
+Relates to ARCH-03/25 (grammar unchanged), ARCH-04 (open command vocab), ARCH-08 (recipes shipped+override), ARCH-16 (big bang), ARCH-22 (result format), ARCH-23 (`_legacy` migration); supersedes the mock `common:toolbox:list:emit:default` as the discovery mechanism.
