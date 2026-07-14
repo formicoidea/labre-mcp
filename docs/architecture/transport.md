@@ -90,13 +90,16 @@ Every tool call carries a `RequestContext` embedded in `params._context`:
       "projectId": "abc123",
       "projectRoot": "/home/user/wardley-project",
       "sessionId": "uuid",
-      "domain": "wardley"
+      "domain": "wardley",
+      "userPrompt": "decarbonise the ULM 412 H production line"
     }
   }
 }
 ```
 
 If `_context` is missing, the daemon falls back to dev-mode placeholders (`projectId = "default"`, `projectRoot = process.cwd()`). V3 SaaS will reject context-less requests at the auth middleware.
+
+`userPrompt` (optional) carries the human user's **original, verbatim prompt** — the request as the person phrased it, not the calling agent's structured reformulation. It is ambient and user-supplied (the daemon never derives or enriches it), so any strategy can judge an agent's extraction against the original intent (e.g. `purpose:generate` stamps it into the study Context it emits, and `purpose:audit-purpose-quality` shows it as unstructured data). It is **never forwarded to telemetry** (metadata-only) and, like the rest of the context, only lands in the local run artifact.
 
 **Rule**: tool handlers must not read `process.cwd()` or `process.env.X` at runtime. The boot-time `process.cwd()` is captured once and exposed only as the default `projectRoot`. Per-request paths are resolved against `context.projectRoot`.
 

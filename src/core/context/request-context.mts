@@ -11,6 +11,12 @@ export const RequestContextSchema = z.object({
   sessionId: z.string().min(1),
   domain: z.string().min(1),
   artifactDir: z.string().min(1).optional(),
+  // The human user's original, verbatim prompt — the request as the person
+  // phrased it, NOT the calling agent's structured reformulation. Ambient and
+  // user-supplied (the MCP never derives or enriches it), so any strategy can
+  // judge an agent's extraction against the original intent. Optional: absent
+  // on stdio and simple clients. Never forwarded to telemetry (metadata-only).
+  userPrompt: z.string().optional(),
   // Populated by the auth middleware (e.g. Supabase JWT) on the HTTP
   // transport; absent on stdio and unauthenticated local dev.
   auth: z

@@ -34,10 +34,6 @@ const METHOD_ID = 'wardley:iteration:purpose:generate:default';
 const PurposeGenerateInputSchema = z.object({
   topic: z.string().default(''),
   intent: z.string().default(''),
-  // The user's original verbatim prompt, passed through into the output
-  // Context (never sent to the LLM as a field to fill). The calling agent is
-  // expected to forward the human's request here; absent → empty.
-  prompt: z.string().default(''),
 });
 
 // The Context fields the LLM is asked to fill. Kept explicit so the parser can
@@ -88,13 +84,14 @@ export class WardleyIterationPurposeGenerateDefaultStrategy extends BaseStrategy
     return METHOD_ID;
   }
 
-  async evaluate(input: unknown, _context: RequestContext): Promise<StrategyResult<PurposeContext>> {
+  async evaluate(input: unknown, requestContext: RequestContext): Promise<StrategyResult<PurposeContext>> {
     const capturedAt = new Date().toISOString();
 
     const parsedIn = PurposeGenerateInputSchema.safeParse(input ?? {});
-    const { topic, intent, prompt } = parsedIn.success
-      ? parsedIn.data
-      : { topic: '', intent: '', prompt: '' };
+    const { topic, intent } = parsedIn.success ? parsedIn.data : { topic: '', intent: '' };
+    // The user's original prompt rides on the ambient RequestContext (set once
+    // by the calling agent), not on this strategy's input — see RequestContext.
+    const userPrompt = requestContext.userPrompt ?? '';
 
     // Resolve the LLM defensively: an unconfigured id or any registry error
     // degrades to the skeleton Context rather than throwing.
@@ -131,15 +128,16 @@ export class WardleyIterationPurposeGenerateDefaultStrategy extends BaseStrategy
     // downstream step still has something to key on; the audit will (rightly)
     // flag the missing raison d'être / problématisation.
     // The user's original prompt is unstructured passthrough — it is never LLM-
-    // generated (not in CONTEXT_KEYS), so it is stamped onto the result here.
+    // generated (not in CONTEXT_KEYS), so it is stamped onto the result from the
+    // ambient RequestContext here.
     const result: PurposeContext = {
       ...(context ?? PurposeContextSchema.parse({ title: topic })),
-      prompt,
+      prompt: userPrompt,
     };
 
     const insights: StrategyResult['insights'] = degraded
-      ? [{ text: 'purpose-generate: LLM indisponible — Context minimal seedé depuis le topic.', by: METHOD_ID, type: 'other' }]
-      : [{ text: `Purpose formulé : « ${result.title || '(sans titre)'} ».`, by: METHOD_ID, type: 'other' }];
+      ? [{ text: 'purpose-generate: LLM unavailable — minimal Context seeded from the topic.', by: METHOD_ID, type: 'other' }]
+      : [{ text: `Purpose formulated: "${result.title || '(untitled)'}".`, by: METHOD_ID, type: 'other' }];
 
     return {
       signals: [

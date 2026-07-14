@@ -58,6 +58,16 @@ describe('strategy.evaluate', () => {
     assert.equal(res.signals.find((s) => s.name === 'topic')?.value, 'ULM 412 H');
   });
 
+  it('stamps the ambient userPrompt (RequestContext) onto the result Context', async () => {
+    const stub = async () => JSON.stringify(FULL_CONTEXT);
+    const strat = new WardleyIterationPurposeGenerateDefaultStrategy({ llmCall: stub });
+    const res = await strat.evaluate(
+      { topic: 'ULM 412 H' },
+      { ...requestCtx, userPrompt: 'décarbone la prod du ULM stp' },
+    );
+    assert.equal(res.result.prompt, 'décarbone la prod du ULM stp');
+  });
+
   it('degrades to a skeleton Context (title = topic) when the LLM is unavailable', async () => {
     const strat = new WardleyIterationPurposeGenerateDefaultStrategy({
       llmCall: async () => { throw new Error('offline'); },
@@ -66,7 +76,7 @@ describe('strategy.evaluate', () => {
     assert.equal(res.result.title, 'Épargne salariale');
     assert.equal(res.result.raisonDetre, ''); // audit will flag this
     assert.equal(res.signals.find((s) => s.name === 'llm-used')?.value, false);
-    assert.ok(res.insights.some((i) => /LLM indisponible/.test(i.text)));
+    assert.ok(res.insights.some((i) => /LLM unavailable/.test(i.text)));
   });
 
   it('degrades to a skeleton Context when the LLM returns malformed JSON', async () => {
