@@ -67,7 +67,9 @@ describe("supabase auth middleware", () => {
       { authorization: `Bearer ${token}` },
       baseContext,
     );
-    assert.deepEqual(context.auth, { userId: "user-abc", role: "authenticated" });
+    // auth.token is the verified raw bearer, threaded for RLS pass-through
+    // tools ([A2] agent.reply) — see jwks-auth.mts (auth review).
+    assert.deepEqual(context.auth, { userId: "user-abc", role: "authenticated", token });
     // Original context fields are preserved.
     assert.equal(context.projectId, baseContext.projectId);
     assert.equal(context.sessionId, baseContext.sessionId);
