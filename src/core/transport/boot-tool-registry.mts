@@ -14,6 +14,7 @@ import { ToolRegistry } from "./mcp-handler.mjs";
 import { ESTIMATE_EVOLUTION_TOOL } from "#mcp/estimate-evolution.tool.mjs";
 import { RUN_COMMAND_TOOL } from "#mcp/run-command.tool.mjs";
 import { RUN_RECIPE_TOOL } from "#mcp/run-recipe.tool.mjs";
+import { AGENT_REPLY_TOOL } from "#mcp/agent-reply.tool.mjs";
 
 export function buildBootRegistry(): ToolRegistry {
   const registry = new ToolRegistry();
@@ -32,5 +33,6 @@ export function buildBootRegistry(): ToolRegistry {
   registry.register(ESTIMATE_EVOLUTION_TOOL);
   registry.register(RUN_COMMAND_TOOL);
   registry.register(RUN_RECIPE_TOOL);
+  registry.register(AGENT_REPLY_TOOL);
   return registry;
 }

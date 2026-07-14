@@ -23,6 +23,16 @@ export const RequestContextSchema = z.object({
     .object({
       userId: z.string().min(1),
       role: z.string().optional(),
+      // ⚠ AUTH REVIEW — raw caller bearer, threaded ONLY by the JWT auth modes
+      // (supabase/oidc via jwks-auth.mts). It is the RLS pass-through credential
+      // for tools that must act AS the caller (agent.reply → conversation
+      // reads/writes under RLS). Deliberately NEVER set for lab_ API keys
+      // (api-key-auth.mts leaves it undefined — a lab_ key is not a JWT and
+      // resolves no auth.uid(), so it cannot pass RLS). Handling discipline,
+      // mirrors supabase-bundle-source's token invariants: it lives ONLY on the
+      // per-request context, is never logged, and is discarded when the request
+      // settles. Do not persist, forward, or serialise it.
+      token: z.string().min(1).optional(),
     })
     .optional(),
 });

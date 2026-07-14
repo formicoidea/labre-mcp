@@ -79,4 +79,16 @@ describe("buildJwksAuthMiddleware (generic OIDC core)", () => {
   test("requires jwksUrl or an injected jwks resolver", () => {
     assert.throws(() => buildJwksAuthMiddleware({ audience: AUDIENCE }), /jwksUrl/);
   });
+
+  // ⚠ AUTH REVIEW coverage — the [A2] token-threading change: a VERIFIED JWT
+  // is retained on context.auth.token for RLS pass-through tools (agent.reply).
+  // Only this middleware sets it; api-key-auth (lab_ keys) never does.
+  test("threads the verified raw bearer as auth.token (RLS pass-through)", async () => {
+    const { jwks, sign } = await setup();
+    const mw = buildJwksAuthMiddleware({ jwks, audience: AUDIENCE });
+
+    const token = await sign({});
+    const ctx = await mw.authenticate(bearer(token), CONTEXT);
+    assert.equal(ctx.auth?.token, token);
+  });
 });
