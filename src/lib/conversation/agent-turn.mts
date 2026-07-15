@@ -16,18 +16,29 @@
 //   5. insert_agent_message — the prose, actor 'external-agent'.
 //   6. release_conversation_turn('normal', produced) — the quiesce receipt.
 // The whole turn is wall-clock bounded; on timeout / error / lost claim it
-// still releases (reason 'normal', produced=false) — the claim is NEVER left
-// behind, and the 60 s TTL is the backstop if even that release fails.
+// still releases (reason 'interrupted', produced=false) — the claim is NEVER
+// left behind, and the 60 s TTL is the backstop if even that release fails.
+//
+// [A3] (ADR-0027, PR-A3-2b) fills the quota seam: assertAgentQuota reads
+// get_my_agent_usage() under the caller's JWT and refuses over-quota turns
+// with the first-class 'quota-exceeded' status (claim released via the
+// bare-delete path — no turn.quiesced for a turn that never started), and the
+// success path records ONE best-effort ai_calls row (source 'external-agent')
+// so the daily meter has data and the spend reaches the admin cost ledger.
 //
 // DELIBERATELY OUT OF SCOPE (this slice): a GLOBAL concurrency cap (N users =
-// N intervals + N in-flight LLM calls; A3 adds the per-user quota via the
-// assertAgentQuota seam), presence (MCP2), draw / tool-call
+// N intervals + N in-flight LLM calls), presence (MCP2), draw / tool-call
 // proposals, streaming, and multi-round loops. The "brain" is a single-round
 // prose completion — streaming and rounds are deferred (ADR-0026 non-goals).
 
 import { randomUUID } from 'node:crypto';
 import { createLLMCall } from '#lib/llm/llm-call.mjs';
+import { runWithUsageCollector, type LlmUsageAggregate } from '#lib/llm/usage-context.mjs';
+import { getPostHogFlags } from '#lib/flags/state.mjs';
+import { agentQuotaDecision, QuotaExceededError } from './agent-quota.mjs';
 import type { LLMCall } from '#types/llm.mjs';
+
+export { QuotaExceededError } from './agent-quota.mjs';
 
 // The claim TTL (seconds) the daemon renews via the heartbeat. Matches the
 // in-app AI's 60 s-family single-flight TTL (ADR-0026 Decision 4).
@@ -82,7 +93,7 @@ export interface AgentTurnAuth {
   token: string;
 }
 
-export type AgentTurnStatus = 'ok' | 'busy' | 'degraded';
+export type AgentTurnStatus = 'ok' | 'busy' | 'degraded' | 'quota-exceeded';
 
 export interface RunAgentTurnResult {
   status: AgentTurnStatus;
@@ -97,6 +108,18 @@ export interface ThreadMessage {
   actor: string;
 }
 
+/** One turn's spend, destined for the ai_calls ledger (ADR-0027 D4.1).
+ *  Token counts are 0 when the backend reported none (the ai_calls columns
+ *  are NOT NULL default 0 — a Copilot-backed turn contributes a call count,
+ *  not tokens). Numbers and a model identifier only — never prompt text. */
+export interface AgentSpendRecord {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  latencyMs: number;
+  source: 'external-agent';
+}
+
 /**
  * The minimal Supabase surface one turn needs, all acting AS the caller under
  * RLS. Abstracted (and injectable) so the orchestration is unit-testable
@@ -107,8 +130,19 @@ export interface AgentTurnClient {
   claimTurn(token: string, ttlSeconds: number, turnId: string): Promise<boolean>;
   /** refresh_conversation_turn(conv, token, ttl) → still-held? */
   refreshTurn(token: string, ttlSeconds: number): Promise<boolean>;
-  /** release_conversation_turn(conv, token, reason, produced). */
-  releaseTurn(token: string, reason: string, produced: boolean): Promise<void>;
+  /** release_conversation_turn(conv, token, reason, produced). `reason` NULL
+   *  is the RPC's bare-delete path: a pure claim delete that emits NO
+   *  turn.quiesced (20260714110000 — "p_reason IS NULL → a bare delete …
+   *  emitting nothing"). Used for a quota-refused turn that never started. */
+  releaseTurn(token: string, reason: string | null, produced: boolean): Promise<void>;
+  /** get_my_agent_usage() under the caller's JWT (ADR-0027 D3.2). Returns the
+   *  raw { ok, body } pair for the pure decision; ok=false on an RPC error.
+   *  May also throw — the quota gate treats a throw like ok=false. */
+  readAgentUsage(): Promise<{ ok: boolean; body: unknown }>;
+  /** Insert one spend-ledger row into ai_calls under the caller's JWT
+   *  (insert-own RLS; user_id defaults to auth.uid()). Throws on failure —
+   *  the caller swallows and captures a receipt (best-effort, ADR-0027 D4.1). */
+  recordAiCall(record: AgentSpendRecord): Promise<void>;
   /** append_conversation_events(conv, events) — best-effort receipts. */
   appendEvents(events: unknown[]): Promise<void>;
   /** insert_agent_message(conv, content, sessionId, null, null, null) → id. */
@@ -132,18 +166,44 @@ export interface RunAgentTurnDeps {
   turnTimeoutMs?: number;
 }
 
-// ─── Quota seam ([A3]) ──────────────────────────────────────────────────────
+// ─── Quota gate ([A3], ADR-0027 Decisions 3 & 4) ────────────────────────────
 
 /**
  * Per-user quota gate, called before the (daemon-owned, daemon-billed) LLM
- * call. A2-minimal NO-OP: [A3] wires the real check against the admin cost
- * ledger, keyed on userId (ADR-0026 Decision 4 "Quotas … keyed on user_id").
- * Kept as a seam now so the call-site exists and A3 is a body change, not a
- * new integration point. Throwing here aborts the turn before any spend.
+ * call. Reads get_my_agent_usage() through the SAME per-request RLS client
+ * the turn already uses (caller's JWT — zero daemon-privileged credentials),
+ * then applies the pure agentQuotaDecision. Throwing here aborts the turn
+ * before any spend.
+ *
+ * Fail-OPEN: a failed read allows the turn AND captures a metadata-only
+ * QuotaCheckDegraded receipt so the outage is observable, never silent
+ * (ADR-0027 D3.3/D6). A deny throws a typed QuotaExceededError carrying
+ * used/limit; runAgentTurn maps it to the 'quota-exceeded' status.
  */
-export async function assertAgentQuota(_userId: string): Promise<void> {
-  // any: intentionally empty — see the doc comment. A3 replaces this body.
-  return;
+export async function assertAgentQuota(userId: string, client: AgentTurnClient): Promise<void> {
+  let ok = false;
+  let body: unknown;
+  try {
+    ({ ok, body } = await client.readAgentUsage());
+  } catch {
+    // Unreachable RPC / broken client → treated exactly like ok=false below.
+    ok = false;
+  }
+
+  const verdict = agentQuotaDecision(ok, body);
+  if (verdict.decision === 'deny') {
+    throw new QuotaExceededError(verdict.used, verdict.limit);
+  }
+
+  if (!ok || verdict.degraded) {
+    // Fail-open, observably: a failed READ (ok=false / throw) or a MALFORMED
+    // row (RPC schema drift — verdict.degraded) both proceed, but never
+    // silently. Metadata only (resource + source, no content).
+    getPostHogFlags()?.capture('QuotaCheckDegraded', userId, {
+      resource: 'agent-turns-day',
+      source: 'external-agent',
+    });
+  }
 }
 
 // ─── Orchestrator ───────────────────────────────────────────────────────────
@@ -239,7 +299,29 @@ export async function runAgentTurn(
     return produced.messageId != null
       ? { status: 'ok', messageId: produced.messageId }
       : { status: 'ok' };
-  } catch {
+  } catch (err) {
+    // Quota refusal FIRST (typed, expected outcome — not a degradation and it
+    // must not invite retries). The turn never started: release through the
+    // bare-delete path (reason NULL → the RPC deletes the claim and emits NO
+    // turn.quiesced — ADR-0027 D4/D6: the log must not say a turn ended that
+    // never began), then surface the first-class 'quota-exceeded' status.
+    if (err instanceof QuotaExceededError) {
+      try {
+        await client.releaseTurn(turnToken, null, false);
+      } catch {
+        // TTL expiry is the backstop for a claim we could not release.
+      }
+      // Metadata-only refusal receipt (ADR-0027 D6): numbers + ids, no content.
+      getPostHogFlags()?.capture('QuotaRefused', auth.userId, {
+        resource: 'agent-turns-day',
+        used: err.used,
+        limit: err.limit,
+        conversation_id: input.conversationId,
+        source: 'external-agent',
+      });
+      return { status: 'quota-exceeded' };
+    }
+
     // Timeout, LLM failure, or a lost claim. NEVER leave the claim behind:
     // best-effort release (produced=false). If even this throws, the TTL is the
     // backstop. The error detail is not surfaced (it may reference internals).
@@ -275,13 +357,48 @@ async function conductTurn(
   client: AgentTurnClient,
   llmCall: LLMCall,
 ): Promise<ConductResult> {
-  // Quota gate BEFORE any spend (A3 seam).
-  await assertAgentQuota(auth.userId);
+  // Quota gate BEFORE any spend ([A3], ADR-0027 D3/D4) — same RLS client as
+  // the rest of the turn. A deny throws QuotaExceededError (caught above).
+  await assertAgentQuota(auth.userId, client);
 
   const thread = await client.readThread(THREAD_WINDOW);
   const prompt = buildPrompt(thread);
 
-  const text = (await llmCall(prompt, undefined, { systemPrompt: SYSTEM_PROMPT })).trim();
+  // One LLM call, usage collected for the spend ledger. Token counts (and the
+  // model id) only exist when the backend reports them through recordLlmUsage
+  // — the Copilot flow reports none, in which case the row still counts the
+  // call (that is the quota's unit, ADR-0027 D1).
+  let usage: LlmUsageAggregate = { llmCalls: 0 };
+  const llmStartedAt = Date.now();
+  const raw = await runWithUsageCollector(
+    () => llmCall(prompt, undefined, { systemPrompt: SYSTEM_PROMPT }),
+    (aggregate) => {
+      usage = aggregate;
+    },
+  );
+  const latencyMs = Date.now() - llmStartedAt;
+  const text = raw.trim();
+
+  // Spend ledger (ADR-0027 D4.1): ONE best-effort ai_calls row under the
+  // caller's JWT — this is what get_my_agent_usage() counts tomorrow, AND the
+  // admin cost ledger's visibility. A failed insert must not fail the turn,
+  // but it must be observable (recording failure = silent unlimited — the
+  // named ADR risk), so it captures a metadata-only receipt.
+  try {
+    await client.recordAiCall({
+      model: usage.model ?? 'unknown',
+      inputTokens: usage.inputTokens ?? 0,
+      outputTokens: usage.outputTokens ?? 0,
+      latencyMs,
+      source: 'external-agent',
+    });
+  } catch {
+    getPostHogFlags()?.capture('AgentSpendRecordFailed', auth.userId, {
+      resource: 'agent-turns-day',
+      source: 'external-agent',
+      conversation_id: input.conversationId,
+    });
+  }
 
   // Best-effort lifecycle receipts (ADR-0025). The active claim satisfies the
   // turn-scope requirement of append_conversation_events (actor derives to
@@ -375,11 +492,34 @@ function buildDefaultClientFactory(): AgentTurnClientFactory {
         return data === true;
       },
       async releaseTurn(token, reason, produced): Promise<void> {
+        // `reason` null is sent EXPLICITLY: supabase-js serializes it as JSON
+        // null → SQL NULL, and release_conversation_turn's p_reason-NULL branch
+        // is the bare delete that emits no turn.quiesced (20260714110000).
         const { error } = await client.rpc('release_conversation_turn', {
           p_conversation_id: conversationId,
           p_token: token,
           p_reason: reason,
           p_produced: produced,
+        });
+        if (error) throw new Error(error.message);
+      },
+      async readAgentUsage(): Promise<{ ok: boolean; body: unknown }> {
+        // SECURITY INVOKER meter under the caller's JWT (ADR-0027 D3.2). An
+        // RPC error maps to ok=false — the gate degrades OPEN on it.
+        const { data, error } = await client.rpc('get_my_agent_usage');
+        if (error) return { ok: false, body: undefined };
+        return { ok: true, body: data };
+      },
+      async recordAiCall(record): Promise<void> {
+        // Insert-own RLS covers this (user_id defaults to auth.uid()); the
+        // ledger is write-only from the app side, so no .select() readback.
+        const { error } = await client.from('ai_calls').insert({
+          conversation_id: conversationId,
+          model: record.model,
+          input_tokens: record.inputTokens,
+          output_tokens: record.outputTokens,
+          latency_ms: record.latencyMs,
+          source: record.source,
         });
         if (error) throw new Error(error.message);
       },

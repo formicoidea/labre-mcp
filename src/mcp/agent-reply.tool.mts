@@ -56,9 +56,10 @@ export function buildAgentReplyTool(runner: AgentTurnRunner = runAgentTurn): Too
       'RLS, produce one concise prose reply, persist it as an external-agent message, ' +
       'and release the turn. Requires a user JWT (not a lab_ API key). ' +
       'Input: { conversationId, sessionId, turnId, writeMode?, scope? }. ' +
-      'Returns { status: "ok" | "busy" | "degraded" | "error", messageId? }: ' +
+      'Returns { status: "ok" | "busy" | "degraded" | "quota-exceeded" | "error", messageId? }: ' +
       '"busy" = another turn holds the conversation; "degraded" = the turn timed out ' +
-      'or errored (the claim was still released).',
+      'or errored (the claim was still released); "quota-exceeded" = the caller\'s ' +
+      'daily external-agent turn quota is used up (resets at midnight UTC — do not retry).',
     // any: zod-to-json conversion — the schema is well-typed at the Zod layer.
     inputSchema: z.toJSONSchema(AgentReplyInputSchema, { io: 'input' }) as Record<string, unknown>,
     async handler(args, context): Promise<AgentReplyResult> {

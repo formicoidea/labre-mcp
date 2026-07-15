@@ -30,11 +30,14 @@ export interface LlmUsageRecord {
  *  `llmCalls` is always present (a plain count). Token sums are only defined
  *  when at least one record carried that dimension — we never fabricate a 0 for
  *  providers that report nothing, so the caller can distinguish "0 tokens" from
- *  "no token data". */
+ *  "no token data". `model` is the FIRST model identifier any record carried
+ *  (undefined when none did) — enough for single-call collectors like the
+ *  agent-turn spend ledger, which needs a model name for its ai_calls row. */
 export interface LlmUsageAggregate {
   llmCalls: number;
   inputTokens?: number;
   outputTokens?: number;
+  model?: string;
 }
 
 /** Mutable per-run accumulator held in the ALS store. */
@@ -42,6 +45,7 @@ interface UsageCollector {
   llmCalls: number;
   inputTokens?: number;
   outputTokens?: number;
+  model?: string;
 }
 
 const storage = new AsyncLocalStorage<UsageCollector>();
@@ -68,6 +72,7 @@ export async function runWithUsageCollector<T>(
     const aggregate: LlmUsageAggregate = { llmCalls: collector.llmCalls };
     if (collector.inputTokens !== undefined) aggregate.inputTokens = collector.inputTokens;
     if (collector.outputTokens !== undefined) aggregate.outputTokens = collector.outputTokens;
+    if (collector.model !== undefined) aggregate.model = collector.model;
     onAggregate(aggregate);
   }
 }
@@ -89,5 +94,10 @@ export function recordLlmUsage(record: LlmUsageRecord): void {
   }
   if (typeof record.outputTokens === 'number') {
     collector.outputTokens = (collector.outputTokens ?? 0) + record.outputTokens;
+  }
+  // First model seen wins (an aggregate has one model slot; multi-model runs
+  // keep the first — the single-call collectors this serves never mix models).
+  if (collector.model === undefined && typeof record.model === 'string') {
+    collector.model = record.model;
   }
 }
