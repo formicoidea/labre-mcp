@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 // Side-effect: registers prompt parsers consumed by some strategies.
 import "#lib/prompts/init.mjs";
-import { buildStrategyRegistry, withApiKeys } from "./labre-daemon.mjs";
+import { buildStrategyRegistry, withApiKeys, selectAuthMiddleware } from "./labre-daemon.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
 import type { RequestContext } from "../context/request-context.mjs";
 
@@ -151,6 +151,118 @@ describe("withApiKeys — lab_ keys ride alongside any JWT mode", () => {
           })
           .catch(reject);
       });
+    });
+  });
+});
+
+describe("selectAuthMiddleware — boot fail-closed matrix (issue #33)", () => {
+  // The auth-related env this function reads. Each test states its OWN complete
+  // environment; everything else is scrubbed and restored afterwards.
+  const AUTH_ENV_KEYS = [
+    "LABRE_AUTH",
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_JWT_AUD",
+    "AUTH_JWKS_URL",
+    "AUTH_AUDIENCE",
+    "AUTH_ISSUER",
+    "AUTH_ROLE_CLAIM",
+  ] as const;
+
+  function withAuthEnv<T>(env: Partial<Record<(typeof AUTH_ENV_KEYS)[number], string>>, fn: () => T): T {
+    const previous = new Map<string, string | undefined>();
+    for (const key of AUTH_ENV_KEYS) {
+      previous.set(key, process.env[key]);
+      const value = env[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    try {
+      return fn();
+    } finally {
+      for (const key of AUTH_ENV_KEYS) {
+        const prev = previous.get(key);
+        if (prev === undefined) delete process.env[key];
+        else process.env[key] = prev;
+      }
+    }
+  }
+
+  const MULTI_FULL = {
+    LABRE_AUTH: "multi",
+    SUPABASE_URL: "https://test.supabase.co",
+    AUTH_JWKS_URL: "https://idp.example/.well-known/jwks.json",
+    AUTH_AUDIENCE: "api://labre-mcp",
+  } as const;
+
+  it('multi with the full env boots (returns a middleware)', () => {
+    withAuthEnv(MULTI_FULL, () => {
+      assert.notEqual(selectAuthMiddleware(), undefined);
+    });
+  });
+
+  // Each required var missing, alone, refuses the boot and NAMES the gap.
+  for (const missing of ["SUPABASE_URL", "AUTH_JWKS_URL", "AUTH_AUDIENCE"] as const) {
+    it(`multi without ${missing} refuses to boot (fail-closed)`, () => {
+      const env: Record<string, string> = { ...MULTI_FULL };
+      delete env[missing];
+      withAuthEnv(env, () => {
+        assert.throws(
+          () => selectAuthMiddleware(),
+          (err: Error) =>
+            err.message.includes('LABRE_AUTH="multi"') && err.message.includes(missing),
+        );
+      });
+    });
+  }
+
+  it("multi with NO issuer env at all refuses to boot and lists every missing var", () => {
+    withAuthEnv({ LABRE_AUTH: "multi" }, () => {
+      assert.throws(
+        () => selectAuthMiddleware(),
+        (err: Error) =>
+          err.message.includes("SUPABASE_URL") &&
+          err.message.includes("AUTH_JWKS_URL") &&
+          err.message.includes("AUTH_AUDIENCE"),
+      );
+    });
+  });
+
+  // Backward compatibility: the three pre-existing modes keep their exact
+  // boot semantics (AC4 — rétrocompatibilité totale).
+  it("supabase mode still requires SUPABASE_URL and boots with it", () => {
+    withAuthEnv({ LABRE_AUTH: "supabase" }, () => {
+      assert.throws(() => selectAuthMiddleware(), /SUPABASE_URL/);
+    });
+    withAuthEnv({ LABRE_AUTH: "supabase", SUPABASE_URL: "https://test.supabase.co" }, () => {
+      assert.notEqual(selectAuthMiddleware(), undefined);
+    });
+  });
+
+  it("oidc mode still requires AUTH_JWKS_URL + AUTH_AUDIENCE and boots with them", () => {
+    withAuthEnv({ LABRE_AUTH: "oidc", AUTH_JWKS_URL: "https://idp.example/keys" }, () => {
+      assert.throws(() => selectAuthMiddleware(), /AUTH_JWKS_URL and AUTH_AUDIENCE/);
+    });
+    withAuthEnv(
+      {
+        LABRE_AUTH: "oidc",
+        AUTH_JWKS_URL: "https://idp.example/.well-known/jwks.json",
+        AUTH_AUDIENCE: "api://labre-mcp",
+      },
+      () => {
+        assert.notEqual(selectAuthMiddleware(), undefined);
+      },
+    );
+  });
+
+  it("none/unset stays a noop (undefined middleware)", () => {
+    withAuthEnv({}, () => assert.equal(selectAuthMiddleware(), undefined));
+    withAuthEnv({ LABRE_AUTH: "none" }, () => assert.equal(selectAuthMiddleware(), undefined));
+  });
+
+  it("an invalid mode still refuses to boot, now naming multi among the valid ones", () => {
+    withAuthEnv({ LABRE_AUTH: "both" }, () => {
+      assert.throws(() => selectAuthMiddleware(), /"supabase", "oidc", "multi" or "none"/);
     });
   });
 });

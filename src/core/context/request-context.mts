@@ -5,6 +5,14 @@
 
 import { z } from "zod";
 
+/** Which auth middleware authenticated the caller. Provenance travels with
+ *  the context so tools can gate on the ISSUER FAMILY, not just on the shape
+ *  of the credentials — e.g. agent.reply requires a Supabase-issued JWT
+ *  (auth.uid() under RLS), and a valid OIDC token at the door is worth
+ *  nothing against PostgREST (see multi-issuer-auth.mts). */
+export const AuthSourceSchema = z.enum(["supabase", "oidc", "api-key"]);
+export type AuthSource = z.infer<typeof AuthSourceSchema>;
+
 export const RequestContextSchema = z.object({
   projectId: z.string().min(1),
   projectRoot: z.string().min(1),
@@ -33,6 +41,13 @@ export const RequestContextSchema = z.object({
       // per-request context, is never logged, and is discarded when the request
       // settles. Do not persist, forward, or serialise it.
       token: z.string().min(1).optional(),
+      // Provenance: which middleware authenticated the caller. Set by every
+      // HTTP auth middleware ('supabase' | 'oidc' | 'api-key'); absent only on
+      // in-process/stdio contexts that never crossed an auth middleware.
+      // Conversation tools (agent.reply) gate on it: ONLY 'supabase' can pass
+      // RLS, so an 'oidc' caller is refused first-class at the tool entry
+      // instead of failing invisibly downstream (issue #33).
+      source: AuthSourceSchema.optional(),
     })
     .optional(),
 });

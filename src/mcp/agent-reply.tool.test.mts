@@ -91,6 +91,64 @@ describe('agent.reply tool', () => {
     assert.match(AGENT_REPLY_TOOL.description, /"quota-exceeded"/);
   });
 
+  // ─── Issuer-provenance gate (issue #33) ──────────────────────────────────
+
+  it('refuses an OIDC-authenticated caller first-class, before ANY Supabase work', async () => {
+    let runnerCalled = false;
+    const runner: AgentTurnRunner = async () => {
+      // The runner is the ONLY seam that builds the per-request Supabase
+      // client — it staying uncalled proves no Supabase call was attempted.
+      runnerCalled = true;
+      return { status: 'ok' };
+    };
+    const tool = buildAgentReplyTool(runner);
+
+    // A valid OIDC JWT at the daemon's door: userId + token present, but the
+    // provenance says the token cannot mint auth.uid() against PostgREST.
+    const context: RequestContext = {
+      ...BASE_CONTEXT,
+      auth: { userId: 'user-oidc', token: 'oidc-jwt', source: 'oidc' },
+    };
+    const out = (await tool.handler(ARGS, context)) as ResultShape;
+
+    assert.equal(out.status, 'unsupported-issuer', 'a first-class status, not a generic error');
+    assert.match(out.error ?? '', /Supabase-issued user JWT/);
+    assert.match(out.error ?? '', /"oidc"/);
+    assert.equal(runnerCalled, false, 'no Supabase call may be attempted');
+  });
+
+  it('a Supabase-provenance caller passes the gate', async () => {
+    const tool = buildAgentReplyTool(async () => ({ status: 'ok', messageId: 'm2' }));
+    const context: RequestContext = {
+      ...BASE_CONTEXT,
+      auth: { userId: 'user-1', token: 'supa-jwt', source: 'supabase' },
+    };
+    const out = (await tool.handler(ARGS, context)) as ResultShape;
+    assert.equal(out.status, 'ok');
+    assert.equal(out.messageId, 'm2');
+  });
+
+  it('an api-key caller keeps its long-standing explicit refusal (not unsupported-issuer)', async () => {
+    let runnerCalled = false;
+    const tool = buildAgentReplyTool(async () => {
+      runnerCalled = true;
+      return { status: 'ok' };
+    });
+    // Real lab_ callers now carry source 'api-key' and never a token.
+    const context: RequestContext = {
+      ...BASE_CONTEXT,
+      auth: { userId: 'user-lab', source: 'api-key' },
+    };
+    const out = (await tool.handler(ARGS, context)) as ResultShape;
+    assert.equal(out.status, 'error');
+    assert.match(out.error ?? '', /requires a user JWT/);
+    assert.equal(runnerCalled, false);
+  });
+
+  it('the tool description documents the unsupported-issuer status (client contract)', () => {
+    assert.match(AGENT_REPLY_TOOL.description, /"unsupported-issuer"/);
+  });
+
   it('rejects malformed input (non-uuid conversationId) before running', async () => {
     let runnerCalled = false;
     const tool = buildAgentReplyTool(async () => {

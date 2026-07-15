@@ -11,6 +11,7 @@ import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { startHttpServer, type OnAuthenticatedHook, type OAuthResourceConfig } from "./http-server.mjs";
 import { buildSupabaseAuthMiddleware, tryExtractBearerToken } from "./supabase-auth.mjs";
 import { buildJwksAuthMiddleware } from "./jwks-auth.mjs";
+import { buildMultiIssuerAuthMiddleware } from "./multi-issuer-auth.mjs";
 import { buildApiKeyAuthMiddleware, routeBearerAuth, API_KEY_PREFIX } from "./api-key-auth.mjs";
 import { registerBootHealthChecks } from "./boot-health-checks.mjs";
 import { runAllHealthChecks } from "#lib/degradation/index.mjs";
@@ -63,8 +64,14 @@ export function withApiKeys(jwt: AuthMiddleware): AuthMiddleware {
 //              connector — the daemon validates AS-issued JWTs via the AS JWKS.
 //   supabase — Supabase preset (JWKS derived from SUPABASE_URL). Legacy path
 //              for raw Supabase session tokens; NOT used by the OAuth connector.
+//   multi    — BOTH JWT populations on one instance (issue #33): each bearer
+//              is routed on its iss claim to the matching issuer config
+//              (Supabase = {SUPABASE_URL}/auth/v1; OIDC = AUTH_JWKS_URL +
+//              AUTH_AUDIENCE, optional AUTH_ISSUER/AUTH_ROLE_CLAIM). Requires
+//              the UNION of both modes' env; unknown iss → 401, no fallback.
 //   none/unset — local noop.
-function selectAuthMiddleware(): AuthMiddleware | undefined {
+// Exported for the boot fail-closed matrix tests (same pattern as withApiKeys).
+export function selectAuthMiddleware(): AuthMiddleware | undefined {
   const mode = process.env.LABRE_AUTH;
   if (mode === undefined || mode === "" || mode === "none") return undefined;
   if (mode === "supabase") {
@@ -95,7 +102,37 @@ function selectAuthMiddleware(): AuthMiddleware | undefined {
       }),
     );
   }
-  throw new Error(`Invalid LABRE_AUTH: "${mode}" (expected "supabase", "oidc" or "none")`);
+  if (mode === "multi") {
+    // The union of both single modes' requirements — every activated issuer
+    // brings its own vars, and ANY missing one refuses the boot (fail-closed,
+    // same posture as the single modes above).
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const jwksUrl = process.env.AUTH_JWKS_URL;
+    const audience = process.env.AUTH_AUDIENCE;
+    const missing = [
+      ...(supabaseUrl ? [] : ["SUPABASE_URL"]),
+      ...(jwksUrl ? [] : ["AUTH_JWKS_URL"]),
+      ...(audience ? [] : ["AUTH_AUDIENCE"]),
+    ];
+    if (!supabaseUrl || !jwksUrl || !audience) {
+      throw new Error(
+        `LABRE_AUTH="multi" requires SUPABASE_URL, AUTH_JWKS_URL and AUTH_AUDIENCE to be set ` +
+          `(missing: ${missing.join(", ")}) (fail-closed: refusing to boot unauthenticated)`,
+      );
+    }
+    return withApiKeys(
+      buildMultiIssuerAuthMiddleware({
+        supabase: { supabaseUrl, audience: process.env.SUPABASE_JWT_AUD },
+        oidc: {
+          jwksUrl,
+          audience,
+          issuer: process.env.AUTH_ISSUER,
+          roleClaim: process.env.AUTH_ROLE_CLAIM,
+        },
+      }),
+    );
+  }
+  throw new Error(`Invalid LABRE_AUTH: "${mode}" (expected "supabase", "oidc", "multi" or "none")`);
 }
 
 // OAuth protected-resource discovery config (env at boot only — ARCH-15).
@@ -142,13 +179,14 @@ function selectBundleRefreshHook(
   authed: boolean,
 ): { hook?: OnAuthenticatedHook; bootLine: string } {
   if (!authed) {
-    return { bootLine: "off (requires LABRE_AUTH=supabase)" };
+    return { bootLine: "off (requires LABRE_AUTH=supabase or multi)" };
   }
   const anonKey = process.env.SUPABASE_ANON_KEY;
   if (!anonKey) {
     return { bootLine: "off (SUPABASE_ANON_KEY not set)" };
   }
-  // selectAuthMiddleware already guaranteed SUPABASE_URL under supabase mode.
+  // selectAuthMiddleware already guaranteed SUPABASE_URL under the supabase
+  // and multi modes (the only ones that reach this branch).
   const supabaseUrl = process.env.SUPABASE_URL as string;
   const ttlSeconds = readBundlesTtlSeconds();
   const source = buildSupabaseBundleSource({
@@ -185,10 +223,12 @@ async function main(): Promise<void> {
   const auth = selectAuthMiddleware();
   const tools: ToolRegistry = buildBootRegistry();
   const strategies = buildStrategyRegistry();
-  // Remote bundles are a Supabase feature (RLS + storage): only the supabase
-  // auth mode enables them — an oidc-mode caller token would mean nothing to
-  // the Supabase RLS layer.
-  const bundles = selectBundleRefreshHook(process.env.LABRE_AUTH === "supabase");
+  // Remote bundles are a Supabase feature (RLS + storage): only the modes
+  // that admit Supabase JWTs enable them (supabase, and multi — issue #33).
+  // An oidc caller token means nothing to the Supabase RLS layer; under multi
+  // the refresh hook simply no-ops usefully for OIDC bearers (RLS refuses).
+  const authMode = process.env.LABRE_AUTH;
+  const bundles = selectBundleRefreshHook(authMode === "supabase" || authMode === "multi");
 
   // LABRE_HTTP_HOST: "0.0.0.0" behind a PaaS router; default
   // stays loopback so a local daemon is never exposed by accident.
@@ -204,8 +244,10 @@ async function main(): Promise<void> {
   // + URL are set.
   const apiKeysEnabled =
     !!auth && !!process.env.SUPABASE_URL && !!process.env.SUPABASE_ANON_KEY;
+  // Honest boot line (issue #33): "multi" spells out both issuer families.
+  const jwtLabel = authMode === "multi" ? "supabase+oidc" : authMode;
   process.stderr.write(
-    `[labre-mcp] Auth: ${auth ? `${process.env.LABRE_AUTH} JWT (JWKS)${apiKeysEnabled ? " + lab_ API keys" : ""}` : "none (local dev)"}\n`,
+    `[labre-mcp] Auth: ${auth ? `${jwtLabel} JWT (JWKS)${apiKeysEnabled ? " + lab_ API keys" : ""}` : "none (local dev)"}\n`,
   );
   process.stderr.write(`[labre-mcp] Remote strategy bundles: ${bundles.bootLine}\n`);
   process.stderr.write(
@@ -225,7 +267,8 @@ async function main(): Promise<void> {
     // Metadata only — no payloads, no user content.
     posthog.capture("mcp_boot", "daemon", {
       port: server.port,
-      auth: auth ? "supabase" : "none",
+      // The actual mode (supabase | oidc | multi), not a hardcoded label.
+      auth: auth ? authMode : "none",
       tools: tools.list().length,
       strategies: strategies.size(),
     });

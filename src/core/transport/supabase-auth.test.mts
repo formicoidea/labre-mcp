@@ -68,8 +68,14 @@ describe("supabase auth middleware", () => {
       baseContext,
     );
     // auth.token is the verified raw bearer, threaded for RLS pass-through
-    // tools ([A2] agent.reply) — see jwks-auth.mts (auth review).
-    assert.deepEqual(context.auth, { userId: "user-abc", role: "authenticated", token });
+    // tools ([A2] agent.reply) — see jwks-auth.mts (auth review). auth.source
+    // is the provenance stamp (issue #33): this preset always says 'supabase'.
+    assert.deepEqual(context.auth, {
+      userId: "user-abc",
+      role: "authenticated",
+      token,
+      source: "supabase",
+    });
     // Original context fields are preserved.
     assert.equal(context.projectId, baseContext.projectId);
     assert.equal(context.sessionId, baseContext.sessionId);

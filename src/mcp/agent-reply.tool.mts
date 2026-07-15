@@ -39,9 +39,13 @@ const AgentReplyInputSchema = z.object({
 });
 
 /** The tool's own result (the daemon dispatch wraps it in Degradable<T> — do
- *  NOT self-wrap, hard rule #18). */
+ *  NOT self-wrap, hard rule #18). 'unsupported-issuer' is the first-class
+ *  refusal for a caller whose JWT did not come from the Supabase issuer
+ *  (issue #33): valid at the door, worthless against PostgREST (auth.uid()
+ *  null) — refused HERE, explicitly, instead of failing invisibly downstream
+ *  in an RLS cascade (the A2 recette's MAJOR failure mode). */
 interface AgentReplyResult {
-  status: RunAgentTurnResult['status'] | 'error';
+  status: RunAgentTurnResult['status'] | 'error' | 'unsupported-issuer';
   messageId?: string;
   error?: string;
 }
@@ -56,13 +60,38 @@ export function buildAgentReplyTool(runner: AgentTurnRunner = runAgentTurn): Too
       'RLS, produce one concise prose reply, persist it as an external-agent message, ' +
       'and release the turn. Requires a user JWT (not a lab_ API key). ' +
       'Input: { conversationId, sessionId, turnId, writeMode?, scope? }. ' +
-      'Returns { status: "ok" | "busy" | "degraded" | "quota-exceeded" | "error", messageId? }: ' +
+      'Returns { status: "ok" | "busy" | "degraded" | "quota-exceeded" | ' +
+      '"unsupported-issuer" | "error", messageId? }: ' +
       '"busy" = another turn holds the conversation; "degraded" = the turn timed out ' +
       'or errored (the claim was still released); "quota-exceeded" = the caller\'s ' +
-      'daily external-agent turn quota is used up (resets at midnight UTC — do not retry).',
+      'daily external-agent turn quota is used up (resets at midnight UTC — do not retry); ' +
+      '"unsupported-issuer" = the caller authenticated with a non-Supabase JWT (e.g. an ' +
+      'OIDC IdP token on a multi-issuer daemon) — such a token cannot act on conversations ' +
+      'under RLS, so this tool requires a Supabase-issued user JWT (do not retry with the ' +
+      'same credentials).',
     // any: zod-to-json conversion — the schema is well-typed at the Zod layer.
     inputSchema: z.toJSONSchema(AgentReplyInputSchema, { io: 'input' }) as Record<string, unknown>,
     async handler(args, context): Promise<AgentReplyResult> {
+      // Provenance gate FIRST (issue #33): conversation tools accept ONLY
+      // Supabase-issued JWTs — an OIDC token is fully valid at the daemon's
+      // door yet mints no auth.uid() against PostgREST, so it must be refused
+      // here with a first-class status the client can read, never allowed to
+      // fail invisibly downstream at RLS. Sources: 'supabase' passes;
+      // 'api-key' falls through to the token check below (its long-standing,
+      // equally explicit refusal); undefined (in-process/stdio contexts that
+      // never crossed an auth middleware) keeps working as before; anything
+      // else — 'oidc' today, any future source — is refused fail-closed.
+      const source = context.auth?.source;
+      if (source !== undefined && source !== 'supabase' && source !== 'api-key') {
+        return {
+          status: 'unsupported-issuer',
+          error:
+            'agent.reply requires a Supabase-issued user JWT: this call was authenticated ' +
+            `by the "${source}" issuer, whose tokens cannot act on conversations under RLS. ` +
+            'Strategy tools remain available; do not retry this tool with the same credentials.',
+        };
+      }
+
       // RLS pass-through requires the caller's raw JWT (threaded ONLY by the
       // JWT auth modes, jwks-auth.mts). A lab_-key caller resolves a userId but
       // no token — it cannot pass RLS, so it is rejected with a clear message.

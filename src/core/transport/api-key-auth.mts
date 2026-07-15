@@ -72,7 +72,7 @@ export function buildApiKeyAuthMiddleware(options: ApiKeyAuthOptions): AuthMiddl
 
       const cached = cache.get(token);
       if (cached && cached.until > Date.now()) {
-        return { ...context, auth: { userId: cached.userId } };
+        return { ...context, auth: { userId: cached.userId, source: "api-key" } };
       }
       cache.delete(token);
 
@@ -88,7 +88,9 @@ export function buildApiKeyAuthMiddleware(options: ApiKeyAuthOptions): AuthMiddl
       if (!owner) throw new AuthenticationError("unknown, revoked or expired api key");
 
       cache.set(token, { userId: owner.userId, until: Date.now() + ttlMs });
-      return { ...context, auth: { userId: owner.userId } };
+      // Provenance (issue #33): a lab_ key resolves a userId but is NOT a JWT
+      // — no token is threaded (it cannot pass RLS) and the source says so.
+      return { ...context, auth: { userId: owner.userId, source: "api-key" } };
     },
   };
 }
