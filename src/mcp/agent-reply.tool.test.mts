@@ -74,15 +74,21 @@ describe('agent.reply tool', () => {
     assert.equal(seenInput?.scope, 'restricted');
   });
 
-  it('relays busy/degraded statuses without a messageId', async () => {
-    const busyTool = buildAgentReplyTool(async () => ({ status: 'busy' }));
+  it('relays busy/degraded/quota-exceeded statuses without a messageId', async () => {
     const context: RequestContext = {
       ...BASE_CONTEXT,
       auth: { userId: 'user-1', token: 'jwt-abc' },
     };
-    const out = (await busyTool.handler(ARGS, context)) as ResultShape;
-    assert.equal(out.status, 'busy');
-    assert.equal(out.messageId, undefined);
+    for (const status of ['busy', 'degraded', 'quota-exceeded'] as const) {
+      const tool = buildAgentReplyTool(async () => ({ status }));
+      const out = (await tool.handler(ARGS, context)) as ResultShape;
+      assert.equal(out.status, status);
+      assert.equal(out.messageId, undefined);
+    }
+  });
+
+  it('the tool description documents the quota-exceeded status (client contract)', () => {
+    assert.match(AGENT_REPLY_TOOL.description, /"quota-exceeded"/);
   });
 
   it('rejects malformed input (non-uuid conversationId) before running', async () => {

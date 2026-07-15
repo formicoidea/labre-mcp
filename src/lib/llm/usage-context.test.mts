@@ -37,6 +37,21 @@ describe('usage-context', () => {
     assert.equal(agg.outputTokens, 6);
   });
 
+  it('carries the first model seen, undefined when no record names one', async () => {
+    let withModel!: LlmUsageAggregate;
+    await runWithUsageCollector(() => {
+      recordLlmUsage({ provider: 'a', model: 'model-one', inputTokens: 1 });
+      recordLlmUsage({ provider: 'a', model: 'model-two', inputTokens: 1 });
+    }, (a) => { withModel = a; });
+    assert.equal(withModel.model, 'model-one');
+
+    let withoutModel!: LlmUsageAggregate;
+    await runWithUsageCollector(() => {
+      recordLlmUsage({ provider: 'copilot' });
+    }, (a) => { withoutModel = a; });
+    assert.equal(withoutModel.model, undefined);
+  });
+
   it('is a no-op outside a collector (does not throw)', () => {
     assert.doesNotThrow(() => recordLlmUsage({ provider: 'a', inputTokens: 1 }));
   });

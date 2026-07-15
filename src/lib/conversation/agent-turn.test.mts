@@ -6,10 +6,18 @@
 //   - LLM throws           → release(produced=false), no insert, degraded
 //   - wall-clock timeout    → release fired, degraded
 //   - heartbeat refuses     → abort mid-turn, release attempted, degraded
+//   - quota deny ([A3])     → release(reason NULL), no LLM call, no message,
+//                             'quota-exceeded' + QuotaRefused receipt
+//   - quota read fails      → turn proceeds (fail-open) + QuotaCheckDegraded
+//   - success               → one ai_calls spend row (source external-agent)
+//   - ledger insert fails   → turn still ok + failure receipt
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { runAgentTurn, type AgentTurnClient, type ThreadMessage } from './agent-turn.mjs';
+import { recordLlmUsage } from '#lib/llm/usage-context.mjs';
+import { setPostHogFlags } from '#lib/flags/state.mjs';
+import type { PostHogFlags } from '#lib/flags/posthog.mjs';
 import type { LLMCall } from '#types/llm.mjs';
 
 const AUTH = { userId: 'user-1', token: 'jwt-token' };
@@ -19,9 +27,16 @@ interface Recorded {
   order: string[];
   claimTurn: Array<{ token: string; ttl: number; turnId: string }>;
   refreshTurn: number;
-  releaseTurn: Array<{ token: string; reason: string; produced: boolean }>;
+  releaseTurn: Array<{ token: string; reason: string | null; produced: boolean }>;
   appendEvents: unknown[][];
   insertMessage: Array<{ content: unknown; sessionId: string }>;
+  aiCalls: Array<{
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    latencyMs: number;
+    source: string;
+  }>;
 }
 
 interface FakeOptions {
@@ -31,6 +46,12 @@ interface FakeOptions {
   insertId?: string | null;
   /** Called once refreshTurn has been observed at least once. */
   onRefresh?: () => void;
+  /** get_my_agent_usage() reply. Defaults to a well-formed under-limit row. */
+  usage?: { ok: boolean; body: unknown };
+  /** readAgentUsage throws (unreachable RPC) — the gate must degrade OPEN. */
+  usageThrows?: boolean;
+  /** recordAiCall throws (ledger insert failure) — the turn must survive. */
+  recordAiCallThrows?: boolean;
 }
 
 function makeClient(opts: FakeOptions = {}): { client: AgentTurnClient; rec: Recorded } {
@@ -41,6 +62,7 @@ function makeClient(opts: FakeOptions = {}): { client: AgentTurnClient; rec: Rec
     releaseTurn: [],
     appendEvents: [],
     insertMessage: [],
+    aiCalls: [],
   };
   const client: AgentTurnClient = {
     async claimTurn(token, ttlSeconds, turnId) {
@@ -71,8 +93,49 @@ function makeClient(opts: FakeOptions = {}): { client: AgentTurnClient; rec: Rec
       rec.order.push('readThread');
       return opts.thread ?? [{ role: 'user', content: 'hi', actor: 'human' }];
     },
+    async readAgentUsage() {
+      rec.order.push('readAgentUsage');
+      if (opts.usageThrows) throw new Error('usage RPC unreachable');
+      return (
+        opts.usage ?? { ok: true, body: [{ agent_turns_today: 0, agent_turns_limit_day: 50 }] }
+      );
+    },
+    async recordAiCall(record) {
+      rec.order.push('recordAiCall');
+      if (opts.recordAiCallThrows) throw new Error('ledger insert failed');
+      rec.aiCalls.push(record);
+    },
   };
   return { client, rec };
+}
+
+interface Captured {
+  event: string;
+  distinctId: string;
+  properties?: Record<string, unknown>;
+}
+
+/** Minimal PostHogFlags fake: only capture records; everything else inert. */
+function makeFlags(): { flags: PostHogFlags; captured: Captured[] } {
+  const captured: Captured[] = [];
+  const flags: PostHogFlags = {
+    async isRecipeEnabled() {
+      return true;
+    },
+    async resolveRecipeVariant() {
+      return undefined;
+    },
+    async resolvePromptVariants() {
+      return {};
+    },
+    capture(event, distinctId, properties) {
+      captured.push({ event, distinctId, properties });
+    },
+    async shutdown() {
+      // inert
+    },
+  };
+  return { flags, captured };
 }
 
 const constantLlm = (text: string): LLMCall => async () => text;
@@ -222,5 +285,219 @@ describe('runAgentTurn', () => {
     assert.ok(rec.refreshTurn >= 1, 'heartbeat attempted');
     assert.equal(rec.releaseTurn.length, 1, 'release attempted even on a lost claim');
     assert.equal(rec.releaseTurn[0].produced, false);
+  });
+
+  // ─── [A3] quota gate + spend ledger (ADR-0027, PR-A3-2b) ──────────────────
+
+  it('quota deny → quota-exceeded, claim released bare (reason NULL), no LLM, no message, QuotaRefused', async () => {
+    const { flags, captured } = makeFlags();
+    setPostHogFlags(flags);
+    try {
+      const { client, rec } = makeClient({
+        usage: { ok: true, body: [{ agent_turns_today: 50, agent_turns_limit_day: 50 }] },
+      });
+      let llmCalled = false;
+      const llmCall: LLMCall = async () => {
+        llmCalled = true;
+        return 'x';
+      };
+
+      const res = await runAgentTurn(INPUT, AUTH, {
+        clientFactory: async () => client,
+        llmCall,
+      });
+
+      assert.equal(res.status, 'quota-exceeded');
+      assert.equal(res.messageId, undefined);
+      assert.equal(llmCalled, false, 'no LLM spend on a refused turn');
+      assert.equal(rec.insertMessage.length, 0, 'no message inserted');
+      assert.equal(rec.aiCalls.length, 0, 'no spend row for a turn that never ran');
+      assert.equal(rec.appendEvents.length, 0, 'no lifecycle receipts — the turn never started');
+
+      // The claim is released through the BARE-DELETE path: reason NULL, so
+      // release_conversation_turn emits NO turn.quiesced (ADR-0027 D4/D6).
+      assert.equal(rec.releaseTurn.length, 1, 'the claim is still released');
+      assert.equal(rec.releaseTurn[0].reason, null);
+      assert.equal(rec.releaseTurn[0].produced, false);
+      assert.equal(rec.releaseTurn[0].token, rec.claimTurn[0].token);
+
+      // Explicit order: the quota gate is the FIRST thing inside the claim,
+      // and the refused turn touches nothing else before releasing.
+      assert.deepEqual(rec.order.slice(0, 3), ['claim', 'readAgentUsage', 'release']);
+
+      // Metadata-only refusal receipt.
+      const refused = captured.filter((c) => c.event === 'QuotaRefused');
+      assert.equal(refused.length, 1);
+      assert.equal(refused[0].distinctId, 'user-1');
+      assert.deepEqual(refused[0].properties, {
+        resource: 'agent-turns-day',
+        used: 50,
+        limit: 50,
+        conversation_id: 'c1',
+        source: 'external-agent',
+      });
+    } finally {
+      setPostHogFlags(undefined);
+    }
+  });
+
+  it('quota read fails → turn proceeds fail-open + QuotaCheckDegraded receipt', async () => {
+    const { flags, captured } = makeFlags();
+    setPostHogFlags(flags);
+    try {
+      const { client, rec } = makeClient({ usageThrows: true });
+      const res = await runAgentTurn(INPUT, AUTH, {
+        clientFactory: async () => client,
+        llmCall: constantLlm('reply text'),
+      });
+
+      assert.equal(res.status, 'ok');
+      assert.equal(res.messageId, 'm1');
+      assert.equal(rec.insertMessage.length, 1, 'the turn ran despite the failed read');
+
+      const degraded = captured.filter((c) => c.event === 'QuotaCheckDegraded');
+      assert.equal(degraded.length, 1);
+      assert.equal(degraded[0].distinctId, 'user-1');
+      assert.deepEqual(degraded[0].properties, {
+        resource: 'agent-turns-day',
+        source: 'external-agent',
+      });
+      assert.equal(
+        captured.filter((c) => c.event === 'QuotaRefused').length,
+        0,
+        'a failed read never refuses',
+      );
+    } finally {
+      setPostHogFlags(undefined);
+    }
+  });
+
+  it('malformed-but-ok usage row → turn proceeds + QuotaCheckDegraded (schema drift observable)', async () => {
+    const { flags, captured } = makeFlags();
+    setPostHogFlags(flags);
+    try {
+      for (const body of [null, [], [{ agent_turns_today: 99 }]]) {
+        const { client } = makeClient({ usage: { ok: true, body } });
+        const res = await runAgentTurn(INPUT, AUTH, {
+          clientFactory: async () => client,
+          llmCall: constantLlm('ok'),
+        });
+        assert.equal(res.status, 'ok');
+      }
+      const degraded = captured.filter((c) => c.event === 'QuotaCheckDegraded');
+      assert.equal(degraded.length, 3, 'one receipt per malformed reply');
+      assert.deepEqual(degraded[0].properties, {
+        resource: 'agent-turns-day',
+        source: 'external-agent',
+      });
+    } finally {
+      setPostHogFlags(undefined);
+    }
+  });
+
+  it('non-positive limit → turn proceeds WITHOUT a degraded receipt (legitimate "no limit")', async () => {
+    const { flags, captured } = makeFlags();
+    setPostHogFlags(flags);
+    try {
+      const { client } = makeClient({
+        usage: { ok: true, body: [{ agent_turns_today: 99, agent_turns_limit_day: 0 }] },
+      });
+      const res = await runAgentTurn(INPUT, AUTH, {
+        clientFactory: async () => client,
+        llmCall: constantLlm('ok'),
+      });
+      assert.equal(res.status, 'ok');
+      assert.equal(captured.filter((c) => c.event === 'QuotaCheckDegraded').length, 0);
+    } finally {
+      setPostHogFlags(undefined);
+    }
+  });
+
+  it('success → one ai_calls spend row: source external-agent, reported tokens + model', async () => {
+    const { client, rec } = makeClient();
+    // An llmCall that reports usage the way real backends do (usage-context).
+    const llmCall: LLMCall = async () => {
+      recordLlmUsage({
+        provider: 'agent-sdk',
+        model: 'claude-sonnet-4-6',
+        inputTokens: 120,
+        outputTokens: 45,
+      });
+      return 'the reply';
+    };
+
+    const res = await runAgentTurn(INPUT, AUTH, {
+      clientFactory: async () => client,
+      llmCall,
+    });
+
+    assert.equal(res.status, 'ok');
+    assert.equal(rec.aiCalls.length, 1, 'exactly one spend row per turn');
+    assert.equal(rec.aiCalls[0].source, 'external-agent');
+    assert.equal(rec.aiCalls[0].model, 'claude-sonnet-4-6');
+    assert.equal(rec.aiCalls[0].inputTokens, 120);
+    assert.equal(rec.aiCalls[0].outputTokens, 45);
+    assert.ok(rec.aiCalls[0].latencyMs >= 0, 'latency is a number');
+    // The ledger row lands after the LLM call, before/independent of insert.
+    assert.ok(rec.order.indexOf('recordAiCall') < rec.order.indexOf('insert'));
+  });
+
+  it('success with a token-less backend → spend row with 0 tokens and unknown model', async () => {
+    // The Copilot flow reports no per-call tokens: the row still counts the
+    // call (the quota unit) with NOT-NULL-friendly zero token defaults.
+    const { client, rec } = makeClient();
+    const res = await runAgentTurn(INPUT, AUTH, {
+      clientFactory: async () => client,
+      llmCall: constantLlm('the reply'),
+    });
+
+    assert.equal(res.status, 'ok');
+    assert.equal(rec.aiCalls.length, 1);
+    assert.equal(rec.aiCalls[0].inputTokens, 0);
+    assert.equal(rec.aiCalls[0].outputTokens, 0);
+    assert.equal(rec.aiCalls[0].model, 'unknown');
+  });
+
+  it('ledger insert failure → turn still ok + AgentSpendRecordFailed receipt', async () => {
+    const { flags, captured } = makeFlags();
+    setPostHogFlags(flags);
+    try {
+      const { client, rec } = makeClient({ recordAiCallThrows: true });
+      const res = await runAgentTurn(INPUT, AUTH, {
+        clientFactory: async () => client,
+        llmCall: constantLlm('the reply'),
+      });
+
+      assert.equal(res.status, 'ok', 'a failed spend record never fails the turn');
+      assert.equal(res.messageId, 'm1');
+      assert.equal(rec.insertMessage.length, 1);
+      assert.equal(rec.releaseTurn[0].reason, 'normal');
+
+      // Recording failure = silent unlimited is the ADR-0027 named risk: the
+      // failure must be observable.
+      const failed = captured.filter((c) => c.event === 'AgentSpendRecordFailed');
+      assert.equal(failed.length, 1);
+      assert.deepEqual(failed[0].properties, {
+        resource: 'agent-turns-day',
+        source: 'external-agent',
+        conversation_id: 'c1',
+      });
+    } finally {
+      setPostHogFlags(undefined);
+    }
+  });
+
+  it('quota deny with no PostHog configured still refuses cleanly (capture is optional)', async () => {
+    // getPostHogFlags() is undefined on stdio/unconfigured daemons — the
+    // refusal path must not depend on telemetry being wired.
+    const { client, rec } = makeClient({
+      usage: { ok: true, body: [{ agent_turns_today: 51, agent_turns_limit_day: 50 }] },
+    });
+    const res = await runAgentTurn(INPUT, AUTH, {
+      clientFactory: async () => client,
+      llmCall: constantLlm('x'),
+    });
+    assert.equal(res.status, 'quota-exceeded');
+    assert.equal(rec.releaseTurn[0].reason, null);
   });
 });
