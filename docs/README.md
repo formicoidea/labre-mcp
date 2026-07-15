@@ -22,6 +22,11 @@ labre-mcp est un serveur **MCP** (Model Context Protocol) exposé via un **daemo
 |---|---|
 | [Démarrage rapide](getting-started.md) | Installation, daemon, smoke test HTTP, premier appel |
 
+### Guides pratiques (`guides/`)
+| Document | Description |
+|---|---|
+| [Déployer une stratégie par le code](guides/deploy-strategy-code.md) | Chemin GitHub (PR + release) pour livrer une stratégie multi-prompts + recette sans la console admin ; renvoie au chemin bundle pour l'A/B testing |
+
 ### Référence fonctionnelle (`functional/`)
 | Document | Description |
 |---|---|
