@@ -62,6 +62,35 @@ describe("registerBootHealthChecks", () => {
       else process.env.POSTHOG_API_KEY = original;
     }
   });
+
+  it("strategy-bundles applies to the multi auth mode like supabase (issue #33)", async () => {
+    const saved = {
+      LABRE_AUTH: process.env.LABRE_AUTH,
+      SUPABASE_URL: process.env.SUPABASE_URL,
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
+    };
+    try {
+      delete process.env.SUPABASE_URL;
+      delete process.env.SUPABASE_ANON_KEY;
+      registerBootHealthChecks();
+
+      // multi admits Supabase JWTs → same bundle config requirements.
+      process.env.LABRE_AUTH = "multi";
+      const degraded = await runHealthCheck("strategy-bundles");
+      assert.ok(degraded);
+      assert.match(degraded.reason, /SUPABASE_URL/);
+      assert.match(degraded.reason, /SUPABASE_ANON_KEY/);
+
+      // oidc-only stays out of play (bundles intentionally off).
+      process.env.LABRE_AUTH = "oidc";
+      assert.equal(await runHealthCheck("strategy-bundles"), null);
+    } finally {
+      for (const [key, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
 });
 
 describe("checkCopilotCliAvailable", () => {

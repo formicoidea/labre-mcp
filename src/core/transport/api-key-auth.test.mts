@@ -87,6 +87,20 @@ describe("api-key auth middleware", () => {
     assert.equal(context.auth?.userId, "user-42");
   });
 
+  it("stamps auth.source 'api-key' and threads NO token, fresh and cached alike (issue #33)", async () => {
+    const middleware = buildApiKeyAuthMiddleware({
+      ...OPTIONS,
+      validate: async () => ({ userId: "user-42" }),
+      cacheTtlMs: 60_000,
+    });
+    const fresh = await middleware.authenticate(headersWith("lab_prov"), baseContext);
+    assert.equal(fresh.auth?.source, "api-key");
+    assert.equal(fresh.auth?.token, undefined, "a lab_ key is never threaded as an RLS bearer");
+    const cached = await middleware.authenticate(headersWith("lab_prov"), baseContext);
+    assert.equal(cached.auth?.source, "api-key");
+    assert.equal(cached.auth?.token, undefined);
+  });
+
   it("re-validates once the TTL has elapsed (revocation takes effect)", async () => {
     let calls = 0;
     const validate: ApiKeyValidator = async () => {

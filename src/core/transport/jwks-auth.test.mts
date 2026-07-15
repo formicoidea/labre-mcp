@@ -91,4 +91,14 @@ describe("buildJwksAuthMiddleware (generic OIDC core)", () => {
     const ctx = await mw.authenticate(bearer(token), CONTEXT);
     assert.equal(ctx.auth?.token, token);
   });
+
+  // Provenance (issue #33): the generic core defaults to 'oidc'; the Supabase
+  // preset overrides it (covered in supabase-auth.test.mts).
+  test("stamps auth.source 'oidc' by default", async () => {
+    const { jwks, sign } = await setup();
+    const mw = buildJwksAuthMiddleware({ jwks, audience: AUDIENCE });
+
+    const ctx = await mw.authenticate(bearer(await sign({})), CONTEXT);
+    assert.equal(ctx.auth?.source, "oidc");
+  });
 });

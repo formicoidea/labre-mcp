@@ -12,7 +12,7 @@
 // then receives a normal IdP-signed JWT and this middleware just works.
 
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
-import type { RequestContext } from "../context/request-context.mjs";
+import type { AuthSource, RequestContext } from "../context/request-context.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { AuthenticationError } from "./auth-middleware.mjs";
 
@@ -30,6 +30,10 @@ export interface JwksAuthOptions {
    *  deployments often use a namespaced custom claim). Non-string values are
    *  ignored — role stays undefined. */
   roleClaim?: string;
+  /** Provenance stamped on context.auth.source (issue #33). Defaults to
+   *  'oidc' — this file IS the generic OIDC core; the Supabase preset
+   *  (supabase-auth.mts) overrides it to 'supabase'. */
+  source?: Extract<AuthSource, "supabase" | "oidc">;
 }
 
 /**
@@ -48,7 +52,10 @@ export function tryExtractBearerToken(headers: Record<string, string>): string |
   return match?.[1];
 }
 
-function extractBearerToken(headers: Record<string, string>): string {
+/** Strict bearer extraction: throws AuthenticationError when the header is
+ *  absent or malformed. Shared with the multi-issuer router, which must
+ *  extract the bearer BEFORE it can decode the iss claim to route on. */
+export function extractBearerToken(headers: Record<string, string>): string {
   const raw = Object.entries(headers).find(
     ([key]) => key.toLowerCase() === "authorization",
   )?.[1];
@@ -62,8 +69,12 @@ export function buildJwksAuthMiddleware(options: JwksAuthOptions): AuthMiddlewar
   if (!options.jwks && !options.jwksUrl) {
     throw new Error("buildJwksAuthMiddleware requires jwksUrl (or an injected jwks resolver)");
   }
+  // One resolver per middleware INSTANCE: jose caches fetched keys inside the
+  // resolver, so composed multi-issuer setups get a per-issuer JWKS cache for
+  // free — the Supabase resolver never serves OIDC keys and vice versa.
   const jwks = options.jwks ?? createRemoteJWKSet(new URL(options.jwksUrl as string));
   const roleClaim = options.roleClaim ?? "role";
+  const source = options.source ?? "oidc";
 
   return {
     async authenticate(headers, context): Promise<RequestContext> {
@@ -72,10 +83,15 @@ export function buildJwksAuthMiddleware(options: JwksAuthOptions): AuthMiddlewar
       let payload;
       try {
         // jwtVerify checks signature (via JWKS), exp/nbf, audience and
-        // — when configured — issuer.
+        // — when configured — issuer. The explicit algorithm allowlist is
+        // belt-and-braces on red-zone auth: jose already confines algorithms
+        // by key type, but a JWKS entry published without an `alg` field
+        // stays bounded to the asymmetric families our issuers actually use
+        // (Supabase signing keys and mainstream OIDC IdPs: ES256/RS256).
         ({ payload } = await jwtVerify(token, jwks, {
           audience: options.audience,
           issuer: options.issuer,
+          algorithms: ["ES256", "RS256"],
         }));
       } catch (err) {
         // Fail closed: any verification error (bad signature, expired,
@@ -100,7 +116,9 @@ export function buildJwksAuthMiddleware(options: JwksAuthOptions): AuthMiddlewar
       // outlives this request's context (see request-context.mts). The lab_
       // API-key middleware (api-key-auth.mts) deliberately does NOT set it: a
       // lab_ key is opaque, mints no auth.uid(), and cannot pass RLS.
-      return { ...context, auth: { userId: payload.sub, role, token } };
+      // `source` records WHICH issuer family verified the token — RLS
+      // pass-through consumers (agent.reply) accept 'supabase' only.
+      return { ...context, auth: { userId: payload.sub, role, token, source } };
     },
   };
 }

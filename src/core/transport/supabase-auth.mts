@@ -33,5 +33,8 @@ export function buildSupabaseAuthMiddleware(options: SupabaseAuthOptions): AuthM
     audience: options.audience ?? DEFAULT_AUDIENCE,
     // Supabase puts the Postgres role in a top-level `role` claim — the
     // generic default already reads it.
+    // Provenance (issue #33): tokens verified through this preset came from
+    // the Supabase issuer — the only source whose bearer can pass RLS.
+    source: "supabase",
   });
 }

@@ -76,8 +76,11 @@ export function registerBootHealthChecks(): void {
   // probe — the source authenticates with the caller's token at request
   // time, so there is nothing meaningful to probe at boot anyway.
   registerHealthCheck("strategy-bundles", () => {
-    if (process.env.LABRE_AUTH !== "supabase") {
-      // Local/noop mode: remote bundles are intentionally out of play.
+    const mode = process.env.LABRE_AUTH;
+    if (mode !== "supabase" && mode !== "multi") {
+      // Local/noop/oidc-only mode: remote bundles are intentionally out of
+      // play. `multi` admits Supabase JWTs too (issue #33), so it needs the
+      // same config as the plain supabase mode.
       return { ready: true };
     }
     const missing: string[] = [];
