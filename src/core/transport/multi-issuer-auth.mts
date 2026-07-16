@@ -1,5 +1,5 @@
 // Multi-issuer JWT auth (issue #33): ONE instance accepts BOTH JWT
-// populations — Supabase session tokens (the labre app, agent.reply's RLS
+// populations — Supabase session tokens (the labre app, agentReply's RLS
 // pass-through) AND a generic OIDC IdP's tokens (external MCP clients) — by
 // routing each bearer on its `iss` claim to the matching single-issuer
 // middleware. lab_ API keys are NOT handled here: the api-key door composes on

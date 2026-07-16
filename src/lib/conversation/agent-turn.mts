@@ -2,7 +2,7 @@
 //
 // This is the daemon-side conductor for ONE external-agent turn on a shared
 // strategy conversation, driven per Decision 4 path 1: the mentioning sender's
-// client calls the `agent.reply` tool with the sender's Supabase JWT, and the
+// client calls the `agentReply` tool with the sender's Supabase JWT, and the
 // daemon acts AS that caller under RLS. The daemon itself holds NO privileged
 // Supabase credential — every DB touch rides the caller's JWT (the same
 // RLS-pass-through pattern as supabase-bundle-source.mts).
@@ -450,9 +450,9 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
  */
 function buildDefaultClientFactory(): AgentTurnClientFactory {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    // Fail-closed: agent.reply is only meaningful on a Supabase-backed daemon.
+    // Fail-closed: agentReply is only meaningful on a Supabase-backed daemon.
     throw new Error(
-      'agent.reply requires SUPABASE_URL and SUPABASE_ANON_KEY (Supabase-backed daemon)',
+      'agentReply requires SUPABASE_URL and SUPABASE_ANON_KEY (Supabase-backed daemon)',
     );
   }
   const url = SUPABASE_URL;

@@ -1,4 +1,4 @@
-// Tool-seam tests for agent.reply: auth gating (lab_-key caller rejected — no
+// Tool-seam tests for agentReply: auth gating (lab_-key caller rejected — no
 // context.auth.token) and JWT wiring (input + auth threaded to the runner).
 // The orchestration itself is covered by src/lib/conversation/agent-turn.test.mts.
 
@@ -27,7 +27,7 @@ interface ResultShape {
   error?: string;
 }
 
-describe('agent.reply tool', () => {
+describe('agentReply tool', () => {
   it('rejects a caller without a JWT (lab_ API key path) with a clear error', async () => {
     let runnerCalled = false;
     const runner: AgentTurnRunner = async () => {
@@ -165,8 +165,8 @@ describe('agent.reply tool', () => {
     assert.equal(runnerCalled, false);
   });
 
-  it('the production instance is named agent.reply and declares the input schema', () => {
-    assert.equal(AGENT_REPLY_TOOL.name, 'agent.reply');
+  it('the production instance is named agentReply and declares the input schema', () => {
+    assert.equal(AGENT_REPLY_TOOL.name, 'agentReply');
     // unknown: JSON-schema shape — narrowed for the assertion only.
     const schema = AGENT_REPLY_TOOL.inputSchema as {
       properties?: Record<string, unknown>;
