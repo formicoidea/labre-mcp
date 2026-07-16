@@ -40,7 +40,7 @@ test("tools/list advertises the five boot tools", async () => {
   const names = list.map((t) => t.name);
   assert.deepEqual(
     names.sort(),
-    ["__ping__", "agent.reply", "estimateEvolution", "runCommand", "runRecipe"].sort(),
+    ["__ping__", "agentReply", "estimateEvolution", "runCommand", "runRecipe"].sort(),
   );
 });
 

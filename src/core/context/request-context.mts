@@ -7,7 +7,7 @@ import { z } from "zod";
 
 /** Which auth middleware authenticated the caller. Provenance travels with
  *  the context so tools can gate on the ISSUER FAMILY, not just on the shape
- *  of the credentials — e.g. agent.reply requires a Supabase-issued JWT
+ *  of the credentials — e.g. agentReply requires a Supabase-issued JWT
  *  (auth.uid() under RLS), and a valid OIDC token at the door is worth
  *  nothing against PostgREST (see multi-issuer-auth.mts). */
 export const AuthSourceSchema = z.enum(["supabase", "oidc", "api-key"]);
@@ -33,7 +33,7 @@ export const RequestContextSchema = z.object({
       role: z.string().optional(),
       // ⚠ AUTH REVIEW — raw caller bearer, threaded ONLY by the JWT auth modes
       // (supabase/oidc via jwks-auth.mts). It is the RLS pass-through credential
-      // for tools that must act AS the caller (agent.reply → conversation
+      // for tools that must act AS the caller (agentReply → conversation
       // reads/writes under RLS). Deliberately NEVER set for lab_ API keys
       // (api-key-auth.mts leaves it undefined — a lab_ key is not a JWT and
       // resolves no auth.uid(), so it cannot pass RLS). Handling discipline,
@@ -44,7 +44,7 @@ export const RequestContextSchema = z.object({
       // Provenance: which middleware authenticated the caller. Set by every
       // HTTP auth middleware ('supabase' | 'oidc' | 'api-key'); absent only on
       // in-process/stdio contexts that never crossed an auth middleware.
-      // Conversation tools (agent.reply) gate on it: ONLY 'supabase' can pass
+      // Conversation tools (agentReply) gate on it: ONLY 'supabase' can pass
       // RLS, so an 'oidc' caller is refused first-class at the tool entry
       // instead of failing invisibly downstream (issue #33).
       source: AuthSourceSchema.optional(),

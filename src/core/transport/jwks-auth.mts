@@ -107,7 +107,7 @@ export function buildJwksAuthMiddleware(options: JwksAuthOptions): AuthMiddlewar
 
       const role = typeof payload[roleClaim] === "string" ? (payload[roleClaim] as string) : undefined;
       // ⚠ AUTH REVIEW — thread the raw, verified bearer onto the context so
-      // downstream tools can act AS the caller under RLS (agent.reply's
+      // downstream tools can act AS the caller under RLS (agentReply's
       // per-request Supabase client, ADR-0026 Decision 4 path 1). This is the
       // ONLY place the token is retained past verification, and ONLY on the JWT
       // path: the token has just passed full jwtVerify (signature + exp + aud +
@@ -117,7 +117,7 @@ export function buildJwksAuthMiddleware(options: JwksAuthOptions): AuthMiddlewar
       // API-key middleware (api-key-auth.mts) deliberately does NOT set it: a
       // lab_ key is opaque, mints no auth.uid(), and cannot pass RLS.
       // `source` records WHICH issuer family verified the token — RLS
-      // pass-through consumers (agent.reply) accept 'supabase' only.
+      // pass-through consumers (agentReply) accept 'supabase' only.
       return { ...context, auth: { userId: payload.sub, role, token, source } };
     },
   };

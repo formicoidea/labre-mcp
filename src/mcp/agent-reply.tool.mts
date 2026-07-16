@@ -1,4 +1,4 @@
-// MCP tool definition for `agent.reply` — the external agent's whole-turn
+// MCP tool definition for `agentReply` — the external agent's whole-turn
 // orchestrator ([A2] slice PR-MCP1, ADR-0026 Decision 4 path 1).
 //
 // The mentioning sender's client calls this once per turn, passing the sender's
@@ -53,7 +53,11 @@ interface AgentReplyResult {
 /** Build the tool, optionally with an injected runner (tests). */
 export function buildAgentReplyTool(runner: AgentTurnRunner = runAgentTurn): ToolDefinition {
   return {
-    name: 'agent.reply',
+    // camelCase like every MCP tool here (estimateEvolution, runCommand, …) AND
+    // required by the Anthropic tool-name pattern ^[a-zA-Z0-9_-]{1,64}$ — the
+    // previous dotted name (agentReply) made claude.ai reject the whole
+    // request of any conversation that included this connector.
+    name: 'agentReply',
     description:
       'Conduct ONE external-agent turn on a shared strategy conversation: claim the ' +
       "per-conversation single-flight turn, read the recent thread under the caller's " +
@@ -86,7 +90,7 @@ export function buildAgentReplyTool(runner: AgentTurnRunner = runAgentTurn): Too
         return {
           status: 'unsupported-issuer',
           error:
-            'agent.reply requires a Supabase-issued user JWT: this call was authenticated ' +
+            'agentReply requires a Supabase-issued user JWT: this call was authenticated ' +
             `by the "${source}" issuer, whose tokens cannot act on conversations under RLS. ` +
             'Strategy tools remain available; do not retry this tool with the same credentials.',
         };
@@ -102,7 +106,7 @@ export function buildAgentReplyTool(runner: AgentTurnRunner = runAgentTurn): Too
         return {
           status: 'error',
           error:
-            'agent.reply requires a user JWT (Supabase session token). A lab_ API key ' +
+            'agentReply requires a user JWT (Supabase session token). A lab_ API key ' +
             'cannot pass RLS on this path.',
         };
       }
