@@ -13,6 +13,7 @@ import { buildSupabaseAuthMiddleware, tryExtractBearerToken } from "./supabase-a
 import { buildJwksAuthMiddleware } from "./jwks-auth.mjs";
 import { buildMultiIssuerAuthMiddleware } from "./multi-issuer-auth.mjs";
 import { buildApiKeyAuthMiddleware, routeBearerAuth, API_KEY_PREFIX } from "./api-key-auth.mjs";
+import { parseAuthDoors } from "./auth-modes.mjs";
 import { registerBootHealthChecks } from "./boot-health-checks.mjs";
 import { runAllHealthChecks } from "#lib/degradation/index.mjs";
 import { buildSupabaseBundleSource } from "#lib/bundles/supabase-bundle-source.mjs";
@@ -41,98 +42,95 @@ function readPort(): number {
   return parsed;
 }
 
-// lab_ personal API keys (created in the labre UI) are validated against the
-// labre_mcp.validate_api_key RPC with the public anon key — independent of the
-// JWT issuer, so they ride ALONGSIDE any JWT mode (supabase OR oidc). Wraps the
-// given JWT middleware to route lab_ bearers to the API-key path; without
-// SUPABASE_URL + SUPABASE_ANON_KEY, lab_ bearers just fall through to the JWT
-// middleware and get its 401 — fail closed, never open.
-export function withApiKeys(jwt: AuthMiddleware): AuthMiddleware {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !anonKey) return jwt;
-  return routeBearerAuth(jwt, buildApiKeyAuthMiddleware({ supabaseUrl, anonKey }));
-}
-
 // Boot-time auth selection (env reads at boot are allowed — ARCH-15 forbids
-// them at request time only). Modes fail closed on missing config; lab_ API
-// keys ride alongside EITHER JWT mode (see withApiKeys):
+// them at request time only). LABRE_AUTH is an explicit list of doors
+// (auth-modes.mts); each listed door fails closed on its own missing env:
+//   supabase — Supabase session JWTs (JWKS from SUPABASE_URL). The labre app's
+//              population; the only source that reaches agent.reply's RLS.
 //   oidc     — any OIDC IdP verifiable by JWKS (Okta, Auth0, Clerk, Entra,
 //              Keycloak, AND the labre OAuth AS that fronts the framework-mcp
-//              connector); requires AUTH_JWKS_URL + AUTH_AUDIENCE; optional
-//              AUTH_ISSUER, AUTH_ROLE_CLAIM. This is the mode for the OAuth
-//              connector — the daemon validates AS-issued JWTs via the AS JWKS.
-//   supabase — Supabase preset (JWKS derived from SUPABASE_URL). Legacy path
-//              for raw Supabase session tokens; NOT used by the OAuth connector.
-//   multi    — BOTH JWT populations on one instance (issue #33): each bearer
-//              is routed on its iss claim to the matching issuer config
-//              (Supabase = {SUPABASE_URL}/auth/v1; OIDC = AUTH_JWKS_URL +
-//              AUTH_AUDIENCE, optional AUTH_ISSUER/AUTH_ROLE_CLAIM). Requires
-//              the UNION of both modes' env; unknown iss → 401, no fallback.
-//   none/unset — local noop.
-// Exported for the boot fail-closed matrix tests (same pattern as withApiKeys).
+//              connector). Requires AUTH_JWKS_URL + AUTH_AUDIENCE; optional
+//              AUTH_ISSUER, AUTH_ROLE_CLAIM.
+//   api-key  — lab_ personal keys (created in the labre UI, validated by the
+//              validate_api_key RPC — no JWT verifier). Requires SUPABASE_URL +
+//              SUPABASE_ANON_KEY; now an EXPLICIT door, no longer an implicit
+//              rider (PR #34 follow-up on issue #33).
+// supabase+oidc together → per-iss routing (multi-issuer middleware); either
+// JWT door alone → that single-issuer middleware. api-key composes on top via
+// routeBearerAuth (lab_ bearers to the RPC path, the rest to the JWT door), or
+// stands alone when it is the only door. Unknown iss / bad token → 401, never a
+// silent fallback. Exported for the boot fail-closed matrix tests.
 export function selectAuthMiddleware(): AuthMiddleware | undefined {
-  const mode = process.env.LABRE_AUTH;
-  if (mode === undefined || mode === "" || mode === "none") return undefined;
-  if (mode === "supabase") {
-    const supabaseUrl = process.env.SUPABASE_URL;
-    if (!supabaseUrl) {
-      throw new Error(
-        'LABRE_AUTH="supabase" requires SUPABASE_URL to be set (fail-closed: refusing to boot unauthenticated)',
-      );
-    }
-    return withApiKeys(
-      buildSupabaseAuthMiddleware({ supabaseUrl, audience: process.env.SUPABASE_JWT_AUD }),
+  const doors = parseAuthDoors();
+  if (doors.size === 0) return undefined;
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const jwksUrl = process.env.AUTH_JWKS_URL;
+  const audience = process.env.AUTH_AUDIENCE;
+
+  // Each JWT door validates its own env — the boot refuses (fail-closed) with
+  // the exact door and missing var named, never a partial/unauthenticated boot.
+  if (doors.has("supabase") && !supabaseUrl) {
+    throw new Error(
+      'LABRE_AUTH lists "supabase" but SUPABASE_URL is not set (fail-closed: refusing to boot unauthenticated)',
     );
   }
-  if (mode === "oidc") {
-    const jwksUrl = process.env.AUTH_JWKS_URL;
-    const audience = process.env.AUTH_AUDIENCE;
-    if (!jwksUrl || !audience) {
-      throw new Error(
-        'LABRE_AUTH="oidc" requires AUTH_JWKS_URL and AUTH_AUDIENCE to be set (fail-closed: refusing to boot unauthenticated)',
-      );
-    }
-    return withApiKeys(
-      buildJwksAuthMiddleware({
-        jwksUrl,
-        audience,
+  if (doors.has("oidc") && (!jwksUrl || !audience)) {
+    const missing = [...(jwksUrl ? [] : ["AUTH_JWKS_URL"]), ...(audience ? [] : ["AUTH_AUDIENCE"])];
+    throw new Error(
+      `LABRE_AUTH lists "oidc" but ${missing.join(" and ")} ${missing.length > 1 ? "are" : "is"} not set ` +
+        `(fail-closed: refusing to boot unauthenticated)`,
+    );
+  }
+
+  // Build the JWT layer from whichever JWT doors are open (0, 1 or 2 of them).
+  let auth: AuthMiddleware | undefined;
+  if (doors.has("supabase") && doors.has("oidc")) {
+    auth = buildMultiIssuerAuthMiddleware({
+      supabase: { supabaseUrl: supabaseUrl as string, audience: process.env.SUPABASE_JWT_AUD },
+      oidc: {
+        jwksUrl: jwksUrl as string,
+        audience: audience as string,
         issuer: process.env.AUTH_ISSUER,
         roleClaim: process.env.AUTH_ROLE_CLAIM,
-      }),
-    );
+      },
+    });
+  } else if (doors.has("supabase")) {
+    auth = buildSupabaseAuthMiddleware({
+      supabaseUrl: supabaseUrl as string,
+      audience: process.env.SUPABASE_JWT_AUD,
+    });
+  } else if (doors.has("oidc")) {
+    auth = buildJwksAuthMiddleware({
+      jwksUrl: jwksUrl as string,
+      audience: audience as string,
+      issuer: process.env.AUTH_ISSUER,
+      roleClaim: process.env.AUTH_ROLE_CLAIM,
+    });
   }
-  if (mode === "multi") {
-    // The union of both single modes' requirements — every activated issuer
-    // brings its own vars, and ANY missing one refuses the boot (fail-closed,
-    // same posture as the single modes above).
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const jwksUrl = process.env.AUTH_JWKS_URL;
-    const audience = process.env.AUTH_AUDIENCE;
-    const missing = [
-      ...(supabaseUrl ? [] : ["SUPABASE_URL"]),
-      ...(jwksUrl ? [] : ["AUTH_JWKS_URL"]),
-      ...(audience ? [] : ["AUTH_AUDIENCE"]),
-    ];
-    if (!supabaseUrl || !jwksUrl || !audience) {
+
+  // api-key door: lab_ keys are verified via the validate_api_key RPC, so this
+  // door needs SUPABASE_URL + SUPABASE_ANON_KEY regardless of the JWT doors.
+  if (doors.has("api-key")) {
+    const anonKey = process.env.SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !anonKey) {
+      const missing = [
+        ...(supabaseUrl ? [] : ["SUPABASE_URL"]),
+        ...(anonKey ? [] : ["SUPABASE_ANON_KEY"]),
+      ];
       throw new Error(
-        `LABRE_AUTH="multi" requires SUPABASE_URL, AUTH_JWKS_URL and AUTH_AUDIENCE to be set ` +
-          `(missing: ${missing.join(", ")}) (fail-closed: refusing to boot unauthenticated)`,
+        `LABRE_AUTH lists "api-key" but ${missing.join(" and ")} ${missing.length > 1 ? "are" : "is"} not set ` +
+          `(fail-closed: refusing to boot unauthenticated)`,
       );
     }
-    return withApiKeys(
-      buildMultiIssuerAuthMiddleware({
-        supabase: { supabaseUrl, audience: process.env.SUPABASE_JWT_AUD },
-        oidc: {
-          jwksUrl,
-          audience,
-          issuer: process.env.AUTH_ISSUER,
-          roleClaim: process.env.AUTH_ROLE_CLAIM,
-        },
-      }),
-    );
+    const apiKey = buildApiKeyAuthMiddleware({ supabaseUrl, anonKey });
+    // Alongside a JWT door: route lab_ bearers to the RPC, the rest to the JWT
+    // verifier. Alone: the api-key middleware IS the whole auth (a JWT-shaped
+    // bearer gets its own "not an API key" 401 — fail-closed, never open).
+    auth = auth ? routeBearerAuth(auth, apiKey) : apiKey;
   }
-  throw new Error(`Invalid LABRE_AUTH: "${mode}" (expected "supabase", "oidc", "multi" or "none")`);
+
+  return auth;
 }
 
 // OAuth protected-resource discovery config (env at boot only — ARCH-15).
@@ -179,14 +177,14 @@ function selectBundleRefreshHook(
   authed: boolean,
 ): { hook?: OnAuthenticatedHook; bootLine: string } {
   if (!authed) {
-    return { bootLine: "off (requires LABRE_AUTH=supabase or multi)" };
+    return { bootLine: "off (requires supabase in LABRE_AUTH)" };
   }
   const anonKey = process.env.SUPABASE_ANON_KEY;
   if (!anonKey) {
     return { bootLine: "off (SUPABASE_ANON_KEY not set)" };
   }
-  // selectAuthMiddleware already guaranteed SUPABASE_URL under the supabase
-  // and multi modes (the only ones that reach this branch).
+  // selectAuthMiddleware already guaranteed SUPABASE_URL whenever the supabase
+  // door is open (the only case that reaches this branch).
   const supabaseUrl = process.env.SUPABASE_URL as string;
   const ttlSeconds = readBundlesTtlSeconds();
   const source = buildSupabaseBundleSource({
@@ -223,12 +221,11 @@ async function main(): Promise<void> {
   const auth = selectAuthMiddleware();
   const tools: ToolRegistry = buildBootRegistry();
   const strategies = buildStrategyRegistry();
-  // Remote bundles are a Supabase feature (RLS + storage): only the modes
-  // that admit Supabase JWTs enable them (supabase, and multi — issue #33).
-  // An oidc caller token means nothing to the Supabase RLS layer; under multi
-  // the refresh hook simply no-ops usefully for OIDC bearers (RLS refuses).
-  const authMode = process.env.LABRE_AUTH;
-  const bundles = selectBundleRefreshHook(authMode === "supabase" || authMode === "multi");
+  // Remote bundles are a Supabase feature (RLS + storage): enabled only when
+  // the supabase door is open. An oidc/lab_ caller token means nothing to the
+  // Supabase RLS layer; the refresh hook simply no-ops usefully for those.
+  const doors = parseAuthDoors();
+  const bundles = selectBundleRefreshHook(doors.has("supabase"));
 
   // LABRE_HTTP_HOST: "0.0.0.0" behind a PaaS router; default
   // stays loopback so a local daemon is never exposed by accident.
@@ -239,16 +236,26 @@ async function main(): Promise<void> {
   process.stderr.write(
     `[labre-mcp] HTTP server listening on http://${hostname}:${server.port} (POST /mcp)\n`,
   );
-  // lab_ keys ride alongside any JWT mode (withApiKeys), so this is no longer
-  // supabase-specific — it's on whenever a JWT mode is active and the anon key
-  // + URL are set.
-  const apiKeysEnabled =
-    !!auth && !!process.env.SUPABASE_URL && !!process.env.SUPABASE_ANON_KEY;
-  // Honest boot line (issue #33): "multi" spells out both issuer families.
-  const jwtLabel = authMode === "multi" ? "supabase+oidc" : authMode;
+  // Honest boot line: name exactly the doors that are open (auth-modes.mts).
+  const jwtNames = [
+    doors.has("supabase") ? "supabase" : undefined,
+    doors.has("oidc") ? "oidc" : undefined,
+  ].filter(Boolean);
+  const authParts = [
+    jwtNames.length ? `${jwtNames.join("+")} JWT (JWKS)` : undefined,
+    doors.has("api-key") ? "lab_ API keys" : undefined,
+  ].filter(Boolean);
   process.stderr.write(
-    `[labre-mcp] Auth: ${auth ? `${jwtLabel} JWT (JWKS)${apiKeysEnabled ? " + lab_ API keys" : ""}` : "none (local dev)"}\n`,
+    `[labre-mcp] Auth: ${authParts.length ? authParts.join(" + ") : "none (local dev)"}\n`,
   );
+  // Migration guard: lab_ keys used to ride implicitly whenever the anon key
+  // was set. Under the explicit-list model they are OFF unless "api-key" is
+  // listed — say so loudly instead of silently 401ing existing lab_ callers.
+  if (auth && !doors.has("api-key") && process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+    process.stderr.write(
+      `[labre-mcp] WARNING: SUPABASE_ANON_KEY is set but "api-key" is not in LABRE_AUTH — lab_ API keys are REFUSED. Add "api-key" to LABRE_AUTH to accept them.\n`,
+    );
+  }
   process.stderr.write(`[labre-mcp] Remote strategy bundles: ${bundles.bootLine}\n`);
   process.stderr.write(
     `[labre-mcp] OAuth discovery: ${oauth ? `on (resource=${oauth.resource}, AS=${oauth.authServer})` : "off (static bearer only)"}\n`,
@@ -267,8 +274,9 @@ async function main(): Promise<void> {
     // Metadata only — no payloads, no user content.
     posthog.capture("mcp_boot", "daemon", {
       port: server.port,
-      // The actual mode (supabase | oidc | multi), not a hardcoded label.
-      auth: auth ? authMode : "none",
+      // The actual doors open, sorted so the same config always reports the
+      // same string regardless of the env list's order (telemetry cardinality).
+      auth: auth ? [...doors].sort().join(",") : "none",
       tools: tools.list().length,
       strategies: strategies.size(),
     });

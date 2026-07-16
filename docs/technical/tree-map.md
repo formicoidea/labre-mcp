@@ -41,10 +41,12 @@ src/
 │   ├── transport/            labre-daemon (HTTP), labre-stdio (stdio), http-server (Hono,
 │   │                         hook onAuthenticated post-auth/pré-dispatch), mcp-handler (dispatch),
 │   │                         boot-tool-registry, json-rpc.schema, context-extractor,
-│   │                         auth-middleware, jwks-auth (cœur OIDC générique),
-│   │                         supabase-auth (preset), api-key-auth (clés lab_ via
-│   │                         RPC validate_api_key + routage par préfixe), boot-health-checks,
-│   │                         strategy-registry-boot                          (ARCH-14)
+│   │                         auth-middleware, auth-modes (parse la liste LABRE_AUTH
+│   │                         en portes supabase/oidc/api-key), jwks-auth (cœur OIDC
+│   │                         générique), supabase-auth (preset), api-key-auth (clés
+│   │                         lab_ via RPC validate_api_key + routage par préfixe),
+│   │                         multi-issuer-auth (routage supabase+oidc par claim iss),
+│   │                         boot-health-checks, strategy-registry-boot        (ARCH-14)
 │   ├── listeners/            artifact-writer-listener (core, toujours actif) (ARCH-12),
 │   │                         posthog-telemetry-listener (run-end/step-error → capture,
 │   │                         attaché par runRecipe quand PostHog est configuré ;
