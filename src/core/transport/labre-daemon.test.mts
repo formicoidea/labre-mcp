@@ -5,9 +5,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 // Side-effect: registers prompt parsers consumed by some strategies.
 import "#lib/prompts/init.mjs";
-import { buildStrategyRegistry, withApiKeys, selectAuthMiddleware } from "./labre-daemon.mjs";
-import type { AuthMiddleware } from "./auth-middleware.mjs";
-import type { RequestContext } from "../context/request-context.mjs";
+import { buildStrategyRegistry, selectAuthMiddleware } from "./labre-daemon.mjs";
 
 describe("labre-daemon boot wiring", () => {
   it("buildStrategyRegistry populates the core registry with every framework strategy", () => {
@@ -94,67 +92,6 @@ describe("labre-daemon boot wiring", () => {
   });
 });
 
-describe("withApiKeys — lab_ keys ride alongside any JWT mode", () => {
-  const marker: AuthMiddleware = {
-    async authenticate(_headers, context) {
-      return { ...context, auth: { userId: "jwt-marker" } };
-    },
-  };
-  const baseCtx: RequestContext = {
-    projectId: "t",
-    projectRoot: "/t",
-    sessionId: "s",
-    domain: "wardley",
-  };
-
-  function withEnv(url: string | undefined, key: string | undefined, fn: () => void): void {
-    const prevUrl = process.env.SUPABASE_URL;
-    const prevKey = process.env.SUPABASE_ANON_KEY;
-    if (url === undefined) delete process.env.SUPABASE_URL;
-    else process.env.SUPABASE_URL = url;
-    if (key === undefined) delete process.env.SUPABASE_ANON_KEY;
-    else process.env.SUPABASE_ANON_KEY = key;
-    try {
-      fn();
-    } finally {
-      if (prevUrl === undefined) delete process.env.SUPABASE_URL;
-      else process.env.SUPABASE_URL = prevUrl;
-      if (prevKey === undefined) delete process.env.SUPABASE_ANON_KEY;
-      else process.env.SUPABASE_ANON_KEY = prevKey;
-    }
-  }
-
-  it("returns the JWT middleware unchanged when SUPABASE_ANON_KEY is absent", () => {
-    withEnv("https://test.supabase.co", undefined, () => {
-      assert.equal(withApiKeys(marker), marker);
-    });
-  });
-
-  it("returns the JWT middleware unchanged when SUPABASE_URL is absent", () => {
-    withEnv(undefined, "anon", () => {
-      assert.equal(withApiKeys(marker), marker);
-    });
-  });
-
-  it("wraps the JWT middleware when both are set, and non-lab_ bearers still reach it", async () => {
-    await new Promise<void>((resolve, reject) => {
-      withEnv("https://test.supabase.co", "anon", () => {
-        const wrapped = withApiKeys(marker);
-        assert.notEqual(wrapped, marker); // a different (routing) middleware
-        // A JWT-shaped bearer is routed to the wrapped middleware (the marker),
-        // never to the lab_ path — so no network call happens here.
-        wrapped
-          .authenticate({ authorization: "Bearer eyJ.jwt.sig" }, baseCtx)
-          .then((ctx) => {
-            assert.equal(ctx.auth?.userId, "jwt-marker");
-            resolve();
-          })
-          .catch(reject);
-      });
-    });
-  });
-});
-
 describe("selectAuthMiddleware — boot fail-closed matrix (issue #33)", () => {
   // The auth-related env this function reads. Each test states its OWN complete
   // environment; everything else is scrubbed and restored afterwards.
@@ -188,49 +125,55 @@ describe("selectAuthMiddleware — boot fail-closed matrix (issue #33)", () => {
     }
   }
 
-  const MULTI_FULL = {
-    LABRE_AUTH: "multi",
+  const LIST_FULL = {
+    LABRE_AUTH: "supabase,oidc,api-key",
     SUPABASE_URL: "https://test.supabase.co",
+    SUPABASE_ANON_KEY: "anon",
     AUTH_JWKS_URL: "https://idp.example/.well-known/jwks.json",
     AUTH_AUDIENCE: "api://labre-mcp",
   } as const;
 
-  it('multi with the full env boots (returns a middleware)', () => {
-    withAuthEnv(MULTI_FULL, () => {
+  it("the full list supabase,oidc,api-key boots (returns a middleware)", () => {
+    withAuthEnv(LIST_FULL, () => {
       assert.notEqual(selectAuthMiddleware(), undefined);
     });
   });
 
-  // Each required var missing, alone, refuses the boot and NAMES the gap.
-  for (const missing of ["SUPABASE_URL", "AUTH_JWKS_URL", "AUTH_AUDIENCE"] as const) {
-    it(`multi without ${missing} refuses to boot (fail-closed)`, () => {
-      const env: Record<string, string> = { ...MULTI_FULL };
+  // supabase+oidc together: each JWT door validates its own env, fail-fast on
+  // the first unsatisfied door, naming that door and its missing var.
+  it("supabase,oidc without SUPABASE_URL refuses to boot, naming the supabase door", () => {
+    withAuthEnv(
+      { LABRE_AUTH: "supabase,oidc", AUTH_JWKS_URL: "https://idp.example/keys", AUTH_AUDIENCE: "aud" },
+      () => {
+        assert.throws(
+          () => selectAuthMiddleware(),
+          (err: Error) => err.message.includes('"supabase"') && err.message.includes("SUPABASE_URL"),
+        );
+      },
+    );
+  });
+
+  for (const missing of ["AUTH_JWKS_URL", "AUTH_AUDIENCE"] as const) {
+    it(`supabase,oidc without ${missing} refuses to boot, naming the oidc door`, () => {
+      const env: Record<string, string> = {
+        LABRE_AUTH: "supabase,oidc",
+        SUPABASE_URL: "https://test.supabase.co",
+        AUTH_JWKS_URL: "https://idp.example/.well-known/jwks.json",
+        AUTH_AUDIENCE: "api://labre-mcp",
+      };
       delete env[missing];
       withAuthEnv(env, () => {
         assert.throws(
           () => selectAuthMiddleware(),
-          (err: Error) =>
-            err.message.includes('LABRE_AUTH="multi"') && err.message.includes(missing),
+          (err: Error) => err.message.includes('"oidc"') && err.message.includes(missing),
         );
       });
     });
   }
 
-  it("multi with NO issuer env at all refuses to boot and lists every missing var", () => {
-    withAuthEnv({ LABRE_AUTH: "multi" }, () => {
-      assert.throws(
-        () => selectAuthMiddleware(),
-        (err: Error) =>
-          err.message.includes("SUPABASE_URL") &&
-          err.message.includes("AUTH_JWKS_URL") &&
-          err.message.includes("AUTH_AUDIENCE"),
-      );
-    });
-  });
-
-  // Backward compatibility: the three pre-existing modes keep their exact
-  // boot semantics (AC4 — rétrocompatibilité totale).
-  it("supabase mode still requires SUPABASE_URL and boots with it", () => {
+  // Backward compatibility: a single-element list IS the old single mode, with
+  // identical fail-closed boot semantics (AC4).
+  it("supabase alone still requires SUPABASE_URL and boots with it", () => {
     withAuthEnv({ LABRE_AUTH: "supabase" }, () => {
       assert.throws(() => selectAuthMiddleware(), /SUPABASE_URL/);
     });
@@ -239,9 +182,9 @@ describe("selectAuthMiddleware — boot fail-closed matrix (issue #33)", () => {
     });
   });
 
-  it("oidc mode still requires AUTH_JWKS_URL + AUTH_AUDIENCE and boots with them", () => {
+  it("oidc alone still requires AUTH_JWKS_URL + AUTH_AUDIENCE and boots with them", () => {
     withAuthEnv({ LABRE_AUTH: "oidc", AUTH_JWKS_URL: "https://idp.example/keys" }, () => {
-      assert.throws(() => selectAuthMiddleware(), /AUTH_JWKS_URL and AUTH_AUDIENCE/);
+      assert.throws(() => selectAuthMiddleware(), /AUTH_AUDIENCE/);
     });
     withAuthEnv(
       {
@@ -255,14 +198,80 @@ describe("selectAuthMiddleware — boot fail-closed matrix (issue #33)", () => {
     );
   });
 
-  it("none/unset stays a noop (undefined middleware)", () => {
-    withAuthEnv({}, () => assert.equal(selectAuthMiddleware(), undefined));
-    withAuthEnv({ LABRE_AUTH: "none" }, () => assert.equal(selectAuthMiddleware(), undefined));
+  // api-key is now an EXPLICIT door (no implicit rider). It stands alone and
+  // fails closed on its own env.
+  it("api-key alone boots with SUPABASE_URL + SUPABASE_ANON_KEY", () => {
+    withAuthEnv(
+      { LABRE_AUTH: "api-key", SUPABASE_URL: "https://test.supabase.co", SUPABASE_ANON_KEY: "anon" },
+      () => {
+        assert.notEqual(selectAuthMiddleware(), undefined);
+      },
+    );
   });
 
-  it("an invalid mode still refuses to boot, now naming multi among the valid ones", () => {
-    withAuthEnv({ LABRE_AUTH: "both" }, () => {
-      assert.throws(() => selectAuthMiddleware(), /"supabase", "oidc", "multi" or "none"/);
+  it("api-key without SUPABASE_ANON_KEY refuses to boot, naming the api-key door", () => {
+    withAuthEnv({ LABRE_AUTH: "api-key", SUPABASE_URL: "https://test.supabase.co" }, () => {
+      assert.throws(
+        () => selectAuthMiddleware(),
+        (err: Error) => err.message.includes('"api-key"') && err.message.includes("SUPABASE_ANON_KEY"),
+      );
     });
+  });
+
+  // "No static secrets" posture: JWT doors only, api-key deliberately omitted —
+  // boots with no anon key at all.
+  it("supabase,oidc (no api-key) boots without any anon key", () => {
+    withAuthEnv(
+      {
+        LABRE_AUTH: "supabase,oidc",
+        SUPABASE_URL: "https://test.supabase.co",
+        AUTH_JWKS_URL: "https://idp.example/.well-known/jwks.json",
+        AUTH_AUDIENCE: "api://labre-mcp",
+      },
+      () => {
+        assert.notEqual(selectAuthMiddleware(), undefined);
+      },
+    );
+  });
+
+  it("none/unset/empty stays a noop (undefined middleware)", () => {
+    withAuthEnv({}, () => assert.equal(selectAuthMiddleware(), undefined));
+    withAuthEnv({ LABRE_AUTH: "none" }, () => assert.equal(selectAuthMiddleware(), undefined));
+    withAuthEnv({ LABRE_AUTH: "" }, () => assert.equal(selectAuthMiddleware(), undefined));
+  });
+
+  it("an unknown door refuses to boot, naming the valid ones", () => {
+    withAuthEnv({ LABRE_AUTH: "both" }, () => {
+      assert.throws(() => selectAuthMiddleware(), /supabase, oidc, api-key/);
+    });
+  });
+
+  // Wiring probes (no network): each topology is identified by the distinct
+  // fail-closed error of the middleware that actually answers.
+  const PROBE_CTX = { projectId: "t", projectRoot: "/t", sessionId: "s", domain: "wardley" };
+
+  it("full list wires the multi-issuer JWT layer (non-lab_ bearer reaches iss routing)", async () => {
+    const auth = withAuthEnv(LIST_FULL, () => selectAuthMiddleware());
+    assert.ok(auth);
+    // Not lab_-prefixed and not a decodable JWT → must land in the
+    // multi-issuer router, whose error names its routing stage.
+    await assert.rejects(
+      auth.authenticate({ authorization: "Bearer not-a-jwt" }, PROBE_CTX),
+      /multi-issuer routing/,
+    );
+  });
+
+  it("api-key alone wires the standalone api-key middleware (JWT-shaped bearer is refused there)", async () => {
+    const auth = withAuthEnv(
+      { LABRE_AUTH: "api-key", SUPABASE_URL: "https://test.supabase.co", SUPABASE_ANON_KEY: "anon" },
+      () => selectAuthMiddleware(),
+    );
+    assert.ok(auth);
+    // No JWT layer exists: a JWT-shaped bearer gets the api-key middleware's
+    // own refusal (fail-closed, no network — the RPC is never reached).
+    await assert.rejects(
+      auth.authenticate({ authorization: "Bearer eyJ.jwt.sig" }, PROBE_CTX),
+      /not an API key/,
+    );
   });
 });

@@ -63,7 +63,7 @@ describe("registerBootHealthChecks", () => {
     }
   });
 
-  it("strategy-bundles applies to the multi auth mode like supabase (issue #33)", async () => {
+  it("strategy-bundles applies to any list containing supabase (issue #33)", async () => {
     const saved = {
       LABRE_AUTH: process.env.LABRE_AUTH,
       SUPABASE_URL: process.env.SUPABASE_URL,
@@ -74,8 +74,8 @@ describe("registerBootHealthChecks", () => {
       delete process.env.SUPABASE_ANON_KEY;
       registerBootHealthChecks();
 
-      // multi admits Supabase JWTs → same bundle config requirements.
-      process.env.LABRE_AUTH = "multi";
+      // A list with the supabase door → same bundle config requirements.
+      process.env.LABRE_AUTH = "supabase,oidc";
       const degraded = await runHealthCheck("strategy-bundles");
       assert.ok(degraded);
       assert.match(degraded.reason, /SUPABASE_URL/);

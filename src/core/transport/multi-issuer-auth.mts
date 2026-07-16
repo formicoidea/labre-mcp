@@ -2,8 +2,8 @@
 // populations — Supabase session tokens (the labre app, agent.reply's RLS
 // pass-through) AND a generic OIDC IdP's tokens (external MCP clients) — by
 // routing each bearer on its `iss` claim to the matching single-issuer
-// middleware. lab_ API keys are NOT handled here: they keep riding alongside
-// via withApiKeys/routeBearerAuth exactly as in the single-issuer modes.
+// middleware. lab_ API keys are NOT handled here: the api-key door composes on
+// top via routeBearerAuth in selectAuthMiddleware (see labre-daemon.mts).
 //
 // Design: pure COMPOSITION of the two existing middlewares, no forked
 // validation logic. The iss claim is decoded WITHOUT verification — it is

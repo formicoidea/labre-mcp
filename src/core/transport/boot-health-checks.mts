@@ -9,6 +9,7 @@
 // returns the not-ready ones for logging. Failures never block boot.
 
 import { registerHealthCheck } from "#lib/degradation/index.mjs";
+import { parseAuthDoors } from "./auth-modes.mjs";
 import { checkEnvironment as checkBigQueryEnv } from "#lib/patent/bigquery-client.mjs";
 import { loadLLMConfig } from "#lib/llm/config.loader.mjs";
 import { checkCopilotCliAvailable } from "#lib/llm/copilot-sdk-call.mjs";
@@ -76,11 +77,9 @@ export function registerBootHealthChecks(): void {
   // probe — the source authenticates with the caller's token at request
   // time, so there is nothing meaningful to probe at boot anyway.
   registerHealthCheck("strategy-bundles", () => {
-    const mode = process.env.LABRE_AUTH;
-    if (mode !== "supabase" && mode !== "multi") {
-      // Local/noop/oidc-only mode: remote bundles are intentionally out of
-      // play. `multi` admits Supabase JWTs too (issue #33), so it needs the
-      // same config as the plain supabase mode.
+    if (!parseAuthDoors().has("supabase")) {
+      // No supabase door: remote bundles are intentionally out of play (they
+      // are Supabase-RLS-bound). Any list without `supabase` skips this check.
       return { ready: true };
     }
     const missing: string[] = [];
