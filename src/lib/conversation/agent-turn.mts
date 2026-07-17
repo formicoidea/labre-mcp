@@ -26,19 +26,61 @@
 // success path records ONE best-effort ai_calls row (source 'external-agent')
 // so the daily meter has data and the spend reaches the admin cost ledger.
 //
+// [A4] (ADR-0028, PR-A4-4) makes the conductor's brain SELECTABLE PER TURN:
+// an optional `agentId` names a REGISTERED agent (a named LLM provider
+// config). When present:
+//   * claim_agent_turn is called with p_agent_id — the DB gates registration
+//     (status='active'), the per-conversation invite, AND the PER-AGENT daily
+//     cap IN-TRANSACTION (agent_turn_quota_ok: turns_per_day_cap → admin
+//     default → 50; the labre owner floor was REMOVED from the predicate at
+//     labre#231 review, commit 7864b48). The daemon does not duplicate those
+//     checks; a refused claim is DIAGNOSED via list_conversation_agents and
+//     mapped to the first-class statuses 'agent-revoked' /
+//     'agent-not-invited' (generic 'agent-refused' when the diagnosis itself
+//     fails). An active+invited agent whose claim is refused maps to 'busy' —
+//     the bare-boolean claim RPC cannot distinguish the single-flight lock
+//     from a per-agent-cap refusal at the gate (documented trade; either way
+//     the DB refused before any spend).
+//   * the [A3] labre quota gate (assertAgentQuota / get_my_agent_usage) is
+//     SKIPPED — arbitrated at labre#231 review: labre quotas meter ONLY
+//     labre's own provider subscription, and a registered-agent turn runs on
+//     the agent OWNER's provider key. The per-agent cap at the claim gate is
+//     the sole labre-side bound on this path.
+//   * get_agent_provider_config(conv, claimToken) is read AT TURN START, under
+//     the active claim; the secret lives in turn-scoped memory only — never
+//     logged, never in events or errors (see agent-provider.mts).
+//   * a provider failure (dead key 401, 429, timeout…) posts a SANITIZED
+//     error notice into the conversation (insert_agent_message under the
+//     still-held claim), then degrades cleanly (release 'interrupted').
+//   * spend is recorded through record_agent_spend (claim-gated DEFINER: the
+//     ledger row lands on the agent OWNER, never the summoner) instead of the
+//     summoner-attributed insert-own ai_calls path.
+// Without `agentId` the behavior is byte-for-byte the [A2]/[A3] path above —
+// including the wire shape of claim_agent_turn (the 4-arg named call resolves
+// through the RPC's DEFAULT NULL).
+//
 // DELIBERATELY OUT OF SCOPE (this slice): a GLOBAL concurrency cap (N users =
 // N intervals + N in-flight LLM calls), presence (MCP2), draw / tool-call
 // proposals, streaming, and multi-round loops. The "brain" is a single-round
 // prose completion — streaming and rounds are deferred (ADR-0026 non-goals).
+// Also out of scope: the web-side dynamic mention picker (PR-A4-3) and the
+// closure of the NULL path (PR-A4-6).
 
 import { randomUUID } from 'node:crypto';
 import { createLLMCall } from '#lib/llm/llm-call.mjs';
 import { runWithUsageCollector, type LlmUsageAggregate } from '#lib/llm/usage-context.mjs';
 import { getPostHogFlags } from '#lib/flags/state.mjs';
 import { agentQuotaDecision, QuotaExceededError } from './agent-quota.mjs';
+import {
+  createAgentProviderCall,
+  providerErrorNotice,
+  PROVIDER_CONFIG_NOTICE,
+  type AgentProviderConfig,
+} from './agent-provider.mjs';
 import type { LLMCall } from '#types/llm.mjs';
 
 export { QuotaExceededError } from './agent-quota.mjs';
+export type { AgentProviderConfig } from './agent-provider.mjs';
 
 // The claim TTL (seconds) the daemon renews via the heartbeat. Matches the
 // in-app AI's 60 s-family single-flight TTL (ADR-0026 Decision 4).
@@ -76,6 +118,13 @@ export interface RunAgentTurnInput {
   conversationId: string;
   sessionId: string;
   turnId: string;
+  /** ADR-0028: the REGISTERED agent conducting this turn (a named LLM provider
+   *  config). Absent = the [A2] anonymous path, byte-for-byte — the daemon's
+   *  default LLM, claim without p_agent_id. Present = claim gated on
+   *  registration+invite+per-agent-cap in the DB (the labre quota does NOT
+   *  apply — the turn runs on the owner's provider key, labre#231 review),
+   *  provider config fetched per turn. */
+  agentId?: string;
   /** ADR-0021 write posture. Default 'ask' — a guest brain never inherits the
    *  owner's auto. Carried for the contract; this prose-only slice proposes no
    *  writes, so it does not yet branch on it. */
@@ -93,11 +142,23 @@ export interface AgentTurnAuth {
   token: string;
 }
 
-export type AgentTurnStatus = 'ok' | 'busy' | 'degraded' | 'quota-exceeded';
+/** 'agent-revoked' / 'agent-not-invited' / 'agent-refused' are the ADR-0028
+ *  first-class refusals for a REGISTERED agent whose claim the DB refused
+ *  (revoked / not invited / undiagnosable). The web client maps any unknown
+ *  non-ok status to a generic "refused", so additions here are non-breaking. */
+export type AgentTurnStatus =
+  | 'ok'
+  | 'busy'
+  | 'degraded'
+  | 'quota-exceeded'
+  | 'agent-revoked'
+  | 'agent-not-invited'
+  | 'agent-refused';
 
 export interface RunAgentTurnResult {
   status: AgentTurnStatus;
-  /** Present only when a non-empty agent message was persisted (status 'ok'). */
+  /** Present when a non-empty agent message was persisted (status 'ok'), or
+   *  when a degraded agent turn posted its sanitized provider-error notice. */
   messageId?: string;
 }
 
@@ -120,14 +181,38 @@ export interface AgentSpendRecord {
   source: 'external-agent';
 }
 
+/** One invited-agent row as returned by list_conversation_agents (the safe
+ *  columns the member lookup RPC serves; only id + status matter here). */
+export interface AgentInviteRow {
+  agentId: string;
+  status: string;
+}
+
 /**
  * The minimal Supabase surface one turn needs, all acting AS the caller under
  * RLS. Abstracted (and injectable) so the orchestration is unit-testable
  * without a live Supabase — the default factory adapts supabase-js.
  */
 export interface AgentTurnClient {
-  /** claim_agent_turn(conv, token, ttl, turnId) → claimed? */
-  claimTurn(token: string, ttlSeconds: number, turnId: string): Promise<boolean>;
+  /** claim_agent_turn(conv, token, ttl, turnId[, agentId]) → claimed?
+   *  `agentId` absent keeps the legacy 4-arg wire call (the RPC's DEFAULT NULL
+   *  path — [A2] byte-for-byte); present, the DB gates registration + invite +
+   *  the per-agent daily cap in-transaction (ADR-0028 Decision 5, amended at
+   *  labre#231 review: no labre owner floor in the predicate). */
+  claimTurn(token: string, ttlSeconds: number, turnId: string, agentId?: string): Promise<boolean>;
+  /** list_conversation_agents(conv) — the member-readable invite lookup (safe
+   *  columns only). Used to DIAGNOSE a refused agent claim. */
+  listConversationAgents(): Promise<AgentInviteRow[]>;
+  /** get_agent_provider_config(conv, claimToken) — claim-gated DEFINER read of
+   *  the conducting agent's provider config + decrypted secret (ADR-0028
+   *  Decision 3c). The secret must stay turn-scoped: callers may hold it only
+   *  for the duration of the turn and never log or persist it. */
+  getProviderConfig(token: string): Promise<AgentProviderConfig>;
+  /** record_agent_spend(conv, claimToken, model, tokens…) — claim-gated
+   *  DEFINER ledger insert attributed to the agent's OWNER (ADR-0028
+   *  Decision 6). Throws on failure — the caller swallows and captures a
+   *  receipt (best-effort, same posture as recordAiCall). */
+  recordAgentSpend(token: string, record: AgentSpendRecord): Promise<void>;
   /** refresh_conversation_turn(conv, token, ttl) → still-held? */
   refreshTurn(token: string, ttlSeconds: number): Promise<boolean>;
   /** release_conversation_turn(conv, token, reason, produced). `reason` NULL
@@ -162,6 +247,10 @@ export type AgentTurnClientFactory = (
 export interface RunAgentTurnDeps {
   clientFactory?: AgentTurnClientFactory;
   llmCall?: LLMCall;
+  /** Builds the per-turn provider-backed LLMCall for a REGISTERED agent
+   *  (default: createAgentProviderCall). Injectable so tests observe the
+   *  config threading without real provider traffic. */
+  providerCallFactory?: (config: AgentProviderConfig) => LLMCall;
   heartbeatIntervalMs?: number;
   turnTimeoutMs?: number;
 }
@@ -232,6 +321,7 @@ export async function runAgentTurn(
 
   const clientFactory = deps.clientFactory ?? buildDefaultClientFactory();
   const llmCall = deps.llmCall ?? createLLMCall();
+  const providerCallFactory = deps.providerCallFactory ?? createAgentProviderCall;
   const heartbeatIntervalMs = deps.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS;
   const turnTimeoutMs = deps.turnTimeoutMs ?? ENV_TURN_TIMEOUT_MS;
 
@@ -241,10 +331,15 @@ export async function runAgentTurn(
   // to claim/refresh/release, NEVER logged.
   const turnToken = randomUUID();
 
-  const claimed = await client.claimTurn(turnToken, CLAIM_TTL_SECONDS, input.turnId);
+  const claimed = await client.claimTurn(turnToken, CLAIM_TTL_SECONDS, input.turnId, input.agentId);
   if (!claimed) {
-    // Another turn (in-app or agent) holds the conversation. No LLM call.
-    return { status: 'busy' };
+    if (input.agentId == null) {
+      // Another turn (in-app or agent) holds the conversation. No LLM call.
+      return { status: 'busy' };
+    }
+    // ADR-0028: the DB refused the AGENT claim — diagnose which first-class
+    // refusal this is (the claim RPC returns a bare boolean by design).
+    return { status: await diagnoseAgentClaimRefusal(client, input.agentId) };
   }
 
   // From here the claim is HELD: every exit path below releases it, and both
@@ -289,7 +384,7 @@ export async function runAgentTurn(
     // append/insert may still land if the claim survived (benign: the caller
     // is a write-member either way — the migration's forgery equivalence).
     const produced = await Promise.race([
-      conductTurn(input, auth, client, llmCall),
+      conductTurn(input, auth, client, { llmCall, providerCallFactory, turnToken }),
       timeout,
       claimLost,
     ]);
@@ -322,6 +417,21 @@ export async function runAgentTurn(
       return { status: 'quota-exceeded' };
     }
 
+    // Provider failure on a REGISTERED-agent turn (ADR-0028): the sanitized
+    // error notice was already posted (best-effort) under the still-held
+    // claim; release 'interrupted' so the quiesce stays distinguishable from a
+    // clean turn, and surface the notice's messageId when it landed.
+    if (err instanceof AgentProviderError) {
+      try {
+        await client.releaseTurn(turnToken, 'interrupted', err.noticeMessageId != null);
+      } catch {
+        // Swallow — TTL expiry is the backstop for a claim we could not release.
+      }
+      return err.noticeMessageId != null
+        ? { status: 'degraded', messageId: err.noticeMessageId }
+        : { status: 'degraded' };
+    }
+
     // Timeout, LLM failure, or a lost claim. NEVER leave the claim behind:
     // best-effort release (produced=false). If even this throws, the TTL is the
     // backstop. The error detail is not surfaced (it may reference internals).
@@ -346,20 +456,133 @@ interface ConductResult {
   messageId?: string;
 }
 
+/** The per-turn wiring conductTurn needs beyond the client itself. */
+interface ConductDeps {
+  /** The daemon's default brain — the [A2] path (no agentId). */
+  llmCall: LLMCall;
+  /** Builds the provider-backed brain for a REGISTERED agent's config. */
+  providerCallFactory: (config: AgentProviderConfig) => LLMCall;
+  /** The claim token: get_agent_provider_config and record_agent_spend are
+   *  gated on the ACTIVE claim (ADR-0028 Decisions 3c/6). Still secret. */
+  turnToken: string;
+}
+
 /**
- * The turn body inside the claim: quota gate → read thread → one LLM call →
- * best-effort receipts → persist prose. Returns the persisted message id (when
- * any). Release is the caller's responsibility (single point, on every path).
+ * Thrown by conductTurn when a REGISTERED agent's provider (or its config
+ * read) fails: the sanitized notice has already been posted best-effort.
+ * runAgentTurn catches THIS TYPE to release 'interrupted' and return
+ * 'degraded' with the notice's messageId. Carries NO provider error detail on
+ * purpose — nothing here may echo response bodies, base_url, or the secret.
+ */
+class AgentProviderError extends Error {
+  readonly noticeMessageId?: string;
+
+  constructor(noticeMessageId?: string) {
+    super('agent provider call failed');
+    this.name = 'AgentProviderError';
+    this.noticeMessageId = noticeMessageId;
+  }
+}
+
+/**
+ * Map a refused agent claim to its first-class status by reading the invite
+ * list (member-readable). Best-effort diagnosis over server data:
+ *   * not in the invite list → 'agent-not-invited' (covers nonexistent agents
+ *     too — an unregistered agent is by construction not invited);
+ *   * invited but status 'revoked' → 'agent-revoked';
+ *   * invited and 'active' → 'busy' (the single-flight lock is the remaining
+ *     NAMED cause; a per-agent-cap refusal at the claim gate is
+ *     indistinguishable from outside the DEFINER and lands here too — the DB
+ *     refused before any spend either way);
+ *   * unreadable list or an unexpected status value → 'agent-refused'.
+ */
+async function diagnoseAgentClaimRefusal(
+  client: AgentTurnClient,
+  agentId: string,
+): Promise<'busy' | 'agent-revoked' | 'agent-not-invited' | 'agent-refused'> {
+  let invites: AgentInviteRow[];
+  try {
+    invites = await client.listConversationAgents();
+  } catch {
+    return 'agent-refused';
+  }
+  const row = invites.find((invite) => invite.agentId === agentId);
+  if (row == null) return 'agent-not-invited';
+  if (row.status === 'revoked') return 'agent-revoked';
+  if (row.status === 'active') return 'busy';
+  return 'agent-refused';
+}
+
+/**
+ * Post the sanitized provider-failure notice into the conversation (the claim
+ * is still held, so insert_agent_message accepts it), best-effort, and return
+ * the typed error runAgentTurn maps to 'degraded'. The notice text is static
+ * prose built from the error CLASS only — never provider bodies or secrets.
+ */
+async function postProviderFailureNotice(
+  client: AgentTurnClient,
+  sessionId: string,
+  notice: string,
+): Promise<AgentProviderError> {
+  let noticeMessageId: string | undefined;
+  try {
+    const id = await client.insertMessage([{ type: 'text', text: notice }], sessionId);
+    if (id != null) noticeMessageId = id;
+  } catch {
+    // Best-effort: a failed notice still degrades the turn cleanly.
+  }
+  return new AgentProviderError(noticeMessageId);
+}
+
+/**
+ * The turn body inside the claim: (legacy path: quota gate) → (agent path:
+ * provider config read) → read thread → one LLM call → best-effort receipts →
+ * persist prose. Returns the persisted message id (when any). Release is the
+ * caller's responsibility (single point, on every path).
  */
 async function conductTurn(
   input: RunAgentTurnInput,
   auth: AgentTurnAuth,
   client: AgentTurnClient,
-  llmCall: LLMCall,
+  deps: ConductDeps,
 ): Promise<ConductResult> {
-  // Quota gate BEFORE any spend ([A3], ADR-0027 D3/D4) — same RLS client as
-  // the rest of the turn. A deny throws QuotaExceededError (caught above).
-  await assertAgentQuota(auth.userId, client);
+  // LEGACY path only — quota gate BEFORE any spend ([A3], ADR-0027 D3/D4):
+  // the anonymous brain runs on LABRE's provider subscription, which is what
+  // labre quotas meter. A deny throws QuotaExceededError (caught above).
+  //
+  // REGISTERED-agent path: SKIPPED by arbitration (labre#231 review) — the
+  // turn runs on the agent OWNER's provider key, so the labre quota does not
+  // apply; the per-agent daily cap was already enforced IN-TRANSACTION at the
+  // claim gate (agent_turn_quota_ok). An over-labre-quota summoner can still
+  // conduct a registered-agent turn.
+  if (input.agentId == null) {
+    await assertAgentQuota(auth.userId, client);
+  }
+
+  // ADR-0028: resolve the turn's BRAIN. A registered agent's provider config
+  // (incl. the decrypted secret) is read AT THE MOMENT OF THE TURN, under the
+  // active claim. The config object stays local to this frame + the driver
+  // closure — turn-scoped memory only.
+  let llmCall = deps.llmCall;
+  let providerModel: string | undefined;
+  if (input.agentId != null) {
+    try {
+      const providerConfig = await client.getProviderConfig(deps.turnToken);
+      // The DRIVER CONSTRUCTION belongs inside the same guard: the factory
+      // validates the config and may THROW (requireCleanBaseUrl refuses a
+      // missing, malformed, credential-carrying, non-https, or
+      // query-carrying base_url). That is a CONFIG problem, not a provider
+      // outage — it must post the same static config notice instead of
+      // falling through to the generic catch and degrading silently.
+      llmCall = deps.providerCallFactory(providerConfig);
+      providerModel = providerConfig.model;
+    } catch {
+      // Config unreadable or invalid (revoked mid-claim, no secret
+      // registered, bad base_url…): post the static config notice — neither
+      // the RPC error text nor the config contents are ever echoed.
+      throw await postProviderFailureNotice(client, input.sessionId, PROVIDER_CONFIG_NOTICE);
+    }
+  }
 
   const thread = await client.readThread(THREAD_WINDOW);
   const prompt = buildPrompt(thread);
@@ -370,28 +593,49 @@ async function conductTurn(
   // call (that is the quota's unit, ADR-0027 D1).
   let usage: LlmUsageAggregate = { llmCalls: 0 };
   const llmStartedAt = Date.now();
-  const raw = await runWithUsageCollector(
-    () => llmCall(prompt, undefined, { systemPrompt: SYSTEM_PROMPT }),
-    (aggregate) => {
-      usage = aggregate;
-    },
-  );
+  let raw: string;
+  try {
+    raw = await runWithUsageCollector(
+      () => llmCall(prompt, undefined, { systemPrompt: SYSTEM_PROMPT }),
+      (aggregate) => {
+        usage = aggregate;
+      },
+    );
+  } catch (err) {
+    // Legacy path: unchanged — the generic catch above degrades silently.
+    if (input.agentId == null) throw err;
+    // Agent path: a provider failure (dead key, 429, timeout…) posts a
+    // SANITIZED notice into the conversation, then degrades (ADR-0028).
+    throw await postProviderFailureNotice(client, input.sessionId, providerErrorNotice(err));
+  }
   const latencyMs = Date.now() - llmStartedAt;
   const text = raw.trim();
 
-  // Spend ledger (ADR-0027 D4.1): ONE best-effort ai_calls row under the
-  // caller's JWT — this is what get_my_agent_usage() counts tomorrow, AND the
-  // admin cost ledger's visibility. A failed insert must not fail the turn,
-  // but it must be observable (recording failure = silent unlimited — the
-  // named ADR risk), so it captures a metadata-only receipt.
+  // Spend ledger, ONE best-effort row per turn. Registered agent: through the
+  // claim-gated record_agent_spend DEFINER — the row lands on the agent
+  // OWNER's ledger (ADR-0028 Decision 6), with the tokens the provider
+  // actually reported. Legacy path: the [A3] insert-own ai_calls row under
+  // the caller's JWT, unchanged. A failed insert must not fail the turn, but
+  // it must be observable (recording failure = silent unlimited — the named
+  // ADR risk), so it captures a metadata-only receipt.
   try {
-    await client.recordAiCall({
-      model: usage.model ?? 'unknown',
-      inputTokens: usage.inputTokens ?? 0,
-      outputTokens: usage.outputTokens ?? 0,
-      latencyMs,
-      source: 'external-agent',
-    });
+    if (input.agentId != null) {
+      await client.recordAgentSpend(deps.turnToken, {
+        model: usage.model ?? providerModel ?? 'unknown',
+        inputTokens: usage.inputTokens ?? 0,
+        outputTokens: usage.outputTokens ?? 0,
+        latencyMs,
+        source: 'external-agent',
+      });
+    } else {
+      await client.recordAiCall({
+        model: usage.model ?? 'unknown',
+        inputTokens: usage.inputTokens ?? 0,
+        outputTokens: usage.outputTokens ?? 0,
+        latencyMs,
+        source: 'external-agent',
+      });
+    }
   } catch {
     getPostHogFlags()?.capture('AgentSpendRecordFailed', auth.userId, {
       resource: 'agent-turns-day',
@@ -472,15 +716,73 @@ function buildDefaultClientFactory(): AgentTurnClientFactory {
     });
 
     return {
-      async claimTurn(token, ttlSeconds, turnId): Promise<boolean> {
-        const { data, error } = await client.rpc('claim_agent_turn', {
+      async claimTurn(token, ttlSeconds, turnId, agentId): Promise<boolean> {
+        // p_agent_id is OMITTED (not sent as null) when absent: the legacy
+        // 4-arg named call resolves through the RPC's DEFAULT NULL, so the
+        // [A2] wire shape stays byte-for-byte (ADR-0028 Transition).
+        const params: Record<string, unknown> = {
           p_conversation_id: conversationId,
           p_token: token,
           p_ttl_seconds: ttlSeconds,
           p_turn_id: turnId,
-        });
+        };
+        if (agentId != null) params.p_agent_id = agentId;
+        const { data, error } = await client.rpc('claim_agent_turn', params);
         if (error) throw new Error(error.message);
         return data === true;
+      },
+      async listConversationAgents(): Promise<AgentInviteRow[]> {
+        const { data, error } = await client.rpc('list_conversation_agents', {
+          p_conversation_id: conversationId,
+        });
+        if (error) throw new Error(error.message);
+        // unknown: untrusted rows — narrow the two fields the diagnosis needs.
+        const rows = (data ?? []) as Array<Record<string, unknown>>;
+        return rows.map((r) => ({
+          agentId: typeof r.agent_id === 'string' ? r.agent_id : '',
+          status: typeof r.status === 'string' ? r.status : '',
+        }));
+      },
+      async getProviderConfig(token): Promise<AgentProviderConfig> {
+        const { data, error } = await client.rpc('get_agent_provider_config', {
+          p_conversation_id: conversationId,
+          p_token: token,
+        });
+        if (error) throw new Error(error.message);
+        // RETURNS TABLE → an array with the single config row. Validate the
+        // shape strictly and NEVER quote row contents in errors (the row
+        // carries the decrypted secret).
+        const rows = (data ?? []) as Array<Record<string, unknown>>;
+        const row = rows[0];
+        const provider = row?.provider;
+        const model = row?.model;
+        const baseUrl = row?.base_url ?? null;
+        const secret = row?.secret;
+        if (
+          (provider !== 'anthropic' && provider !== 'openai' && provider !== 'openai-compatible') ||
+          typeof model !== 'string' ||
+          model.length === 0 ||
+          (baseUrl !== null && typeof baseUrl !== 'string') ||
+          typeof secret !== 'string' ||
+          secret.length === 0
+        ) {
+          throw new Error('get_agent_provider_config returned an unexpected shape');
+        }
+        return { provider, model, baseUrl, secret };
+      },
+      async recordAgentSpend(token, record): Promise<void> {
+        // Claim-gated DEFINER insert; the owner is resolved through the claim
+        // row server-side. p_cost_usd stays at its DEFAULT (null) — the
+        // daemon does not price provider calls.
+        const { error } = await client.rpc('record_agent_spend', {
+          p_conversation_id: conversationId,
+          p_token: token,
+          p_model: record.model,
+          p_input_tokens: record.inputTokens,
+          p_output_tokens: record.outputTokens,
+          p_latency_ms: record.latencyMs,
+        });
+        if (error) throw new Error(error.message);
       },
       async refreshTurn(token, ttlSeconds): Promise<boolean> {
         const { data, error } = await client.rpc('refresh_conversation_turn', {

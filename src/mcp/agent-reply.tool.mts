@@ -34,6 +34,10 @@ const AgentReplyInputSchema = z.object({
   // BEFORE the daemon-billed LLM spend, not at the terminal insert (recette).
   sessionId: z.string().uuid(),
   turnId: z.string().uuid(),
+  // ADR-0028 (PR-A4-4): the REGISTERED agent to conduct the turn as — a named
+  // LLM provider config owned by the conversation owner. OPTIONAL: absent
+  // keeps the [A2] anonymous path byte-for-byte (the daemon's default brain).
+  agentId: z.string().uuid().optional(),
   writeMode: z.enum(['auto', 'ask', 'read-only']).default('ask'),
   scope: z.enum(['full', 'restricted']).default('restricted'),
 });
@@ -63,12 +67,24 @@ export function buildAgentReplyTool(runner: AgentTurnRunner = runAgentTurn): Too
       "per-conversation single-flight turn, read the recent thread under the caller's " +
       'RLS, produce one concise prose reply, persist it as an external-agent message, ' +
       'and release the turn. Requires a user JWT (not a lab_ API key). ' +
-      'Input: { conversationId, sessionId, turnId, writeMode?, scope? }. ' +
+      'Input: { conversationId, sessionId, turnId, agentId?, writeMode?, scope? }. ' +
+      'agentId (optional) names a REGISTERED agent — a per-agent LLM provider ' +
+      'configuration — to conduct the turn as; without it the daemon uses its default ' +
+      'brain, unchanged. ' +
       'Returns { status: "ok" | "busy" | "degraded" | "quota-exceeded" | ' +
+      '"agent-revoked" | "agent-not-invited" | "agent-refused" | ' +
       '"unsupported-issuer" | "error", messageId? }: ' +
       '"busy" = another turn holds the conversation; "degraded" = the turn timed out ' +
-      'or errored (the claim was still released); "quota-exceeded" = the caller\'s ' +
-      'daily external-agent turn quota is used up (resets at midnight UTC — do not retry); ' +
+      'or errored (the claim was still released; on a registered-agent provider failure ' +
+      'a sanitized error notice is posted into the conversation and its messageId is ' +
+      'returned); "quota-exceeded" = the caller\'s ' +
+      'daily external-agent turn quota is used up (default-brain turns only: a ' +
+      "registered-agent turn runs on the agent owner's provider key and is bounded by the " +
+      'per-agent daily cap at the claim gate instead; resets at midnight UTC — do not retry); ' +
+      '"agent-revoked" = the registered agent was revoked by its owner (do not retry); ' +
+      '"agent-not-invited" = the agent is not invited to this conversation (or does not ' +
+      'exist — do not retry until invited); "agent-refused" = the agent claim was refused ' +
+      'for another reason (do not retry blindly); ' +
       '"unsupported-issuer" = the caller authenticated with a non-Supabase JWT (e.g. an ' +
       'OIDC IdP token on a multi-issuer daemon) — such a token cannot act on conversations ' +
       'under RLS, so this tool requires a Supabase-issued user JWT (do not retry with the ' +
@@ -117,6 +133,7 @@ export function buildAgentReplyTool(runner: AgentTurnRunner = runAgentTurn): Too
           conversationId: input.conversationId,
           sessionId: input.sessionId,
           turnId: input.turnId,
+          agentId: input.agentId,
           writeMode: input.writeMode,
           scope: input.scope,
         },

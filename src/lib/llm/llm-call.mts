@@ -285,8 +285,11 @@ export function createOpenCodeCall(config: OpenCodeConfig = {}): LLMCall {
     }
 
     if (!response.ok) {
+      // Bound the body excerpt: this message feeds MCP log notifications, and
+      // an unbounded provider body (HTML error page, verbose JSON) floods
+      // them. Log hygiene only — no semantic change.
       const body = await response.text();
-      const apiErr = new Error(`OpenCode API error ${response.status}: ${body}`);
+      const apiErr = new Error(`OpenCode API error ${response.status}: ${body.slice(0, 500)}`);
       classifyAndLogLLMError(apiErr, errorContext);
       throw apiErr;
     }
@@ -369,8 +372,11 @@ export function createOpenCodeLogprobCall(
     }
 
     if (!response.ok) {
+      // Same bounded excerpt as the text driver above — log hygiene only.
       const body = await response.text();
-      const apiErr = new Error(`OpenCode logprob API error ${response.status}: ${body}`);
+      const apiErr = new Error(
+        `OpenCode logprob API error ${response.status}: ${body.slice(0, 500)}`,
+      );
       classifyAndLogLLMError(apiErr, errorContext);
       throw apiErr;
     }

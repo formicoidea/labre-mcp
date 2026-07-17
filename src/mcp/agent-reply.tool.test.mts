@@ -69,9 +69,83 @@ describe('agentReply tool', () => {
     assert.equal(seenInput?.conversationId, ARGS.conversationId);
     assert.equal(seenInput?.sessionId, ARGS.sessionId);
     assert.equal(seenInput?.turnId, ARGS.turnId);
+    // No agentId on the wire → none threaded (the [A2] path stays default).
+    assert.equal(seenInput?.agentId, undefined);
     // Guest-brain defaults (ADR-0021): ask + restricted.
     assert.equal(seenInput?.writeMode, 'ask');
     assert.equal(seenInput?.scope, 'restricted');
+  });
+
+  // ─── ADR-0028 (PR-A4-4): optional agentId → registered-agent turns ────────
+
+  it('threads an optional agentId through to the runner', async () => {
+    const agentId = '55555555-5555-4555-8555-555555555555';
+    let seenInput: RunAgentTurnInput | undefined;
+    const tool = buildAgentReplyTool(async (input) => {
+      seenInput = input;
+      return { status: 'ok', messageId: 'm9' };
+    });
+    const context: RequestContext = {
+      ...BASE_CONTEXT,
+      auth: { userId: 'user-1', token: 'jwt-abc' },
+    };
+    const out = (await tool.handler({ ...ARGS, agentId }, context)) as ResultShape;
+    assert.equal(out.status, 'ok');
+    assert.equal(seenInput?.agentId, agentId);
+  });
+
+  it('rejects a malformed (non-uuid) agentId before running', async () => {
+    let runnerCalled = false;
+    const tool = buildAgentReplyTool(async () => {
+      runnerCalled = true;
+      return { status: 'ok' };
+    });
+    const context: RequestContext = {
+      ...BASE_CONTEXT,
+      auth: { userId: 'user-1', token: 'jwt-abc' },
+    };
+    await assert.rejects(tool.handler({ ...ARGS, agentId: 'not-a-uuid' }, context));
+    assert.equal(runnerCalled, false);
+  });
+
+  it('relays the agent refusal statuses without a messageId', async () => {
+    const context: RequestContext = {
+      ...BASE_CONTEXT,
+      auth: { userId: 'user-1', token: 'jwt-abc' },
+    };
+    for (const status of ['agent-revoked', 'agent-not-invited', 'agent-refused'] as const) {
+      const tool = buildAgentReplyTool(async () => ({ status }));
+      const out = (await tool.handler(ARGS, context)) as ResultShape;
+      assert.equal(out.status, status);
+      assert.equal(out.messageId, undefined);
+    }
+  });
+
+  it('relays a degraded agent turn WITH the posted error-notice messageId', async () => {
+    const tool = buildAgentReplyTool(async () => ({ status: 'degraded', messageId: 'notice-1' }));
+    const context: RequestContext = {
+      ...BASE_CONTEXT,
+      auth: { userId: 'user-1', token: 'jwt-abc' },
+    };
+    const out = (await tool.handler(ARGS, context)) as ResultShape;
+    assert.equal(out.status, 'degraded');
+    assert.equal(out.messageId, 'notice-1');
+  });
+
+  it('the tool description documents the agent refusal statuses (client contract)', () => {
+    assert.match(AGENT_REPLY_TOOL.description, /"agent-revoked"/);
+    assert.match(AGENT_REPLY_TOOL.description, /"agent-not-invited"/);
+    assert.match(AGENT_REPLY_TOOL.description, /"agent-refused"/);
+  });
+
+  it('agentId is declared optional in the input schema', () => {
+    // unknown: JSON-schema shape — narrowed for the assertion only.
+    const schema = AGENT_REPLY_TOOL.inputSchema as {
+      properties?: Record<string, unknown>;
+      required?: string[];
+    };
+    assert.ok(schema.properties?.agentId, 'agentId is declared');
+    assert.ok(!(schema.required ?? []).includes('agentId'), 'agentId stays optional');
   });
 
   it('relays busy/degraded/quota-exceeded statuses without a messageId', async () => {
