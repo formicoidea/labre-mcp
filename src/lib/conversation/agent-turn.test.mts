@@ -14,7 +14,13 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { runAgentTurn, type AgentTurnClient, type ThreadMessage } from './agent-turn.mjs';
+import {
+  runAgentTurn,
+  type AgentTurnClient,
+  type AgentInviteRow,
+  type AgentProviderConfig,
+  type ThreadMessage,
+} from './agent-turn.mjs';
 import { recordLlmUsage } from '#lib/llm/usage-context.mjs';
 import { setPostHogFlags } from '#lib/flags/state.mjs';
 import type { PostHogFlags } from '#lib/flags/posthog.mjs';
@@ -25,12 +31,22 @@ const INPUT = { conversationId: 'c1', sessionId: 's1', turnId: 't1' };
 
 interface Recorded {
   order: string[];
-  claimTurn: Array<{ token: string; ttl: number; turnId: string }>;
+  claimTurn: Array<{ token: string; ttl: number; turnId: string; agentId?: string }>;
   refreshTurn: number;
   releaseTurn: Array<{ token: string; reason: string | null; produced: boolean }>;
   appendEvents: unknown[][];
   insertMessage: Array<{ content: unknown; sessionId: string }>;
   aiCalls: Array<{
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    latencyMs: number;
+    source: string;
+  }>;
+  listConversationAgents: number;
+  getProviderConfig: Array<{ token: string }>;
+  agentSpends: Array<{
+    token: string;
     model: string;
     inputTokens: number;
     outputTokens: number;
@@ -52,7 +68,24 @@ interface FakeOptions {
   usageThrows?: boolean;
   /** recordAiCall throws (ledger insert failure) — the turn must survive. */
   recordAiCallThrows?: boolean;
+  /** list_conversation_agents rows (claim-refusal diagnosis, ADR-0028). */
+  invites?: AgentInviteRow[];
+  /** listConversationAgents throws — the diagnosis must map to 'agent-refused'. */
+  invitesThrow?: boolean;
+  /** get_agent_provider_config reply. Defaults to a plain anthropic config. */
+  providerConfig?: AgentProviderConfig;
+  /** getProviderConfig throws (revoked mid-claim / no secret registered). */
+  providerConfigThrows?: boolean;
+  /** record_agent_spend throws — the turn must survive with a receipt. */
+  recordAgentSpendThrows?: boolean;
 }
+
+const DEFAULT_PROVIDER_CONFIG: AgentProviderConfig = {
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-6',
+  baseUrl: null,
+  secret: 'sk-ant-TURN-SCOPED-SECRET',
+};
 
 function makeClient(opts: FakeOptions = {}): { client: AgentTurnClient; rec: Recorded } {
   const rec: Recorded = {
@@ -63,12 +96,32 @@ function makeClient(opts: FakeOptions = {}): { client: AgentTurnClient; rec: Rec
     appendEvents: [],
     insertMessage: [],
     aiCalls: [],
+    listConversationAgents: 0,
+    getProviderConfig: [],
+    agentSpends: [],
   };
   const client: AgentTurnClient = {
-    async claimTurn(token, ttlSeconds, turnId) {
+    async claimTurn(token, ttlSeconds, turnId, agentId) {
       rec.order.push('claim');
-      rec.claimTurn.push({ token, ttl: ttlSeconds, turnId });
+      rec.claimTurn.push({ token, ttl: ttlSeconds, turnId, agentId });
       return opts.claimResult ?? true;
+    },
+    async listConversationAgents() {
+      rec.order.push('listConversationAgents');
+      rec.listConversationAgents += 1;
+      if (opts.invitesThrow) throw new Error('list RPC unreachable');
+      return opts.invites ?? [];
+    },
+    async getProviderConfig(token) {
+      rec.order.push('getProviderConfig');
+      rec.getProviderConfig.push({ token });
+      if (opts.providerConfigThrows) throw new Error('no provider secret registered');
+      return opts.providerConfig ?? DEFAULT_PROVIDER_CONFIG;
+    },
+    async recordAgentSpend(token, record) {
+      rec.order.push('recordAgentSpend');
+      if (opts.recordAgentSpendThrows) throw new Error('spend RPC refused');
+      rec.agentSpends.push({ token, ...record });
     },
     async refreshTurn(_token, _ttl) {
       rec.order.push('refresh');
@@ -499,5 +552,376 @@ describe('runAgentTurn', () => {
     });
     assert.equal(res.status, 'quota-exceeded');
     assert.equal(rec.releaseTurn[0].reason, null);
+  });
+});
+
+// ─── [A4] registered-agent turns (ADR-0028, PR-A4-4) ─────────────────────────
+
+const AGENT_ID = '99999999-9999-4999-8999-999999999999';
+const AGENT_INPUT = { ...INPUT, agentId: AGENT_ID };
+
+describe('runAgentTurn with a registered agent (agentId)', () => {
+  it('threads agentId into the claim; absent agentId claims with undefined (legacy wire shape)', async () => {
+    const { client, rec } = makeClient();
+    await runAgentTurn(AGENT_INPUT, AUTH, {
+      clientFactory: async () => client,
+      providerCallFactory: () => constantLlm('reply'),
+      llmCall: constantLlm('never used'),
+    });
+    assert.equal(rec.claimTurn[0].agentId, AGENT_ID);
+
+    const { client: legacyClient, rec: legacyRec } = makeClient();
+    await runAgentTurn(INPUT, AUTH, {
+      clientFactory: async () => legacyClient,
+      llmCall: constantLlm('reply'),
+    });
+    assert.equal(legacyRec.claimTurn[0].agentId, undefined);
+  });
+
+  it('fetches the provider config AT TURN START with the claim token and uses the provider brain', async () => {
+    const config: AgentProviderConfig = {
+      provider: 'openai-compatible',
+      model: 'my-model',
+      baseUrl: 'https://llm.example.com/v1',
+      secret: 'sk-compat-secret',
+    };
+    let seenConfig: AgentProviderConfig | undefined;
+    let defaultBrainCalled = false;
+    const { client, rec } = makeClient({ providerConfig: config });
+
+    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+      clientFactory: async () => client,
+      providerCallFactory: (cfg) => {
+        seenConfig = cfg;
+        return constantLlm('provider reply');
+      },
+      llmCall: async () => {
+        defaultBrainCalled = true;
+        return 'default reply';
+      },
+    });
+
+    assert.equal(res.status, 'ok');
+    assert.equal(res.messageId, 'm1');
+    assert.deepEqual(seenConfig, config);
+    assert.equal(defaultBrainCalled, false, 'the default brain is out of the loop');
+    // The config read is gated on the ACTIVE claim: same token as the claim,
+    // and it happens before the thread read / LLM call.
+    assert.equal(rec.getProviderConfig.length, 1);
+    assert.equal(rec.getProviderConfig[0].token, rec.claimTurn[0].token);
+    assert.ok(rec.order.indexOf('getProviderConfig') > rec.order.indexOf('claim'));
+    assert.ok(rec.order.indexOf('getProviderConfig') < rec.order.indexOf('readThread'));
+    // Message content shape unchanged.
+    assert.deepEqual(rec.insertMessage[0].content, [{ type: 'text', text: 'provider reply' }]);
+  });
+
+  it('records spend through record_agent_spend (owner-attributed), NOT insert-own ai_calls', async () => {
+    const { client, rec } = makeClient();
+    const llm: LLMCall = async () => {
+      recordLlmUsage({
+        provider: 'anthropic-api',
+        model: 'claude-sonnet-4-6',
+        inputTokens: 200,
+        outputTokens: 80,
+      });
+      return 'the reply';
+    };
+
+    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+      clientFactory: async () => client,
+      providerCallFactory: () => llm,
+    });
+
+    assert.equal(res.status, 'ok');
+    assert.equal(rec.aiCalls.length, 0, 'no summoner-attributed insert-own row on the agent path');
+    assert.equal(rec.agentSpends.length, 1, 'exactly one owner-attributed spend row');
+    assert.equal(rec.agentSpends[0].token, rec.claimTurn[0].token, 'claim-gated: same token');
+    assert.equal(rec.agentSpends[0].model, 'claude-sonnet-4-6');
+    assert.equal(rec.agentSpends[0].inputTokens, 200);
+    assert.equal(rec.agentSpends[0].outputTokens, 80);
+    // Spend is recorded while the claim is HELD (before release — the RPC's gate).
+    assert.ok(rec.order.indexOf('recordAgentSpend') < rec.order.indexOf('release'));
+  });
+
+  it('token-less provider backends fall back to the config model on the spend row', async () => {
+    const { client, rec } = makeClient({
+      providerConfig: { ...DEFAULT_PROVIDER_CONFIG, model: 'config-model' },
+    });
+    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+      clientFactory: async () => client,
+      providerCallFactory: () => constantLlm('the reply'),
+    });
+    assert.equal(res.status, 'ok');
+    assert.equal(rec.agentSpends[0].model, 'config-model');
+    assert.equal(rec.agentSpends[0].inputTokens, 0);
+    assert.equal(rec.agentSpends[0].outputTokens, 0);
+  });
+
+  it('record_agent_spend failure → turn still ok + AgentSpendRecordFailed receipt', async () => {
+    const { flags, captured } = makeFlags();
+    setPostHogFlags(flags);
+    try {
+      const { client, rec } = makeClient({ recordAgentSpendThrows: true });
+      const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+        clientFactory: async () => client,
+        providerCallFactory: () => constantLlm('the reply'),
+      });
+      assert.equal(res.status, 'ok');
+      assert.equal(rec.insertMessage.length, 1);
+      assert.equal(captured.filter((c) => c.event === 'AgentSpendRecordFailed').length, 1);
+    } finally {
+      setPostHogFlags(undefined);
+    }
+  });
+
+  it('legacy path (no agentId) never touches the agent RPCs and keeps the labre quota gate', async () => {
+    const { client, rec } = makeClient();
+    const res = await runAgentTurn(INPUT, AUTH, {
+      clientFactory: async () => client,
+      llmCall: constantLlm('reply'),
+    });
+    assert.equal(res.status, 'ok');
+    assert.equal(rec.getProviderConfig.length, 0);
+    assert.equal(rec.listConversationAgents, 0);
+    assert.equal(rec.agentSpends.length, 0);
+    assert.equal(rec.aiCalls.length, 1, 'legacy spend path unchanged');
+    assert.ok(
+      rec.order.includes('readAgentUsage'),
+      'the labre quota gate stays in place on the legacy path',
+    );
+  });
+
+  // ── labre quotas do NOT bind registered-agent turns (labre#231 review) ────
+
+  it('the agent path never reads get_my_agent_usage (labre quota = labre subscription only)', async () => {
+    const { client, rec } = makeClient();
+    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+      clientFactory: async () => client,
+      providerCallFactory: () => constantLlm('reply'),
+    });
+    assert.equal(res.status, 'ok');
+    assert.equal(
+      rec.order.filter((step) => step === 'readAgentUsage').length,
+      0,
+      'assertAgentQuota must be skipped when an agentId conducts the turn',
+    );
+  });
+
+  it('a summoner over the labre quota CAN still conduct a registered-agent turn', async () => {
+    // get_my_agent_usage would deny (50/50) — but the agent turn runs on the
+    // OWNER's provider key, so the labre bound does not apply; the per-agent
+    // cap is enforced by the DB at the claim gate, not here.
+    const { client, rec } = makeClient({
+      usage: { ok: true, body: [{ agent_turns_today: 50, agent_turns_limit_day: 50 }] },
+    });
+    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+      clientFactory: async () => client,
+      providerCallFactory: () => constantLlm('agent reply'),
+    });
+    assert.equal(res.status, 'ok');
+    assert.equal(res.messageId, 'm1');
+    assert.equal(rec.insertMessage.length, 1, 'the turn ran despite the exhausted labre meter');
+    assert.equal(rec.order.filter((step) => step === 'readAgentUsage').length, 0);
+    // Same over-quota summoner WITHOUT an agentId still refuses (unchanged).
+    const { client: legacyClient } = makeClient({
+      usage: { ok: true, body: [{ agent_turns_today: 50, agent_turns_limit_day: 50 }] },
+    });
+    const legacyRes = await runAgentTurn(INPUT, AUTH, {
+      clientFactory: async () => legacyClient,
+      llmCall: constantLlm('x'),
+    });
+    assert.equal(legacyRes.status, 'quota-exceeded');
+  });
+
+  // ── Claim-refusal diagnosis → first-class statuses ────────────────────────
+
+  it("refused claim + revoked invite row → 'agent-revoked' (no LLM, nothing released)", async () => {
+    const { client, rec } = makeClient({
+      claimResult: false,
+      invites: [{ agentId: AGENT_ID, status: 'revoked' }],
+    });
+    let llmCalled = false;
+    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+      clientFactory: async () => client,
+      providerCallFactory: () => async () => {
+        llmCalled = true;
+        return 'x';
+      },
+    });
+    assert.equal(res.status, 'agent-revoked');
+    assert.equal(llmCalled, false);
+    assert.equal(rec.getProviderConfig.length, 0, 'the secret is never fetched on a refusal');
+    assert.equal(rec.releaseTurn.length, 0, 'a refused claim releases nothing');
+    assert.equal(rec.insertMessage.length, 0);
+  });
+
+  it("refused claim + agent absent from the invite list → 'agent-not-invited'", async () => {
+    const { client } = makeClient({
+      claimResult: false,
+      invites: [{ agentId: 'some-other-agent', status: 'active' }],
+    });
+    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+      clientFactory: async () => client,
+      providerCallFactory: () => constantLlm('x'),
+    });
+    assert.equal(res.status, 'agent-not-invited');
+  });
+
+  it("refused claim + active invited agent → 'busy' (single-flight semantics preserved)", async () => {
+    const { client } = makeClient({
+      claimResult: false,
+      invites: [{ agentId: AGENT_ID, status: 'active' }],
+    });
+    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+      clientFactory: async () => client,
+      providerCallFactory: () => constantLlm('x'),
+    });
+    assert.equal(res.status, 'busy');
+  });
+
+  it("refused claim + unreadable invite list → generic 'agent-refused'", async () => {
+    const { client } = makeClient({ claimResult: false, invitesThrow: true });
+    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+      clientFactory: async () => client,
+      providerCallFactory: () => constantLlm('x'),
+    });
+    assert.equal(res.status, 'agent-refused');
+  });
+
+  it("refused claim + unexpected invite status → generic 'agent-refused'", async () => {
+    const { client } = makeClient({
+      claimResult: false,
+      invites: [{ agentId: AGENT_ID, status: 'suspended' }],
+    });
+    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+      clientFactory: async () => client,
+      providerCallFactory: () => constantLlm('x'),
+    });
+    assert.equal(res.status, 'agent-refused');
+  });
+
+  // ── Provider failures: sanitized notice POSTED + clean degradation ────────
+
+  it('provider error (dead key 401) → sanitized notice posted, release(interrupted), degraded + messageId', async () => {
+    const { client, rec } = makeClient();
+    const deadKeyLlm: LLMCall = async () => {
+      throw new Error('Anthropic API error 401: {"type":"authentication_error"}');
+    };
+
+    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+      clientFactory: async () => client,
+      providerCallFactory: () => deadKeyLlm,
+    });
+
+    assert.equal(res.status, 'degraded');
+    assert.equal(res.messageId, 'm1', 'the posted notice id is surfaced');
+    assert.equal(rec.insertMessage.length, 1, 'the error notice IS posted into the conversation');
+    const content = rec.insertMessage[0].content as Array<{ type: string; text: string }>;
+    assert.equal(content[0].type, 'text');
+    assert.match(content[0].text, /rejected the configured API key/);
+    assert.match(content[0].text, /401/);
+    // Clean degradation: interrupted (not normal), produced=true (a notice landed).
+    assert.equal(rec.releaseTurn.length, 1);
+    assert.equal(rec.releaseTurn[0].reason, 'interrupted');
+    assert.equal(rec.releaseTurn[0].produced, true);
+    assert.equal(rec.agentSpends.length, 0, 'no spend row for a failed provider call');
+  });
+
+  it('driver construction throws (invalid base_url…) → config notice posted, degraded, clean release', async () => {
+    // requireCleanBaseUrl-style factory failures are CONFIG problems: they
+    // must ride the same guard as the config read — notice posted, never the
+    // silent generic degradation.
+    const { client, rec } = makeClient();
+    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+      clientFactory: async () => client,
+      providerCallFactory: () => {
+        throw new Error('agent provider config: base_url must not embed credentials');
+      },
+    });
+    assert.equal(res.status, 'degraded');
+    assert.equal(res.messageId, 'm1', 'the posted notice id is surfaced');
+    assert.equal(rec.insertMessage.length, 1, 'the config notice IS posted');
+    const content = rec.insertMessage[0].content as Array<{ type: string; text: string }>;
+    assert.match(content[0].text, /provider configuration could not be read/);
+    assert.ok(
+      !content[0].text.includes('base_url'),
+      'the factory error text is never echoed into the conversation',
+    );
+    assert.equal(rec.releaseTurn.length, 1, 'the claim is still released');
+    assert.equal(rec.releaseTurn[0].reason, 'interrupted');
+    assert.equal(rec.releaseTurn[0].produced, true);
+  });
+
+  it('provider config unreadable → static config notice posted, degraded (RPC error never echoed)', async () => {
+    const { client, rec } = makeClient({ providerConfigThrows: true });
+    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+      clientFactory: async () => client,
+      providerCallFactory: () => constantLlm('never reached'),
+    });
+    assert.equal(res.status, 'degraded');
+    assert.equal(rec.insertMessage.length, 1);
+    const content = rec.insertMessage[0].content as Array<{ type: string; text: string }>;
+    assert.match(content[0].text, /provider configuration could not be read/);
+    assert.ok(
+      !content[0].text.includes('no provider secret registered'),
+      'the raw RPC error text is never echoed',
+    );
+    assert.equal(rec.releaseTurn[0].reason, 'interrupted');
+  });
+
+  it('provider error with the notice insert ALSO failing → still degrades cleanly, no messageId', async () => {
+    const { client, rec } = makeClient({ insertId: null });
+    // insertId null: the fake returns null (insert refused). Make the LLM throw
+    // so the notice path is exercised.
+    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+      clientFactory: async () => client,
+      providerCallFactory: () => throwingLlm(),
+    });
+    assert.equal(res.status, 'degraded');
+    assert.equal(res.messageId, undefined);
+    assert.equal(rec.releaseTurn.length, 1, 'the claim is still released');
+    assert.equal(rec.releaseTurn[0].reason, 'interrupted');
+    assert.equal(rec.releaseTurn[0].produced, false);
+  });
+
+  // ── Secret hygiene: the provider secret never leaks ───────────────────────
+
+  it('the decrypted secret appears NOWHERE: result, posted messages, events, receipts, release', async () => {
+    const SECRET = 'sk-ant-EXTREMELY-SECRET-VALUE';
+    const { flags, captured } = makeFlags();
+    setPostHogFlags(flags);
+    try {
+      // Failure run (the leakiest path: classified error → notice → receipts).
+      const { client: failClient, rec: failRec } = makeClient({
+        providerConfig: { ...DEFAULT_PROVIDER_CONFIG, secret: SECRET },
+        recordAgentSpendThrows: true,
+      });
+      const failRes = await runAgentTurn(AGENT_INPUT, AUTH, {
+        clientFactory: async () => failClient,
+        providerCallFactory: () => async () => {
+          throw new Error('provider exploded (HTTP 500)');
+        },
+      });
+
+      // Success run (usage collection, spend, receipts).
+      const { client: okClient, rec: okRec } = makeClient({
+        providerConfig: { ...DEFAULT_PROVIDER_CONFIG, secret: SECRET },
+      });
+      const okRes = await runAgentTurn(AGENT_INPUT, AUTH, {
+        clientFactory: async () => okClient,
+        providerCallFactory: () => constantLlm('a perfectly normal reply'),
+      });
+
+      const everything = JSON.stringify({
+        failRes,
+        okRes,
+        failRec,
+        okRec,
+        captured,
+      });
+      assert.ok(!everything.includes(SECRET), 'the provider secret must never leak');
+    } finally {
+      setPostHogFlags(undefined);
+    }
   });
 });
