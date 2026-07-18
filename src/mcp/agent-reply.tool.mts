@@ -34,9 +34,16 @@ const AgentReplyInputSchema = z.object({
   // BEFORE the daemon-billed LLM spend, not at the terminal insert (recette).
   sessionId: z.string().uuid(),
   turnId: z.string().uuid(),
-  // ADR-0028 (PR-A4-4): the REGISTERED agent to conduct the turn as — a named
-  // LLM provider config owned by the conversation owner. OPTIONAL: absent
-  // keeps the [A2] anonymous path byte-for-byte (the daemon's default brain).
+  // ADR-0028: the REGISTERED agent to conduct the turn as — a named LLM
+  // provider config owned by the conversation owner and invited here.
+  // REQUIRED in practice since PR-A4-6 retired the anonymous path.
+  //
+  // Kept `.optional()` in the SCHEMA on purpose: a required field would make
+  // an omission fail as a raw zod validation error, which reaches the caller
+  // as an opaque input rejection. Refusing in the turn instead yields the
+  // first-class 'agent-required' status, which says what to do about it —
+  // the same posture as 'unsupported-issuer' (refuse explicitly, never fail
+  // invisibly). The type still allows undefined; runAgentTurn is the gate.
   agentId: z.string().uuid().optional(),
   writeMode: z.enum(['auto', 'ask', 'read-only']).default('ask'),
   scope: z.enum(['full', 'restricted']).default('restricted'),
@@ -67,12 +74,13 @@ export function buildAgentReplyTool(runner: AgentTurnRunner = runAgentTurn): Too
       "per-conversation single-flight turn, read the recent thread under the caller's " +
       'RLS, produce one concise prose reply, persist it as an external-agent message, ' +
       'and release the turn. Requires a user JWT (not a lab_ API key). ' +
-      'Input: { conversationId, sessionId, turnId, agentId?, writeMode?, scope? }. ' +
-      'agentId (optional) names a REGISTERED agent — a per-agent LLM provider ' +
-      'configuration — to conduct the turn as; without it the daemon uses its default ' +
-      'brain, unchanged. ' +
+      'Input: { conversationId, sessionId, turnId, agentId, writeMode?, scope? }. ' +
+      'agentId names the REGISTERED agent — a per-agent LLM provider configuration, ' +
+      'owned by the conversation owner and invited into the conversation — to conduct ' +
+      'the turn as. It is REQUIRED: the anonymous default-brain path was retired with ' +
+      'the agent registry, and a call without it is refused with "agent-required". ' +
       'Returns { status: "ok" | "busy" | "degraded" | "quota-exceeded" | ' +
-      '"agent-revoked" | "agent-not-invited" | "agent-refused" | ' +
+      '"agent-revoked" | "agent-not-invited" | "agent-refused" | "agent-required" | ' +
       '"unsupported-issuer" | "error", messageId? }: ' +
       '"busy" = another turn holds the conversation; "degraded" = the turn timed out ' +
       'or errored (the claim was still released; on a registered-agent provider failure ' +
@@ -85,6 +93,8 @@ export function buildAgentReplyTool(runner: AgentTurnRunner = runAgentTurn): Too
       '"agent-not-invited" = the agent is not invited to this conversation (or does not ' +
       'exist — do not retry until invited); "agent-refused" = the agent claim was refused ' +
       'for another reason (do not retry blindly); ' +
+      '"agent-required" = no agentId was given and the anonymous path is retired ' +
+      '(register an agent, invite it, and pass its id); ' +
       '"unsupported-issuer" = the caller authenticated with a non-Supabase JWT (e.g. an ' +
       'OIDC IdP token on a multi-issuer daemon) — such a token cannot act on conversations ' +
       'under RLS, so this tool requires a Supabase-issued user JWT (do not retry with the ' +

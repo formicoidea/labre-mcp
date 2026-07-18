@@ -1,21 +1,28 @@
 // Unit tests for the external-agent turn orchestrator. A fake AgentTurnClient
-// and a mocked llmCall exercise the lifecycle without a live Supabase or LLM:
+// and an injected provider brain exercise the lifecycle without a live Supabase
+// or LLM. Since PR-A4-6 every turn is conducted by a REGISTERED agent (the
+// anonymous [A2] path is retired), so the lifecycle suite below runs on the
+// agent path: the brain comes from `providerCallFactory` and spend is recorded
+// through record_agent_spend.
 //   - claim refused        → busy, no LLM call, no release
 //   - happy path           → claim → refresh → events → insert → release
 //                            (reason 'normal', produced true), status ok
-//   - LLM throws           → release(produced=false), no insert, degraded
+//   - provider throws      → sanitized notice posted, release('interrupted'),
+//                            degraded, no agent reply persisted
 //   - wall-clock timeout    → release fired, degraded
 //   - heartbeat refuses     → abort mid-turn, release attempted, degraded
-//   - quota deny ([A3])     → release(reason NULL), no LLM call, no message,
-//                             'quota-exceeded' + QuotaRefused receipt
-//   - quota read fails      → turn proceeds (fail-open) + QuotaCheckDegraded
-//   - success               → one ai_calls spend row (source external-agent)
+//   - success               → one record_agent_spend row (source external-agent)
 //   - ledger insert fails   → turn still ok + failure receipt
+//   - no agentId            → 'agent-required' before any I/O (the retirement)
+// The [A3] quota gate is exercised directly (see the `assertAgentQuota` suite):
+// runAgentTurn no longer reaches it, because it only ran on the retired path.
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   runAgentTurn,
+  assertAgentQuota,
+  QuotaExceededError,
   type AgentTurnClient,
   type AgentInviteRow,
   type AgentProviderConfig,
@@ -27,7 +34,13 @@ import type { PostHogFlags } from '#lib/flags/posthog.mjs';
 import type { LLMCall } from '#types/llm.mjs';
 
 const AUTH = { userId: 'user-1', token: 'jwt-token' };
-const INPUT = { conversationId: 'c1', sessionId: 's1', turnId: 't1' };
+const AGENT_ID = '99999999-9999-4999-8999-999999999999';
+/** The ONLY shape a turn can take since PR-A4-6: a registered agent conducts
+ *  it. The whole lifecycle suite runs on this input. */
+const INPUT = { conversationId: 'c1', sessionId: 's1', turnId: 't1', agentId: AGENT_ID };
+/** The RETIRED shape (no agentId). Used only by the two retirement tests that
+ *  pin the 'agent-required' refusal — never by a lifecycle test. */
+const NO_AGENT_INPUT = { conversationId: 'c1', sessionId: 's1', turnId: 't1' };
 
 interface Recorded {
   order: string[];
@@ -207,16 +220,23 @@ describe('runAgentTurn', () => {
   });
 
   it('returns busy without an LLM call when the claim is refused', async () => {
-    const { client, rec } = makeClient({ claimResult: false });
+    // The conducting agent is registered AND actively invited, so the only
+    // remaining named cause of a refusal is the single-flight lock → 'busy'
+    // (ADR-0028 diagnosis). What this test pins is the cost of a refusal: no
+    // brain built, nothing written, nothing released.
+    const { client, rec } = makeClient({
+      claimResult: false,
+      invites: [{ agentId: AGENT_ID, status: 'active' }],
+    });
     let llmCalled = false;
-    const llmCall: LLMCall = async () => {
+    const providerCall: LLMCall = async () => {
       llmCalled = true;
       return 'x';
     };
 
     const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
-      llmCall,
+      providerCallFactory: () => providerCall,
     });
 
     assert.equal(res.status, 'busy');
@@ -241,7 +261,7 @@ describe('runAgentTurn', () => {
 
     const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
-      llmCall,
+      providerCallFactory: () => llmCall,
       heartbeatIntervalMs: 5,
     });
 
@@ -280,7 +300,7 @@ describe('runAgentTurn', () => {
     const { client, rec } = makeClient();
     const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
-      llmCall: constantLlm('   '),
+      providerCallFactory: () => constantLlm('   '),
     });
 
     assert.equal(res.status, 'ok');
@@ -290,27 +310,35 @@ describe('runAgentTurn', () => {
     assert.equal(rec.releaseTurn[0].reason, 'normal');
   });
 
-  it('LLM throw → release(produced=false), no insert, degraded', async () => {
+  it('LLM throw → no agent reply, sanitized notice posted, release(interrupted), degraded', async () => {
     const { client, rec } = makeClient();
     const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
-      llmCall: throwingLlm(),
+      providerCallFactory: () => throwingLlm(),
     });
 
     assert.equal(res.status, 'degraded');
-    assert.equal(rec.insertMessage.length, 0, 'no message on failure');
     assert.equal(rec.releaseTurn.length, 1, 'the claim is still released');
+    // BEHAVIOUR CHANGED with the retirement of the anonymous path: on the agent
+    // path a brain failure POSTS a sanitized notice under the still-held claim
+    // (ADR-0028) instead of persisting nothing. The invariant this test guards
+    // is unchanged — the agent's own reply is never persisted on failure — but
+    // the single insert is now that notice, hence produced=true.
+    assert.equal(rec.insertMessage.length, 1, 'only the sanitized notice is written');
+    const content = rec.insertMessage[0].content as Array<{ type: string; text: string }>;
+    assert.match(content[0].text, /The agent could not reply/);
     // Catch-path releases carry 'interrupted' so a degraded turn stays
     // distinguishable from a clean one (recette).
     assert.equal(rec.releaseTurn[0].reason, 'interrupted');
-    assert.equal(rec.releaseTurn[0].produced, false);
+    assert.equal(rec.releaseTurn[0].produced, true, 'a notice landed');
+    assert.equal(rec.agentSpends.length, 0, 'no spend row for a failed provider call');
   });
 
   it('wall-clock timeout → release fired, degraded (claim never left behind)', async () => {
     const { client, rec } = makeClient();
     const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
-      llmCall: neverLlm(),
+      providerCallFactory: () => neverLlm(),
       turnTimeoutMs: 20,
       // Large heartbeat so only the timeout fires.
       heartbeatIntervalMs: 10_000,
@@ -328,7 +356,7 @@ describe('runAgentTurn', () => {
     const { client, rec } = makeClient({ refreshResult: false });
     const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
-      llmCall: neverLlm(),
+      providerCallFactory: () => neverLlm(),
       heartbeatIntervalMs: 5,
       turnTimeoutMs: 10_000,
     });
@@ -340,135 +368,14 @@ describe('runAgentTurn', () => {
     assert.equal(rec.releaseTurn[0].produced, false);
   });
 
-  // ─── [A3] quota gate + spend ledger (ADR-0027, PR-A3-2b) ──────────────────
+  // ─── Spend ledger (ADR-0027 D4.1 → ADR-0028 Decision 6) ───────────────────
+  // The [A3] quota-gate lifecycle tests that used to live here moved to the
+  // `assertAgentQuota` suite below: runAgentTurn only ever ran that gate on the
+  // anonymous path, which PR-A4-6 retired.
 
-  it('quota deny → quota-exceeded, claim released bare (reason NULL), no LLM, no message, QuotaRefused', async () => {
-    const { flags, captured } = makeFlags();
-    setPostHogFlags(flags);
-    try {
-      const { client, rec } = makeClient({
-        usage: { ok: true, body: [{ agent_turns_today: 50, agent_turns_limit_day: 50 }] },
-      });
-      let llmCalled = false;
-      const llmCall: LLMCall = async () => {
-        llmCalled = true;
-        return 'x';
-      };
-
-      const res = await runAgentTurn(INPUT, AUTH, {
-        clientFactory: async () => client,
-        llmCall,
-      });
-
-      assert.equal(res.status, 'quota-exceeded');
-      assert.equal(res.messageId, undefined);
-      assert.equal(llmCalled, false, 'no LLM spend on a refused turn');
-      assert.equal(rec.insertMessage.length, 0, 'no message inserted');
-      assert.equal(rec.aiCalls.length, 0, 'no spend row for a turn that never ran');
-      assert.equal(rec.appendEvents.length, 0, 'no lifecycle receipts — the turn never started');
-
-      // The claim is released through the BARE-DELETE path: reason NULL, so
-      // release_conversation_turn emits NO turn.quiesced (ADR-0027 D4/D6).
-      assert.equal(rec.releaseTurn.length, 1, 'the claim is still released');
-      assert.equal(rec.releaseTurn[0].reason, null);
-      assert.equal(rec.releaseTurn[0].produced, false);
-      assert.equal(rec.releaseTurn[0].token, rec.claimTurn[0].token);
-
-      // Explicit order: the quota gate is the FIRST thing inside the claim,
-      // and the refused turn touches nothing else before releasing.
-      assert.deepEqual(rec.order.slice(0, 3), ['claim', 'readAgentUsage', 'release']);
-
-      // Metadata-only refusal receipt.
-      const refused = captured.filter((c) => c.event === 'QuotaRefused');
-      assert.equal(refused.length, 1);
-      assert.equal(refused[0].distinctId, 'user-1');
-      assert.deepEqual(refused[0].properties, {
-        resource: 'agent-turns-day',
-        used: 50,
-        limit: 50,
-        conversation_id: 'c1',
-        source: 'external-agent',
-      });
-    } finally {
-      setPostHogFlags(undefined);
-    }
-  });
-
-  it('quota read fails → turn proceeds fail-open + QuotaCheckDegraded receipt', async () => {
-    const { flags, captured } = makeFlags();
-    setPostHogFlags(flags);
-    try {
-      const { client, rec } = makeClient({ usageThrows: true });
-      const res = await runAgentTurn(INPUT, AUTH, {
-        clientFactory: async () => client,
-        llmCall: constantLlm('reply text'),
-      });
-
-      assert.equal(res.status, 'ok');
-      assert.equal(res.messageId, 'm1');
-      assert.equal(rec.insertMessage.length, 1, 'the turn ran despite the failed read');
-
-      const degraded = captured.filter((c) => c.event === 'QuotaCheckDegraded');
-      assert.equal(degraded.length, 1);
-      assert.equal(degraded[0].distinctId, 'user-1');
-      assert.deepEqual(degraded[0].properties, {
-        resource: 'agent-turns-day',
-        source: 'external-agent',
-      });
-      assert.equal(
-        captured.filter((c) => c.event === 'QuotaRefused').length,
-        0,
-        'a failed read never refuses',
-      );
-    } finally {
-      setPostHogFlags(undefined);
-    }
-  });
-
-  it('malformed-but-ok usage row → turn proceeds + QuotaCheckDegraded (schema drift observable)', async () => {
-    const { flags, captured } = makeFlags();
-    setPostHogFlags(flags);
-    try {
-      for (const body of [null, [], [{ agent_turns_today: 99 }]]) {
-        const { client } = makeClient({ usage: { ok: true, body } });
-        const res = await runAgentTurn(INPUT, AUTH, {
-          clientFactory: async () => client,
-          llmCall: constantLlm('ok'),
-        });
-        assert.equal(res.status, 'ok');
-      }
-      const degraded = captured.filter((c) => c.event === 'QuotaCheckDegraded');
-      assert.equal(degraded.length, 3, 'one receipt per malformed reply');
-      assert.deepEqual(degraded[0].properties, {
-        resource: 'agent-turns-day',
-        source: 'external-agent',
-      });
-    } finally {
-      setPostHogFlags(undefined);
-    }
-  });
-
-  it('non-positive limit → turn proceeds WITHOUT a degraded receipt (legitimate "no limit")', async () => {
-    const { flags, captured } = makeFlags();
-    setPostHogFlags(flags);
-    try {
-      const { client } = makeClient({
-        usage: { ok: true, body: [{ agent_turns_today: 99, agent_turns_limit_day: 0 }] },
-      });
-      const res = await runAgentTurn(INPUT, AUTH, {
-        clientFactory: async () => client,
-        llmCall: constantLlm('ok'),
-      });
-      assert.equal(res.status, 'ok');
-      assert.equal(captured.filter((c) => c.event === 'QuotaCheckDegraded').length, 0);
-    } finally {
-      setPostHogFlags(undefined);
-    }
-  });
-
-  it('success → one ai_calls spend row: source external-agent, reported tokens + model', async () => {
+  it('success → one owner-attributed spend row: source external-agent, reported tokens + model', async () => {
     const { client, rec } = makeClient();
-    // An llmCall that reports usage the way real backends do (usage-context).
+    // A brain that reports usage the way real backends do (usage-context).
     const llmCall: LLMCall = async () => {
       recordLlmUsage({
         provider: 'agent-sdk',
@@ -481,44 +388,51 @@ describe('runAgentTurn', () => {
 
     const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
-      llmCall,
+      providerCallFactory: () => llmCall,
     });
 
     assert.equal(res.status, 'ok');
-    assert.equal(rec.aiCalls.length, 1, 'exactly one spend row per turn');
-    assert.equal(rec.aiCalls[0].source, 'external-agent');
-    assert.equal(rec.aiCalls[0].model, 'claude-sonnet-4-6');
-    assert.equal(rec.aiCalls[0].inputTokens, 120);
-    assert.equal(rec.aiCalls[0].outputTokens, 45);
-    assert.ok(rec.aiCalls[0].latencyMs >= 0, 'latency is a number');
+    // The ledger row now rides record_agent_spend (claim-gated DEFINER, lands
+    // on the agent OWNER) instead of the summoner-attributed ai_calls insert —
+    // the latter was the anonymous path's ledger and is unreachable now.
+    assert.equal(rec.aiCalls.length, 0, 'the summoner-attributed insert-own path is retired');
+    assert.equal(rec.agentSpends.length, 1, 'exactly one spend row per turn');
+    assert.equal(rec.agentSpends[0].source, 'external-agent');
+    assert.equal(rec.agentSpends[0].model, 'claude-sonnet-4-6');
+    assert.equal(rec.agentSpends[0].inputTokens, 120);
+    assert.equal(rec.agentSpends[0].outputTokens, 45);
+    assert.ok(rec.agentSpends[0].latencyMs >= 0, 'latency is a number');
     // The ledger row lands after the LLM call, before/independent of insert.
-    assert.ok(rec.order.indexOf('recordAiCall') < rec.order.indexOf('insert'));
+    assert.ok(rec.order.indexOf('recordAgentSpend') < rec.order.indexOf('insert'));
   });
 
-  it('success with a token-less backend → spend row with 0 tokens and unknown model', async () => {
+  it('success with a token-less backend → spend row with 0 tokens, model from the provider config', async () => {
     // The Copilot flow reports no per-call tokens: the row still counts the
     // call (the quota unit) with NOT-NULL-friendly zero token defaults.
+    // The old 'unknown' model fallback is no longer observable here: on the
+    // agent path the provider config always supplies a model, so
+    // `usage.model ?? providerModel ?? 'unknown'` stops at providerModel.
     const { client, rec } = makeClient();
     const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
-      llmCall: constantLlm('the reply'),
+      providerCallFactory: () => constantLlm('the reply'),
     });
 
     assert.equal(res.status, 'ok');
-    assert.equal(rec.aiCalls.length, 1);
-    assert.equal(rec.aiCalls[0].inputTokens, 0);
-    assert.equal(rec.aiCalls[0].outputTokens, 0);
-    assert.equal(rec.aiCalls[0].model, 'unknown');
+    assert.equal(rec.agentSpends.length, 1);
+    assert.equal(rec.agentSpends[0].inputTokens, 0);
+    assert.equal(rec.agentSpends[0].outputTokens, 0);
+    assert.equal(rec.agentSpends[0].model, DEFAULT_PROVIDER_CONFIG.model);
   });
 
   it('ledger insert failure → turn still ok + AgentSpendRecordFailed receipt', async () => {
     const { flags, captured } = makeFlags();
     setPostHogFlags(flags);
     try {
-      const { client, rec } = makeClient({ recordAiCallThrows: true });
+      const { client, rec } = makeClient({ recordAgentSpendThrows: true });
       const res = await runAgentTurn(INPUT, AUTH, {
         clientFactory: async () => client,
-        llmCall: constantLlm('the reply'),
+        providerCallFactory: () => constantLlm('the reply'),
       });
 
       assert.equal(res.status, 'ok', 'a failed spend record never fails the turn');
@@ -539,43 +453,118 @@ describe('runAgentTurn', () => {
       setPostHogFlags(undefined);
     }
   });
+});
 
-  it('quota deny with no PostHog configured still refuses cleanly (capture is optional)', async () => {
+// ─── [A3] quota gate as a UNIT (ADR-0027 Decisions 3 & 4) ────────────────────
+// PR-A4-6 retired the anonymous turn, and conductTurn runs assertAgentQuota
+// only when `agentId == null` — a shape runAgentTurn now refuses up front. The
+// gate's OWN contract is still pinned here, called directly, so none of its
+// behaviour lost coverage. What is genuinely unreachable (and so no longer
+// asserted anywhere) is its WIRING inside runAgentTurn: the 'quota-exceeded'
+// status, the bare-delete release (reason NULL, no turn.quiesced) and the
+// QuotaRefused receipt. See the report on PR-A4-6 — that is dead code to prune,
+// not behaviour to re-test.
+
+describe('assertAgentQuota', () => {
+  it('deny → throws QuotaExceededError carrying used/limit, and captures no receipt', async () => {
+    const { flags, captured } = makeFlags();
+    setPostHogFlags(flags);
+    try {
+      const { client } = makeClient({
+        usage: { ok: true, body: [{ agent_turns_today: 50, agent_turns_limit_day: 50 }] },
+      });
+      await assert.rejects(
+        assertAgentQuota(AUTH.userId, client),
+        (err: unknown) => err instanceof QuotaExceededError && err.used === 50 && err.limit === 50,
+      );
+      // A clean deny is not a degradation: no QuotaCheckDegraded receipt.
+      assert.equal(captured.filter((c) => c.event === 'QuotaCheckDegraded').length, 0);
+    } finally {
+      setPostHogFlags(undefined);
+    }
+  });
+
+  it('read failure → resolves (fail-open) + QuotaCheckDegraded receipt', async () => {
+    const { flags, captured } = makeFlags();
+    setPostHogFlags(flags);
+    try {
+      const { client } = makeClient({ usageThrows: true });
+      await assertAgentQuota(AUTH.userId, client);
+
+      const degraded = captured.filter((c) => c.event === 'QuotaCheckDegraded');
+      assert.equal(degraded.length, 1);
+      assert.equal(degraded[0].distinctId, 'user-1');
+      assert.deepEqual(degraded[0].properties, {
+        resource: 'agent-turns-day',
+        source: 'external-agent',
+      });
+    } finally {
+      setPostHogFlags(undefined);
+    }
+  });
+
+  it('malformed-but-ok usage row → resolves + QuotaCheckDegraded (schema drift observable)', async () => {
+    const { flags, captured } = makeFlags();
+    setPostHogFlags(flags);
+    try {
+      for (const body of [null, [], [{ agent_turns_today: 99 }]]) {
+        const { client } = makeClient({ usage: { ok: true, body } });
+        await assertAgentQuota(AUTH.userId, client);
+      }
+      const degraded = captured.filter((c) => c.event === 'QuotaCheckDegraded');
+      assert.equal(degraded.length, 3, 'one receipt per malformed reply');
+      assert.deepEqual(degraded[0].properties, {
+        resource: 'agent-turns-day',
+        source: 'external-agent',
+      });
+    } finally {
+      setPostHogFlags(undefined);
+    }
+  });
+
+  it('non-positive limit → resolves WITHOUT a degraded receipt (legitimate "no limit")', async () => {
+    const { flags, captured } = makeFlags();
+    setPostHogFlags(flags);
+    try {
+      const { client } = makeClient({
+        usage: { ok: true, body: [{ agent_turns_today: 99, agent_turns_limit_day: 0 }] },
+      });
+      await assertAgentQuota(AUTH.userId, client);
+      assert.equal(captured.filter((c) => c.event === 'QuotaCheckDegraded').length, 0);
+    } finally {
+      setPostHogFlags(undefined);
+    }
+  });
+
+  it('deny with no PostHog configured still refuses cleanly (capture is optional)', async () => {
     // getPostHogFlags() is undefined on stdio/unconfigured daemons — the
     // refusal path must not depend on telemetry being wired.
-    const { client, rec } = makeClient({
+    const { client } = makeClient({
       usage: { ok: true, body: [{ agent_turns_today: 51, agent_turns_limit_day: 50 }] },
     });
-    const res = await runAgentTurn(INPUT, AUTH, {
-      clientFactory: async () => client,
-      llmCall: constantLlm('x'),
-    });
-    assert.equal(res.status, 'quota-exceeded');
-    assert.equal(rec.releaseTurn[0].reason, null);
+    await assert.rejects(
+      assertAgentQuota(AUTH.userId, client),
+      (err: unknown) => err instanceof QuotaExceededError,
+    );
   });
 });
 
 // ─── [A4] registered-agent turns (ADR-0028, PR-A4-4) ─────────────────────────
 
-const AGENT_ID = '99999999-9999-4999-8999-999999999999';
-const AGENT_INPUT = { ...INPUT, agentId: AGENT_ID };
-
 describe('runAgentTurn with a registered agent (agentId)', () => {
-  it('threads agentId into the claim; absent agentId claims with undefined (legacy wire shape)', async () => {
+  it('threads the conducting agentId into the claim', async () => {
+    // REFORMULATED at PR-A4-6: this test used to also pin the legacy wire shape
+    // ("absent agentId claims with undefined"). That half has no object left —
+    // a turn without an agentId never reaches claim_agent_turn now, and the DB
+    // migration 20260718100000 refuses such a claim anyway.
     const { client, rec } = makeClient();
-    await runAgentTurn(AGENT_INPUT, AUTH, {
+    await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
       providerCallFactory: () => constantLlm('reply'),
       llmCall: constantLlm('never used'),
     });
+    assert.equal(rec.claimTurn.length, 1);
     assert.equal(rec.claimTurn[0].agentId, AGENT_ID);
-
-    const { client: legacyClient, rec: legacyRec } = makeClient();
-    await runAgentTurn(INPUT, AUTH, {
-      clientFactory: async () => legacyClient,
-      llmCall: constantLlm('reply'),
-    });
-    assert.equal(legacyRec.claimTurn[0].agentId, undefined);
   });
 
   it('fetches the provider config AT TURN START with the claim token and uses the provider brain', async () => {
@@ -589,7 +578,7 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
     let defaultBrainCalled = false;
     const { client, rec } = makeClient({ providerConfig: config });
 
-    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+    const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
       providerCallFactory: (cfg) => {
         seenConfig = cfg;
@@ -627,7 +616,7 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
       return 'the reply';
     };
 
-    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+    const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
       providerCallFactory: () => llm,
     });
@@ -647,7 +636,7 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
     const { client, rec } = makeClient({
       providerConfig: { ...DEFAULT_PROVIDER_CONFIG, model: 'config-model' },
     });
-    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+    const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
       providerCallFactory: () => constantLlm('the reply'),
     });
@@ -662,7 +651,7 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
     setPostHogFlags(flags);
     try {
       const { client, rec } = makeClient({ recordAgentSpendThrows: true });
-      const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+      const res = await runAgentTurn(INPUT, AUTH, {
         clientFactory: async () => client,
         providerCallFactory: () => constantLlm('the reply'),
       });
@@ -674,28 +663,47 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
     }
   });
 
-  it('legacy path (no agentId) never touches the agent RPCs and keeps the labre quota gate', async () => {
+  // ── PR-A4-6: the anonymous [A2] path is RETIRED ──────────────────────────
+  // This test used to pin the opposite (a turn WITHOUT an agentId succeeded on
+  // the daemon's default brain). It is inverted, not deleted: the behaviour
+  // changed on purpose, and the DB closing migration (20260718100000) now
+  // refuses such a claim anyway — the daemon must say WHY instead of letting
+  // it read as 'busy'.
+
+  it('a turn without an agentId is refused with agent-required, before any I/O', async () => {
     const { client, rec } = makeClient();
-    const res = await runAgentTurn(INPUT, AUTH, {
+    const res = await runAgentTurn(NO_AGENT_INPUT, AUTH, {
       clientFactory: async () => client,
       llmCall: constantLlm('reply'),
     });
-    assert.equal(res.status, 'ok');
+    assert.equal(res.status, 'agent-required');
+    // Refused BEFORE the client is even used: no claim, no quota read, no LLM
+    // call, no spend — the retirement costs nothing.
+    assert.deepEqual(rec.order, []);
+    assert.equal(rec.insertMessage.length, 0);
+    assert.equal(rec.aiCalls.length, 0);
+    assert.equal(rec.agentSpends.length, 0);
     assert.equal(rec.getProviderConfig.length, 0);
     assert.equal(rec.listConversationAgents, 0);
-    assert.equal(rec.agentSpends.length, 0);
-    assert.equal(rec.aiCalls.length, 1, 'legacy spend path unchanged');
-    assert.ok(
-      rec.order.includes('readAgentUsage'),
-      'the labre quota gate stays in place on the legacy path',
-    );
+  });
+
+  it('never mistakes the retirement for the single-flight lock (not "busy")', async () => {
+    // The regression that matters: 'busy' invites a retry that can never
+    // succeed. 'agent-required' tells the caller to register and invite one.
+    const { client } = makeClient();
+    const res = await runAgentTurn(NO_AGENT_INPUT, AUTH, {
+      clientFactory: async () => client,
+      llmCall: constantLlm('reply'),
+    });
+    assert.notEqual(res.status, 'busy');
+    assert.notEqual(res.status, 'ok');
   });
 
   // ── labre quotas do NOT bind registered-agent turns (labre#231 review) ────
 
   it('the agent path never reads get_my_agent_usage (labre quota = labre subscription only)', async () => {
     const { client, rec } = makeClient();
-    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+    const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
       providerCallFactory: () => constantLlm('reply'),
     });
@@ -714,7 +722,7 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
     const { client, rec } = makeClient({
       usage: { ok: true, body: [{ agent_turns_today: 50, agent_turns_limit_day: 50 }] },
     });
-    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+    const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
       providerCallFactory: () => constantLlm('agent reply'),
     });
@@ -722,15 +730,10 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
     assert.equal(res.messageId, 'm1');
     assert.equal(rec.insertMessage.length, 1, 'the turn ran despite the exhausted labre meter');
     assert.equal(rec.order.filter((step) => step === 'readAgentUsage').length, 0);
-    // Same over-quota summoner WITHOUT an agentId still refuses (unchanged).
-    const { client: legacyClient } = makeClient({
-      usage: { ok: true, body: [{ agent_turns_today: 50, agent_turns_limit_day: 50 }] },
-    });
-    const legacyRes = await runAgentTurn(INPUT, AUTH, {
-      clientFactory: async () => legacyClient,
-      llmCall: constantLlm('x'),
-    });
-    assert.equal(legacyRes.status, 'quota-exceeded');
+    // The contrast half of this test ("the same over-quota summoner WITHOUT an
+    // agentId still refuses with quota-exceeded") was dropped at PR-A4-6: that
+    // caller is now refused earlier, with 'agent-required', and never reaches
+    // the meter at all — the two retirement tests above pin that.
   });
 
   // ── Claim-refusal diagnosis → first-class statuses ────────────────────────
@@ -741,7 +744,7 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
       invites: [{ agentId: AGENT_ID, status: 'revoked' }],
     });
     let llmCalled = false;
-    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+    const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
       providerCallFactory: () => async () => {
         llmCalled = true;
@@ -760,7 +763,7 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
       claimResult: false,
       invites: [{ agentId: 'some-other-agent', status: 'active' }],
     });
-    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+    const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
       providerCallFactory: () => constantLlm('x'),
     });
@@ -772,7 +775,7 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
       claimResult: false,
       invites: [{ agentId: AGENT_ID, status: 'active' }],
     });
-    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+    const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
       providerCallFactory: () => constantLlm('x'),
     });
@@ -781,7 +784,7 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
 
   it("refused claim + unreadable invite list → generic 'agent-refused'", async () => {
     const { client } = makeClient({ claimResult: false, invitesThrow: true });
-    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+    const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
       providerCallFactory: () => constantLlm('x'),
     });
@@ -793,7 +796,7 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
       claimResult: false,
       invites: [{ agentId: AGENT_ID, status: 'suspended' }],
     });
-    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+    const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
       providerCallFactory: () => constantLlm('x'),
     });
@@ -808,7 +811,7 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
       throw new Error('Anthropic API error 401: {"type":"authentication_error"}');
     };
 
-    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+    const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
       providerCallFactory: () => deadKeyLlm,
     });
@@ -832,7 +835,7 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
     // must ride the same guard as the config read — notice posted, never the
     // silent generic degradation.
     const { client, rec } = makeClient();
-    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+    const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
       providerCallFactory: () => {
         throw new Error('agent provider config: base_url must not embed credentials');
@@ -854,7 +857,7 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
 
   it('provider config unreadable → static config notice posted, degraded (RPC error never echoed)', async () => {
     const { client, rec } = makeClient({ providerConfigThrows: true });
-    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+    const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
       providerCallFactory: () => constantLlm('never reached'),
     });
@@ -873,7 +876,7 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
     const { client, rec } = makeClient({ insertId: null });
     // insertId null: the fake returns null (insert refused). Make the LLM throw
     // so the notice path is exercised.
-    const res = await runAgentTurn(AGENT_INPUT, AUTH, {
+    const res = await runAgentTurn(INPUT, AUTH, {
       clientFactory: async () => client,
       providerCallFactory: () => throwingLlm(),
     });
@@ -896,7 +899,7 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
         providerConfig: { ...DEFAULT_PROVIDER_CONFIG, secret: SECRET },
         recordAgentSpendThrows: true,
       });
-      const failRes = await runAgentTurn(AGENT_INPUT, AUTH, {
+      const failRes = await runAgentTurn(INPUT, AUTH, {
         clientFactory: async () => failClient,
         providerCallFactory: () => async () => {
           throw new Error('provider exploded (HTTP 500)');
@@ -907,7 +910,7 @@ describe('runAgentTurn with a registered agent (agentId)', () => {
       const { client: okClient, rec: okRec } = makeClient({
         providerConfig: { ...DEFAULT_PROVIDER_CONFIG, secret: SECRET },
       });
-      const okRes = await runAgentTurn(AGENT_INPUT, AUTH, {
+      const okRes = await runAgentTurn(INPUT, AUTH, {
         clientFactory: async () => okClient,
         providerCallFactory: () => constantLlm('a perfectly normal reply'),
       });
