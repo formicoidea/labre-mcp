@@ -302,3 +302,67 @@ describe('providerErrorNotice — sanitized, class-only member copy', () => {
     assert.match(PROVIDER_CONFIG_NOTICE, /provider configuration could not be read/);
   });
 });
+
+describe('createAgentProviderCall — pasted endpoint suffix (2026-07-18)', () => {
+  it('absorbs a base_url that already carries /chat/completions', async () => {
+    // The real trap: OpenCode Zen documents the FULL endpoint, so that is what
+    // a user pastes into a "base URL" field. Without stripping, the request
+    // would go to `…/v1/chat/completions/chat/completions` → 404.
+    const config: AgentProviderConfig = {
+      provider: 'openai-compatible',
+      model: 'opencode/deepseek-v4-pro',
+      baseUrl: 'https://opencode.ai/zen/v1/chat/completions',
+      secret: SECRET,
+    };
+    const calls = await withFetch(
+      () => chatCompletionsOk('ok'),
+      async () => {
+        const llm = createAgentProviderCall(config);
+        await llm('ping');
+      },
+    );
+    assert.equal(calls[0].url, 'https://opencode.ai/zen/v1/chat/completions');
+  });
+
+  it('absorbs the sibling endpoints Zen documents on the same base', async () => {
+    for (const suffix of ['/responses', '/messages', '/chat/completions/']) {
+      const config: AgentProviderConfig = {
+        provider: 'openai-compatible',
+        model: 'm',
+        baseUrl: `https://opencode.ai/zen/v1${suffix}`,
+        secret: SECRET,
+      };
+      const calls = await withFetch(
+        () => chatCompletionsOk('ok'),
+        async () => {
+          const llm = createAgentProviderCall(config);
+          await llm('ping');
+        },
+      );
+      assert.equal(
+        calls[0].url,
+        'https://opencode.ai/zen/v1/chat/completions',
+        `${suffix} must normalize to the single canonical endpoint`,
+      );
+    }
+  });
+
+  it('does not eat a path segment that merely LOOKS like an endpoint', async () => {
+    // 'messages' as a tenant/route segment mid-path must survive; only a
+    // TRAILING documented endpoint is stripped.
+    const config: AgentProviderConfig = {
+      provider: 'openai-compatible',
+      model: 'm',
+      baseUrl: 'https://llm.example.com/messages/v1',
+      secret: SECRET,
+    };
+    const calls = await withFetch(
+      () => chatCompletionsOk('ok'),
+      async () => {
+        const llm = createAgentProviderCall(config);
+        await llm('ping');
+      },
+    );
+    assert.equal(calls[0].url, 'https://llm.example.com/messages/v1/chat/completions');
+  });
+});
