@@ -144,8 +144,10 @@ export interface AgentTurnAuth {
 
 /** 'agent-revoked' / 'agent-not-invited' / 'agent-refused' are the ADR-0028
  *  first-class refusals for a REGISTERED agent whose claim the DB refused
- *  (revoked / not invited / undiagnosable). The web client maps any unknown
- *  non-ok status to a generic "refused", so additions here are non-breaking. */
+ *  (revoked / not invited / undiagnosable). 'agent-required' (PR-A4-6) is the
+ *  refusal for a call that names NO agent at all, now that the anonymous path
+ *  is retired. The web client maps any unknown non-ok status to a generic
+ *  "refused", so additions here are non-breaking. */
 export type AgentTurnStatus =
   | 'ok'
   | 'busy'
@@ -153,7 +155,8 @@ export type AgentTurnStatus =
   | 'quota-exceeded'
   | 'agent-revoked'
   | 'agent-not-invited'
-  | 'agent-refused';
+  | 'agent-refused'
+  | 'agent-required';
 
 export interface RunAgentTurnResult {
   status: AgentTurnStatus;
@@ -317,6 +320,17 @@ export async function runAgentTurn(
   if (!auth.token) {
     // Defence in depth — the tool handler already rejects lab_-key callers.
     throw new Error('runAgentTurn requires a user JWT (auth.token)');
+  }
+
+  // ADR-0028 PR-A4-6: the anonymous [A2] path is RETIRED. The closing
+  // migration (20260718100000) refuses a claim that carries no agent id, so a
+  // turn without one can no longer succeed — refuse it HERE, before building a
+  // client and spending a round trip, and say WHY. Without this the caller
+  // would read a bare 'busy' (the claim RPC returns a boolean and cannot
+  // distinguish a refusal from the single-flight lock), i.e. exactly the
+  // indistinguishable non-reply the A2 recette classed MAJOR.
+  if (input.agentId == null) {
+    return { status: 'agent-required' };
   }
 
   const clientFactory = deps.clientFactory ?? buildDefaultClientFactory();
