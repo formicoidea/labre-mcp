@@ -104,8 +104,23 @@ function requireCleanBaseUrl(baseUrl: string | null): string {
   if (parsed.search !== '' || parsed.hash !== '') {
     throw new Error('agent provider config: base_url must not carry a query string or fragment');
   }
-  // createOpenCodeCall appends '/chat/completions' — normalize trailing slashes.
-  return baseUrl.trim().replace(/\/+$/, '');
+  // createOpenCodeCall appends '/chat/completions' itself, so a base_url that
+  // ALREADY carries the documented endpoint path would be doubled
+  // (`…/v1/chat/completions/chat/completions` → 404 at the provider). Strip it
+  // instead of refusing: pasting the endpoint a gateway documents is the
+  // expected gesture, not a user error. Mirrors normalizeBaseUrl in the app's
+  // registration form (labre apps/web/src/modules/agents.ts) — this copy is
+  // defence in depth AND the repair path for agents registered before that
+  // normalisation existed, whose stored base_url still holds the full endpoint.
+  //
+  // Real case (2026-07-18): OpenCode Zen documents
+  // `https://opencode.ai/zen/v1/chat/completions` for its OpenAI-compatible
+  // models, plus `/responses` (GPT) and `/messages` (Anthropic-compatible) on
+  // the same base — all three are absorbed here.
+  return baseUrl
+    .trim()
+    .replace(/\/(chat\/completions|responses|messages)\/*$/i, '')
+    .replace(/\/+$/, '');
 }
 
 /** Anthropic Messages API driver (native fetch, non-streaming, tool-less). */
