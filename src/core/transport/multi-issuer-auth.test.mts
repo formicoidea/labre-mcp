@@ -1,7 +1,9 @@
 // Multi-issuer JWT routing (issue #33): iss-based selection between the
 // Supabase and OIDC issuer configs, fail-closed on unknown/missing iss, no
 // cross-issuer fallback, per-issuer JWKS resolvers (no cache pollution), and
-// provenance stamping (auth.source) for the conversation-tool gate.
+// provenance stamping (auth.source). That stamp fed a conversation-tool gate
+// (agentReply), retired in slice B4 (ADR-0028 amendment 2026-07-18) — nothing
+// gates on it today, so these assertions now pin the stamp itself, not a gate.
 //
 // Each issuer gets its own real keypair + a COUNTING local JWKS resolver, so
 // every assertion can also prove WHICH issuer's key set was consulted — the

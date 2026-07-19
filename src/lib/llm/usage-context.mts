@@ -31,8 +31,10 @@ export interface LlmUsageRecord {
  *  when at least one record carried that dimension — we never fabricate a 0 for
  *  providers that report nothing, so the caller can distinguish "0 tokens" from
  *  "no token data". `model` is the FIRST model identifier any record carried
- *  (undefined when none did) — enough for single-call collectors like the
- *  agent-turn spend ledger, which needs a model name for its ai_calls row. */
+ *  (undefined when none did) — enough for single-call collectors that need to
+ *  name the model they billed. Currently written but read by no caller: its
+ *  only consumer was the daemon's agent-turn spend ledger, retired with the
+ *  per-turn provider backend (ADR-0028 amendment 2026-07-18, slice B4). */
 export interface LlmUsageAggregate {
   llmCalls: number;
   inputTokens?: number;

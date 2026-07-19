@@ -107,17 +107,23 @@ export function buildJwksAuthMiddleware(options: JwksAuthOptions): AuthMiddlewar
 
       const role = typeof payload[roleClaim] === "string" ? (payload[roleClaim] as string) : undefined;
       // ⚠ AUTH REVIEW — thread the raw, verified bearer onto the context so
-      // downstream tools can act AS the caller under RLS (agentReply's
-      // per-request Supabase client, ADR-0026 Decision 4 path 1). This is the
-      // ONLY place the token is retained past verification, and ONLY on the JWT
+      // downstream tools can act AS the caller under RLS. This is the ONLY
+      // place the token is retained past verification, and ONLY on the JWT
       // path: the token has just passed full jwtVerify (signature + exp + aud +
-      // issuer), so it is a genuine, live user JWT — exactly the RLS credential
-      // the bundle-source refresh already uses. It is never logged and never
-      // outlives this request's context (see request-context.mts). The lab_
-      // API-key middleware (api-key-auth.mts) deliberately does NOT set it: a
-      // lab_ key is opaque, mints no auth.uid(), and cannot pass RLS.
-      // `source` records WHICH issuer family verified the token — RLS
-      // pass-through consumers (agentReply) accept 'supabase' only.
+      // issuer), so it is a genuine, live user JWT. It is never logged and
+      // never outlives this request's context (see request-context.mts). The
+      // lab_ API-key middleware (api-key-auth.mts) deliberately does NOT set
+      // it: a lab_ key is opaque, mints no auth.uid(), and cannot pass RLS.
+      // `source` records WHICH issuer family verified the token.
+      //
+      // ⚠ THE JUSTIFICATION ABOVE NO LONGER HAS A BENEFICIARY. The downstream
+      // tool was agentReply (ADR-0026 Decision 4 path 1), retired in slice B4
+      // (ADR-0028 amendment 2026-07-18). Neither `token` nor `source` is read
+      // by any tool now. The bundle-source refresh is NOT a reader either: it
+      // pulls the bearer straight from the request headers (labre-daemon.mts),
+      // so it would keep working if this threading were dropped. Retaining an
+      // unused raw user JWT is a standing decision to re-examine — an AUTH
+      // change (red zone, CODEOWNERS), deliberately not bundled into B4.
       return { ...context, auth: { userId: payload.sub, role, token, source } };
     },
   };

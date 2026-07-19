@@ -101,7 +101,7 @@ labre-mcp/
 22. The command vocabulary (segment 4) is **open**, not a fixed set: `generate, parse, emit, audit, identify, estimate, update, …` (ARCH-04 superseded by ARCH-25). `update` is a valid standalone command (write-gateway `wardley:map:output:update:default`)
 23. `context` (business environment, user-supplied only) and `description` (component label, MCP may enrich) are distinct — never fall back from one to the other
 24. Use generic Wardley phase keys `phase1..phase4` for distributions, never `wonder/build/operate/usage` or `genesis/custom/product/commodity` (semantic contamination)
-24b. MCP tool names are camelCase verb phrases (`estimateEvolution`, `runCommand`, `agentReply`) and MUST match `^[a-zA-Z0-9_-]{1,64}$` (Anthropic tool-name pattern) — no dots: a single invalid name makes claude.ai reject the whole request of any conversation that includes the connector
+24b. MCP tool names are camelCase verb phrases (`estimateEvolution`, `runCommand`, `runRecipe`) and MUST match `^[a-zA-Z0-9_-]{1,64}$` (Anthropic tool-name pattern) — no dots: a single invalid name makes claude.ai reject the whole request of any conversation that includes the connector
 
 ## Strategy result format (ARCH-22)
 
