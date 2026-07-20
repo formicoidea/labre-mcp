@@ -81,8 +81,13 @@ describe("buildJwksAuthMiddleware (generic OIDC core)", () => {
   });
 
   // ⚠ AUTH REVIEW coverage — the [A2] token-threading change: a VERIFIED JWT
-  // is retained on context.auth.token for RLS pass-through tools (agentReply).
-  // Only this middleware sets it; api-key-auth (lab_ keys) never does.
+  // is retained on context.auth.token. Only this middleware sets it;
+  // api-key-auth (lab_ keys) never does.
+  // The RLS pass-through tool this fed (agentReply) was retired in slice B4
+  // (ADR-0028 amendment 2026-07-18); no tool reads auth.token today. This test
+  // still pins the CURRENT behaviour of the middleware — it is the tripwire
+  // that will fail loudly if the pending auth decision (stop retaining an
+  // unused bearer, red zone) is ever taken, which is exactly what we want.
   test("threads the verified raw bearer as auth.token (RLS pass-through)", async () => {
     const { jwks, sign } = await setup();
     const mw = buildJwksAuthMiddleware({ jwks, audience: AUDIENCE });

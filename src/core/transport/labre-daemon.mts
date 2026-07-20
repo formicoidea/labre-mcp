@@ -46,7 +46,10 @@ function readPort(): number {
 // them at request time only). LABRE_AUTH is an explicit list of doors
 // (auth-modes.mts); each listed door fails closed on its own missing env:
 //   supabase — Supabase session JWTs (JWKS from SUPABASE_URL). The labre app's
-//              population; the only source that reaches agentReply's RLS.
+//              population; the only source whose tokens pass Supabase RLS, and
+//              so the only one that can refresh remote bundles. (It also fed
+//              agentReply's RLS pass-through, retired in B4 — ADR-0028
+//              amendment 2026-07-18.)
 //   oidc     — any OIDC IdP verifiable by JWKS (Okta, Auth0, Clerk, Entra,
 //              Keycloak, AND the labre OAuth AS that fronts the framework-mcp
 //              connector). Requires AUTH_JWKS_URL + AUTH_AUDIENCE; optional

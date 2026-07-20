@@ -68,8 +68,10 @@ describe("supabase auth middleware", () => {
       baseContext,
     );
     // auth.token is the verified raw bearer, threaded for RLS pass-through
-    // tools ([A2] agentReply) — see jwks-auth.mts (auth review). auth.source
-    // is the provenance stamp (issue #33): this preset always says 'supabase'.
+    // — see jwks-auth.mts (auth review). auth.source is the provenance stamp
+    // (issue #33): this preset always says 'supabase'. Both fields lost their
+    // only reader when agentReply was retired in slice B4 (ADR-0028 amendment
+    // 2026-07-18); the assertion pins what the middleware still produces.
     assert.deepEqual(context.auth, {
       userId: "user-abc",
       role: "authenticated",

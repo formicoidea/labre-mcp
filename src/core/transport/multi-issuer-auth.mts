@@ -1,9 +1,15 @@
 // Multi-issuer JWT auth (issue #33): ONE instance accepts BOTH JWT
-// populations — Supabase session tokens (the labre app, agentReply's RLS
-// pass-through) AND a generic OIDC IdP's tokens (external MCP clients) — by
-// routing each bearer on its `iss` claim to the matching single-issuer
-// middleware. lab_ API keys are NOT handled here: the api-key door composes on
-// top via routeBearerAuth in selectAuthMiddleware (see labre-daemon.mts).
+// populations — Supabase session tokens (the labre app; the only population
+// that passes Supabase RLS) AND a generic OIDC IdP's tokens (external MCP
+// clients) — by routing each bearer on its `iss` claim to the matching
+// single-issuer middleware. lab_ API keys are NOT handled here: the api-key
+// door composes on top via routeBearerAuth in selectAuthMiddleware (see
+// labre-daemon.mts).
+//
+// The routing and its provenance stamp (auth.source) are what issue #33 asked
+// for; the tool that CONSUMED that stamp (agentReply) was retired in slice B4
+// (ADR-0028 amendment 2026-07-18), so nothing gates on it today — see the note
+// on AuthSourceSchema in request-context.mts.
 //
 // Design: pure COMPOSITION of the two existing middlewares, no forked
 // validation logic. The iss claim is decoded WITHOUT verification — it is
