@@ -23,6 +23,8 @@ import {
   runWithUsageCollector,
   type LlmUsageAggregate,
 } from "#lib/llm/usage-context.mjs";
+import { reportUsageToLedger } from "#lib/llm/ledger-report.mjs";
+import { assertQuotaOk } from "#lib/llm/quota-guard.mjs";
 
 export interface RunOptions {
   recipe: Recipe;
@@ -178,9 +180,23 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
     }
   };
 
+  // Budget gate (ADR-0032 Decision 2), BEFORE any step runs: on the hosted
+  // daemon the LLM calls below spend labre's own key, so a caller whose labre
+  // AI budget is exhausted is refused here rather than after the money is gone.
+  // A no-op off the hosted daemon (no caller JWT) and fail-open on any doubt.
+  // Outside the try/finally on purpose: nothing has started, so there is no
+  // run-end to emit and no subscription to unwind.
+  await assertQuotaOk();
+
   try {
     await runWithUsageCollector(runWithOverrides, (aggregate) => {
       usage = aggregate;
+      // Report this run's spend to labre's cost ledger (ADR-0032 Decision 3).
+      // Fire-and-forget: a no-op unless a caller JWT is in scope (the hosted
+      // daemon), and best-effort inside — it never throws and never blocks the
+      // run's return. Not awaited: the aggregate callback is synchronous and the
+      // run must not wait on a metering write.
+      void reportUsageToLedger(aggregate.records);
     });
     emitRunEnd();
   } catch (err) {

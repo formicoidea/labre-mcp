@@ -23,6 +23,8 @@ import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { noopAuthMiddleware, AuthenticationError } from "./auth-middleware.mjs";
 import { loadLLMConfig } from "#lib/llm/config.loader.mjs";
 import type { LLMConfig } from "#lib/llm/config.schema.mjs";
+import { tryExtractBearerToken } from "./supabase-auth.mjs";
+import { runWithLedgerAuth } from "#lib/llm/ledger-auth-context.mjs";
 
 /**
  * OAuth 2.0 protected-resource discovery (RFC 9728), opt-in. When set, the
@@ -187,11 +189,22 @@ export function buildApp(options: {
       }
     }
 
-    const response = await dispatch({
-      request: parsed.data,
-      context,
-      tools: options.tools,
-    });
+    // Carry the caller's bearer token to the cost-ledger reporter (ADR-0032
+    // Decision 3) via an ALS, so a run driven on labre's hosted key writes one
+    // ai_calls row per LLM call under the caller's own JWT. No token (dev/noop
+    // auth) → dispatch runs unwrapped and the reporter stays a no-op. The token
+    // lives only in the ALS for this request's async tree: never on the context,
+    // never logged.
+    const bearer = tryExtractBearerToken(headers);
+    const runDispatch = () =>
+      dispatch({
+        request: parsed.data,
+        context,
+        tools: options.tools,
+      });
+    const response = bearer
+      ? await runWithLedgerAuth(bearer, runDispatch)
+      : await runDispatch();
 
     if (response === null) {
       // Notification — no body, just 204.
