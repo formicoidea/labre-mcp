@@ -96,8 +96,16 @@ function assertSupports(
   provider: LLMProvider,
 ): void {
   if (!provider.supports[cap]) {
+    const kind = cfg.providers[providerId].kind;
+    if (cap === 'vision') {
+      // Say what is actually missing (an image channel), not "capability
+      // vision" — this message reaches the MCP degradation insight verbatim.
+      throw new Error(
+        `Strategy "${id}" sends images but provider "${providerId}" (${kind}) does not support image input`,
+      );
+    }
     throw new Error(
-      `Strategy "${id}" requires capability "${cap}" but provider "${providerId}" (${cfg.providers[providerId].kind}) does not support it`,
+      `Strategy "${id}" requires capability "${cap}" but provider "${providerId}" (${kind}) does not support it`,
     );
   }
 }
@@ -135,6 +143,13 @@ export function getStrategyStructuredLLM<T = unknown>(
 
 export function getStrategyLogprobLLM(id: string): LogprobLLMCall {
   return callFor(id, 'logprobs', (strategy, provider) => provider.logprobs(strategy));
+}
+
+/** Text completion that additionally accepts `opts.images`. Throws when the
+ *  resolved provider cannot carry an image — never returns a call that would
+ *  silently answer about an image the model never received. */
+export function getStrategyVisionLLM(id: string): LLMCall {
+  return callFor(id, 'vision', (strategy, provider) => provider.vision(strategy));
 }
 
 // ─── Test helpers ───────────────────────────────────────────────────────────

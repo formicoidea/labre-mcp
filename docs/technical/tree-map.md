@@ -12,7 +12,7 @@
 | Élément | État |
 |---|---|
 | Outils MCP câblés | `estimateEvolution` (recette `estimate-component-evolution`), `runCommand` (invocation directe de n'importe quel methodId), `__ping__` (smoke). Recettes multi-étapes restantes (evaluateMap, generateValueChain) non encore exposées — roadmap B3. |
-| Stratégies enregistrées | 85 au boot : **22 réelles** + **63 mocks** (`LABRE_DISABLE_MOCKS=1` isole les réelles). Liste des réelles : [ast-schema.md → « État d'implémentation »](../architecture/ast-schema.md). |
+| Stratégies enregistrées | 85 au boot : **24 réelles** + **61 mocks** (`LABRE_DISABLE_MOCKS=1` isole les réelles). Liste des réelles : [ast-schema.md → « État d'implémentation »](../architecture/ast-schema.md). |
 
 ## 2. Points d'entrée
 
@@ -58,6 +58,8 @@ src/
 ├── lib/                      ── Utilitaires transverses (PAS encore sous core/ — roadmap B1)
 │   ├── llm/                  registry, config.loader, llm-call, strategy-ids,
 │   │                         providers/{agent-sdk, http-api, copilot-sdk}, llm-error-handler,
+│   │                         capability `vision` (images base64 dans LLMCallOptions ; http-api seul
+│   │                         provider vision, les autres échouent explicitement),
 │   │                         usage-context (collector ALS d'usage LLM par run —
 │   │                         llmCalls + tokens quand le provider les expose)
 │   ├── prompts/              registry (cache global + branche override ALS + substitution
@@ -99,11 +101,12 @@ src/
 │   │   │                     _legacy/write/{strategies,routing,pipeline,patent,s-curve}/
 │   │   ├── climate/  doctrine/  gameplay/  iteration/   mock-strategies (surface AST exposée)
 │   ├── common/               registry.mts (réel : place-labels, overlap-check — I/O canonique WardleyMap) ; layout/, toolbox/
-│   ├── render/               wardley-map/{owm,image}/  — 4 réels au contrat canonique : owm/{parse,emit}/dsl (round-trip
-│   │   │                     byte-exact via lib/owm + vendored cli-owm), image/emit/svg (renderToSVG), image/parse/svg
-│   │   │                     (SVG → WardleyMap, inversion géométrique calibrée par computeMapGeometry)
+│   ├── render/               wardley-map/{owm,image}/  — 6 réels au contrat canonique : owm/{parse,emit}/dsl (round-trip
+│   │   │                     byte-exact via lib/owm + vendored cli-owm), image/emit/{svg,png} (renderToSVG/renderToPNG),
+│   │   │                     image/parse/svg (inversion géométrique calibrée par computeMapGeometry),
+│   │   │                     image/parse/png (LLM vision → JSON intermédiaire strict → projection déterministe)
 │   │   └── wardley-map/acl/  anti-corruption layer : WardleyMap ↔ PositionedValueChain (inverse la convention de visibilité : legacy 0.95=haut ↔ renderer 0=haut)
-│   ├── mocks-registry.mts    enregistre les 63 *.mock-strategy.mts
+│   ├── mocks-registry.mts    enregistre les 61 *.mock-strategy.mts
 │
 ├── mcp/                      ── Wrappers des outils MCP câblés
 │   ├── estimate-evolution.tool.mts        ToolDefinition estimateEvolution
