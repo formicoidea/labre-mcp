@@ -60,6 +60,7 @@ import type { RequestContext } from '#core/context/request-context.mjs';
 import { WardleyMapSchema, type WardleyMap } from '#schemas/wardley-map.schema.mjs';
 import type { LLMCall } from '#types/llm.mjs';
 import { getStrategyVisionLLM } from '#lib/llm/registry.mjs';
+import { uniqueSlug } from '#lib/owm/canonical-ids.mjs';
 import { getPrompt } from '#lib/prompts/registry.mjs';
 import { tryDegradeAmbient } from '#lib/degradation/index.mjs';
 
@@ -162,12 +163,7 @@ function buildIds(names: readonly string[]): { ids: string[]; firstIdByName: Map
   const ids: string[] = [];
   const firstIdByName = new Map<string, string>();
   for (const name of names) {
-    const base =
-      name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'node';
-    let id = base;
-    let n = 2;
-    while (used.has(id)) id = `${base}-${n++}`;
-    used.add(id);
+    const id = uniqueSlug(name, used);
     ids.push(id);
     if (!firstIdByName.has(name)) firstIdByName.set(name, id);
   }
