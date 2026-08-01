@@ -182,7 +182,7 @@ Un **strategy bundle** est un paquet déclaratif data-only (aucun code exécutab
 | `promptfooconfig.yaml` | Configuration d'évaluation promptfoo (voir [evaluation.md](../functional/evaluation.md)) |
 | `schema/*.schema.json` | JSON Schemas publiés du contrat de donnée (wardley-map copié du renderer, json-labre, command-call, command-result) — régénérés par `npm run schemas`, servis en `GET /schemas/<fichier>` ([ast-schema.md § 2.0](../architecture/ast-schema.md)) |
 | `scripts/export-schemas.mts` | Script d'export des schémas ci-dessus (copie renderer + `z.toJSONSchema` sur les Zod de `src/schemas/`) |
-| `scripts/build-dataset.mts` | Harnais dataset synthétique : générateur seedé (mulberry32) → `emit:dsl→parse:dsl→emit:dsl` (oracle byte-exact) + `emit:svg→parse:svg` (oracle structurel ±0.02) → `dataset/records.jsonl` + `summary.json` ; exit 1 si un oracle échoue. Attention : `scripts/` est hors du `include` de tsconfig (angle mort du typecheck CI) |
+| `scripts/build-dataset.mts` | Harnais dataset synthétique : générateur seedé (mulberry32) → `emit:dsl→parse:dsl→emit:dsl` (oracle byte-exact) + `emit:svg→parse:svg` (oracle structurel ±0.02) → `dataset/records.jsonl` + `summary.json` ; exit 1 si un oracle échoue. `scripts/` est typechecké en strict par `tsconfig.scripts.json` (`npm run typecheck:scripts`, chaîné dans `typecheck` donc dans `prepublishOnly`) |
 
 > Il n'y a **plus** de `tool.config.json` (purgé) : le routing par type passe désormais par les recipes et le strategy registry.
 
