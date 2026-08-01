@@ -35,24 +35,30 @@
 // ── The loss contract, as OBSERVED from the strategies ─────────────────
 //
 // Losses are reported at two different moments, and the harness distinguishes
-// them: OWM declares its losses when EMITTING (`emit:dsl` insights), the SVG
-// pipeline discovers them when PARSING (`parse:svg` warnings).
+// them: an EMIT strategy declares up front what it is about to lose (`emit:dsl`
+// and `emit:svg` insights), a PARSE strategy warns about what it could not
+// project back (`parse:svg` warnings).
 //
-//   construct        │ owm (emit:dsl)              │ svg (parse:svg)
+//   construct        │ owm (emit:dsl)              │ svg
 //   ─────────────────┼─────────────────────────────┼──────────────────────────
-//   subtype          │ insight "component taxonomy"│ market/ecosystem: warning
-//                    │                             │ others: SILENT DROP
-//   nature           │ insight "component taxonomy"│ SILENT DROP
-//   evolvesTo        │ NOT LOST (`evolve` line)    │ warning: layer dropped
-//   label.position   │ on an ANCHOR: insight       │ SILENT DROP (always)
+//   subtype          │ insight "component taxonomy"│ market/ecosystem: parse:svg
+//                    │                             │   warning (symbol seen)
+//                    │                             │ others: emit:svg insight
+//   nature           │ insight "component taxonomy"│ emit:svg insight
+//   evolvesTo        │ NOT LOST (`evolve` line)    │ parse:svg warning: layer
+//                    │                             │   dropped
+//   label.position   │ on an ANCHOR: insight       │ emit:svg insight (always)
 //                    │ on a component: NOT LOST    │
 //   relation type    │ insight "relation type/flow"│ NOT LOST (stroke colour)
 //
 // The two "NOT LOST" cells are the reason no `expectedLoss` is recorded for
 // them: their preservation is already asserted by the oracles themselves
 // (byte-identity for the OWM label offset, `relation.type` equality for SVG).
-// The four SILENT DROP cells are the WP5 finding worth writing down: those
-// constructions vanish through the SVG round-trip without a single warning.
+// The four cells that used to read SILENT DROP (the WP5 finding: subtype
+// without a symbol, nature, label offsets vanished through the SVG round-trip
+// without a single message) are now DECLARED by `emit:svg` with the same
+// accumulator contract as `emit:dsl` — a loss falling silent again is a
+// regression this harness fails on.
 //
 // Run: npm run dataset -- [--count=N] [--seed=S] [--with-svg] [--lossless-only]
 // Out: dataset/records.jsonl + dataset/summary.json (git-ignored).
@@ -310,12 +316,12 @@ export type LossFormat = 'owm' | 'svg' | 'both';
 
 /**
  * What the strategy is expected to DO about the loss:
- *   - `insight`      — declared by an EMIT strategy (`emit:dsl` insights);
+ *   - `insight`      — declared by an EMIT strategy (`emit:dsl` / `emit:svg`);
  *   - `warning`      — discovered by a PARSE strategy (`parse:*` warnings);
- *   - `silent-drop`  — the construction vanishes without a single message. The
- *                      harness still proves the drop happened (the field is
- *                      absent from the round-tripped map) and that it stayed
- *                      silent (rule (c) catches any message about it).
+ *   - `silent-drop`  — the construction vanishes without a single message. No
+ *                      generated map declares one anymore (emit:svg closed the
+ *                      last four cells), but the machinery stays: it is the
+ *                      regression detector for a loss falling silent again.
  */
 export type LossExpectation = 'warning' | 'insight' | 'silent-drop';
 
@@ -364,7 +370,11 @@ const ALL_CONSTRUCTS: readonly LossConstruct[] = [
   'relation.type',
 ];
 
-/** `subtype` on a component: OWM declares it, SVG only notices exotic symbols. */
+/**
+ * `subtype` on a component: OWM declares it at emit. On the SVG side an exotic
+ * subtype is drawn with a symbol `parse:svg` warns about; any other subtype has
+ * no glyph at all, so `emit:svg` declares the drop itself.
+ */
 function subtypeLosses(target: string, subtype: string): ExpectedLoss[] {
   return [
     { construct: 'subtype', target, detail: subtype, format: 'owm', expectation: 'insight' },
@@ -373,7 +383,7 @@ function subtypeLosses(target: string, subtype: string): ExpectedLoss[] {
       target,
       detail: subtype,
       format: 'svg',
-      expectation: EXOTIC_SUBTYPES.has(subtype) ? 'warning' : 'silent-drop',
+      expectation: EXOTIC_SUBTYPES.has(subtype) ? 'warning' : 'insight',
     },
   ];
 }
@@ -417,7 +427,7 @@ function injectLossyConstructs(
         expectedLoss.push(...subtypeLosses(target.id, 'functional'));
         expectedLoss.push(
           { construct: 'nature', target: target.id, detail: nature, format: 'owm', expectation: 'insight' },
-          { construct: 'nature', target: target.id, detail: nature, format: 'svg', expectation: 'silent-drop' },
+          { construct: 'nature', target: target.id, detail: nature, format: 'svg', expectation: 'insight' },
         );
         break;
       }
@@ -485,7 +495,7 @@ function injectLossyConstructs(
           target: target.id,
           detail: target.type,
           format: 'svg',
-          expectation: 'silent-drop',
+          expectation: 'insight',
         });
         break;
       }
@@ -573,7 +583,10 @@ export interface OwmStats {
 export interface SvgStats {
   /** Worst |Δ| over every evolution/visibility scalar of the map. */
   maxScalarError: number;
+  /** Constructions `parse:svg` could not project back. */
   warnings: string[];
+  /** Losses `emit:svg` declared up front (mirrors OwmStats.emitInsights). */
+  emitInsights: string[];
 }
 
 export interface OracleReport {
@@ -625,7 +638,11 @@ function lossFragments(loss: ExpectedLoss, format: 'owm' | 'svg'): string[] | nu
     case 'subtype':
       return loss.detail !== undefined && EXOTIC_SUBTYPES.has(loss.detail)
         ? [`component "${loss.target}"`, `is drawn with the ${loss.detail} symbol`]
-        : null;
+        : ['component taxonomy (subtype/nature) has no distinct SVG symbol'];
+    case 'nature':
+      return ['component taxonomy (subtype/nature) has no distinct SVG symbol'];
+    case 'label.position':
+      return ['label offsets (label.position) are not recoverable from an SVG render'];
     case 'evolvesTo':
       return ['layer "evolvesTo" is not parsed by this strategy'];
     default:
@@ -833,6 +850,7 @@ export async function runOracles(
 
   // ── Oracle B — SVG structural round-trip ────────────────────────────
   const rendered = await emitSvg.evaluate(map, CTX);
+  const svgEmitInsights = rendered.insights.map((i) => i.text);
   let svg = rendered.result.svg;
   let maxScalarError = Number.POSITIVE_INFINITY;
   const svgWarnings: string[] = [];
@@ -859,7 +877,10 @@ export async function runOracles(
       ...emitInsights.map((text): LossMessage => ({ text, origin: 'insight' })),
       ...parseWarnings.map((text): LossMessage => ({ text, origin: 'warning' })),
     ],
-    svgWarnings.map((text): LossMessage => ({ text, origin: 'warning' })),
+    [
+      ...svgEmitInsights.map((text): LossMessage => ({ text, origin: 'insight' })),
+      ...svgWarnings.map((text): LossMessage => ({ text, origin: 'warning' })),
+    ],
     parsedOwm,
     parsedSvg,
     failures,
@@ -874,7 +895,7 @@ export async function runOracles(
       emitInsights,
       parseWarnings,
     },
-    svgStats: { maxScalarError, warnings: svgWarnings },
+    svgStats: { maxScalarError, warnings: svgWarnings, emitInsights: svgEmitInsights },
     observedLoss,
     oracle: { pass: failures.length === 0, failures },
   };
