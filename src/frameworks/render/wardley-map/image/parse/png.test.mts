@@ -131,6 +131,51 @@ describe('projectToWardleyMap', () => {
     );
   });
 
+  it('projects the optional decorators: color, inertia, evolvesTo, pipeline', () => {
+    const { map, warnings } = projectToWardleyMap({
+      title: 'Decorated',
+      components: [
+        { name: 'Kettle', type: 'component', evolution: 0.35, visibility: 0.6, color: 'red', inertia: true, evolvesTo: 0.68 },
+        { name: 'Power', type: 'component', evolution: 0.7, visibility: 0.9, pipeline: { evoStart: 0.8, evoEnd: 0.55 } },
+      ],
+      relations: [],
+    });
+    assert.equal(warnings.length, 0);
+    const [kettle, power] = map!.components;
+    assert.equal(kettle.color, 'red');
+    assert.equal(kettle.inertia, true);
+    // The movement arrow stays on the component's row; the renderer draws the
+    // inertia wall from the TARGET's flag, so it is mirrored there.
+    assert.deepEqual(kettle.evolvesTo![0].position, {
+      evolution: { scalar: 0.68 },
+      visibility: { scalar: 0.6 },
+    });
+    assert.equal(kettle.evolvesTo![0].inertia, true);
+    // A pipeline band promotes the node to the canonical `pipeline` type
+    // (validateMap refuses the geometry on any other type).
+    assert.equal(power.type, 'pipeline');
+    // Pipeline edges are normalised left-to-right at the component's row.
+    assert.deepEqual(power.pipelineGeometry, {
+      evoStart: 0.55,
+      evoEnd: 0.8,
+      visStart: 0.9,
+      visEnd: 0.9,
+    });
+  });
+
+  it('rejects a pipeline band on an anchor and stays render-valid', () => {
+    const { map, warnings } = projectToWardleyMap({
+      title: 'T',
+      components: [
+        { name: 'User', type: 'anchor', evolution: 0.5, visibility: 0.05, pipeline: { evoStart: 0.2, evoEnd: 0.6 } },
+      ],
+      relations: [],
+    });
+    assert.equal(map!.components[0].pipelineGeometry, undefined);
+    assert.ok(warnings.some((w) => w.includes('pipeline band on anchor')));
+    assert.ok(!warnings.some((w) => w.startsWith('render-validity:')), warnings.join('; '));
+  });
+
   it('de-duplicates ids of repeated labels and warns', () => {
     const { map, warnings } = projectToWardleyMap(
       parseVisionExtraction(

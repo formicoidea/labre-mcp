@@ -110,7 +110,8 @@ src/
 │   │   │                     renderConfig V3 ; emit est l'inverse exact),
 │   │   │                     image/emit/{svg,png} (renderToSVG/renderToPNG),
 │   │   │                     image/parse/svg (inversion géométrique calibrée par computeMapGeometry),
-│   │   │                     image/parse/png (LLM vision → JSON intermédiaire strict → projection déterministe),
+│   │   │                     image/parse/png (LLM vision → JSON intermédiaire strict → projection déterministe ;
+│   │   │                     décorateurs dessinés capturés : couleurs, inertie, flèches evolve, bandes pipeline),
 │   │   │                     text/lint/default (lint LLM de texte quasi-structuré, target json [défaut, sans perte,
 │   │   │                     structured output si le provider le supporte] ou owm [éditable] ;
 │   │   │                     court-circuits déterministes, refus NOT_A_VALUE_CHAIN sur la prose libre)
