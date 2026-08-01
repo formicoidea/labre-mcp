@@ -19,12 +19,13 @@ const ctx: RequestContext = {
 };
 
 describe('mocks-registry', () => {
-  // 64 = full v0.1.0 catalogue minus the two mocks now backed by real strategies
-  // (purpose:generate, audit-purpose-quality).
-  it('registers the full v0.1.0 mock catalogue (64 entries)', () => {
+  // 61 = full v0.1.0 catalogue minus the five mocks now backed by real strategies
+  // (purpose:generate, audit-purpose-quality, image emit:png, image parse:png,
+  // image parse:svg).
+  it('registers the full v0.1.0 mock catalogue (61 entries)', () => {
     const registry = new StrategyRegistry<BaseStrategy>();
     registerMocks(registry);
-    assert.equal(registry.size(), 64);
+    assert.equal(registry.size(), 61);
   });
 
   it('every registered mock returns a conformant StrategyResult', async () => {

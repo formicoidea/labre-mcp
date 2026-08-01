@@ -12,7 +12,7 @@
 | Élément | État |
 |---|---|
 | Outils MCP câblés | `estimateEvolution` (recette `estimate-component-evolution`), `runCommand` (invocation directe de n'importe quel methodId), `__ping__` (smoke). Recettes multi-étapes restantes (evaluateMap, generateValueChain) non encore exposées — roadmap B3. |
-| Stratégies enregistrées | 85 au boot : **22 réelles** + **63 mocks** (`LABRE_DISABLE_MOCKS=1` isole les réelles). Liste des réelles : [ast-schema.md → « État d'implémentation »](../architecture/ast-schema.md). |
+| Stratégies enregistrées | 85 au boot : **24 réelles** + **61 mocks** (`LABRE_DISABLE_MOCKS=1` isole les réelles). Liste des réelles : [ast-schema.md → « État d'implémentation »](../architecture/ast-schema.md). |
 
 ## 2. Points d'entrée
 
@@ -58,6 +58,8 @@ src/
 ├── lib/                      ── Utilitaires transverses (PAS encore sous core/ — roadmap B1)
 │   ├── llm/                  registry, config.loader, llm-call, strategy-ids,
 │   │                         providers/{agent-sdk, http-api, copilot-sdk}, llm-error-handler,
+│   │                         capability `vision` (images base64 dans LLMCallOptions ; http-api seul
+│   │                         provider vision, les autres échouent explicitement),
 │   │                         usage-context (collector ALS d'usage LLM par run —
 │   │                         llmCalls + tokens quand le provider les expose)
 │   ├── prompts/              registry (cache global + branche override ALS + substitution
@@ -101,11 +103,12 @@ src/
 │   │   │                     _legacy/write/{strategies,routing,pipeline,patent,s-curve}/
 │   │   ├── climate/  doctrine/  gameplay/  iteration/   mock-strategies (surface AST exposée)
 │   ├── common/               registry.mts (réel : place-labels, overlap-check — I/O canonique WardleyMap) ; layout/, toolbox/
-│   ├── render/               wardley-map/{owm,image}/  — 4 réels au contrat canonique : owm/{parse,emit}/dsl (round-trip
-│   │   │                     byte-exact via lib/owm + vendored cli-owm), image/emit/svg (renderToSVG), image/parse/svg
-│   │   │                     (SVG → WardleyMap, inversion géométrique calibrée par computeMapGeometry)
+│   ├── render/               wardley-map/{owm,image}/  — 6 réels au contrat canonique : owm/{parse,emit}/dsl (round-trip
+│   │   │                     byte-exact via lib/owm + vendored cli-owm), image/emit/{svg,png} (renderToSVG/renderToPNG),
+│   │   │                     image/parse/svg (inversion géométrique calibrée par computeMapGeometry),
+│   │   │                     image/parse/png (LLM vision → JSON intermédiaire strict → projection déterministe)
 │   │   └── wardley-map/acl/  anti-corruption layer : WardleyMap ↔ PositionedValueChain (inverse la convention de visibilité : legacy 0.95=haut ↔ renderer 0=haut)
-│   ├── mocks-registry.mts    enregistre les 63 *.mock-strategy.mts
+│   ├── mocks-registry.mts    enregistre les 61 *.mock-strategy.mts
 │
 ├── mcp/                      ── Wrappers des outils MCP câblés
 │   ├── estimate-evolution.tool.mts        ToolDefinition estimateEvolution
@@ -181,7 +184,7 @@ Un **strategy bundle** est un paquet déclaratif data-only (aucun code exécutab
 | `promptfooconfig.yaml` | Configuration d'évaluation promptfoo (voir [evaluation.md](../functional/evaluation.md)) |
 | `schema/*.schema.json` | JSON Schemas publiés du contrat de donnée (wardley-map copié du renderer, json-labre, command-call, command-result) — régénérés par `npm run schemas`, servis en `GET /schemas/<fichier>` ([ast-schema.md § 2.0](../architecture/ast-schema.md)) |
 | `scripts/export-schemas.mts` | Script d'export des schémas ci-dessus (copie renderer + `z.toJSONSchema` sur les Zod de `src/schemas/`) |
-| `scripts/build-dataset.mts` | Harnais dataset synthétique : générateur seedé (mulberry32) → `emit:dsl→parse:dsl→emit:dsl` (oracle byte-exact) + `emit:svg→parse:svg` (oracle structurel ±0.02) → `dataset/records.jsonl` + `summary.json` ; exit 1 si un oracle échoue. Attention : `scripts/` est hors du `include` de tsconfig (angle mort du typecheck CI) |
+| `scripts/build-dataset.mts` | Harnais dataset synthétique : générateur seedé (mulberry32) → `emit:dsl→parse:dsl→emit:dsl` (oracle byte-exact) + `emit:svg→parse:svg` (oracle structurel ±0.02) → `dataset/records.jsonl` + `summary.json` ; exit 1 si un oracle échoue. `scripts/` est typechecké en strict par `tsconfig.scripts.json` (`npm run typecheck:scripts`, chaîné dans `typecheck` donc dans `prepublishOnly`) |
 
 > Il n'y a **plus** de `tool.config.json` (purgé) : le routing par type passe désormais par les recipes et le strategy registry.
 

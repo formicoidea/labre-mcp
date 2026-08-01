@@ -21,9 +21,9 @@ describe("labre-daemon boot wiring", () => {
     // + map node identify (1)
     // + map basemap generate (1)
     // + map value-chain (5 = 1 generate + 1 organized-y-position + 1 select-by-type + 1 prevent-collision + 1 audit)
-    // + render wardley-map (4 = owm parse + owm emit + image emit svg + image parse svg)
-    // + iteration purpose (2 = generate + audit-purpose-quality) = 22 total real strategies
-    assert.equal(registry.size(), 22);
+    // + render wardley-map (6 = owm parse/emit + image emit/parse svg + image emit/parse png)
+    // + iteration purpose (2 = generate + audit-purpose-quality) = 24 total real strategies
+    assert.equal(registry.size(), 24);
 
     const expected = [
       // map climate: position-functional-in-evolution (6)
@@ -46,11 +46,13 @@ describe("labre-daemon boot wiring", () => {
       "wardley:map:value-chain:generate:top-down",
       "wardley:map:value-chain:organized-y-position:default",
       "wardley:map:value-chain:select-by-type:component",
-      // render: owm parse/emit + image emit/parse svg (4)
+      // render: owm parse/emit + image emit/parse svg + image emit/parse png (6)
       "render:wardley-map:owm:parse:dsl",
       "render:wardley-map:owm:emit:dsl",
       "render:wardley-map:image:emit:svg",
       "render:wardley-map:image:parse:svg",
+      "render:wardley-map:image:emit:png",
+      "render:wardley-map:image:parse:png",
       // iteration: purpose generate + audit-purpose-quality (2, promoted from mock)
       "wardley:iteration:purpose:generate:default",
       "wardley:iteration:purpose:audit-purpose-quality:default",
@@ -81,9 +83,9 @@ describe("labre-daemon boot wiring", () => {
 
   it("buildStrategyRegistry exposes the full v0.1.0 catalogue (real + mocks)", () => {
     const registry = buildStrategyRegistry();
-    // 22 real strategies (CP3-CP6 + basemap/Y-layout/svg + image parse svg +
+    // 24 real strategies (CP3-CP6 + basemap/Y-layout + render image emit/parse svg+png +
     // value-chain select-by-type engine + iteration purpose generate + audit-purpose-quality)
-    // + 63 mock strategies (CP10, image parse svg promoted) = 85 total.
+    // + 61 mock strategies (CP10, image emit/parse png promoted) = 85 total.
     assert.equal(registry.size(), 85);
     // Every registered id is a valid 5-segment methodId.
     for (const id of registry.list()) {

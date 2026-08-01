@@ -12,7 +12,11 @@ import {
 } from '../copilot-sdk-call.mjs';
 import type { LLMCall, StructuredLLMCall, LogprobLLMCall } from '../../../types/llm.mjs';
 import type { ProviderConfig, StrategyConfig } from '../config.schema.mjs';
-import { UnsupportedCapabilityError, type LLMProvider } from './provider.types.mjs';
+import {
+  UnsupportedCapabilityError,
+  UnsupportedVisionError,
+  type LLMProvider,
+} from './provider.types.mjs';
 
 export function createCopilotSdkProvider(providerConfig: ProviderConfig): LLMProvider {
   const githubToken = providerConfig.authEnv
@@ -21,7 +25,11 @@ export function createCopilotSdkProvider(providerConfig: ProviderConfig): LLMPro
 
   return {
     kind: 'copilot-sdk',
-    supports: { text: true, structured: true, logprobs: false },
+    // vision: false — `MessageOptions.attachments` does accept a
+    // `{ type: 'blob', data, mimeType }` entry (dist/types.d.ts), so this is a
+    // credible second vision backend, but the path is unexercised and gated by
+    // the CLI's `max_prompt_images` capability. Not claimed until driven.
+    supports: { text: true, structured: true, logprobs: false, vision: false },
 
     text(strategy: StrategyConfig): LLMCall {
       return createCopilotSdkTextCall({
@@ -45,6 +53,10 @@ export function createCopilotSdkProvider(providerConfig: ProviderConfig): LLMPro
 
     logprobs(_strategy: StrategyConfig): LogprobLLMCall {
       throw new UnsupportedCapabilityError('copilot-sdk', 'logprobs');
+    },
+
+    vision(_strategy: StrategyConfig): LLMCall {
+      throw new UnsupportedVisionError('copilot-sdk');
     },
   };
 }

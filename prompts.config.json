@@ -218,5 +218,16 @@
       "variables": ["topic", "intent"],
       "parser": { "kind": "custom", "id": "parsePurposeContext" }
     }
+  },
+  "render-image-parse-png": {
+    "default": {
+      "kind": "template",
+      "templateFile": {
+        "system": "prompts/render-image-parse-png.system.md",
+        "user": "prompts/render-image-parse-png.user.md"
+      },
+      "variables": ["mediaType"],
+      "parser": { "kind": "delimited", "startMarker": "MAP_START", "endMarker": "MAP_END" }
+    }
   }
 }

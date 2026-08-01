@@ -108,11 +108,11 @@ Listing **canonique** des commandes spécifiées en v0.1.0. La spécification co
 
 ### État d'implémentation (real vs mock) — v0.1.0
 
-> Le catalogue ci-dessous décrit la **surface cible** complète. Aujourd'hui, sur les **85 commandes enregistrées** au boot, seules **20** ont une stratégie réellement implémentée ; les **65 autres** sont des **mocks** — des stratégies d'échafaudage enregistrées pour exposer la surface dès le jour 1 (elles retournent un `insight` « `mock strategy for <methodId>` » et aucun `result` métier). Le champ `StrategyMetadata.status` (§ 3.4.3) porte la distinction : `experimental | stable` = réel, `mock` = échafaudage.
+> Le catalogue ci-dessous décrit la **surface cible** complète. Aujourd'hui, sur les **85 commandes enregistrées** au boot, seules **22** ont une stratégie réellement implémentée ; les **63 autres** sont des **mocks** — des stratégies d'échafaudage enregistrées pour exposer la surface dès le jour 1 (elles retournent un `insight` « `mock strategy for <methodId>` » et aucun `result` métier). Le champ `StrategyMetadata.status` (§ 3.4.3) porte la distinction : `experimental | stable` = réel, `mock` = échafaudage.
 >
 > **Source de vérité** : le daemon imprime au boot la liste des methodId enregistrés (stderr) ; `LABRE_DISABLE_MOCKS=1` ne boote que les réelles. Tenir cette liste à jour à chaque promotion mock → réel (cf. [roadmap.md](roadmap.md) B4).
 
-**Commandes réellement implémentées (20)** :
+**Commandes réellement implémentées (22)** :
 
 | methodId | Rôle |
 | --- | --- |
@@ -136,6 +136,8 @@ Listing **canonique** des commandes spécifiées en v0.1.0. La spécification co
 | `wardley:map:basemap:generate:default` | Squelette `WardleyMap` canonique (titre + context, composants vides) |
 | `render:wardley-map:image:emit:svg` | Rendu SVG d'un `WardleyMap` via `renderToSVG` du package `@formicoidea/wardley-map-renderer` (schéma canonique consommé **directement**, sans détour) |
 | `render:wardley-map:image:parse:svg` | Inverse de `image:emit:svg` : SVG émis par notre renderer → `WardleyMap` canonique (inversion géométrique déterministe calibrée par `computeMapGeometry`, oracle d'idempotence du dataset round-trip) |
+| `render:wardley-map:image:emit:png` | Rendu PNG d'un `WardleyMap` via `renderToPNG` du renderer (base64 ; ~1 s/rendu, rasterisation resvg) |
+| `render:wardley-map:image:parse:png` | PNG → `WardleyMap` canonique via LLM **vision** (capability `vision` de la lib LLM, provider http-api) : extraction intermédiaire JSON stricte puis projection déterministe ; non déterministe, qualité mesurée par éval |
 
 Toute autre commande des § 1.2 / § 2 est aujourd'hui `status: mock`. Côté **outils** MCP, la surface câblée est `estimateEvolution`, `runCommand` (invocation directe de n'importe quel methodId, réel ou mock), `runRecipe` (invocation d'une recette multi-étapes par référence `<domain>:<tool>:<name>`) et `__ping__` — voir [roadmap.md](roadmap.md) B3.
 

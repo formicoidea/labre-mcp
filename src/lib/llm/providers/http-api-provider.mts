@@ -13,9 +13,24 @@ export function createHttpApiProvider(providerConfig: ProviderConfig): LLMProvid
 
   return {
     kind: 'http-api',
-    supports: { text: true, structured: false, logprobs: true },
+    // `vision: true` is a TRANSPORT claim: the OpenAI-compatible body can carry
+    // an image part. Whether the MODEL a strategy points at can read it is a
+    // configuration question, answered in llm.config.json.
+    supports: { text: true, structured: false, logprobs: true, vision: true },
 
     text(strategy: StrategyConfig): LLMCall {
+      return createOpenCodeCall({
+        model: strategy.model,
+        baseUrl,
+        apiKey,
+        temperature: strategy.temperature,
+        systemPrompt: strategy.systemPrompt,
+      });
+    },
+
+    // Same driver as text(): `createOpenCodeCall` encodes `opts.images` when
+    // present and produces a byte-identical body when absent.
+    vision(strategy: StrategyConfig): LLMCall {
       return createOpenCodeCall({
         model: strategy.model,
         baseUrl,
