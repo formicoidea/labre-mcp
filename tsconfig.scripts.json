@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // rootDir "." (scripts/ lives outside src/) breaks the outDir→rootDir
+    // back-mapping tsc uses to resolve the package's own "#*" subpath imports,
+    // so resolve them like tsx does: via the labre-mcp-dev condition → src/.
+    "rootDir": ".",
+    "customConditions": ["labre-mcp-dev"],
+    "types": ["node"]
+  },
+  "include": ["scripts/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
