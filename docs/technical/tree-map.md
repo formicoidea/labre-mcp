@@ -67,7 +67,9 @@ src/
 │   │                         + activeVariants), override-validation (seuls les prompts
 │   │                         shipped kind template sont shadowables)
 │   ├── owm/                  owm-dsl, render-adapter, cli-owm-adapter,
-│   │                         analytical-geometry, overlap-detector, svg-bbox-parser
+│   │                         analytical-geometry, overlap-detector, svg-bbox-parser,
+│   │                         canonical-ids (slug d'id partagé + flipVisibility —
+│   │                         source unique pour ACL, parseurs svg/dsl, dataset)
 │   ├── bundles/              bundle-loader : validation des strategy bundles v0 (cœur
 │   │                         loadBundleFromFiles en mémoire + wrapper loadBundleFromDir),
 │   │                         registerBundle ; supabase-bundle-source : fetch distant lazy

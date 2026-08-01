@@ -30,6 +30,7 @@ import { RenderWardleyMapOwmEmitDslStrategy } from '#frameworks/render/wardley-m
 import { RenderWardleyMapOwmParseDslStrategy } from '#frameworks/render/wardley-map/owm/parse/dsl.mjs';
 import { RenderWardleyMapImageEmitSvgStrategy } from '#frameworks/render/wardley-map/image/emit/svg.mjs';
 import { RenderWardleyMapImageParseSvgStrategy } from '#frameworks/render/wardley-map/image/parse/svg.mjs';
+import { slugify } from '#lib/owm/canonical-ids.mjs';
 
 // ── Seeded PRNG ────────────────────────────────────────────────────────
 
@@ -126,21 +127,11 @@ const DISAMBIGUATORS: readonly string[] = [
 
 // ── Generation ─────────────────────────────────────────────────────────
 
-/**
- * Id derivation — byte-for-byte the `slugify` of `image/parse/svg.mts` (and of
- * the value-chain ACL). A plain `component` leaks no id in the SVG, so the parse
- * strategy re-derives it from the label: generating ids any other way would fail
- * oracle B for a reason that has nothing to do with the strategies.
- */
-export function slugify(name: string): string {
-  return (
-    name
-      .toLowerCase()
-      .normalize('NFKD')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'node'
-  );
-}
+// Id derivation — the shared canonical algorithm. A plain `component` leaks no
+// id in the SVG, so the parse strategy re-derives it from the label: generating
+// ids any other way would fail oracle B for a reason that has nothing to do
+// with the strategies. Re-exported for the test's oracle assertions.
+export { slugify };
 
 /** Round like the canonical schema does at its boundary (`round3`). */
 function round3(v: number): number {

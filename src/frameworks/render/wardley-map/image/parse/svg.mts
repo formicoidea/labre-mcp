@@ -65,6 +65,7 @@ import { BaseStrategy, type StrategyResult } from '#core/ast/base-strategy.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
 import { WardleyMapSchema, type WardleyMap } from '#schemas/wardley-map.schema.mjs';
 import { computeMapGeometry } from '@formicoidea/wardley-map-renderer';
+import { uniqueSlug } from '#lib/owm/canonical-ids.mjs';
 
 const METHOD_ID = 'render:wardley-map:image:parse:svg';
 
@@ -161,21 +162,6 @@ function clamp01(v: number): number {
 function roundScalar(v: number): number {
   const f = 10 ** SCALAR_DECIMALS;
   return Math.round(clamp01(v) * f) / f;
-}
-
-/**
- * Slugify a label into an id — byte-for-byte the algorithm of `buildIdMap` in
- * `../../acl/value-chain.mts`, so a map produced by the value-chain ACL
- * round-trips to the very same ids.
- */
-function slugify(name: string): string {
-  return (
-    name
-      .toLowerCase()
-      .normalize('NFKD')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'node'
-  );
 }
 
 // ── Layer slicing ──────────────────────────────────────────────────────
@@ -505,20 +491,14 @@ function parseWardleySvg(svg: string): ParseOutcome {
     }
   }
 
-  // Ids: reuse what the SVG leaks, slugify the rest — same order-sensitive
-  // de-duplication as `buildIdMap` in the value-chain ACL.
+  // Ids: reuse what the SVG leaks, slugify the rest (shared canonical algorithm,
+  // so a map produced by the value-chain ACL round-trips to the very same ids).
   const usedIds = new Set<string>();
   const components = nodes.map((node, i) => {
     const label = labelForNode[i];
     const name = label?.text ?? '';
     if (label === undefined) warnings.push(`node #${i} has no label: name left empty`);
-    let id = node.id;
-    if (id === undefined) {
-      const base = slugify(name);
-      id = base;
-      let n = 2;
-      while (usedIds.has(id)) id = `${base}-${n++}`;
-    }
+    const id = node.id ?? uniqueSlug(name, usedIds);
     usedIds.add(id);
     if (node.exoticSymbol !== undefined) {
       warnings.push(

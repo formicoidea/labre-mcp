@@ -37,6 +37,7 @@ import {
   type OwmCoords,
   type OwmLabelOffset,
 } from '#lib/owm/owm-dsl.mjs';
+import { flipVisibility } from '#lib/owm/canonical-ids.mjs';
 
 const METHOD_ID = 'render:wardley-map:owm:emit:dsl';
 
@@ -50,12 +51,8 @@ export interface RenderWardleyMapOwmEmitDslResult {
 // them (the other being the parse strategy):
 //   - OWM: `visibilityToY(v) = (1 - v) * height` (cli-owm render.mts) → 1 = top.
 //   - canonical: `visToY = plotTop + scalar * plotHeight` → 0 = top/visible.
-// So the projection is `owmVisibility = 1 - scalar`. The flip is self-inverse,
-// exactly like `flipVisibility` in the value-chain ACL.
-function flipVisibility(scalar: number): number {
-  const flipped = 1 - scalar;
-  return flipped < 0 ? 0 : flipped > 1 ? 1 : flipped;
-}
+// So the projection is `owmVisibility = 1 - scalar` — the shared self-inverse
+// `flipVisibility` (#lib/owm/canonical-ids.mjs).
 
 // Sequences that break the OWM line grammar: the parser splits declarations on
 // ' [' , links on '->' and link context on ';', and `\n` is our own in-label
