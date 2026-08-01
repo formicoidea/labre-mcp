@@ -9,8 +9,8 @@ Le routage est transparent : l'utilisateur fournit un nom de composant et le sys
 
 > **Grammaire des methodId** : tous les identifiants ci-dessous suivent la forme 5 segments `domain:tool:sous-domaine:command:strategie@version`, definie dans [`../architecture/ast-schema.md`](../architecture/ast-schema.md). Le registre / contrat des strategies est documente dans [`../architecture/strategies.md`](../architecture/strategies.md).
 >
-> **Reel vs mock** : 85 strategies sont enregistrees, mais seulement **24 sont reellement implementees** — le reste est du scaffolding `status: mock`. La liste d'autorite est la table « Etat d'implementation » de [`../architecture/ast-schema.md`](../architecture/ast-schema.md). En resume :
-> `render:wardley-map:owm:{parse:dsl, emit:dsl}`, `render:wardley-map:image:{emit:svg, parse:svg, emit:png, parse:png}`, `wardley:iteration:purpose:{generate:default, audit-purpose-quality:default}`, `wardley:map:node:identify:default`, `wardley:map:basemap:generate:default`, `wardley:map:value-chain:{generate:top-down, organized-y-position:default, prevent-collision:default, audit:overlap-check, select-by-type:component}`, `wardley:map:climate:position-functional-in-evolution:{s-curve, llm-direct, cpc-evolution, logprob-distribution, publication-analysis, timeline-benchmark}`, `wardley:map:climate:position-solution-in-evolution:property-assessment`, `wardley:map:climate:position-anchor-in-evolution:{culture-phase, default}`.
+> **Reel vs mock** : 86 strategies sont enregistrees, mais seulement **25 sont reellement implementees** — le reste est du scaffolding `status: mock`. La liste d'autorite est la table « Etat d'implementation » de [`../architecture/ast-schema.md`](../architecture/ast-schema.md). En resume :
+> `render:wardley-map:owm:{parse:dsl, emit:dsl}`, `render:wardley-map:image:{emit:svg, parse:svg, emit:png, parse:png}`, `render:wardley-map:text:lint:default`, `wardley:iteration:purpose:{generate:default, audit-purpose-quality:default}`, `wardley:map:node:identify:default`, `wardley:map:basemap:generate:default`, `wardley:map:value-chain:{generate:top-down, organized-y-position:default, prevent-collision:default, audit:overlap-check, select-by-type:component}`, `wardley:map:climate:position-functional-in-evolution:{s-curve, llm-direct, cpc-evolution, logprob-distribution, publication-analysis, timeline-benchmark}`, `wardley:map:climate:position-solution-in-evolution:property-assessment`, `wardley:map:climate:position-anchor-in-evolution:{culture-phase, default}`.
 
 ---
 
@@ -18,7 +18,7 @@ Le routage est transparent : l'utilisateur fournit un nom de composant et le sys
 
 Les capability strategies (famille `wardley:map:climate:position-functional-in-evolution:*`) evaluent les capacites abstraites via 6 strategies pluggables reellement implementees : `s-curve`, `publication-analysis`, `timeline-benchmark`, `llm-direct`, `logprob-distribution`, `cpc-evolution`. Chaque strategie produit un resultat independant : `{ evolution, confidence, method }`.
 
-> `sector-agent` (decrit plus bas pour memoire) fait partie de la surface `mock` et n'est pas dans les 24 strategies reelles.
+> `sector-agent` (decrit plus bas pour memoire) fait partie de la surface `mock` et n'est pas dans les 25 strategies reelles.
 
 ## Auto-decouverte
 
@@ -177,7 +177,7 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 ## 6. Sector Agent (mock — non implemente)
 
-> Cette strategie ne fait pas partie des 24 strategies reelles. Elle est conservee ici pour memoire conceptuelle. Tant qu'elle n'est pas implementee, elle reste un scaffold `status: mock`.
+> Cette strategie ne fait pas partie des 25 strategies reelles. Elle est conservee ici pour memoire conceptuelle. Tant qu'elle n'est pas implementee, elle reste un scaffold `status: mock`.
 
 **Principe** : Agent specialise par secteur industriel qui analyse le composant dans son contexte sectoriel specifique.
 

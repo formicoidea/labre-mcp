@@ -262,13 +262,34 @@ describe('render:wardley-map:owm:parse:dsl (real, deterministic)', () => {
     assert.equal(result.map!.context, undefined);
   });
 
+  it('passes a canonical map through untouched when the lint already produced one (recipe seam)', async () => {
+    const upstream = WardleyMapSchema.parse({
+      title: 'FromLint',
+      components: [
+        { id: 'a', label: { name: 'A' }, type: 'component', position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.4 } } },
+      ],
+      relations: [],
+    });
+    const out = await parse.evaluate(
+      { map: { ...upstream, renderConfig: { style: {} } }, dsl: null, format: 'json' },
+      ctx,
+    );
+    assert.equal(out.result.parsed, true);
+    assert.equal(out.result.map!.title, 'FromLint');
+    // Input-shape renderConfig survives the passthrough.
+    // any: input-shape renderConfig is untyped by design
+    assert.deepEqual((out.result.map as any).renderConfig, { style: {} });
+    assert.ok(out.signals.some((s) => s.name === 'passthrough' && s.value === true));
+    assert.equal(out.insights.length, 0);
+  });
+
   it('degrades gracefully when the input carries no `dsl` string', async () => {
     const out = await parse.evaluate({ mock: true, methodId: 'whatever' }, ctx);
     assert.equal(out.result.parsed, false);
     assert.equal(out.result.map, null);
     assert.deepEqual(out.result.warnings, []);
     assert.equal(out.insights.length, 1);
-    assert.match(out.insights[0].text, /does not carry a `dsl` string/);
+    assert.match(out.insights[0].text, /carries neither a `dsl` string nor a canonical `map`/);
   });
 });
 

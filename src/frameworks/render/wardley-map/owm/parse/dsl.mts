@@ -22,6 +22,7 @@ import { z } from 'zod';
 import { BaseStrategy, type StrategyResult } from '#core/ast/base-strategy.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
 import { WardleyMapSchema, type WardleyMap } from '#schemas/wardley-map.schema.mjs';
+import { readRenderConfig, withoutRenderConfig } from '#schemas/render-config-passthrough.mjs';
 import { PurposeContextSchema, type PurposeContext } from '#schemas/context.schema.mjs';
 import { TemporalitySchema } from '#schemas/value-chain.schema.mjs';
 import { parse as parseOwm, type UnifiedWardleyMap } from '#lib/vendor/cli-owm/index.mjs';
@@ -395,12 +396,39 @@ export class RenderWardleyMapOwmParseDslStrategy extends BaseStrategy<
     const validated = InputSchema.safeParse(input);
 
     if (!validated.success) {
+      // Recipe seam: an upstream lint on the `json` target hands over
+      // `{ map, dsl: null, … }` — the map is already canonical, there is
+      // nothing left to parse. Pass it through as-is (identity), so the
+      // recipe output is uniform across both lint targets.
+      const upstreamMap =
+        input && typeof input === 'object' && 'map' in input
+          ? // any: narrowed by the schema right below
+            (input as { map: unknown }).map
+          : undefined;
+      if (upstreamMap !== null && upstreamMap !== undefined) {
+        const passthrough = WardleyMapSchema.safeParse(withoutRenderConfig(upstreamMap));
+        if (passthrough.success) {
+          const rc = readRenderConfig(upstreamMap);
+          const map = (rc !== undefined
+            ? { ...passthrough.data, renderConfig: rc }
+            : passthrough.data) as WardleyMap;
+          return {
+            signals: [
+              { name: 'input-valid', value: true, source: 'computed', capturedAt },
+              { name: 'passthrough', value: true, source: 'computed', capturedAt },
+            ],
+            reasoning: [],
+            insights: [],
+            result: { map, parsed: true, warnings: [] },
+          };
+        }
+      }
       return {
         signals: [{ name: 'input-valid', value: false, source: 'computed', capturedAt }],
         reasoning: [],
         insights: [
           {
-            text: 'cannot parse: input does not carry a `dsl` string (upstream step not yet promoted?)',
+            text: 'cannot parse: input carries neither a `dsl` string nor a canonical `map` (upstream step not yet promoted?)',
             by: METHOD_ID,
             type: 'other',
           },

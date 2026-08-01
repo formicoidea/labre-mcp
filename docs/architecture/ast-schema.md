@@ -108,11 +108,11 @@ Listing **canonique** des commandes spécifiées en v0.1.0. La spécification co
 
 ### État d'implémentation (real vs mock) — v0.1.0
 
-> Le catalogue ci-dessous décrit la **surface cible** complète. Aujourd'hui, sur les **85 commandes enregistrées** au boot, seules **24** ont une stratégie réellement implémentée ; les **61 autres** sont des **mocks** — des stratégies d'échafaudage enregistrées pour exposer la surface dès le jour 1 (elles retournent un `insight` « `mock strategy for <methodId>` » et aucun `result` métier). Le champ `StrategyMetadata.status` (§ 3.4.3) porte la distinction : `experimental | stable` = réel, `mock` = échafaudage.
+> Le catalogue ci-dessous décrit la **surface cible** complète. Aujourd'hui, sur les **86 commandes enregistrées** au boot, seules **25** ont une stratégie réellement implémentée ; les **61 autres** sont des **mocks** — des stratégies d'échafaudage enregistrées pour exposer la surface dès le jour 1 (elles retournent un `insight` « `mock strategy for <methodId>` » et aucun `result` métier). Le champ `StrategyMetadata.status` (§ 3.4.3) porte la distinction : `experimental | stable` = réel, `mock` = échafaudage.
 >
 > **Source de vérité** : le daemon imprime au boot la liste des methodId enregistrés (stderr) ; `LABRE_DISABLE_MOCKS=1` ne boote que les réelles. Tenir cette liste à jour à chaque promotion mock → réel (cf. [roadmap.md](roadmap.md) B4).
 
-**Commandes réellement implémentées (24)** :
+**Commandes réellement implémentées (25)** :
 
 | methodId | Rôle |
 | --- | --- |
@@ -138,6 +138,7 @@ Listing **canonique** des commandes spécifiées en v0.1.0. La spécification co
 | `render:wardley-map:image:parse:svg` | Inverse de `image:emit:svg` : SVG émis par notre renderer → `WardleyMap` canonique (inversion géométrique déterministe calibrée par `computeMapGeometry`, oracle d'idempotence du dataset round-trip) |
 | `render:wardley-map:image:emit:png` | Rendu PNG d'un `WardleyMap` via `renderToPNG` du renderer (base64 ; ~1 s/rendu, rasterisation resvg) |
 | `render:wardley-map:image:parse:png` | PNG → `WardleyMap` canonique via LLM **vision** (capability `vision` de la lib LLM, provider http-api) : extraction intermédiaire JSON stricte puis projection déterministe ; non déterministe, qualité mesurée par éval |
+| `render:wardley-map:text:lint:default` | Lint LLM d'un texte quasi-structuré (presque-OWM, listes, JSON approximatif) → OWM DSL ou JSON canonique ; court-circuits déterministes, la couche déterministe reste seule productrice du map (recette `render:map:text-to-canonical`) |
 | `wardley:iteration:purpose:generate:default` | Génération d'un `Context` d'étude (purpose) depuis un `topic` + `intent` libres — LLM avec dégradation en squelette déterministe |
 | `wardley:iteration:purpose:audit-purpose-quality:default` | Audit qualité d'un `Context` (purpose) — checks déterministes + passe LLM sémantique, un `Insight` par dimension |
 
@@ -255,6 +256,9 @@ Toute autre commande des § 1.2 / § 2 est aujourd'hui `status: mock`. Côté **
 - `render:wardley-map:image:config:svg`
 - `render:wardley-map:image:config:png`
 
+**sous-domaine `text`** (ajouté post-v0.1.0 — couche lint du split lint/déterministe)
+
+- `render:wardley-map:text:lint:default` — normalisation LLM d'un texte quasi-structuré vers le canonique (target `json`, défaut) ou l'OWM DSL (target `owm`) ; la couche déterministe (schéma/parseur) reste seule productrice du map. Recette associée : `render:map:text-to-canonical` (le namespace de recette `render:map` suit la convention `<domain>:<tool>` des refs 3 segments).
 
 ## 1.3. Cas d'études et recipes
 

@@ -25,6 +25,7 @@
     "dual-verification":    { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
     "pipeline-enrichment":  { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
     "write-chain":          { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "medium" },
-    "render-image-parse-png": { "provider": "opencode", "model": "kimi-k2.5" }
+    "render-image-parse-png": { "provider": "opencode", "model": "kimi-k2.5" },
+    "render-text-lint":       { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "low" }
   }
 }

@@ -27,7 +27,7 @@ OPENCODE_API_KEY=sk-votre-cle-ici
 # Port du daemon (optionnel, défaut 6767)
 # LABRE_HTTP_PORT=6767
 
-# Ne booter que les 24 stratégies réelles (sans les 61 mocks) (optionnel)
+# Ne booter que les 25 stratégies réelles (sans les 61 mocks) (optionnel)
 # LABRE_DISABLE_MOCKS=1
 ```
 
@@ -142,7 +142,7 @@ Voir [notifications.md](functional/notifications.md).
 | | |
 |---|---|
 | Outils MCP câblés | `estimateEvolution`, `runCommand` (invocation directe de n'importe quel methodId), `__ping__`. Recettes multi-étapes restantes non encore exposées — [roadmap.md](architecture/roadmap.md) B3 |
-| Stratégies | 85 enregistrées : 24 réelles + 61 mocks |
+| Stratégies | 86 enregistrées : 25 réelles + 61 mocks |
 
 ## Scripts npm
 
