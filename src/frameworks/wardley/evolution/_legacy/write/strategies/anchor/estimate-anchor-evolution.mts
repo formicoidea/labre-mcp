@@ -173,8 +173,7 @@ export class EstimateAnchorEvolutionStrategy
     input: AnchorEvolutionInput,
     _context: RequestContext,
   ): Promise<StrategyResult<AnchorEvolutionResult>> {
-    // any: legacy registry id 'anchor-evolution' is not in the StrategyId enum yet.
-    const llmCall: LLMCall = this._llmCall ?? (await getStrategyLLM('anchor-evolution' as any) as LLMCall);
+    const llmCall: LLMCall = this._llmCall ?? getStrategyLLM('anchor-evolution');
     const result = await estimateAnchorEvolution(input, llmCall);
 
     const capturedAt = new Date().toISOString();

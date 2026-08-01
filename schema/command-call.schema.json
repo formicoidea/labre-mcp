@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "command": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*(?::[a-z][a-z0-9-]*){4}(?:@\\d+\\.\\d+\\.\\d+)?$",
+      "description": "Target methodId, 5-segment grammar domain:tool:sous-domaine:command:strategie[@x.y.z] (e.g. \"render:wardley-map:owm:parse:dsl\"). See docs/architecture/ast-schema.md."
+    },
+    "input": {
+      "description": "Input passed verbatim to the target strategy. Shape depends on the command."
+    },
+    "metadata": {
+      "description": "Optional caller metadata (request id, timestamp, caller agent).",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "requestedAt": {
+          "type": "string"
+        },
+        "callerAgent": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "command",
+    "input"
+  ],
+  "additionalProperties": false,
+  "$id": "https://framework-mcp.labre.app/schemas/command-call.schema.json"
+}

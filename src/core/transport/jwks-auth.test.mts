@@ -79,4 +79,31 @@ describe("buildJwksAuthMiddleware (generic OIDC core)", () => {
   test("requires jwksUrl or an injected jwks resolver", () => {
     assert.throws(() => buildJwksAuthMiddleware({ audience: AUDIENCE }), /jwksUrl/);
   });
+
+  // ⚠ AUTH REVIEW coverage — the [A2] token-threading change: a VERIFIED JWT
+  // is retained on context.auth.token. Only this middleware sets it;
+  // api-key-auth (lab_ keys) never does.
+  // The RLS pass-through tool this fed (agentReply) was retired in slice B4
+  // (ADR-0028 amendment 2026-07-18); no tool reads auth.token today. This test
+  // still pins the CURRENT behaviour of the middleware — it is the tripwire
+  // that will fail loudly if the pending auth decision (stop retaining an
+  // unused bearer, red zone) is ever taken, which is exactly what we want.
+  test("threads the verified raw bearer as auth.token (RLS pass-through)", async () => {
+    const { jwks, sign } = await setup();
+    const mw = buildJwksAuthMiddleware({ jwks, audience: AUDIENCE });
+
+    const token = await sign({});
+    const ctx = await mw.authenticate(bearer(token), CONTEXT);
+    assert.equal(ctx.auth?.token, token);
+  });
+
+  // Provenance (issue #33): the generic core defaults to 'oidc'; the Supabase
+  // preset overrides it (covered in supabase-auth.test.mts).
+  test("stamps auth.source 'oidc' by default", async () => {
+    const { jwks, sign } = await setup();
+    const mw = buildJwksAuthMiddleware({ jwks, audience: AUDIENCE });
+
+    const ctx = await mw.authenticate(bearer(await sign({})), CONTEXT);
+    assert.equal(ctx.auth?.source, "oidc");
+  });
 });

@@ -16,6 +16,7 @@
 // for session event payloads. We touch only the fields we rely on at runtime.
 import { createRequire } from 'node:module';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
+import { rejectImageInput } from './llm-call.mjs';
 import { classifyAndLogLLMError } from './llm-error-handler.mjs';
 import { recordLlmUsage } from './usage-context.mjs';
 import type {
@@ -190,6 +191,11 @@ export function createCopilotSdkTextCall(config: CopilotSdkTextConfig = {}): LLM
   } = config;
 
   return async function copilotSdkTextCall(prompt, variables, opts) {
+    // The Copilot SDK CAN carry an image — `MessageOptions.attachments` accepts
+    // `{ type: 'blob', data, mimeType }` (dist/types.d.ts) — but the path is
+    // unexercised here and gated by the CLI's `max_prompt_images` capability.
+    // Refuse explicitly instead of answering about an unseen image.
+    rejectImageInput('copilot-sdk', opts);
     const interpolated = interpolate(prompt, variables);
     const effectiveSystemPrompt = opts?.systemPrompt ?? factorySystemPrompt;
 
@@ -245,6 +251,7 @@ export function createCopilotSdkStructuredCall<T = unknown>(
     `No prose, no markdown, no code fences.\n\n${schemaJson}`;
 
   return async function copilotSdkStructuredCall(prompt, variables, opts) {
+    rejectImageInput('copilot-sdk', opts);
     const interpolated = interpolate(prompt, variables);
     const effectiveSystemPrompt = opts?.systemPrompt ?? factorySystemPrompt;
     // The output contract is strategy-static (same schema each call) and

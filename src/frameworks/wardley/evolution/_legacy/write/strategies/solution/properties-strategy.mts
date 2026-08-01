@@ -603,8 +603,7 @@ export class PropertiesStrategyCore extends CoreBaseStrategy<SolutionInput, Solu
     component: SolutionInput,
     _context: RequestContext,
   ): Promise<StrategyResult<SolutionEvolutionResult>> {
-    // any: legacy registry id 'properties-strategy' is not in the StrategyId enum yet.
-    const llmCall: LLMCall = this._llmCall ?? (await getStrategyLLM('properties-strategy' as any) as LLMCall);
+    const llmCall: LLMCall = this._llmCall ?? getStrategyLLM('properties-strategy');
     const legacy = new PropertiesStrategy({ llmCall, mode: this._mode });
     // any: legacy result carries properties[] with per-property phase + reason.
     // Shape is open across legacy/auto/conversational modes.

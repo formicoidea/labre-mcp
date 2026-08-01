@@ -27,6 +27,8 @@ Hono app  ────►  auth middleware  ────►  context extractor  
 |---|---|---|
 | `GET` | `/health` | Liveness probe. Returns `{ status: "ok" }`. |
 | `GET` | `/version` | Server info: `{ name: "labre-mcp", version }`. |
+| `GET` | `/config/llm` | Read-only live LLM config for the Labre admin console, **opt-in**. Present only when `LABRE_MCP_ADMIN_TOKEN` is set (else `503`); requires `Authorization: Bearer <token>` (`401` otherwise). Returns `{ defaultProvider, providers, strategies }` with a per-provider `hasKey` boolean — never secret values. |
+| `GET` | `/.well-known/oauth-protected-resource` | OAuth discovery (RFC 9728), **opt-in**. Present only when `LABRE_OAUTH_RESOURCE` + `LABRE_OAUTH_AUTH_SERVER` are set. Returns `{ resource, authorization_servers: [<labre AS>] }`. |
 | `POST` | `/mcp` | JSON-RPC 2.0 dispatch. Body must conform to [`JsonRpcRequestSchema`](../../src/core/transport/json-rpc.schema.mts). |
 
 The `/mcp` endpoint accepts these MCP methods:
@@ -50,7 +52,11 @@ The `.mcp.json` at the repo root declares the labre-mcp server with HTTP transpo
 
 ## Configuration
 
-The daemon reads the port from `LABRE_HTTP_PORT` (default `6767`) and the bind address from `LABRE_HTTP_HOST` (default `127.0.0.1`, loopback-only). Production deployments behind a PaaS router (seenode, ...) set `LABRE_HTTP_HOST=0.0.0.0`; a local daemon stays loopback-only unless explicitly opted in.
+The daemon reads the port from `LABRE_HTTP_PORT` (default `6767`) and the bind address from `LABRE_HTTP_HOST` (default `127.0.0.1`, loopback-only). Production deployments behind a PaaS router set `LABRE_HTTP_HOST=0.0.0.0`; a local daemon stays loopback-only unless explicitly opted in.
+
+### Ops config endpoint (`GET /config/llm`)
+
+Opt-in, gated by `LABRE_MCP_ADMIN_TOKEN` — a **shared ops secret** held by both the daemon and its sole consumer, the Labre admin console (Framework-MCP section). This is a server-to-server bearer, distinct from the per-user auth on `/mcp` (JWT / `lab_` keys). Unset → the route returns `503` (feature disabled); header missing or mismatched → `401`. On success it returns the config resolved by `loadLLMConfig()` — `{ defaultProvider, providers, strategies }` — augmented with a per-provider `hasKey = Boolean(process.env[apiKeyEnv ?? authEnv])`. The config only ever names env vars, so no secret value is read or emitted; `hasKey` is a boolean ops signal only.
 
 ### Shipped recipes location
 
@@ -84,13 +90,16 @@ Every tool call carries a `RequestContext` embedded in `params._context`:
       "projectId": "abc123",
       "projectRoot": "/home/user/wardley-project",
       "sessionId": "uuid",
-      "domain": "wardley"
+      "domain": "wardley",
+      "userPrompt": "decarbonise the ULM 412 H production line"
     }
   }
 }
 ```
 
 If `_context` is missing, the daemon falls back to dev-mode placeholders (`projectId = "default"`, `projectRoot = process.cwd()`). V3 SaaS will reject context-less requests at the auth middleware.
+
+`userPrompt` (optional) carries the human user's **original, verbatim prompt** — the request as the person phrased it, not the calling agent's structured reformulation. It is ambient and user-supplied (the daemon never derives or enriches it), so any strategy can judge an agent's extraction against the original intent (e.g. `purpose:generate` stamps it into the study Context it emits, and `purpose:audit-purpose-quality` shows it as unstructured data). It is **never forwarded to telemetry** (metadata-only) and, like the rest of the context, only lands in the local run artifact.
 
 **Rule**: tool handlers must not read `process.cwd()` or `process.env.X` at runtime. The boot-time `process.cwd()` is captured once and exposed only as the default `projectRoot`. Per-request paths are resolved against `context.projectRoot`.
 
@@ -103,6 +112,19 @@ context = await auth.authenticate(httpHeaders, contextFromBody);
 ```
 
 V3 SaaS replaces `noopAuthMiddleware` with a real implementation (OAuth/API key validation, tenant extraction). No tool handler changes.
+
+## OAuth resource-server role (discovery only)
+
+The daemon can act as an OAuth 2.0 **protected resource** for clients that only speak OAuth (claude.ai custom connectors). It stays a *resource* server — it validates bearer tokens via the auth middleware (JWKS in `oidc`/`supabase` mode) but **never mints them**. The authorization server (authorize / token / registration / consent) lives in the **labre app**, on a different origin — the MCP authorization spec explicitly allows AS and RS to be separate.
+
+When `LABRE_OAUTH_RESOURCE` + `LABRE_OAUTH_AUTH_SERVER` are set (opt-in), the daemon:
+
+1. serves `GET /.well-known/oauth-protected-resource` → `{ resource, authorization_servers: [<labre AS>] }` (RFC 9728);
+2. stamps a `WWW-Authenticate: Bearer resource_metadata="<…/.well-known/oauth-protected-resource>"` header on every `401`, so the client discovers the AS.
+
+Discovery flow: client → daemon `/mcp` (401 + WWW-Authenticate) → daemon well-known (finds the labre AS) → labre `/authorize` + `/token` (labre reuses the Supabase session, issues a labre-signed JWT) → daemon `/mcp` with that JWT (validated via labre's JWKS, `LABRE_AUTH=oidc`). Unset → no discovery surface. The labre-side AS is a separate build (labre repo).
+
+**Explicit auth doors (`LABRE_AUTH` list).** `LABRE_AUTH` is a comma-separated list of the credential families the daemon accepts — `supabase`, `oidc`, `api-key` (see `auth-modes.mts`); every door is named, nothing rides implicitly. For the connector the daemon runs `LABRE_AUTH=oidc,api-key` pointed at the labre AS JWKS: one JWT issuer plus `lab_` personal keys (validated by RPC, not the JWT verifier). Listing `supabase,oidc` opens both JWT populations on one instance (per-`iss` routing, `multi-issuer-auth.mts`); only `supabase` tokens pass Supabase RLS (remote bundles), `oidc`/`api-key` do not. Only doors in the list are open, so `oidc` alone means "no static secrets" and `api-key` alone means "keys only".
 
 ## Synchronous only (ARCH-11)
 

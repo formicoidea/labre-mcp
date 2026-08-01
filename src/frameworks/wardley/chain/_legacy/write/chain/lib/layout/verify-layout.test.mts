@@ -103,6 +103,37 @@ describe('verifyLayout — hard-violation guarantee', () => {
     assert.equal(out.report.unresolvedHard, 0);
   });
 
+  it('resolves a thin-band overlap between two long labels (round-safe projection)', () => {
+    // Regression: long labels crammed at the top of a value chain overlap
+    // by a razor-thin band (~0.5 px tall × ~80 px wide). The projection
+    // separated them to *exactly touching*, but the sub-pixel gap collapsed
+    // back into an overlap when label offsets were rounded to integers at
+    // emit — leaving unresolvedHard > 0 and degraded: true. The separation
+    // now carries a round-safe clearance margin.
+    const c = chain(
+      [
+        { name: 'Salarie epargnant',                 role: 'anchor',     visibility: 0.95, evolution: 0.28, label: { dx: -100, dy: 0 } },
+        { name: "Dispositif d'epargne salariale",    role: 'need',       visibility: 0.90, evolution: 0.24 },
+        { name: 'Gestion des versements volontaires', role: 'need',      visibility: 0.88, evolution: 0.27 },
+        { name: "Abondement de l'employeur",         role: 'capability', visibility: 0.86, evolution: 0.30 },
+        { name: 'Teneur de compte conservateur',     role: 'capability', visibility: 0.84, evolution: 0.33 },
+        { name: 'Information fiscale et sociale',    role: 'capability', visibility: 0.82, evolution: 0.36 },
+      ],
+      [
+        { from: 'Salarie epargnant', to: "Dispositif d'epargne salariale" },
+        { from: "Dispositif d'epargne salariale", to: 'Gestion des versements volontaires' },
+        { from: 'Gestion des versements volontaires', to: "Abondement de l'employeur" },
+        { from: "Abondement de l'employeur", to: 'Teneur de compte conservateur' },
+        { from: 'Teneur de compte conservateur', to: 'Information fiscale et sociale' },
+      ],
+    );
+    const out = verifyLayout(c, emitOpts);
+    assert.equal(out.report.unresolvedHard, 0);
+    // And the emitted (integer-rounded) chain must actually be clean — not
+    // just the internal float state.
+    assert.equal(countHardOverlaps(out.chain), 0);
+  });
+
   it('drives hard violations to 0 even on a colliding chain', () => {
     // Two components at the exact same position with overlapping labels.
     const c = chain([

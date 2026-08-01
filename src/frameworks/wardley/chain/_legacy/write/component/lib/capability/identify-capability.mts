@@ -150,8 +150,7 @@ export class IdentifyCapabilityStrategy
     component: IdentifyCapabilityInput,
     _context: RequestContext,
   ): Promise<StrategyResult<ParsedCapabilityResponse>> {
-    // any: legacy registry id 'identify-capability' is not in the StrategyId enum yet.
-    const llmCall: LLMCall = this._llmCall ?? (await getStrategyLLM('identify-capability' as any) as LLMCall);
+    const llmCall: LLMCall = this._llmCall ?? getStrategyLLM('identify-capability');
     const result = await identifyCapability(component, llmCall);
 
     const capturedAt = new Date().toISOString();

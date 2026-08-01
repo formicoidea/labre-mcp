@@ -69,7 +69,7 @@ Le boot (`src/core/transport/strategy-registry-boot.mts`) appelle chaque
 
 Pour matérialiser un `methodId` avant son implémentation réelle, créer un fichier
 `*.mock-strategy.mts` et l'enregistrer via `registerMocks` (`src/frameworks/mocks-registry.mts`).
-Les 70 mocks sont désactivables au boot via `LABRE_DISABLE_MOCKS=1`. La promotion d'un mock
+Les 61 mocks sont désactivables au boot via `LABRE_DISABLE_MOCKS=1`. La promotion d'un mock
 vers une stratégie réelle est suivie en [roadmap.md](../architecture/roadmap.md) (item B4).
 
 ```typescript

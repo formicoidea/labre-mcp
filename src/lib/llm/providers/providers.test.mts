@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import { createAgentSdkProvider } from './agent-sdk-provider.mjs';
 import { createHttpApiProvider } from './http-api-provider.mjs';
 import { createCopilotSdkProvider } from './copilot-sdk-provider.mjs';
-import { UnsupportedCapabilityError } from './provider.types.mjs';
+import { UnsupportedCapabilityError, UnsupportedVisionError } from './provider.types.mjs';
 
 describe('agent-sdk provider', () => {
   const p = createAgentSdkProvider();
 
-  it('advertises text + structured, not logprobs', () => {
-    assert.deepEqual(p.supports, { text: true, structured: true, logprobs: false });
+  it('advertises text + structured, not logprobs, not vision', () => {
+    assert.deepEqual(p.supports, { text: true, structured: true, logprobs: false, vision: false });
   });
 
   it('exposes a callable text function', () => {
@@ -31,13 +31,25 @@ describe('agent-sdk provider', () => {
       UnsupportedCapabilityError,
     );
   });
+
+  it('throws UnsupportedVisionError for vision', () => {
+    assert.throws(
+      () => p.vision({ provider: 'x', model: 'claude-sonnet-4-6' }),
+      UnsupportedVisionError,
+    );
+  });
 });
 
 describe('http-api provider', () => {
   const p = createHttpApiProvider({ kind: 'http-api', baseUrl: 'https://example.com/v1', apiKeyEnv: 'DUMMY_KEY' });
 
-  it('advertises text + logprobs, not structured', () => {
-    assert.deepEqual(p.supports, { text: true, structured: false, logprobs: true });
+  it('advertises text + logprobs + vision, not structured', () => {
+    assert.deepEqual(p.supports, { text: true, structured: false, logprobs: true, vision: true });
+  });
+
+  it('exposes a callable vision function (image-capable transport)', () => {
+    const call = p.vision({ provider: 'x', model: 'some-vision-model' });
+    assert.equal(typeof call, 'function');
   });
 
   it('exposes a callable text function', () => {
@@ -61,8 +73,8 @@ describe('http-api provider', () => {
 describe('copilot-sdk provider', () => {
   const p = createCopilotSdkProvider({ kind: 'copilot-sdk', authEnv: 'COPILOT_GITHUB_TOKEN' });
 
-  it('advertises text + structured, not logprobs', () => {
-    assert.deepEqual(p.supports, { text: true, structured: true, logprobs: false });
+  it('advertises text + structured, not logprobs, not vision', () => {
+    assert.deepEqual(p.supports, { text: true, structured: true, logprobs: false, vision: false });
   });
 
   it('exposes a callable text function', () => {
@@ -82,6 +94,13 @@ describe('copilot-sdk provider', () => {
     assert.throws(
       () => p.logprobs({ provider: 'x', model: 'gpt-5' }),
       UnsupportedCapabilityError,
+    );
+  });
+
+  it('throws UnsupportedVisionError for vision', () => {
+    assert.throws(
+      () => p.vision({ provider: 'x', model: 'gpt-5' }),
+      UnsupportedVisionError,
     );
   });
 });

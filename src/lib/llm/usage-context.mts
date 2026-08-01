@@ -30,11 +30,22 @@ export interface LlmUsageRecord {
  *  `llmCalls` is always present (a plain count). Token sums are only defined
  *  when at least one record carried that dimension — we never fabricate a 0 for
  *  providers that report nothing, so the caller can distinguish "0 tokens" from
- *  "no token data". */
+ *  "no token data". `model` is the FIRST model identifier any record carried
+ *  (undefined when none did) — enough for single-call collectors that need to
+ *  name the model they billed. Currently written but read by no caller: its
+ *  only consumer was the daemon's agent-turn spend ledger, retired with the
+ *  per-turn provider backend (ADR-0028 amendment 2026-07-18, slice B4). */
 export interface LlmUsageAggregate {
   llmCalls: number;
   inputTokens?: number;
   outputTokens?: number;
+  model?: string;
+  /** The individual per-call records, in order. Kept alongside the sums (which
+   *  the telemetry payload uses) so a per-call consumer — the labre cost ledger
+   *  (ADR-0032 Decision 3) — can write one row per call with its own model,
+   *  which the summed dimensions above cannot reconstruct. `model` above is the
+   *  FIRST model only; these carry one each. */
+  records: LlmUsageRecord[];
 }
 
 /** Mutable per-run accumulator held in the ALS store. */
@@ -42,6 +53,8 @@ interface UsageCollector {
   llmCalls: number;
   inputTokens?: number;
   outputTokens?: number;
+  model?: string;
+  records: LlmUsageRecord[];
 }
 
 const storage = new AsyncLocalStorage<UsageCollector>();
@@ -59,15 +72,19 @@ export async function runWithUsageCollector<T>(
   fn: () => Promise<T> | T,
   onAggregate: (aggregate: LlmUsageAggregate) => void,
 ): Promise<T> {
-  const collector: UsageCollector = { llmCalls: 0 };
+  const collector: UsageCollector = { llmCalls: 0, records: [] };
   try {
     return await Promise.resolve(storage.run(collector, fn));
   } finally {
     // Snapshot into the public aggregate shape. Token sums stay undefined when
     // no record ever carried them.
-    const aggregate: LlmUsageAggregate = { llmCalls: collector.llmCalls };
+    const aggregate: LlmUsageAggregate = {
+      llmCalls: collector.llmCalls,
+      records: collector.records,
+    };
     if (collector.inputTokens !== undefined) aggregate.inputTokens = collector.inputTokens;
     if (collector.outputTokens !== undefined) aggregate.outputTokens = collector.outputTokens;
+    if (collector.model !== undefined) aggregate.model = collector.model;
     onAggregate(aggregate);
   }
 }
@@ -84,10 +101,16 @@ export function recordLlmUsage(record: LlmUsageRecord): void {
   const collector = storage.getStore();
   if (!collector) return; // outside a collector: silent no-op
   collector.llmCalls += 1;
+  collector.records.push(record);
   if (typeof record.inputTokens === 'number') {
     collector.inputTokens = (collector.inputTokens ?? 0) + record.inputTokens;
   }
   if (typeof record.outputTokens === 'number') {
     collector.outputTokens = (collector.outputTokens ?? 0) + record.outputTokens;
+  }
+  // First model seen wins (an aggregate has one model slot; multi-model runs
+  // keep the first — the single-call collectors this serves never mix models).
+  if (collector.model === undefined && typeof record.model === 'string') {
+    collector.model = record.model;
   }
 }

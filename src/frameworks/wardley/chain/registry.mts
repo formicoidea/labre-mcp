@@ -8,9 +8,8 @@
 import type { StrategyRegistry } from '#core/registry/strategy-registry.mjs';
 import type { BaseStrategy } from '#core/ast/base-strategy.mjs';
 
-// OWM DSL parser (read) and serializer (emit).
-import { OwmParserStrategy } from './read/map/owm-parser-strategy.mjs';
-import { OwmEmitStrategy } from './emit/owm/owm-emit-strategy.mjs';
+// OWM parse/emit retired: `render:wardley-map:owm:{parse,emit}:dsl` are now
+// real canonical-boundary strategies registered in the render registry.
 // Basemap skeleton generator (canonical WardleyMap entry point).
 import { WardleyMapBasemapGenerateDefaultStrategy } from '#frameworks/wardley/map/basemap/generate/default.mjs';
 // Canonical value-chain generation + Y layout (WardleyMap → WardleyMap).
@@ -25,8 +24,6 @@ import { WardleyMapValueChainSelectByTypeComponentStrategy } from '#frameworks/w
 export function registerChainStrategies(
   registry: StrategyRegistry<BaseStrategy>,
 ): void {
-  registry.register(OwmParserStrategy.method, OwmParserStrategy);
-  registry.register(OwmEmitStrategy.method, OwmEmitStrategy);
   registry.register(
     WardleyMapBasemapGenerateDefaultStrategy.method,
     WardleyMapBasemapGenerateDefaultStrategy,

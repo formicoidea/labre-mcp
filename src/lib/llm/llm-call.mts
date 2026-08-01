@@ -25,6 +25,8 @@ import type {
   OpenCodeConfig,
   OpenCodeLogprobConfig,
   TemplateVariables,
+  LLMCallOptions,
+  LLMImageInput,
 } from '../../types/llm.mjs';
 
 // ─── Retry Configuration (aligned with Ouroboros claude_code_adapter) ───────
@@ -56,6 +58,54 @@ export function interpolate(template: string, variables?: TemplateVariables): st
   });
 }
 
+// ─── Image input (multimodal) ───────────────────────────────────────────────
+
+/**
+ * Guard for text-only backends. Dropping `opts.images` on the floor would look
+ * like a model-quality problem (the model answers about an image it never saw),
+ * so a text-only driver refuses the call outright. The wording is the contract
+ * asserted by callers and by the registry — keep it stable.
+ */
+export function rejectImageInput(providerKind: string, opts?: LLMCallOptions): void {
+  if (opts?.images !== undefined && opts.images.length > 0) {
+    throw new Error(`Provider "${providerKind}" does not support image input`);
+  }
+}
+
+/**
+ * One part of an OpenAI-compatible multimodal `content` array. The OpenCode
+ * gateway speaks the OpenAI chat/completions dialect (see `createOpenCodeCall`
+ * below), where an image travels as a `data:` URI inside `image_url`.
+ */
+type OpenAiContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
+/** OpenAI-compatible message: plain string content, or multimodal parts. */
+interface OpenAiMessage {
+  role: string;
+  content: string | OpenAiContentPart[];
+}
+
+/**
+ * Build the user message content. With no image the content stays the plain
+ * string the text-only path has always sent — byte-identical request body, so
+ * adding vision support cannot regress existing text strategies.
+ */
+function buildUserContent(
+  text: string,
+  images?: readonly LLMImageInput[],
+): string | OpenAiContentPart[] {
+  if (images === undefined || images.length === 0) return text;
+  return [
+    { type: 'text', text },
+    ...images.map((img): OpenAiContentPart => ({
+      type: 'image_url',
+      image_url: { url: `data:${img.mediaType};base64,${img.base64}` },
+    })),
+  ];
+}
+
 // ─── Backend 1: Claude Agent SDK ────────────────────────────────────────────
 
 /**
@@ -70,6 +120,12 @@ export function createLLMCall(config: ClaudeLLMConfig = {}): LLMCall {
   } = config;
 
   return async function llmCall(prompt, variables, opts) {
+    // The Agent SDK CAN carry images (query() accepts an
+    // AsyncIterable<SDKUserMessage> whose `message` is an Anthropic
+    // MessageParam, sdk.d.ts:1687/2631), but this driver uses the plain
+    // string-prompt mode. Until the streaming-input path is implemented, refuse
+    // explicitly rather than answering about an image the model never received.
+    rejectImageInput('agent-sdk', opts);
     const interpolatedPrompt = interpolate(prompt, variables);
     // Per-call opts.systemPrompt wins over factory-level config.systemPrompt.
     // This lets split-prompt call-sites carry the .system.md content while
@@ -161,6 +217,7 @@ export function createStructuredLLMCall<T = unknown>(
   }
 
   return async function structuredLLMCall(prompt, variables, opts) {
+    rejectImageInput('agent-sdk', opts);
     const interpolatedPrompt = interpolate(prompt, variables);
     const effectiveSystemPrompt = opts?.systemPrompt ?? factorySystemPrompt;
 
@@ -237,6 +294,12 @@ export function createStructuredLLMCall<T = unknown>(
 /**
  * Create an LLM call function backed by the OpenCode API gateway.
  * Uses standard OpenAI-compatible chat completions endpoint.
+ *
+ * This is the ONE driver that accepts `opts.images`: the request body is plain
+ * JSON we fully control, so a multimodal `content` array is a body-only change
+ * — no SDK surface, no subprocess, no new dependency. The capability is a
+ * TRANSPORT capability: the configured MODEL must itself be vision-capable,
+ * which `llm.config.json` decides, not this module.
  */
 export function createOpenCodeCall(config: OpenCodeConfig = {}): LLMCall {
   const {
@@ -259,11 +322,11 @@ export function createOpenCodeCall(config: OpenCodeConfig = {}): LLMCall {
       throw authErr;
     }
 
-    const messages: Array<{ role: string; content: string }> = [];
+    const messages: OpenAiMessage[] = [];
     if (effectiveSystemPrompt) {
       messages.push({ role: 'system', content: effectiveSystemPrompt });
     }
-    messages.push({ role: 'user', content: interpolatedPrompt });
+    messages.push({ role: 'user', content: buildUserContent(interpolatedPrompt, opts?.images) });
 
     let response: Response;
     try {
@@ -285,8 +348,11 @@ export function createOpenCodeCall(config: OpenCodeConfig = {}): LLMCall {
     }
 
     if (!response.ok) {
+      // Bound the body excerpt: this message feeds MCP log notifications, and
+      // an unbounded provider body (HTML error page, verbose JSON) floods
+      // them. Log hygiene only — no semantic change.
       const body = await response.text();
-      const apiErr = new Error(`OpenCode API error ${response.status}: ${body}`);
+      const apiErr = new Error(`OpenCode API error ${response.status}: ${body.slice(0, 500)}`);
       classifyAndLogLLMError(apiErr, errorContext);
       throw apiErr;
     }
@@ -329,6 +395,9 @@ export function createOpenCodeLogprobCall(
   } = config;
 
   return async function openCodeLogprobCall(prompt, variables, opts): Promise<LogprobResult> {
+    // Logprob calls are a single-token classification probe (max_tokens: 10);
+    // an image would be paid for and wasted. Refuse rather than silently drop.
+    rejectImageInput('http-api (logprobs mode)', opts);
     const interpolatedPrompt = interpolate(prompt, variables);
     const effectiveSystemPrompt = opts?.systemPrompt ?? factorySystemPrompt;
 
@@ -369,8 +438,11 @@ export function createOpenCodeLogprobCall(
     }
 
     if (!response.ok) {
+      // Same bounded excerpt as the text driver above — log hygiene only.
       const body = await response.text();
-      const apiErr = new Error(`OpenCode logprob API error ${response.status}: ${body}`);
+      const apiErr = new Error(
+        `OpenCode logprob API error ${response.status}: ${body.slice(0, 500)}`,
+      );
       classifyAndLogLLMError(apiErr, errorContext);
       throw apiErr;
     }

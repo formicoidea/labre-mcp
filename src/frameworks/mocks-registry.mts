@@ -73,12 +73,8 @@ import { MockWardleyIterationObserveNextStepDefaultStrategy } from './wardley/it
 import { MockWardleyIterationOrientNextStepDefaultStrategy } from './wardley/iteration/orient/next-step/default.mock-strategy.mjs';
 import { MockWardleyIterationDecideNextStepDefaultStrategy } from './wardley/iteration/decide/next-step/default.mock-strategy.mjs';
 import { MockWardleyIterationActNextStepDefaultStrategy } from './wardley/iteration/act/next-step/default.mock-strategy.mjs';
-import { MockWardleyIterationPurposeGenerateDefaultStrategy } from './wardley/iteration/purpose/generate/default.mock-strategy.mjs';
-import { MockWardleyIterationPurposeAuditPurposeQualityDefaultStrategy } from './wardley/iteration/purpose/audit-purpose-quality/default.mock-strategy.mjs';
+// purpose generate + audit-purpose-quality promoted to real strategies (registered in iteration/registry).
 import { MockRenderWardleyMapOwmConfigDslStrategy } from './render/wardley-map/owm/config/dsl.mock-strategy.mjs';
-import { MockRenderWardleyMapImageParseSvgStrategy } from './render/wardley-map/image/parse/svg.mock-strategy.mjs';
-import { MockRenderWardleyMapImageParsePngStrategy } from './render/wardley-map/image/parse/png.mock-strategy.mjs';
-import { MockRenderWardleyMapImageEmitPngStrategy } from './render/wardley-map/image/emit/png.mock-strategy.mjs';
 import { MockRenderWardleyMapImageConfigSvgStrategy } from './render/wardley-map/image/config/svg.mock-strategy.mjs';
 import { MockRenderWardleyMapImageConfigPngStrategy } from './render/wardley-map/image/config/png.mock-strategy.mjs';
 
@@ -141,12 +137,7 @@ export function registerMocks(registry: StrategyRegistry<BaseStrategy>): void {
   registry.register(MockWardleyIterationOrientNextStepDefaultStrategy.method, MockWardleyIterationOrientNextStepDefaultStrategy);
   registry.register(MockWardleyIterationDecideNextStepDefaultStrategy.method, MockWardleyIterationDecideNextStepDefaultStrategy);
   registry.register(MockWardleyIterationActNextStepDefaultStrategy.method, MockWardleyIterationActNextStepDefaultStrategy);
-  registry.register(MockWardleyIterationPurposeGenerateDefaultStrategy.method, MockWardleyIterationPurposeGenerateDefaultStrategy);
-  registry.register(MockWardleyIterationPurposeAuditPurposeQualityDefaultStrategy.method, MockWardleyIterationPurposeAuditPurposeQualityDefaultStrategy);
   registry.register(MockRenderWardleyMapOwmConfigDslStrategy.method, MockRenderWardleyMapOwmConfigDslStrategy);
-  registry.register(MockRenderWardleyMapImageParseSvgStrategy.method, MockRenderWardleyMapImageParseSvgStrategy);
-  registry.register(MockRenderWardleyMapImageParsePngStrategy.method, MockRenderWardleyMapImageParsePngStrategy);
-  registry.register(MockRenderWardleyMapImageEmitPngStrategy.method, MockRenderWardleyMapImageEmitPngStrategy);
   registry.register(MockRenderWardleyMapImageConfigSvgStrategy.method, MockRenderWardleyMapImageConfigSvgStrategy);
   registry.register(MockRenderWardleyMapImageConfigPngStrategy.method, MockRenderWardleyMapImageConfigPngStrategy);
 }

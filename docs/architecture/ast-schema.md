@@ -108,16 +108,16 @@ Listing **canonique** des commandes spécifiées en v0.1.0. La spécification co
 
 ### État d'implémentation (real vs mock) — v0.1.0
 
-> Le catalogue ci-dessous décrit la **surface cible** complète. Aujourd'hui, sur les **85 commandes enregistrées** au boot, seules **19** ont une stratégie réellement implémentée ; les **66 autres** sont des **mocks** — des stratégies d'échafaudage enregistrées pour exposer la surface dès le jour 1 (elles retournent un `insight` « `mock strategy for <methodId>` » et aucun `result` métier). Le champ `StrategyMetadata.status` (§ 3.4.3) porte la distinction : `experimental | stable` = réel, `mock` = échafaudage.
+> Le catalogue ci-dessous décrit la **surface cible** complète. Aujourd'hui, sur les **86 commandes enregistrées** au boot, seules **25** ont une stratégie réellement implémentée ; les **61 autres** sont des **mocks** — des stratégies d'échafaudage enregistrées pour exposer la surface dès le jour 1 (elles retournent un `insight` « `mock strategy for <methodId>` » et aucun `result` métier). Le champ `StrategyMetadata.status` (§ 3.4.3) porte la distinction : `experimental | stable` = réel, `mock` = échafaudage.
 >
 > **Source de vérité** : le daemon imprime au boot la liste des methodId enregistrés (stderr) ; `LABRE_DISABLE_MOCKS=1` ne boote que les réelles. Tenir cette liste à jour à chaque promotion mock → réel (cf. [roadmap.md](roadmap.md) B4).
 
-**Commandes réellement implémentées (19)** :
+**Commandes réellement implémentées (25)** :
 
 | methodId | Rôle |
 | --- | --- |
-| `render:wardley-map:owm:parse:dsl` | Parser OWM DSL → JSON-labre |
-| `render:wardley-map:owm:emit:dsl` | Sérialiseur JSON-labre → OWM DSL |
+| `render:wardley-map:owm:parse:dsl` | Parser OWM DSL → `WardleyMap` canonique (déterministe, dégradation gracieuse, round-trip byte-exact avec `owm:emit:dsl` sur le dialecte émis). Capture : en-têtes `// clé: valeur` (context/PurposeContext, alias FR), `evolve`→evolvesTo, `inertia`, `pipeline`→pipelineGeometry, `(build\|buy\|outsource)`→method, directive `evolution`→phases (renderConfig V3 input-shape) |
+| `render:wardley-map:owm:emit:dsl` | Sérialiseur `WardleyMap` canonique → OWM DSL (via `src/lib/owm/owm-dsl.mts`) |
 | `wardley:map:node:identify:default` | Identification capability / nature d'un nœud |
 | `wardley:map:value-chain:generate:top-down` | Génération chaîne de valeur (algorithme top-down) |
 | `wardley:map:value-chain:organized-y-position:default` | Layout Y lisible (bandes par profondeur, `WardleyMap`→`WardleyMap`) |
@@ -135,6 +135,12 @@ Listing **canonique** des commandes spécifiées en v0.1.0. La spécification co
 | `wardley:map:value-chain:select-by-type:component` | Sélecteur : construit le tableau des nœuds `type:'component'` (anchors et autres types exclus), projetés en `ComponentInput[]`, pour fan-out per-composant |
 | `wardley:map:basemap:generate:default` | Squelette `WardleyMap` canonique (titre + context, composants vides) |
 | `render:wardley-map:image:emit:svg` | Rendu SVG d'un `WardleyMap` via `renderToSVG` du package `@formicoidea/wardley-map-renderer` (schéma canonique consommé **directement**, sans détour) |
+| `render:wardley-map:image:parse:svg` | Inverse de `image:emit:svg` : SVG émis par notre renderer → `WardleyMap` canonique (inversion géométrique déterministe calibrée par `computeMapGeometry`, oracle d'idempotence du dataset round-trip) |
+| `render:wardley-map:image:emit:png` | Rendu PNG d'un `WardleyMap` via `renderToPNG` du renderer (base64 ; ~1 s/rendu, rasterisation resvg) |
+| `render:wardley-map:image:parse:png` | PNG → `WardleyMap` canonique via LLM **vision** (capability `vision` de la lib LLM, provider http-api) : extraction intermédiaire JSON stricte puis projection déterministe ; capture aussi les décorateurs dessinés (couleurs, barres d'inertie, flèches d'évolution→evolvesTo, bandes pipeline) ; non déterministe, qualité mesurée par éval |
+| `render:wardley-map:text:lint:default` | Lint LLM d'un texte quasi-structuré (presque-OWM, listes, JSON approximatif) → OWM DSL ou JSON canonique ; court-circuits déterministes, la couche déterministe reste seule productrice du map (recette `render:map:text-to-canonical`) |
+| `wardley:iteration:purpose:generate:default` | Génération d'un `Context` d'étude (purpose) depuis un `topic` + `intent` libres — LLM avec dégradation en squelette déterministe |
+| `wardley:iteration:purpose:audit-purpose-quality:default` | Audit qualité d'un `Context` (purpose) — checks déterministes + passe LLM sémantique, un `Insight` par dimension |
 
 Toute autre commande des § 1.2 / § 2 est aujourd'hui `status: mock`. Côté **outils** MCP, la surface câblée est `estimateEvolution`, `runCommand` (invocation directe de n'importe quel methodId, réel ou mock), `runRecipe` (invocation d'une recette multi-étapes par référence `<domain>:<tool>:<name>`) et `__ping__` — voir [roadmap.md](roadmap.md) B3.
 
@@ -249,6 +255,10 @@ Toute autre commande des § 1.2 / § 2 est aujourd'hui `status: mock`. Côté **
 - `render:wardley-map:image:emit:png`
 - `render:wardley-map:image:config:svg`
 - `render:wardley-map:image:config:png`
+
+**sous-domaine `text`** (ajouté post-v0.1.0 — couche lint du split lint/déterministe)
+
+- `render:wardley-map:text:lint:default` — normalisation LLM d'un texte quasi-structuré vers le canonique (target `json`, défaut) ou l'OWM DSL (target `owm`) ; la couche déterministe (schéma/parseur) reste seule productrice du map. Recette associée : `render:map:text-to-canonical` (le namespace de recette `render:map` suit la convention `<domain>:<tool>` des refs 3 segments).
 
 ## 1.3. Cas d'études et recipes
 
@@ -466,6 +476,16 @@ La forme canonique d'une carte de Wardley dans `wardley.map` est **strictement c
 </aside>
 
 Les types `Component`, `EvolutionPosition`, `ValueChain`, `Map` ne sont **pas redéfinis ici** : ils dérivent intégralement du schéma renderer. Le **modèle interne** d'une stratégie peut être plus riche (ARCH-05 amendé) ; la frontière I/O doit conformer au schéma renderer.
+
+#### Publication des schémas
+
+Le contrat de donnée est publié en JSON Schema (draft 2020-12) dans `schema/` à la racine du repo, régénéré par `npm run schemas` (`scripts/export-schemas.mts`) et servi par le daemon en `GET /schemas/<fichier>` :
+
+- `wardley-map.schema.json` — copie verbatim du schéma renderer (source de vérité, `$id` d'origine conservé) ;
+- `json-labre.schema.json` — artefact JSON-labre complet (le sous-arbre `wardley.map` est un `$ref` vers le schéma renderer, jamais dupliqué) ;
+- `command-call.schema.json` / `command-result.schema.json` — enveloppes d'invocation (§ 3.4.1).
+
+Les `$id` générés pointent sur `https://framework-mcp.labre.app/schemas/…`, résolvables en production. Toute évolution des Zod de `src/schemas/` doit être suivie d'un `npm run schemas` dans le même commit.
 
 #### Anti-corruption layer
 

@@ -14,13 +14,13 @@
     {
       "stepId": "estimate-all",
       "tool": "wardley:map:climate:position-functional-in-evolution:llm-direct",
-      "over": "$.chain.result.components",
+      "over": "$.chain.result.map.components",
       "out": "$.evaluations"
     },
     {
       "stepId": "identify-all",
       "tool": "wardley:map:node:identify:default",
-      "over": "$.chain.result.components",
+      "over": "$.chain.result.map.components",
       "out": "$.identified"
     }
   ],

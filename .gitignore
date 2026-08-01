@@ -52,6 +52,9 @@ logs/
 npm-debug.log*
 pnpm-debug.log*
 
+# ── Synthetic round-trip dataset (npm run dataset) ──
+dataset/
+
 # ── Test & coverage ───────────────────────────
 coverage/
 .nyc_output/

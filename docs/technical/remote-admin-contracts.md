@@ -39,10 +39,13 @@ compromise alone cannot inject a bundle (the row is service-role-writable only).
   `AuthenticationError` → HTTP 401 with JSON-RPC error `Unauthorized = -32001`
   (no internal reason leaked). Auth runs BEFORE dispatch; the enriched context
   is what dispatch receives.
-- Boot selection (`labre-daemon.mts` only): `LABRE_AUTH=supabase` requires
-  `SUPABASE_URL` (boot fails if absent); optional `SUPABASE_JWT_AUD`. Unset or
-  `none` → noop middleware (local dev). Env reads at boot are the allowed
-  exception; never at request time.
+- Boot selection (`labre-daemon.mts` only): `LABRE_AUTH` is a comma-separated
+  list of doors (`supabase`, `oidc`, `api-key` — see `auth-modes.mts`). Each
+  listed door fails closed on its own env: `supabase` needs `SUPABASE_URL`
+  (optional `SUPABASE_JWT_AUD`); `oidc` needs `AUTH_JWKS_URL` + `AUTH_AUDIENCE`;
+  `api-key` needs `SUPABASE_URL` + `SUPABASE_ANON_KEY`. Unset, `none` or empty →
+  noop middleware (local dev). Env reads at boot are the allowed exception;
+  never at request time.
 
 ## Contract 2 — Strategy bundle manifest v0 (labre-mcp)
 

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0",
+  "name": "text-to-canonical",
+  "domain": "render",
+  "tool": "map",
+  "description": "Near-structured value-chain text to canonical WardleyMap. Step 1 lints the source (LLM, deterministic short-circuits; input { text, target: 'json'|'owm' }, default json = lossless with colors/evolvesTo/inertia/pipelines/method/context/custom phases via renderConfig, schema-constrained when the provider supports `structured`); step 2 deterministically parses the DSL (owm target) and captures // key: value study-context headers. The AI layer is cosmetic: the deterministic schema/parser has the final word. On the json target the map is already in $.linted.result.map and the parse step degrades gracefully (no dsl input).",
+  "steps": [
+    {
+      "stepId": "lint",
+      "tool": "render:wardley-map:text:lint:default",
+      "in": "$.input",
+      "out": "$.linted"
+    },
+    {
+      "stepId": "parse",
+      "tool": "render:wardley-map:owm:parse:dsl",
+      "in": "$.linted.result",
+      "out": "$.output"
+    }
+  ]
+}

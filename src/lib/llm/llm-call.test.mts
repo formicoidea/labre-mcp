@@ -3,7 +3,14 @@
 
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { interpolate, createOpenCodeCall, createOpenCodeLogprobCall } from './llm-call.mjs';
+import {
+  interpolate,
+  createLLMCall,
+  createStructuredLLMCall,
+  createOpenCodeCall,
+  createOpenCodeLogprobCall,
+  rejectImageInput,
+} from './llm-call.mjs';
 import { runWithUsageCollector, type LlmUsageAggregate } from './usage-context.mjs';
 
 describe('interpolate', () => {
@@ -122,6 +129,106 @@ describe('createOpenCodeCall — fetch stubbed', () => {
 
     assert.equal(capturedBody.messages.length, 1);
     assert.equal(capturedBody.messages[0].role, 'user');
+  });
+
+  // ── Image input (vision) ──────────────────────────────────────────────────
+
+  it('keeps the user content a plain string when no image is attached', async () => {
+    globalThis.fetch = (async (_url: any, init: any) => {
+      capturedBody = JSON.parse(init.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 });
+    }) as typeof fetch;
+
+    const call = createOpenCodeCall({ apiKey: 'k' });
+    await call('hi', {}, { images: [] });
+
+    // Empty list must be indistinguishable from no list at all: adding vision
+    // support may not change the body of any existing text strategy.
+    assert.equal(typeof capturedBody.messages[0].content, 'string');
+    assert.equal(capturedBody.messages[0].content, 'hi');
+  });
+
+  it('encodes attached images as OpenAI-compatible image_url data URIs', async () => {
+    globalThis.fetch = (async (_url: any, init: any) => {
+      capturedBody = JSON.parse(init.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 });
+    }) as typeof fetch;
+
+    const call = createOpenCodeCall({ apiKey: 'k', systemPrompt: 'transcribe' });
+    await call('read this', {}, { images: [{ mediaType: 'image/png', base64: 'QUJD' }] });
+
+    assert.equal(capturedBody.messages[0].role, 'system');
+    const user = capturedBody.messages[1];
+    assert.equal(user.role, 'user');
+    assert.deepEqual(user.content, [
+      { type: 'text', text: 'read this' },
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,QUJD' } },
+    ]);
+  });
+
+  it('carries several images in order, after the text part', async () => {
+    globalThis.fetch = (async (_url: any, init: any) => {
+      capturedBody = JSON.parse(init.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 });
+    }) as typeof fetch;
+
+    const call = createOpenCodeCall({ apiKey: 'k' });
+    await call('two maps', {}, {
+      images: [
+        { mediaType: 'image/png', base64: 'AAA' },
+        { mediaType: 'image/png', base64: 'BBB' },
+      ],
+    });
+
+    assert.deepEqual(
+      capturedBody.messages[0].content.map((p: any) => p.type),
+      ['text', 'image_url', 'image_url'],
+    );
+    assert.equal(capturedBody.messages[0].content[1].image_url.url, 'data:image/png;base64,AAA');
+    assert.equal(capturedBody.messages[0].content[2].image_url.url, 'data:image/png;base64,BBB');
+  });
+});
+
+describe('text-only backends refuse image input', () => {
+  // These reject BEFORE any network / subprocess work, so no real LLM is
+  // involved. Silently dropping the image would surface as an inexplicable
+  // quality regression — the refusal is the contract.
+
+  it('createLLMCall (agent-sdk) rejects attached images', async () => {
+    const call = createLLMCall();
+    await assert.rejects(
+      () => call('describe', {}, { images: [{ mediaType: 'image/png', base64: 'AAA' }] }),
+      /Provider "agent-sdk" does not support image input/,
+    );
+  });
+
+  it('createStructuredLLMCall (agent-sdk) rejects attached images', async () => {
+    const call = createStructuredLLMCall({ schema: { type: 'object' } });
+    await assert.rejects(
+      () => call('describe', {}, { images: [{ mediaType: 'image/png', base64: 'AAA' }] }),
+      /Provider "agent-sdk" does not support image input/,
+    );
+  });
+
+  it('createOpenCodeLogprobCall rejects attached images', async () => {
+    const call = createOpenCodeLogprobCall({ apiKey: 'k' });
+    await assert.rejects(
+      () => call('classify', {}, { images: [{ mediaType: 'image/png', base64: 'AAA' }] }),
+      /does not support image input/,
+    );
+  });
+
+  it('is a pure guard: an empty list never trips it', () => {
+    // Asserted on the guard directly — calling the agent-sdk drivers with an
+    // empty list would proceed to a REAL subprocess call, which these unit
+    // tests must never do.
+    assert.doesNotThrow(() => rejectImageInput('agent-sdk', { images: [] }));
+    assert.doesNotThrow(() => rejectImageInput('agent-sdk', {}));
+    assert.doesNotThrow(() => rejectImageInput('agent-sdk', undefined));
+    assert.throws(
+      () => rejectImageInput('agent-sdk', { images: [{ mediaType: 'image/png', base64: 'A' }] }),
+      /does not support image input/,
+    );
   });
 });
 

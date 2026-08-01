@@ -9,12 +9,35 @@
 /** Variables d'interpolation pour un template `{{key}}`. */
 export type TemplateVariables = Record<string, string | number | boolean | undefined>;
 
+/** Media types accepted as image input.
+ *
+ *  PNG only today: the single consumer is the Wardley-map vision parser
+ *  (`render:wardley-map:image:parse:png`). Widen the union — and every
+ *  provider's encoder with it — when a caller genuinely needs jpeg/webp. */
+export type LLMImageMediaType = 'image/png';
+
+/** One inline image attached to an LLM call.
+ *
+ *  `base64` is the RAW payload, WITHOUT any `data:` URI prefix: each provider
+ *  wraps it in its own transport encoding (OpenAI-compatible `image_url` data
+ *  URI, Anthropic `source.data`, …). Keeping the raw form here means a caller
+ *  never has to know which backend will serve the call. */
+export interface LLMImageInput {
+  mediaType: LLMImageMediaType;
+  base64: string;
+}
+
 /** Per-call options that can override factory-level configuration. */
 export interface LLMCallOptions {
   /** System prompt override. Takes priority over the factory-level systemPrompt
    *  when both are provided. Intended to carry the `.system.md` content of a
    *  split prompt definition. */
   systemPrompt?: string;
+  /** Images sent alongside the user prompt (multimodal call). Backends that do
+   *  not advertise the `vision` capability REJECT a non-empty list with an
+   *  explicit "does not support image input" error — they never drop it
+   *  silently, which would surface as an inexplicable quality regression. */
+  images?: LLMImageInput[];
 }
 
 /** Fonction d'appel LLM texte → texte. */

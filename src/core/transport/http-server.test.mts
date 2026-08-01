@@ -7,7 +7,7 @@ import { generateKeyPair, exportJWK, createLocalJWKSet, SignJWT } from "jose";
 import "#lib/prompts/init.mjs";
 import { buildApp } from "./http-server.mjs";
 import { buildBootRegistry } from "./labre-daemon.mjs";
-import { noopAuthMiddleware } from "./auth-middleware.mjs";
+import { noopAuthMiddleware, AuthenticationError } from "./auth-middleware.mjs";
 import { buildSupabaseAuthMiddleware } from "./supabase-auth.mjs";
 
 function buildTestApp() {
@@ -44,6 +44,22 @@ describe("labre-mcp HTTP transport", () => {
     const res = await app.request("/version");
     const body = (await res.json()) as { name: string; version: string };
     assert.equal(body.name, "labre-mcp");
+  });
+
+  it("GET /schemas serves a published schema and 404s the rest", async () => {
+    const app = buildTestApp();
+
+    const ok = await app.request("/schemas/json-labre.schema.json");
+    assert.equal(ok.status, 200);
+    assert.equal(ok.headers.get("content-type"), "application/schema+json");
+    const schema = (await ok.json()) as { $id: string };
+    assert.match(schema.$id, /json-labre\.schema\.json$/);
+
+    const missing = await app.request("/schemas/nope.schema.json");
+    assert.equal(missing.status, 404);
+
+    const traversal = await app.request("/schemas/..%2Fpackage.json");
+    assert.equal(traversal.status, 404);
   });
 
   it("MCP ping returns empty success", async () => {
@@ -221,6 +237,76 @@ describe("labre-mcp HTTP transport", () => {
   });
 });
 
+describe("labre-mcp GET /config/llm (ops endpoint)", () => {
+  const ADMIN_TOKEN = "ops-secret-token";
+  const STUB_CONFIG = {
+    defaultProvider: "opencode",
+    providers: {
+      opencode: { kind: "http-api", baseUrl: "https://x", apiKeyEnv: "OPENCODE_API_KEY" },
+      claude: { kind: "agent-sdk" },
+    },
+    strategies: {
+      "some:strategy": { provider: "opencode", model: "kimi-k2.5", topLogprobs: 5 },
+    },
+  } as unknown as import("#lib/llm/config.schema.mjs").LLMConfig;
+
+  function buildConfigApp() {
+    return buildApp({
+      tools: buildBootRegistry(),
+      auth: noopAuthMiddleware,
+      loadConfig: () => STUB_CONFIG,
+    });
+  }
+
+  it("returns 503 when LABRE_MCP_ADMIN_TOKEN is unset", async () => {
+    delete process.env.LABRE_MCP_ADMIN_TOKEN;
+    const res = await buildConfigApp().request("/config/llm");
+    assert.equal(res.status, 503);
+    assert.deepEqual(await res.json(), { error: "config endpoint disabled" });
+  });
+
+  it("returns 401 with a missing or wrong bearer token", async () => {
+    process.env.LABRE_MCP_ADMIN_TOKEN = ADMIN_TOKEN;
+    try {
+      const noHeader = await buildConfigApp().request("/config/llm");
+      assert.equal(noHeader.status, 401);
+      const wrong = await buildConfigApp().request("/config/llm", {
+        headers: { authorization: "Bearer nope" },
+      });
+      assert.equal(wrong.status, 401);
+    } finally {
+      delete process.env.LABRE_MCP_ADMIN_TOKEN;
+    }
+  });
+
+  it("returns 200 with the resolved config and per-provider hasKey (no secret values)", async () => {
+    process.env.LABRE_MCP_ADMIN_TOKEN = ADMIN_TOKEN;
+    process.env.OPENCODE_API_KEY = "sk-live-should-not-leak";
+    try {
+      const res = await buildConfigApp().request("/config/llm", {
+        headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
+      });
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as {
+        defaultProvider: string;
+        providers: Record<string, { kind: string; apiKeyEnv?: string; hasKey: boolean }>;
+        strategies: Record<string, { provider: string; model: string }>;
+      };
+      assert.equal(body.defaultProvider, "opencode");
+      assert.equal(body.providers.opencode.apiKeyEnv, "OPENCODE_API_KEY");
+      assert.equal(body.providers.opencode.hasKey, true);
+      // No env var set for the agent-sdk provider → hasKey false.
+      assert.equal(body.providers.claude.hasKey, false);
+      assert.equal(body.strategies["some:strategy"].model, "kimi-k2.5");
+      // Secret values never appear anywhere in the payload.
+      assert.ok(!JSON.stringify(body).includes("sk-live-should-not-leak"));
+    } finally {
+      delete process.env.LABRE_MCP_ADMIN_TOKEN;
+      delete process.env.OPENCODE_API_KEY;
+    }
+  });
+});
+
 describe("labre-mcp HTTP transport with supabase auth", () => {
   async function buildAuthedApp() {
     const { publicKey, privateKey } = await generateKeyPair("ES256");
@@ -335,5 +421,59 @@ describe("labre-mcp HTTP transport with supabase auth", () => {
     const body = (await res.json()) as { id: number; result: unknown };
     assert.equal(body.id, 9);
     assert.deepEqual(body.result, {});
+  });
+});
+
+describe("labre-mcp OAuth protected-resource discovery (RFC 9728)", () => {
+  const OAUTH = {
+    resource: "https://framework-mcp.labre.app/mcp",
+    authServer: "https://labre.app",
+  };
+  const METADATA_URL =
+    "https://framework-mcp.labre.app/.well-known/oauth-protected-resource";
+
+  // A middleware that always rejects, to exercise the 401 WWW-Authenticate path
+  // without needing a real token.
+  const rejectingAuth = {
+    async authenticate(): Promise<never> {
+      throw new AuthenticationError("no token");
+    },
+  };
+
+  it("serves the protected-resource metadata when configured", async () => {
+    const app = buildApp({ tools: buildBootRegistry(), auth: noopAuthMiddleware, oauth: OAUTH });
+    const res = await app.request("/.well-known/oauth-protected-resource");
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as { resource: string; authorization_servers: string[] };
+    assert.equal(body.resource, OAUTH.resource);
+    assert.deepEqual(body.authorization_servers, [OAUTH.authServer]);
+  });
+
+  it("stamps a 401 with WWW-Authenticate pointing at the resource metadata", async () => {
+    const app = buildApp({ tools: buildBootRegistry(), auth: rejectingAuth, oauth: OAUTH });
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+    });
+    assert.equal(res.status, 401);
+    assert.equal(
+      res.headers.get("WWW-Authenticate"),
+      `Bearer resource_metadata="${METADATA_URL}"`,
+    );
+  });
+
+  it("is fully off when unconfigured: no well-known route, plain 401", async () => {
+    const app = buildApp({ tools: buildBootRegistry(), auth: rejectingAuth });
+    const wellKnown = await app.request("/.well-known/oauth-protected-resource");
+    assert.equal(wellKnown.status, 404);
+
+    const res = await app.request("/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+    });
+    assert.equal(res.status, 401);
+    assert.equal(res.headers.get("WWW-Authenticate"), null);
   });
 });

@@ -4,12 +4,22 @@
 import { createLLMCall, createStructuredLLMCall } from '../llm-call.mjs';
 import type { LLMCall, StructuredLLMCall, LogprobLLMCall } from '../../../types/llm.mjs';
 import type { StrategyConfig } from '../config.schema.mjs';
-import { UnsupportedCapabilityError, type LLMProvider } from './provider.types.mjs';
+import {
+  UnsupportedCapabilityError,
+  UnsupportedVisionError,
+  type LLMProvider,
+} from './provider.types.mjs';
 
 export function createAgentSdkProvider(): LLMProvider {
   return {
     kind: 'agent-sdk',
-    supports: { text: true, structured: true, logprobs: false },
+    // vision: false — the SDK could carry images (query() accepts an
+    // AsyncIterable<SDKUserMessage> whose `message` is an Anthropic MessageParam,
+    // sdk.d.ts:1687/2631) but this provider drives it in plain string-prompt
+    // mode, and the Anthropic content-block types are not installed here
+    // (@anthropic-ai/sdk is absent from node_modules). Flip to true only
+    // together with a real streaming-input driver.
+    supports: { text: true, structured: true, logprobs: false, vision: false },
 
     text(strategy: StrategyConfig): LLMCall {
       return createLLMCall({
@@ -33,6 +43,10 @@ export function createAgentSdkProvider(): LLMProvider {
 
     logprobs(_strategy: StrategyConfig): LogprobLLMCall {
       throw new UnsupportedCapabilityError('agent-sdk', 'logprobs');
+    },
+
+    vision(_strategy: StrategyConfig): LLMCall {
+      throw new UnsupportedVisionError('agent-sdk');
     },
   };
 }

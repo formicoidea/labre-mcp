@@ -14,7 +14,12 @@
 // extraction below forwards numbers exclusively (never string signal values).
 
 import type { EventBus } from "../bus/event-bus.mjs";
-import { type PostHogFlags, promptExperimentFlagKey } from "#lib/flags/posthog.mjs";
+import {
+  type PostHogFlags,
+  type RecipeRef,
+  promptExperimentFlagKey,
+  recipeFlagKey,
+} from "#lib/flags/posthog.mjs";
 
 export interface AttachPostHogTelemetryOptions {
   bus: EventBus;
@@ -30,6 +35,14 @@ export interface AttachPostHogTelemetryOptions {
    * PRIVACY: only variant names and strategy ids — still no prompt text.
    */
   variants?: Record<string, string>;
+  /**
+   * Recipe-experiment attribution: the requested ref and the recipe variant
+   * ACTUALLY served for this run (after any fail-open fallback). Forwarded as
+   * `$feature/mcp-recipe-<ref>` = servedVariant so run-end attributes to the
+   * recipe that truly ran — never a variant that didn't. Omitted when no
+   * variant swapped in (default path unchanged).
+   */
+  recipeExperiment?: { ref: RecipeRef; servedVariant: string };
 }
 
 export interface PostHogTelemetryHandle {
@@ -45,6 +58,10 @@ export function attachPostHogTelemetry(
   const featureProps: Record<string, string> = {};
   for (const [strategyId, variantName] of Object.entries(options.variants ?? {})) {
     featureProps[`$feature/${promptExperimentFlagKey(strategyId)}`] = variantName;
+  }
+  if (options.recipeExperiment) {
+    const { ref, servedVariant } = options.recipeExperiment;
+    featureProps[`$feature/${recipeFlagKey(ref)}`] = servedVariant;
   }
 
   const subscription = options.bus

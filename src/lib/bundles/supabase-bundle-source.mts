@@ -50,6 +50,9 @@ interface AcceptedBundle {
   prompts: Record<string, Record<string, BundlePromptPair>>;
 }
 
+// labre-mcp-owned tables live in the labre_mcp schema (1 data-owning system =
+// 1 schema); the schema must be listed in PostgREST "Exposed schemas".
+const SCHEMA = 'labre_mcp';
 const TABLE = 'strategy_bundles';
 const BUCKET = 'strategy-bundles';
 const DEFAULT_TTL_SECONDS = 300;
@@ -111,6 +114,7 @@ function buildDefaultClientFactory(
     const { createClient } = await import('@supabase/supabase-js');
     const client = createClient(supabaseUrl, anonKey, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      db: { schema: SCHEMA },
       // The caller's JWT rides every request; RLS authorizes. The client is
       // discarded after the refresh — the token never outlives it.
       global: { headers: { Authorization: `Bearer ${bearerToken}` } },

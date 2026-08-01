@@ -23,6 +23,9 @@ function buildRecordingFlags(): PostHogFlags & {
     async resolvePromptVariants() {
       return {};
     },
+    async resolveRecipeVariant() {
+      return undefined;
+    },
     capture(event, distinctId, properties) {
       captured.push({ event, distinctId, properties });
     },

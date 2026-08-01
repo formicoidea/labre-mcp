@@ -73,3 +73,64 @@ Dans PostHog, comparer les événements `mcp_run_end` ventilés par
   les noms explicites (`cpc-mapper/pick-class`…) ne sont jamais substitués.
 - Fail-open intégral : panne PostHog, flag absent ou variante inconnue →
   comportement nominal (`default`), jamais d'erreur.
+
+# A/B testing de recettes
+
+Symétrique aux prompts, au niveau de la **recette entière** : un run peut être
+routé vers une variante de recette au lieu de celle demandée.
+
+## Principe
+
+La **même** clé de flag qui sert de gate rollout — `mcp-recipe-<domain>-<tool>-<name>`
+— devient un sélecteur de variante quand sa valeur est une **string** (flag
+multivarié). La convention est identique à celle des prompts : **la clé de
+variante EST le `name` de la recette** à exécuter à la place (même `domain` +
+`tool`). Une valeur **boolean** reste le simple gate on/off (`isRecipeEnabled`).
+
+| Valeur du flag `mcp-recipe-<ref>` | Effet |
+|---|---|
+| absente / `true` | recette demandée exécutée (nominal) |
+| `false` | recette **désactivée** pour cet utilisateur (gate rollout) |
+| string `"<autre-name>"` | **variante** : `<autre-name>` exécutée à la place |
+
+## Pas à pas
+
+### 1. Publier la recette variante
+
+La variante est **une recette comme une autre** de même `domain:tool`, résolue
+par le chemin `loadRecipe` standard (bundle distant, override projet, ou
+shipped). Pour la piloter depuis l'admin sans redéployer : la publier comme
+**bundle** (`labre_mcp.strategy_bundles`) sous son `name` de variante. Un bundle
+ne peut jamais shadow une recette shipped — la variante porte donc toujours un
+slug distinct de la recette demandée.
+
+### 2. Créer le flag multivarié dans PostHog
+
+- Clé : `mcp-recipe-<domain>-<tool>-<name>` (la recette **demandée**).
+- Variantes : `control` (= la recette demandée elle-même, ou toute valeur non
+  string-de-nom) + une clé par recette variante dont **la valeur = le slug** de
+  la variante publiée.
+
+### 3. Lancer des runs
+
+L'affectation se fait une fois par run de `runRecipe`, avec le **même**
+`distinctId` que le gate et les variantes de prompt (bucketing cohérent). Daemon
+non authentifié → tous en `anonymous` (même variante) : l'expérience n'a de sens
+qu'avec l'auth active.
+
+### 4. Lire les résultats
+
+Événements `mcp_run_end` ventilés par `$feature/mcp-recipe-<ref>`. La valeur
+attribuée est la recette **réellement servie** (après fail-open) — jamais une
+variante qui n'a pas tourné. Mêmes propriétés de performance que pour les
+prompts (`durationMs`, `llmCalls`, `quality_<name>`, …).
+
+## Limites & garanties
+
+- Même périmètre que les prompts : seul **`runRecipe`** est instrumenté.
+- **Fail-open renforcé** : si la variante nomme une recette introuvable, le run
+  exécute la recette **demandée** et n'émet **aucune** attribution `$feature/`
+  (contrairement aux prompts où l'attribution peut refléter une variante non
+  servie — corrigé ici puisque le swap se fait en un point unique).
+- Prompts et recettes se composent : les variantes de prompt s'appliquent
+  ensuite aux stratégies de la recette réellement servie.

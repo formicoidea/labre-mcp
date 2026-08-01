@@ -1,0 +1,3074 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wardley-map-renderer/schema/wardley-map.schema.json",
+  "title": "WardleyMap",
+  "description": "Input file schema for wardley-map-renderer. Generated from src/schema.ts (Zod) via scripts/generate-json-schema.ts — do not edit by hand.",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "position": {
+                "type": "object",
+                "properties": {
+                  "dx": {
+                    "type": "number"
+                  },
+                  "dy": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "dx",
+                  "dy"
+                ]
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "anchor",
+              "component",
+              "pipeline"
+            ]
+          },
+          "subtype": {
+            "type": "string",
+            "enum": [
+              "userNeed",
+              "market",
+              "ecosystem",
+              "solution",
+              "functional",
+              "supplier"
+            ]
+          },
+          "nature": {
+            "type": "string",
+            "enum": [
+              "personae",
+              "generic",
+              "group",
+              "natural",
+              "anthropic",
+              "practice",
+              "data",
+              "activity",
+              "knowledge"
+            ]
+          },
+          "position": {
+            "type": "object",
+            "properties": {
+              "evolution": {
+                "type": "object",
+                "properties": {
+                  "scalar": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "range": {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "scalar"
+                ]
+              },
+              "visibility": {
+                "type": "object",
+                "properties": {
+                  "scalar": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "scalar"
+                ]
+              }
+            },
+            "required": [
+              "evolution",
+              "visibility"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "evolvesTo": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "object",
+                  "properties": {
+                    "evolution": {
+                      "type": "object",
+                      "properties": {
+                        "scalar": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      },
+                      "required": [
+                        "scalar"
+                      ]
+                    },
+                    "visibility": {
+                      "type": "object",
+                      "properties": {
+                        "scalar": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      },
+                      "required": [
+                        "scalar"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "evolution",
+                    "visibility"
+                  ]
+                },
+                "evolveType": {
+                  "default": "natural",
+                  "type": "string",
+                  "enum": [
+                    "natural",
+                    "ecosystem",
+                    "forced",
+                    "late"
+                  ]
+                },
+                "inertia": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "position"
+              ]
+            }
+          },
+          "pipelineGeometry": {
+            "type": "object",
+            "properties": {
+              "evoStart": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "evoEnd": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "visStart": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "visEnd": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "handleEvolution": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "evoStart",
+              "evoEnd",
+              "visStart",
+              "visEnd"
+            ]
+          },
+          "color": {
+            "type": "string"
+          },
+          "method": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "recommendation": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "category",
+              "recommendation"
+            ]
+          },
+          "inertia": {
+            "type": "boolean"
+          },
+          "accelerator": {
+            "type": "boolean"
+          },
+          "deaccelerator": {
+            "type": "boolean"
+          },
+          "step": {
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "color": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "number"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "type",
+          "position"
+        ]
+      }
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "consumer": {
+            "type": "string"
+          },
+          "supplier": {
+            "type": "string"
+          },
+          "type": {
+            "default": "DependsOn",
+            "type": "string",
+            "enum": [
+              "DependsOn",
+              "Flow",
+              "Constraint"
+            ]
+          },
+          "flow": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "style": {
+                "default": "solid",
+                "type": "string",
+                "enum": [
+                  "solid",
+                  "dashed",
+                  "bold"
+                ]
+              }
+            },
+            "required": [
+              "label"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "consumer",
+          "supplier"
+        ]
+      }
+    },
+    "context": {
+      "type": "string"
+    },
+    "renderConfig": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "display": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "boolean"
+            },
+            "nodes": {
+              "type": "boolean"
+            },
+            "labels": {
+              "type": "boolean"
+            },
+            "edges": {
+              "type": "boolean"
+            },
+            "pipelines": {
+              "type": "boolean"
+            },
+            "notes": {
+              "type": "boolean"
+            },
+            "evolveArrows": {
+              "type": "boolean"
+            },
+            "axisEvolution": {
+              "type": "boolean"
+            },
+            "axisValueChain": {
+              "type": "boolean"
+            },
+            "phases": {
+              "type": "boolean"
+            },
+            "legend": {
+              "type": "boolean"
+            },
+            "accelerators": {
+              "type": "boolean"
+            },
+            "steps": {
+              "type": "boolean"
+            },
+            "component": {
+              "type": "boolean"
+            },
+            "anchor": {
+              "type": "boolean"
+            },
+            "pipeline": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "rendering": {
+          "type": "object",
+          "properties": {
+            "locale": {
+              "type": "string",
+              "enum": [
+                "en",
+                "fr"
+              ]
+            },
+            "avoidCollisions": {
+              "type": "boolean"
+            },
+            "theme": {
+              "type": "string",
+              "enum": [
+                "default",
+                "dark",
+                "highContrast"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "style": {
+          "type": "object",
+          "properties": {
+            "global": {
+              "type": "object",
+              "properties": {
+                "fontFamily": {
+                  "type": "string"
+                },
+                "labelScale": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 5
+                },
+                "strokeWidth": {
+                  "type": "number",
+                  "minimum": 0.25,
+                  "maximum": 8
+                },
+                "color": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "view": {
+              "type": "object",
+              "properties": {
+                "default": {
+                  "type": "object",
+                  "properties": {
+                    "width": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "maximum": 10000
+                    },
+                    "height": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "maximum": 10000
+                    },
+                    "dpi": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "maximum": 2400
+                    },
+                    "align": {
+                      "type": "string",
+                      "enum": [
+                        "center",
+                        "top-left"
+                      ]
+                    }
+                  }
+                },
+                "override": {
+                  "type": "object",
+                  "properties": {
+                    "width": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "maximum": 10000
+                    },
+                    "height": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "maximum": 10000
+                    },
+                    "dpi": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "maximum": 2400
+                    },
+                    "align": {
+                      "type": "string",
+                      "enum": [
+                        "center",
+                        "top-left"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "title": {
+              "type": "object",
+              "properties": {
+                "default": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "object",
+                      "properties": {
+                        "fontFamily": {
+                          "type": "string"
+                        },
+                        "scale": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 5
+                        },
+                        "color": {
+                          "type": "string"
+                        },
+                        "offset": {
+                          "type": "object",
+                          "properties": {
+                            "dx": {
+                              "type": "number"
+                            },
+                            "dy": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "dx",
+                            "dy"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "override": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "object",
+                      "properties": {
+                        "fontFamily": {
+                          "type": "string"
+                        },
+                        "scale": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 5
+                        },
+                        "color": {
+                          "type": "string"
+                        },
+                        "offset": {
+                          "type": "object",
+                          "properties": {
+                            "dx": {
+                              "type": "number"
+                            },
+                            "dy": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "dx",
+                            "dy"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "legend": {
+              "type": "object",
+              "properties": {
+                "default": {
+                  "type": "object",
+                  "properties": {
+                    "box": {
+                      "type": "object",
+                      "properties": {
+                        "position": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "top-left",
+                                "top-right",
+                                "bottom-left",
+                                "bottom-right",
+                                "auto"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y"
+                              ]
+                            }
+                          ]
+                        },
+                        "overflow": {
+                          "type": "string",
+                          "enum": [
+                            "clip",
+                            "allow",
+                            "warn"
+                          ]
+                        },
+                        "fill": {
+                          "type": "string"
+                        },
+                        "stroke": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "label": {
+                      "type": "object",
+                      "properties": {
+                        "fontFamily": {
+                          "type": "string"
+                        },
+                        "scale": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 5
+                        },
+                        "color": {
+                          "type": "string"
+                        },
+                        "offset": {
+                          "type": "object",
+                          "properties": {
+                            "dx": {
+                              "type": "number"
+                            },
+                            "dy": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "dx",
+                            "dy"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "override": {
+                  "type": "object",
+                  "properties": {
+                    "box": {
+                      "type": "object",
+                      "properties": {
+                        "position": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "top-left",
+                                "top-right",
+                                "bottom-left",
+                                "bottom-right",
+                                "auto"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y"
+                              ]
+                            }
+                          ]
+                        },
+                        "overflow": {
+                          "type": "string",
+                          "enum": [
+                            "clip",
+                            "allow",
+                            "warn"
+                          ]
+                        },
+                        "fill": {
+                          "type": "string"
+                        },
+                        "stroke": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "label": {
+                      "type": "object",
+                      "properties": {
+                        "fontFamily": {
+                          "type": "string"
+                        },
+                        "scale": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 5
+                        },
+                        "color": {
+                          "type": "string"
+                        },
+                        "offset": {
+                          "type": "object",
+                          "properties": {
+                            "dx": {
+                              "type": "number"
+                            },
+                            "dy": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "dx",
+                            "dy"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "background": {
+              "type": "object",
+              "properties": {
+                "canvas": {
+                  "type": "object",
+                  "properties": {
+                    "default": {
+                      "type": "object",
+                      "properties": {
+                        "width": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 10000
+                        },
+                        "height": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 10000
+                        },
+                        "evolutionRange": {
+                          "type": "array",
+                          "prefixItems": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            }
+                          ]
+                        },
+                        "visibilityRange": {
+                          "type": "array",
+                          "prefixItems": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            }
+                          ]
+                        },
+                        "fill": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "override": {
+                      "type": "object",
+                      "properties": {
+                        "width": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 10000
+                        },
+                        "height": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 10000
+                        },
+                        "evolutionRange": {
+                          "type": "array",
+                          "prefixItems": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            }
+                          ]
+                        },
+                        "visibilityRange": {
+                          "type": "array",
+                          "prefixItems": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            }
+                          ]
+                        },
+                        "fill": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "axisEvolution": {
+                  "type": "object",
+                  "properties": {
+                    "default": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "label": {
+                          "type": "object",
+                          "properties": {
+                            "fontFamily": {
+                              "type": "string"
+                            },
+                            "scale": {
+                              "type": "number",
+                              "exclusiveMinimum": 0,
+                              "maximum": 5
+                            },
+                            "color": {
+                              "type": "string"
+                            },
+                            "offset": {
+                              "type": "object",
+                              "properties": {
+                                "dx": {
+                                  "type": "number"
+                                },
+                                "dy": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "dx",
+                                "dy"
+                              ]
+                            },
+                            "text": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "override": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "label": {
+                          "type": "object",
+                          "properties": {
+                            "fontFamily": {
+                              "type": "string"
+                            },
+                            "scale": {
+                              "type": "number",
+                              "exclusiveMinimum": 0,
+                              "maximum": 5
+                            },
+                            "color": {
+                              "type": "string"
+                            },
+                            "offset": {
+                              "type": "object",
+                              "properties": {
+                                "dx": {
+                                  "type": "number"
+                                },
+                                "dy": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "dx",
+                                "dy"
+                              ]
+                            },
+                            "text": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "axisValueChain": {
+                  "type": "object",
+                  "properties": {
+                    "default": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "label": {
+                          "type": "object",
+                          "properties": {
+                            "fontFamily": {
+                              "type": "string"
+                            },
+                            "scale": {
+                              "type": "number",
+                              "exclusiveMinimum": 0,
+                              "maximum": 5
+                            },
+                            "color": {
+                              "type": "string"
+                            },
+                            "offset": {
+                              "type": "object",
+                              "properties": {
+                                "dx": {
+                                  "type": "number"
+                                },
+                                "dy": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "dx",
+                                "dy"
+                              ]
+                            },
+                            "text": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "override": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "label": {
+                          "type": "object",
+                          "properties": {
+                            "fontFamily": {
+                              "type": "string"
+                            },
+                            "scale": {
+                              "type": "number",
+                              "exclusiveMinimum": 0,
+                              "maximum": 5
+                            },
+                            "color": {
+                              "type": "string"
+                            },
+                            "offset": {
+                              "type": "object",
+                              "properties": {
+                                "dx": {
+                                  "type": "number"
+                                },
+                                "dy": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "dx",
+                                "dy"
+                              ]
+                            },
+                            "text": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "phases": {
+                  "type": "object",
+                  "properties": {
+                    "default": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "labels": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "fontFamily": {
+                                "type": "string"
+                              },
+                              "scale": {
+                                "type": "number",
+                                "exclusiveMinimum": 0,
+                                "maximum": 5
+                              },
+                              "color": {
+                                "type": "string"
+                              },
+                              "offset": {
+                                "type": "object",
+                                "properties": {
+                                  "dx": {
+                                    "type": "number"
+                                  },
+                                  "dy": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "dx",
+                                  "dy"
+                                ]
+                              },
+                              "text": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "override": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "labels": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "fontFamily": {
+                                "type": "string"
+                              },
+                              "scale": {
+                                "type": "number",
+                                "exclusiveMinimum": 0,
+                                "maximum": 5
+                              },
+                              "color": {
+                                "type": "string"
+                              },
+                              "offset": {
+                                "type": "object",
+                                "properties": {
+                                  "dx": {
+                                    "type": "number"
+                                  },
+                                  "dy": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "dx",
+                                  "dy"
+                                ]
+                              },
+                              "text": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "nodes": {
+              "type": "object",
+              "properties": {
+                "default": {
+                  "type": "object",
+                  "properties": {
+                    "default": {
+                      "type": "object",
+                      "properties": {
+                        "symbol": {
+                          "type": "object",
+                          "properties": {
+                            "shape": {
+                              "type": "string"
+                            },
+                            "radius": {
+                              "type": "number",
+                              "exclusiveMinimum": 0,
+                              "maximum": 50
+                            },
+                            "fill": {
+                              "type": "string"
+                            },
+                            "stroke": {
+                              "type": "string"
+                            },
+                            "strokeWidth": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            }
+                          }
+                        },
+                        "label": {
+                          "type": "object",
+                          "properties": {
+                            "fontFamily": {
+                              "type": "string"
+                            },
+                            "scale": {
+                              "type": "number",
+                              "exclusiveMinimum": 0,
+                              "maximum": 5
+                            },
+                            "color": {
+                              "type": "string"
+                            },
+                            "offset": {
+                              "type": "object",
+                              "properties": {
+                                "dx": {
+                                  "type": "number"
+                                },
+                                "dy": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "dx",
+                                "dy"
+                              ]
+                            },
+                            "text": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "override": {
+                      "type": "object",
+                      "properties": {
+                        "symbol": {
+                          "type": "object",
+                          "properties": {
+                            "shape": {
+                              "type": "string"
+                            },
+                            "radius": {
+                              "type": "number",
+                              "exclusiveMinimum": 0,
+                              "maximum": 50
+                            },
+                            "fill": {
+                              "type": "string"
+                            },
+                            "stroke": {
+                              "type": "string"
+                            },
+                            "strokeWidth": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            }
+                          }
+                        },
+                        "label": {
+                          "type": "object",
+                          "properties": {
+                            "fontFamily": {
+                              "type": "string"
+                            },
+                            "scale": {
+                              "type": "number",
+                              "exclusiveMinimum": 0,
+                              "maximum": 5
+                            },
+                            "color": {
+                              "type": "string"
+                            },
+                            "offset": {
+                              "type": "object",
+                              "properties": {
+                                "dx": {
+                                  "type": "number"
+                                },
+                                "dy": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "dx",
+                                "dy"
+                              ]
+                            },
+                            "text": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "byType": {
+                  "type": "object",
+                  "properties": {
+                    "anchor": {
+                      "type": "object",
+                      "properties": {
+                        "default": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "override": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "component": {
+                      "type": "object",
+                      "properties": {
+                        "default": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "override": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "pipeline": {
+                      "type": "object",
+                      "properties": {
+                        "default": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "override": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "bySubtype": {
+                  "type": "object",
+                  "properties": {
+                    "userNeed": {
+                      "type": "object",
+                      "properties": {
+                        "default": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "override": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "market": {
+                      "type": "object",
+                      "properties": {
+                        "default": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "override": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "ecosystem": {
+                      "type": "object",
+                      "properties": {
+                        "default": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "override": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "solution": {
+                      "type": "object",
+                      "properties": {
+                        "default": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "override": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "functional": {
+                      "type": "object",
+                      "properties": {
+                        "default": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "override": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "supplier": {
+                      "type": "object",
+                      "properties": {
+                        "default": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "override": {
+                          "type": "object",
+                          "properties": {
+                            "symbol": {
+                              "type": "object",
+                              "properties": {
+                                "shape": {
+                                  "type": "string"
+                                },
+                                "radius": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 50
+                                },
+                                "fill": {
+                                  "type": "string"
+                                },
+                                "stroke": {
+                                  "type": "string"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 8
+                                }
+                              }
+                            },
+                            "label": {
+                              "type": "object",
+                              "properties": {
+                                "fontFamily": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 5
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": "object",
+                                  "properties": {
+                                    "dx": {
+                                      "type": "number"
+                                    },
+                                    "dy": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "dx",
+                                    "dy"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "relations": {
+              "type": "object",
+              "properties": {
+                "dependency": {
+                  "type": "object",
+                  "properties": {
+                    "default": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "override": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "flow": {
+                  "type": "object",
+                  "properties": {
+                    "default": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "label": {
+                          "type": "object",
+                          "properties": {
+                            "fontFamily": {
+                              "type": "string"
+                            },
+                            "scale": {
+                              "type": "number",
+                              "exclusiveMinimum": 0,
+                              "maximum": 5
+                            },
+                            "color": {
+                              "type": "string"
+                            },
+                            "offset": {
+                              "type": "object",
+                              "properties": {
+                                "dx": {
+                                  "type": "number"
+                                },
+                                "dy": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "dx",
+                                "dy"
+                              ]
+                            },
+                            "text": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "override": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "label": {
+                          "type": "object",
+                          "properties": {
+                            "fontFamily": {
+                              "type": "string"
+                            },
+                            "scale": {
+                              "type": "number",
+                              "exclusiveMinimum": 0,
+                              "maximum": 5
+                            },
+                            "color": {
+                              "type": "string"
+                            },
+                            "offset": {
+                              "type": "object",
+                              "properties": {
+                                "dx": {
+                                  "type": "number"
+                                },
+                                "dy": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "dx",
+                                "dy"
+                              ]
+                            },
+                            "text": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "constraint": {
+                  "type": "object",
+                  "properties": {
+                    "default": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "override": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "movement": {
+              "type": "object",
+              "properties": {
+                "default": {
+                  "type": "object",
+                  "properties": {
+                    "default": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "override": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "natural": {
+                  "type": "object",
+                  "properties": {
+                    "default": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "override": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "ecosystem": {
+                  "type": "object",
+                  "properties": {
+                    "default": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "override": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "forced": {
+                  "type": "object",
+                  "properties": {
+                    "default": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "override": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "late": {
+                  "type": "object",
+                  "properties": {
+                    "default": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "override": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "object",
+                          "properties": {
+                            "color": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 8
+                            },
+                            "dash": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "decorators": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "default": {
+                        "type": "object",
+                        "properties": {
+                          "color": {
+                            "type": "string"
+                          },
+                          "legend": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "override": {
+                        "type": "object",
+                        "properties": {
+                          "color": {
+                            "type": "string"
+                          },
+                          "legend": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "configIntent": {
+          "type": "object",
+          "properties": {
+            "staticExport": {
+              "type": "boolean"
+            },
+            "noTemporalDiff": {
+              "type": "boolean"
+            },
+            "noInteraction": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "title",
+    "components",
+    "relations"
+  ]
+}
