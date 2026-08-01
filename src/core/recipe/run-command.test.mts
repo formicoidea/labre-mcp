@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { StrategyRegistry } from '#core/registry/strategy-registry.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
 import { runCommand } from './recipe-runner.mjs';
-import { OwmParserStrategy } from '#frameworks/wardley/chain/read/map/owm-parser-strategy.mjs';
+import { RenderWardleyMapOwmParseDslStrategy } from '#frameworks/render/wardley-map/owm/parse/dsl.mjs';
 
 const context: RequestContext = {
   projectId: 'test',
@@ -15,7 +15,7 @@ const context: RequestContext = {
 describe('runCommand', () => {
   it('runs a single real strategy and returns a populated envelope', async () => {
     const registry = new StrategyRegistry();
-    registry.register(OwmParserStrategy.method, OwmParserStrategy);
+    registry.register(RenderWardleyMapOwmParseDslStrategy.method, RenderWardleyMapOwmParseDslStrategy);
 
     const outcome = await runCommand({
       command: 'render:wardley-map:owm:parse:dsl',
@@ -25,9 +25,12 @@ describe('runCommand', () => {
     });
 
     // The strategy's StrategyResult is written to $.result on the AST.
-    const written = outcome.ast.result as { result: { title: string; componentCount: number } };
-    assert.equal(typeof written.result.title, 'string');
-    assert.ok(written.result.componentCount >= 1);
+    const written = outcome.ast.result as {
+      result: { parsed: boolean; map: { title: string; components: unknown[] } };
+    };
+    assert.equal(written.result.parsed, true);
+    assert.equal(written.result.map.title, 'Test');
+    assert.ok(written.result.map.components.length >= 1);
 
     // The envelope is assembled from the strategy's signals/insights + a trace entry.
     assert.ok(outcome.envelope.signals.length >= 1);

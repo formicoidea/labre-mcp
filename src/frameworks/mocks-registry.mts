@@ -75,7 +75,6 @@ import { MockWardleyIterationDecideNextStepDefaultStrategy } from './wardley/ite
 import { MockWardleyIterationActNextStepDefaultStrategy } from './wardley/iteration/act/next-step/default.mock-strategy.mjs';
 // purpose generate + audit-purpose-quality promoted to real strategies (registered in iteration/registry).
 import { MockRenderWardleyMapOwmConfigDslStrategy } from './render/wardley-map/owm/config/dsl.mock-strategy.mjs';
-import { MockRenderWardleyMapImageParseSvgStrategy } from './render/wardley-map/image/parse/svg.mock-strategy.mjs';
 import { MockRenderWardleyMapImageParsePngStrategy } from './render/wardley-map/image/parse/png.mock-strategy.mjs';
 import { MockRenderWardleyMapImageEmitPngStrategy } from './render/wardley-map/image/emit/png.mock-strategy.mjs';
 import { MockRenderWardleyMapImageConfigSvgStrategy } from './render/wardley-map/image/config/svg.mock-strategy.mjs';
@@ -141,7 +140,6 @@ export function registerMocks(registry: StrategyRegistry<BaseStrategy>): void {
   registry.register(MockWardleyIterationDecideNextStepDefaultStrategy.method, MockWardleyIterationDecideNextStepDefaultStrategy);
   registry.register(MockWardleyIterationActNextStepDefaultStrategy.method, MockWardleyIterationActNextStepDefaultStrategy);
   registry.register(MockRenderWardleyMapOwmConfigDslStrategy.method, MockRenderWardleyMapOwmConfigDslStrategy);
-  registry.register(MockRenderWardleyMapImageParseSvgStrategy.method, MockRenderWardleyMapImageParseSvgStrategy);
   registry.register(MockRenderWardleyMapImageParsePngStrategy.method, MockRenderWardleyMapImageParsePngStrategy);
   registry.register(MockRenderWardleyMapImageEmitPngStrategy.method, MockRenderWardleyMapImageEmitPngStrategy);
   registry.register(MockRenderWardleyMapImageConfigSvgStrategy.method, MockRenderWardleyMapImageConfigSvgStrategy);
