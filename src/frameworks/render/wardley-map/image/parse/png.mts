@@ -195,6 +195,18 @@ export interface ProjectionOutcome {
  * Intermediate → canonical WardleyMap. Pure and total: every rejection is a
  * warning, the function never throws.
  */
+/**
+ * Canonical `color` is resolved by the renderer as hex-or-Tailwind-name, with a
+ * BLACK fallback for anything else — so a disobedient model answering "red"
+ * would silently repaint the component black. The prompt demands `#rrggbb`;
+ * this guard enforces it deterministically, dropping (with a warning) instead
+ * of forwarding a value the renderer would misread. Follow-up: color does not
+ * need a model at all — once the dot's pixel location is known, sampling the
+ * PNG pixel is exact and deterministic; this guard is where that sampler will
+ * plug in.
+ */
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
 export function projectToWardleyMap(extraction: VisionExtraction): ProjectionOutcome {
   const warnings: string[] = [];
 
@@ -204,6 +216,11 @@ export function projectToWardleyMap(extraction: VisionExtraction): ProjectionOut
   for (const c of extraction.components) {
     if (c.pipeline !== undefined && c.type === 'anchor') {
       warnings.push(`pipeline band on anchor "${c.name}" ignored (anchors cannot carry pipelineGeometry)`);
+    }
+    if (c.color !== undefined && !HEX_COLOR.test(c.color)) {
+      warnings.push(
+        `color "${c.color}" on "${c.name}" dropped: not #rrggbb — the renderer would repaint it black`,
+      );
     }
   }
 
@@ -228,7 +245,7 @@ export function projectToWardleyMap(extraction: VisionExtraction): ProjectionOut
       evolution: { scalar: c.evolution },
       visibility: { scalar: c.visibility },
     },
-    ...(c.color !== undefined ? { color: c.color } : {}),
+    ...(c.color !== undefined && HEX_COLOR.test(c.color) ? { color: c.color } : {}),
     ...(c.inertia === true ? { inertia: true } : {}),
     // A movement arrow moves along X: the target keeps the component's row.
     // The renderer draws the inertia wall from the TARGET's flag — mirror it.
