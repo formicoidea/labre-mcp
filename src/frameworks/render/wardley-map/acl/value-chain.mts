@@ -27,22 +27,7 @@ import type {
   OwmComponentType,
 } from '#types/value-chain.mjs';
 import type { CapabilityNature } from '#schemas/inputs.schema.mjs';
-
-// Deterministic id from a name, unique within the map (`-2`, `-3`, … on clash).
-function buildIdMap(names: string[]): Map<string, string> {
-  const used = new Set<string>();
-  const byName = new Map<string, string>();
-  for (const name of names) {
-    const base =
-      name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'node';
-    let id = base;
-    let n = 2;
-    while (used.has(id)) id = `${base}-${n++}`;
-    used.add(id);
-    byName.set(name, id);
-  }
-  return byName;
-}
+import { buildIdMap, flipVisibility } from '#lib/owm/canonical-ids.mjs';
 
 // PositionedValueChain `type` (OWM enum) → renderer {type, subtype?}.
 // market/ecosystem are renderer SUBTYPES of a `component`.
@@ -69,13 +54,6 @@ function fromRendererType(type: string, subtype?: string): { owmType: OwmCompone
 
 // CapabilityNature ⊂ renderer NatureEnum, except 'none' (omitted).
 const NATURE_PASSTHROUGH = new Set(['activity', 'practice', 'data', 'knowledge']);
-
-// Reconcile the inverted visibility conventions (see file header). Self-inverse,
-// so the same function serves both projection directions.
-function flipVisibility(v: number): number {
-  const flipped = 1 - v;
-  return flipped < 0 ? 0 : flipped > 1 ? 1 : flipped;
-}
 
 export function fromPositionedValueChain(chain: PositionedValueChain): WardleyMap {
   const idByName = buildIdMap(chain.components.map((c) => c.name));

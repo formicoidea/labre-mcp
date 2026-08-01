@@ -23,6 +23,7 @@ import { BaseStrategy, type StrategyResult } from '#core/ast/base-strategy.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
 import { WardleyMapSchema, type WardleyMap } from '#schemas/wardley-map.schema.mjs';
 import { parse as parseOwm, type UnifiedWardleyMap } from '#lib/vendor/cli-owm/index.mjs';
+import { flipVisibility, uniqueSlug } from '#lib/owm/canonical-ids.mjs';
 
 const METHOD_ID = 'render:wardley-map:owm:parse:dsl';
 
@@ -39,13 +40,6 @@ export interface RenderWardleyMapOwmParseDslResult {
 
 /** One element as the vendored parser returns it (anchors and components alike). */
 type OwmElement = UnifiedWardleyMap['components'][number];
-
-// VISIBILITY CONVENTION — see the emit strategy's header: OWM puts 1 at the top
-// of the value chain, the canonical schema puts 0 there. Self-inverse flip.
-function flipVisibility(owmVisibility: number): number {
-  const flipped = 1 - owmVisibility;
-  return flipped < 0 ? 0 : flipped > 1 ? 1 : flipped;
-}
 
 function clamp01(n: number): number {
   if (!Number.isFinite(n)) return 0;
@@ -65,13 +59,6 @@ function decodeComponentName(owmName: string): string {
     name = name.slice(1, -1);
   }
   return name.replace(/\s*\\n\s*/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-/** Deterministic slug id, unique within the map (`-2`, `-3`, … on clash). */
-function slugify(name: string): string {
-  return (
-    name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'node'
-  );
 }
 
 // Keywords the vendored Converter has NO extraction strategy for — the lines are
@@ -117,10 +104,7 @@ function toCanonicalMap(owm: UnifiedWardleyMap, dsl: string, warnings: string[])
   const idByOwmName = new Map<string, string>();
   const components = elements.map((el) => {
     const name = decodeComponentName(el.name ?? '');
-    const base = slugify(name);
-    let id = base;
-    for (let n = 2; usedIds.has(id); n++) id = `${base}-${n}`;
-    usedIds.add(id);
+    const id = uniqueSlug(name, usedIds);
 
     // Links reference components by their RAW (formatted) declaration spelling.
     if (idByOwmName.has(el.name)) {
