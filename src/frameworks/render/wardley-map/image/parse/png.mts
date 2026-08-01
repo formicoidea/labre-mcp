@@ -45,10 +45,12 @@
 //   - notes, annotations and flow labels are not extracted; the model is told
 //     to ignore them. Colors, inertia walls, movement (evolve) arrows and
 //     pipeline bands ARE extracted when clearly drawn (optional fields).
-//     Colors are additionally ARBITRATED BY THE PIXELS: the model reports the
-//     dot's px/py alongside `color`, and the deterministic stage samples the
-//     decoded PNG there (see `sampleDotColor`) — confirming, replacing or
-//     vetoing what the model declared.
+//     Colors are additionally ARBITRATED BY THE PIXELS: the deterministic
+//     stage samples the decoded PNG at the dot's location — confirming,
+//     replacing or vetoing what the model declared. The location itself is
+//     COMPUTED from the extracted scalars whenever the image follows our own
+//     renderer's geometry, because the model's px/py estimate is unreliable
+//     (see `sampleDotColor` and the block comment above it).
 //   - subtypes (userNeed / market / ecosystem / …) and natures are not
 //     recovered: everything is `component` or `anchor`.
 //   - relation types (DependsOn / Flow / Constraint) are not recovered; the
@@ -63,7 +65,7 @@ import { z } from 'zod';
 import { BaseStrategy, type StrategyResult } from '#core/ast/base-strategy.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
 import { WardleyMapSchema, type WardleyMap } from '#schemas/wardley-map.schema.mjs';
-import { validateComponent } from '@formicoidea/wardley-map-renderer';
+import { computeMapGeometry, validateComponent } from '@formicoidea/wardley-map-renderer';
 import type { LLMCall } from '#types/llm.mjs';
 import { getStrategyVisionLLM } from '#lib/llm/registry.mjs';
 import { uniqueSlug } from '#lib/owm/canonical-ids.mjs';
@@ -225,17 +227,36 @@ const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 // A blended pixel alone cannot be inverted (its coverage is unknown), but
 // every stroke pixel is `coverage·color + (1−coverage)·white`, so a DECLARED
 // color CAN be verified against it. Hence the division of labour:
-//   - the model detects that a non-default color exists and where the dot is;
+//   - the model detects that a non-default color exists (and roughly where the
+//     dot is, for images we did not render ourselves);
 //   - the pixels then either CONFIRM the declared value (kept verbatim — this
 //     is what makes the round-trip oracle exact), VETO a hallucination (the
 //     dot is default-styled → no color field), or, on divergence, supply the
 //     most saturated tint as the best available estimate (sampled wins).
 // Dots that are filled with a solid color (maps drawn by other tools) hit the
 // same path with coverage 1, i.e. exact confirmation or exact replacement.
+//
+// WHERE to sample is a problem of its own: real vision models localise a dot
+// ~130px off, far outside any sane window. Two stages:
+//   A. CALIBRATED (our own renders). `computeMapGeometry` on the decoded
+//      canvas size predicts each dot's centre from the extracted scalars — the
+//      model's px/py is ignored entirely. Achromatic INK at the predicted spot
+//      is a default-styled dot drawn by us → trusted veto; a BLANK spot means
+//      the image does not follow our geometry → stage B.
+//   B. FOREIGN images. The model's px/py, with a progressively widened window
+//      (12 → 32 → 64) absorbing its localisation error; the veto only fires
+//      when even the widest window stays achromatic.
 
-/** Half-side of the square sampling window. Wide enough to absorb the model's
+/** Half-side of the square sampling window. Wide enough to absorb small
  *  localisation error (a default dot's ring sits at radius 5 + 1px of AA). */
 const SAMPLE_RADIUS = 12;
+/** Widening steps for the model's px/py (stage B): stop at the first window
+ *  where something chromatic (or a confirming blend) shows up. Wider passes
+ *  rescan the inner pixels — cheap, and the verdict is monotonic. */
+const WIDE_RADII = [SAMPLE_RADIUS, 32, 64] as const;
+/** A pixel counts as INK when any channel sits this far below pure white —
+ *  catches black strokes, greys and label glyphs alike. */
+const INK_TOL = 24;
 /** Minimum chroma (max−min channel) for a pixel to count as colored: the
  *  default stroke is BLACK and anti-aliases into pure greys (chroma 0), which
  *  must never become a `color` field. */
@@ -250,7 +271,9 @@ const CHANNEL_TOL = 12;
 type DotColorSample =
   | { kind: 'confirmed' }
   | { kind: 'divergent'; color: string }
-  | { kind: 'default' }
+  /** Achromatic window; `inked` distinguishes a default-styled dot (something
+   *  IS drawn there) from a blank canvas (nothing there at all). */
+  | { kind: 'default'; inked: boolean }
   /** px/py landed entirely outside the image — nothing to arbitrate with. */
   | { kind: 'blind' };
 
@@ -260,6 +283,7 @@ function sampleDotColor(
   px: number,
   py: number,
   declared: string | null,
+  radius: number = SAMPLE_RADIUS,
 ): DotColorSample {
   const cx = Math.round(px);
   const cy = Math.round(py);
@@ -274,17 +298,19 @@ function sampleDotColor(
   const verifiable = dL !== null && dL[k] >= 16;
 
   let sampled = 0;
+  let inked = false;
   let bestBlend = 0;
   let bestChroma = 0;
   let bestPixel: [number, number, number] = [255, 255, 255];
-  for (let dy = -SAMPLE_RADIUS; dy <= SAMPLE_RADIUS; dy++) {
-    for (let dx = -SAMPLE_RADIUS; dx <= SAMPLE_RADIUS; dx++) {
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
       const x = cx + dx;
       const y = cy + dy;
       if (x < 0 || y < 0 || x >= png.width || y >= png.height) continue;
       const [r, g, b, a] = pixelAt(png, x, y);
       if (a < 200) continue; // our renders are opaque; skip transparent fringe
       sampled++;
+      if (Math.min(r, g, b) <= 255 - INK_TOL) inked = true;
       const chroma = Math.max(r, g, b) - Math.min(r, g, b);
       if (chroma > bestChroma) {
         bestChroma = chroma;
@@ -311,7 +337,49 @@ function sampleDotColor(
     const hex = `#${bestPixel.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
     return { kind: 'divergent', color: hex };
   }
-  return { kind: 'default' };
+  return { kind: 'default', inked };
+}
+
+/** Stage B sampling: widen the window step by step, stopping as soon as the
+ *  pixels yield an actual verdict (confirmation or chroma). */
+function sampleDotColorWide(
+  png: DecodedPng,
+  px: number,
+  py: number,
+  declared: string | null,
+): DotColorSample {
+  let last: DotColorSample = { kind: 'blind' };
+  for (const radius of WIDE_RADII) {
+    last = sampleDotColor(png, px, py, declared, radius);
+    if (last.kind === 'confirmed' || last.kind === 'divergent') return last;
+  }
+  return last;
+}
+
+/** Empty map used to interrogate the renderer's own projection — the same
+ *  calibration trick as `parse:svg`: with no component, `computeMapGeometry`
+ *  only resolves margins + plot area, i.e. exactly the coordinate system that
+ *  predicts where OUR renders draw each dot. */
+const CALIBRATION_MAP: WardleyMap = WardleyMapSchema.parse({
+  title: '',
+  components: [],
+  relations: [],
+});
+
+interface CalibratedGeometry {
+  evoToX: (evolution: number) => number;
+  visToY: (visibility: number) => number;
+}
+
+/** Scalars → pixel converters for a canvas of this size, or null when the
+ *  renderer cannot lay such a canvas out at all. */
+function tryCalibrateGeometry(width: number, height: number): CalibratedGeometry | null {
+  try {
+    const ctx = computeMapGeometry(CALIBRATION_MAP, { width, height });
+    return { evoToX: ctx.evoToX, visToY: ctx.visToY };
+  } catch {
+    return null;
+  }
 }
 
 export function projectToWardleyMap(
@@ -330,8 +398,11 @@ export function projectToWardleyMap(
   }
 
   // Resolve each component's color once: declared by the model, arbitrated by
-  // the pixels whenever the model also localised the dot (px/py) and the PNG
-  // was decodable. The pixel verdict wins over the declaration.
+  // the pixels whenever the PNG was decodable. The pixel verdict wins over the
+  // declaration. Sampling location: calibrated geometry first (stage A), the
+  // model's px/py as the foreign-image fallback (stage B) — see the block
+  // comment above `SAMPLE_RADIUS`.
+  const geometry = png !== null ? tryCalibrateGeometry(png.width, png.height) : null;
   const colors = extraction.components.map((c): string | undefined => {
     if (c.color === undefined) return undefined;
     const declared = HEX_COLOR.test(c.color) ? c.color : null;
@@ -341,31 +412,57 @@ export function projectToWardleyMap(
       );
       return undefined;
     };
+    // Turn a sample into a color decision. `final: false` (stage A) declines
+    // to conclude on a blank or blind window — the image is then simply not
+    // one of ours, and stage B gets its chance. `final: true` always decides.
+    const arbitrate = (
+      verdict: DotColorSample,
+      at: string,
+      final: boolean,
+    ): { color: string | undefined } | null => {
+      switch (verdict.kind) {
+        case 'confirmed':
+          return { color: declared ?? undefined };
+        case 'divergent':
+          warnings.push(
+            declared === null
+              ? `color "${c.color}" on "${c.name}" is not #rrggbb: replaced by ${verdict.color}, sampled at ${at}`
+              : `color on "${c.name}": declared ${declared} diverges from the pixels at ${at} — sampled ${verdict.color} wins`,
+          );
+          return { color: verdict.color };
+        case 'default':
+          // The calibrated probe only vetoes on INK (a default-styled dot we
+          // drew); an achromatic BLANK window there just means the image does
+          // not follow our geometry.
+          if (!final && !verdict.inked) return null;
+          warnings.push(
+            `color "${c.color}" on "${c.name}" dropped: the pixels at ${at} show a default-styled dot`,
+          );
+          return { color: undefined };
+        case 'blind':
+          if (!final) return null;
+          warnings.push(`color on "${c.name}" not sampled: px/py ${at} falls outside the image`);
+          return { color: declared ?? dropInvalid() };
+      }
+    };
+    if (png !== null && geometry !== null) {
+      const gx = geometry.evoToX(c.evolution);
+      const gy = geometry.visToY(c.visibility);
+      const resolved = arbitrate(
+        sampleDotColor(png, gx, gy, declared),
+        `(${Math.round(gx)}, ${Math.round(gy)})`,
+        false,
+      );
+      if (resolved !== null) return resolved.color;
+    }
     if (png === null || c.px === undefined || c.py === undefined) {
       return declared ?? dropInvalid();
     }
     const at = `(${Math.round(c.px)}, ${Math.round(c.py)})`;
-    const verdict = sampleDotColor(png, c.px, c.py, declared);
-    switch (verdict.kind) {
-      case 'confirmed':
-        // any-cast free: confirmed implies declared !== null (verifiable path).
-        return declared ?? undefined;
-      case 'divergent':
-        warnings.push(
-          declared === null
-            ? `color "${c.color}" on "${c.name}" is not #rrggbb: replaced by ${verdict.color}, sampled at ${at}`
-            : `color on "${c.name}": declared ${declared} diverges from the pixels at ${at} — sampled ${verdict.color} wins`,
-        );
-        return verdict.color;
-      case 'default':
-        warnings.push(
-          `color "${c.color}" on "${c.name}" dropped: the pixels at ${at} show a default-styled dot`,
-        );
-        return undefined;
-      case 'blind':
-        warnings.push(`color on "${c.name}" not sampled: px/py ${at} falls outside the image`);
-        return declared ?? dropInvalid();
-    }
+    const resolved = arbitrate(sampleDotColorWide(png, c.px, c.py, declared), at, true);
+    // `final: true` always resolves; the fallback is unreachable but keeps the
+    // expression total without a non-null assertion.
+    return resolved !== null ? resolved.color : (declared ?? dropInvalid());
   });
 
   const seenNames = new Set<string>();
@@ -583,7 +680,9 @@ export class RenderWardleyMapImageParsePngStrategy extends BaseStrategy<
           // A failure is a degradation (fall back to the declared colors),
           // never a crash: wild images may use any PNG format they like.
           let decoded: DecodedPng | null = null;
-          if (extraction.components.some((c) => c.color !== undefined && c.px !== undefined && c.py !== undefined)) {
+          // px/py is NOT required: on our own renders the sampling location is
+          // computed from the scalars (calibrated geometry, stage A).
+          if (extraction.components.some((c) => c.color !== undefined)) {
             try {
               decoded = decodePng(Buffer.from(pngBase64, 'base64'));
             } catch (err) {

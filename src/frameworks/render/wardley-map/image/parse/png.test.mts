@@ -364,6 +364,19 @@ describe('projectToWardleyMap · color sampling', () => {
     assert.match(warnings[0], /"green" .* not #rrggbb: replaced by #00aa55/);
   });
 
+  it('widens the window progressively on a foreign image before vetoing', () => {
+    // Foreign geometry: nothing at the calibrated spot, and the dot sits 20px
+    // away from the model's px/py — outside the tight 12px window, inside the
+    // 32px one. The old single-window sampler would have falsely vetoed this.
+    const png = syntheticPng(200, 200, disk([0xe0, 0x52, 0x52], 150, 60));
+    const { map, warnings } = projectToWardleyMap(
+      { title: '', components: [dotComponent({ color: '#e05252', px: 130, py: 60 })], relations: [] },
+      png,
+    );
+    assert.equal(map!.components[0].color, '#e05252');
+    assert.deepEqual(warnings, []);
+  });
+
   it('keeps the declared color when px/py fall outside the image', () => {
     const png = syntheticPng(40, 40, () => null);
     const { map, warnings } = projectToWardleyMap(
@@ -432,6 +445,18 @@ describe('pixel-color oracle: emit:png → sample → exact color round-trip', (
     const { png, centers } = await renderOnce();
     const k = centers.get('kettle')!;
     const { map, warnings } = projectToWardleyMap(kettleExtraction(k.x + 4, k.y - 3), png);
+    assert.equal(map!.components[0].color, '#e05252');
+    assert.deepEqual(warnings, []);
+  });
+
+  it('stays exact when the model mislocates the dot by 100px (calibrated geometry)', async () => {
+    // Real vision models land ~130px off: far outside any sane sampling
+    // window. On OUR renders the sampling location is recomputed from the
+    // extracted scalars through the renderer's own geometry, so the model's
+    // px/py is ignored entirely — no veto, no divergence, exact round-trip.
+    const { png, centers } = await renderOnce();
+    const k = centers.get('kettle')!;
+    const { map, warnings } = projectToWardleyMap(kettleExtraction(k.x + 100, k.y - 100), png);
     assert.equal(map!.components[0].color, '#e05252');
     assert.deepEqual(warnings, []);
   });
