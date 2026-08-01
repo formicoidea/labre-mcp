@@ -45,6 +45,10 @@
 //   - notes, annotations and flow labels are not extracted; the model is told
 //     to ignore them. Colors, inertia walls, movement (evolve) arrows and
 //     pipeline bands ARE extracted when clearly drawn (optional fields).
+//     Colors are additionally ARBITRATED BY THE PIXELS: the model reports the
+//     dot's px/py alongside `color`, and the deterministic stage samples the
+//     decoded PNG there (see `sampleDotColor`) — confirming, replacing or
+//     vetoing what the model declared.
 //   - subtypes (userNeed / market / ecosystem / …) and natures are not
 //     recovered: everything is `component` or `anchor`.
 //   - relation types (DependsOn / Flow / Constraint) are not recovered; the
@@ -65,6 +69,7 @@ import { getStrategyVisionLLM } from '#lib/llm/registry.mjs';
 import { uniqueSlug } from '#lib/owm/canonical-ids.mjs';
 import { getPrompt } from '#lib/prompts/registry.mjs';
 import { tryDegradeAmbient } from '#lib/degradation/index.mjs';
+import { decodePng, pixelAt, type DecodedPng } from '#lib/png/decode.mjs';
 
 const METHOD_ID = 'render:wardley-map:image:parse:png';
 
@@ -107,6 +112,11 @@ const VisionComponentSchema = z.object({
   evolution: z.number().min(0).max(1),
   visibility: z.number().min(0).max(1),
   color: z.string().min(1).optional(),
+  /** Approximate pixel position of the dot's CENTRE in the source image,
+   *  requested alongside `color`: the model only localises the dot, the exact
+   *  color value is then read from the pixels (see `sampleDotColor`). */
+  px: z.number().min(0).optional(),
+  py: z.number().min(0).optional(),
   inertia: z.boolean().optional(),
   evolvesTo: z.number().min(0).max(1).optional(),
   pipeline: z
@@ -200,14 +210,114 @@ export interface ProjectionOutcome {
  * BLACK fallback for anything else — so a disobedient model answering "red"
  * would silently repaint the component black. The prompt demands `#rrggbb`;
  * this guard enforces it deterministically, dropping (with a warning) instead
- * of forwarding a value the renderer would misread. Follow-up: color does not
- * need a model at all — once the dot's pixel location is known, sampling the
- * PNG pixel is exact and deterministic; this guard is where that sampler will
- * plug in.
+ * of forwarding a value the renderer would misread.
  */
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
-export function projectToWardleyMap(extraction: VisionExtraction): ProjectionOutcome {
+// ── Deterministic color sampling ───────────────────────────────────────────
+//
+// Color does not need a model: once the dot's pixel location is known (the
+// optional `px`/`py` the model reports alongside `color`), the PNG pixels are
+// ground truth. The subtlety is HOW our renderer paints a colored component:
+// a WHITE-filled circle with a 1px colored STROKE, fully anti-aliased — NO
+// pixel carries the pure color (measured on a #e05252 stroke: only white-
+// blended tints such as #ec9797 exist, zero exact pixels in the whole image).
+// A blended pixel alone cannot be inverted (its coverage is unknown), but
+// every stroke pixel is `coverage·color + (1−coverage)·white`, so a DECLARED
+// color CAN be verified against it. Hence the division of labour:
+//   - the model detects that a non-default color exists and where the dot is;
+//   - the pixels then either CONFIRM the declared value (kept verbatim — this
+//     is what makes the round-trip oracle exact), VETO a hallucination (the
+//     dot is default-styled → no color field), or, on divergence, supply the
+//     most saturated tint as the best available estimate (sampled wins).
+// Dots that are filled with a solid color (maps drawn by other tools) hit the
+// same path with coverage 1, i.e. exact confirmation or exact replacement.
+
+/** Half-side of the square sampling window. Wide enough to absorb the model's
+ *  localisation error (a default dot's ring sits at radius 5 + 1px of AA). */
+const SAMPLE_RADIUS = 12;
+/** Minimum chroma (max−min channel) for a pixel to count as colored: the
+ *  default stroke is BLACK and anti-aliases into pure greys (chroma 0), which
+ *  must never become a `color` field. */
+const MIN_CHROMA = 24;
+/** Minimum white-blend coverage for a declared color to count as confirmed —
+ *  a 1px stroke peaks around 0.75 at the dot's cardinal points. */
+const MIN_BLEND = 0.35;
+/** Per-channel tolerance of the blend check (rounding plus resvg's slightly
+ *  non-linear anti-aliasing, measured within ~5% per channel). */
+const CHANNEL_TOL = 12;
+
+type DotColorSample =
+  | { kind: 'confirmed' }
+  | { kind: 'divergent'; color: string }
+  | { kind: 'default' }
+  /** px/py landed entirely outside the image — nothing to arbitrate with. */
+  | { kind: 'blind' };
+
+/** `declared` must be a valid `#rrggbb` or null (pre-checked by the caller). */
+function sampleDotColor(
+  png: DecodedPng,
+  px: number,
+  py: number,
+  declared: string | null,
+): DotColorSample {
+  const cx = Math.round(px);
+  const cy = Math.round(py);
+  // Declared color as per-channel distance from white; the most informative
+  // channel is the farthest one. A near-white declaration is unverifiable
+  // (every light pixel would "confirm" it) and falls through to the chroma path.
+  const dL =
+    declared !== null
+      ? ([1, 3, 5] as const).map((i) => 255 - parseInt(declared.slice(i, i + 2), 16))
+      : null;
+  const k = dL !== null ? dL.indexOf(Math.max(...dL)) : 0;
+  const verifiable = dL !== null && dL[k] >= 16;
+
+  let sampled = 0;
+  let bestBlend = 0;
+  let bestChroma = 0;
+  let bestPixel: [number, number, number] = [255, 255, 255];
+  for (let dy = -SAMPLE_RADIUS; dy <= SAMPLE_RADIUS; dy++) {
+    for (let dx = -SAMPLE_RADIUS; dx <= SAMPLE_RADIUS; dx++) {
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 0 || y < 0 || x >= png.width || y >= png.height) continue;
+      const [r, g, b, a] = pixelAt(png, x, y);
+      if (a < 200) continue; // our renders are opaque; skip transparent fringe
+      sampled++;
+      const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+      if (chroma > bestChroma) {
+        bestChroma = chroma;
+        bestPixel = [r, g, b];
+      }
+      if (!verifiable) continue;
+      const d = [255 - r, 255 - g, 255 - b];
+      // Coverage implied by the reference channel; > 1 means the pixel is
+      // darker than the declared color can explain (label glyphs, edges).
+      const blend = d[k] / dL[k];
+      if (blend < MIN_BLEND || blend > 1.06) continue;
+      if (d.every((dc, c) => Math.abs(dc - blend * dL[c]) <= CHANNEL_TOL)) {
+        bestBlend = Math.max(bestBlend, blend);
+      }
+    }
+  }
+
+  if (sampled === 0) return { kind: 'blind' };
+  if (verifiable && bestBlend >= MIN_BLEND) return { kind: 'confirmed' };
+  if (bestChroma >= MIN_CHROMA) {
+    // ponytail: the most saturated tint underestimates a 1px-stroked color
+    // (coverage < 1); exact only for solid-filled dots. Good enough for the
+    // divergence fallback — the declared value was wrong anyway.
+    const hex = `#${bestPixel.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+    return { kind: 'divergent', color: hex };
+  }
+  return { kind: 'default' };
+}
+
+export function projectToWardleyMap(
+  extraction: VisionExtraction,
+  png: DecodedPng | null = null,
+): ProjectionOutcome {
   const warnings: string[] = [];
 
   const names = extraction.components.map((c) => c.name);
@@ -217,12 +327,46 @@ export function projectToWardleyMap(extraction: VisionExtraction): ProjectionOut
     if (c.pipeline !== undefined && c.type === 'anchor') {
       warnings.push(`pipeline band on anchor "${c.name}" ignored (anchors cannot carry pipelineGeometry)`);
     }
-    if (c.color !== undefined && !HEX_COLOR.test(c.color)) {
+  }
+
+  // Resolve each component's color once: declared by the model, arbitrated by
+  // the pixels whenever the model also localised the dot (px/py) and the PNG
+  // was decodable. The pixel verdict wins over the declaration.
+  const colors = extraction.components.map((c): string | undefined => {
+    if (c.color === undefined) return undefined;
+    const declared = HEX_COLOR.test(c.color) ? c.color : null;
+    const dropInvalid = (): undefined => {
       warnings.push(
         `color "${c.color}" on "${c.name}" dropped: not #rrggbb — the renderer would repaint it black`,
       );
+      return undefined;
+    };
+    if (png === null || c.px === undefined || c.py === undefined) {
+      return declared ?? dropInvalid();
     }
-  }
+    const at = `(${Math.round(c.px)}, ${Math.round(c.py)})`;
+    const verdict = sampleDotColor(png, c.px, c.py, declared);
+    switch (verdict.kind) {
+      case 'confirmed':
+        // any-cast free: confirmed implies declared !== null (verifiable path).
+        return declared ?? undefined;
+      case 'divergent':
+        warnings.push(
+          declared === null
+            ? `color "${c.color}" on "${c.name}" is not #rrggbb: replaced by ${verdict.color}, sampled at ${at}`
+            : `color on "${c.name}": declared ${declared} diverges from the pixels at ${at} — sampled ${verdict.color} wins`,
+        );
+        return verdict.color;
+      case 'default':
+        warnings.push(
+          `color "${c.color}" on "${c.name}" dropped: the pixels at ${at} show a default-styled dot`,
+        );
+        return undefined;
+      case 'blind':
+        warnings.push(`color on "${c.name}" not sampled: px/py ${at} falls outside the image`);
+        return declared ?? dropInvalid();
+    }
+  });
 
   const seenNames = new Set<string>();
   for (const name of names) {
@@ -245,7 +389,7 @@ export function projectToWardleyMap(extraction: VisionExtraction): ProjectionOut
       evolution: { scalar: c.evolution },
       visibility: { scalar: c.visibility },
     },
-    ...(c.color !== undefined && HEX_COLOR.test(c.color) ? { color: c.color } : {}),
+    ...(colors[i] !== undefined ? { color: colors[i] } : {}),
     ...(c.inertia === true ? { inertia: true } : {}),
     // A movement arrow moves along X: the target keeps the component's row.
     // The renderer draws the inertia wall from the TARGET's flag — mirror it.
@@ -435,7 +579,20 @@ export class RenderWardleyMapImageParsePngStrategy extends BaseStrategy<
         }
 
         if (extraction !== null) {
-          const projected = projectToWardleyMap(extraction);
+          // Decode the source PNG only when a color needs pixel arbitration.
+          // A failure is a degradation (fall back to the declared colors),
+          // never a crash: wild images may use any PNG format they like.
+          let decoded: DecodedPng | null = null;
+          if (extraction.components.some((c) => c.color !== undefined && c.px !== undefined && c.py !== undefined)) {
+            try {
+              decoded = decodePng(Buffer.from(pngBase64, 'base64'));
+            } catch (err) {
+              warnings.push(
+                `color sampling unavailable (${(err as Error).message}); colors kept as declared`,
+              );
+            }
+          }
+          const projected = projectToWardleyMap(extraction, decoded);
           map = projected.map;
           warnings.push(...projected.warnings);
         }

@@ -59,6 +59,8 @@ MAP_START
       "evolution": 0.42,
       "visibility": 0.17,
       "color": "#e05252",
+      "px": 640,
+      "py": 210,
       "inertia": true,
       "evolvesTo": 0.68,
       "pipeline": { "evoStart": 0.35, "evoEnd": 0.8 }
@@ -90,6 +92,11 @@ Field rules:
   color that distinguishes it from the other components; ALWAYS a hex value
   (e.g. `#e05252`), never a color name — the renderer resolves hex only.
   Never report the color of a band, zone or legend.
+- `px`, `py` — ALWAYS present when `color` is: the pixel coordinates of the
+  centre of the dot, counted from the top-left corner of the FULL image
+  (integers, `px` rightward, `py` downward). The exact color value is then
+  read from the image pixels at that point, so `color` may be approximate as
+  long as `px`/`py` point at the right dot.
 - `inertia` — `true` only when an inertia marker is drawn: a short thick
   vertical bar (a "wall") on or right next to the dot.
 - `evolvesTo` — the evolution in [0, 1] of the TIP of a movement arrow

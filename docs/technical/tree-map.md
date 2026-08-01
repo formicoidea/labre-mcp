@@ -85,6 +85,10 @@ src/
 │   │                         du daemon ; clés mcp-recipe-<domain>-<tool>-<name> et
 │   │                         mcp-prompt-<strategyId>)
 │   ├── patent/               bigquery-* , patent-data-source, patent-indicators, mock-patent-source
+│   ├── png/                  decode : décodeur PNG minimal vendoré (node:zlib inflate +
+│   │                         défiltrage des scanlines ; sous-ensemble émis par notre renderer :
+│   │                         8-bit truecolor RGB/RGBA non entrelacé, sinon PngDecodeError propre)
+│   │                         — sert l'arbitrage pixel des couleurs dans render/image/parse/png
 │   ├── vendor/cli-owm/       cli-owm@4950f330 (GPL-2.0) vendoré + parser/
 │   ├── zod/                  helpers Zod (validateOrThrow…)
 │   ├── errors.mts
@@ -111,7 +115,9 @@ src/
 │   │   │                     image/emit/{svg,png} (renderToSVG/renderToPNG),
 │   │   │                     image/parse/svg (inversion géométrique calibrée par computeMapGeometry),
 │   │   │                     image/parse/png (LLM vision → JSON intermédiaire strict → projection déterministe ;
-│   │   │                     décorateurs dessinés capturés : couleurs, inertie, flèches evolve, bandes pipeline),
+│   │   │                     décorateurs dessinés capturés : couleurs, inertie, flèches evolve, bandes pipeline ;
+│   │   │                     couleurs arbitrées par les pixels via lib/png : le modèle localise le point (px/py),
+│   │   │                     sampleDotColor confirme/remplace/veto la valeur déclarée — oracle round-trip exact),
 │   │   │                     text/lint/default (lint LLM de texte quasi-structuré, target json [défaut, sans perte,
 │   │   │                     structured output si le provider le supporte] ou owm [éditable] ;
 │   │   │                     court-circuits déterministes, refus NOT_A_VALUE_CHAIN sur la prose libre)
