@@ -104,7 +104,11 @@ src/
 │   │   ├── climate/  doctrine/  gameplay/  iteration/   mock-strategies (surface AST exposée)
 │   ├── common/               registry.mts (réel : place-labels, overlap-check — I/O canonique WardleyMap) ; layout/, toolbox/
 │   ├── render/               wardley-map/{owm,image}/  — 6 réels au contrat canonique : owm/{parse,emit}/dsl (round-trip
-│   │   │                     byte-exact via lib/owm + vendored cli-owm), image/emit/{svg,png} (renderToSVG/renderToPNG),
+│   │   │                     byte-exact via lib/owm + vendored cli-owm ; parse capture en-têtes `// clé: valeur` →
+│   │   │                     result.header + PurposeContext + map.context [alias FR], evolve→evolvesTo, inertia,
+│   │   │                     pipeline→pipelineGeometry, (build|buy|outsource)→method, directive evolution→phases
+│   │   │                     renderConfig V3 ; emit est l'inverse exact),
+│   │   │                     image/emit/{svg,png} (renderToSVG/renderToPNG),
 │   │   │                     image/parse/svg (inversion géométrique calibrée par computeMapGeometry),
 │   │   │                     image/parse/png (LLM vision → JSON intermédiaire strict → projection déterministe)
 │   │   └── wardley-map/acl/  anti-corruption layer : WardleyMap ↔ PositionedValueChain (inverse la convention de visibilité : legacy 0.95=haut ↔ renderer 0=haut)

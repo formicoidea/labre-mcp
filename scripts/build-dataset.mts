@@ -20,7 +20,8 @@
 // v1 stayed inside the round-trippable dialect so that any failure was a
 // regression signal. v2 deliberately steps OUTSIDE it: half the maps carry
 // constructions the round-trips are DOCUMENTED to lose (subtype, nature,
-// evolvesTo, label offsets, non-default relation types). For those, silence is
+// label offsets, non-default relation types; evolvesTo is svg-lossy only —
+// OWM round-trips it as an `evolve` line). For those, silence is
 // no longer the expectation — the harness asserts WHICH warning/insight each
 // construction must produce:
 //
@@ -42,7 +43,7 @@
 //   subtype          │ insight "component taxonomy"│ market/ecosystem: warning
 //                    │                             │ others: SILENT DROP
 //   nature           │ insight "component taxonomy"│ SILENT DROP
-//   evolvesTo        │ insight "evolvesTo targets" │ warning: layer dropped
+//   evolvesTo        │ NOT LOST (`evolve` line)    │ warning: layer dropped
 //   label.position   │ on an ANCHOR: insight       │ SILENT DROP (always)
 //                    │ on a component: NOT LOST    │
 //   relation type    │ insight "relation type/flow"│ NOT LOST (stroke colour)
@@ -66,6 +67,7 @@ import { RenderWardleyMapOwmParseDslStrategy } from '#frameworks/render/wardley-
 import { RenderWardleyMapImageEmitSvgStrategy } from '#frameworks/render/wardley-map/image/emit/svg.mjs';
 import { RenderWardleyMapImageParseSvgStrategy } from '#frameworks/render/wardley-map/image/parse/svg.mjs';
 import { slugify } from '#lib/owm/canonical-ids.mjs';
+import { EVOLVE_MATURITY_PATTERN, formatComponentName } from '#lib/owm/owm-dsl.mjs';
 
 // ── Seeded PRNG ────────────────────────────────────────────────────────
 
@@ -421,8 +423,16 @@ function injectLossyConstructs(
       }
 
       case 'evolvesTo': {
+        // Only OWM-referenceable targets: the `evolve <name> <maturity>` line
+        // cannot reference a quote-wrapped name and misbinds on a name with an
+        // embedded decimal (emit refuses both with an insight). Those hostile
+        // shapes are pinned by the emit unit tests, not injected here.
         const pool = draft.components.filter(
-          (c) => c.type !== 'anchor' && c.evolvesTo === undefined,
+          (c) =>
+            c.type !== 'anchor' &&
+            c.evolvesTo === undefined &&
+            !formatComponentName(c.label.name).includes('"') &&
+            !EVOLVE_MATURITY_PATTERN.test(` ${c.label.name}`),
         );
         if (pool.length === 0) break;
         const target = rng.pick(pool);
@@ -438,8 +448,9 @@ function injectLossyConstructs(
             evolveType: 'natural',
           },
         ];
+        // OWM: NOT LOST since the deterministic evolve projection — the target
+        // round-trips as an `evolve <name> <maturity>` line (round2 precision).
         expectedLoss.push(
-          { construct: 'evolvesTo', target: target.id, format: 'owm', expectation: 'insight' },
           { construct: 'evolvesTo', target: target.id, format: 'svg', expectation: 'warning' },
         );
         break;
@@ -598,7 +609,9 @@ function lossFragments(loss: ExpectedLoss, format: 'owm' | 'svg'): string[] | nu
       case 'nature':
         return ['component taxonomy (subtype/nature) has no OWM equivalent'];
       case 'evolvesTo':
-        return ['evolvesTo targets are not projected'];
+        // NOT LOST on owm since the evolve projection — no owm expectation is
+        // ever recorded for it, this branch is unreachable and kept explicit.
+        return null;
       case 'label.position':
         // Only the ANCHOR offset is dropped; a component offset round-trips.
         return loss.detail === 'anchor'

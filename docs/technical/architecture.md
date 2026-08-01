@@ -21,7 +21,7 @@ Au boot, le daemon construit deux registres :
   recettes multi-étapes restantes (evaluateMap, generateValueChain) est suivi en
   [roadmap.md](../architecture/roadmap.md) (item B3).
 - **Registre de stratégies** (`src/core/transport/strategy-registry-boot.mts`) — 85 stratégies
-  au boot : 15 réelles + 70 mocks. `LABRE_DISABLE_MOCKS=1` ne charge que les 15 réelles.
+  au boot : 24 réelles + 61 mocks. `LABRE_DISABLE_MOCKS=1` ne charge que les 24 réelles.
 
 Chaque outil MCP résout son traitement via une **recipe** (`recipes/<domain>/<tool>/*.recipe.json`)
 qui orchestre des appels de stratégies par `methodId`. Les `methodId` suivent la grammaire 5 segments
