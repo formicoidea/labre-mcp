@@ -35,7 +35,8 @@ export interface StrategyResult<TResult = unknown> {
       | "web-search"
       | "cpc-database"
       | "llm-internal"
-      | "computed";
+      | "computed"
+      | "naming-convention";
     capturedAt: string;
   }>;
   reasoning: Array<{
@@ -52,6 +53,7 @@ export interface StrategyResult<TResult = unknown> {
       | "comparable"
       | "trajectory"
       | "cluster"
+      | "phase-distribution-anomaly"
       | "other";
     confidence?: number;
   }>;

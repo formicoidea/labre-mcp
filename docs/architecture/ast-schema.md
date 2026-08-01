@@ -467,6 +467,16 @@ La forme canonique d'une carte de Wardley dans `wardley.map` est **strictement c
 
 Les types `Component`, `EvolutionPosition`, `ValueChain`, `Map` ne sont **pas redéfinis ici** : ils dérivent intégralement du schéma renderer. Le **modèle interne** d'une stratégie peut être plus riche (ARCH-05 amendé) ; la frontière I/O doit conformer au schéma renderer.
 
+#### Publication des schémas
+
+Le contrat de donnée est publié en JSON Schema (draft 2020-12) dans `schema/` à la racine du repo, régénéré par `npm run schemas` (`scripts/export-schemas.mts`) et servi par le daemon en `GET /schemas/<fichier>` :
+
+- `wardley-map.schema.json` — copie verbatim du schéma renderer (source de vérité, `$id` d'origine conservé) ;
+- `json-labre.schema.json` — artefact JSON-labre complet (le sous-arbre `wardley.map` est un `$ref` vers le schéma renderer, jamais dupliqué) ;
+- `command-call.schema.json` / `command-result.schema.json` — enveloppes d'invocation (§ 3.4.1).
+
+Les `$id` générés pointent sur `https://framework-mcp.labre.app/schemas/…`, résolvables en production. Toute évolution des Zod de `src/schemas/` doit être suivie d'un `npm run schemas` dans le même commit.
+
 #### Anti-corruption layer
 
 Le domaine `render` (§ 2.3) joue le rôle d'**anti-corruption layer** entre les modèles internes enrichis et le schéma renderer canonique. Lorsqu'une commande produit naturellement des objets enrichis (champs propres à la stratégie, métadonnées d'incertitude, etc.), une étape d'**ETL** projette ces objets vers le format renderer en :

@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "default": "0.1.0",
+      "type": "string"
+    },
+    "wardley": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "map": {
+          "$ref": "./wardley-map.schema.json"
+        },
+        "doctrine": {},
+        "climate": {},
+        "gameplay": {},
+        "iteration": {}
+      },
+      "additionalProperties": false
+    },
+    "envelope": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "signals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {},
+              "source": {
+                "type": "string"
+              },
+              "capturedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "value",
+              "source",
+              "capturedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "reasoning": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "by": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "promptTokens": {
+                "type": "number"
+              },
+              "completionTokens": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "by",
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "insights": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "by": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "text",
+              "by",
+              "type"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "trace": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "type": "string"
+              },
+              "stepId": {
+                "type": "string"
+              },
+              "durationMs": {
+                "type": "number"
+              },
+              "startedAt": {
+                "type": "string"
+              },
+              "completedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "command",
+              "stepId",
+              "startedAt",
+              "completedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "artifactPath": {
+                "type": "string"
+              },
+              "jsonPath": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "artifactPath"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "context",
+        "signals",
+        "reasoning",
+        "insights",
+        "trace",
+        "references"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "version",
+    "wardley",
+    "envelope"
+  ],
+  "additionalProperties": false,
+  "$id": "https://framework-mcp.labre.app/schemas/json-labre.schema.json"
+}

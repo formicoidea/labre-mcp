@@ -21,6 +21,7 @@
   },
   "files": [
     "dist",
+    "schema",
     "recipes",
     "prompts",
     "prompts.config.json",
@@ -86,6 +87,7 @@
     "build": "tsc",
     "dev": "tsx --conditions labre-mcp-dev src/core/transport/labre-daemon.mts",
     "typecheck": "tsc --noEmit",
+    "schemas": "tsx --conditions labre-mcp-dev scripts/export-schemas.mts",
     "test": "tsx --conditions labre-mcp-dev --test \"src/**/*.test.mts\"",
     "prepublishOnly": "npm run typecheck && npm run build",
     "ci:version": "npm version patch -m \"release: v%s\"",

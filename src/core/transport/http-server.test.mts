@@ -46,6 +46,22 @@ describe("labre-mcp HTTP transport", () => {
     assert.equal(body.name, "labre-mcp");
   });
 
+  it("GET /schemas serves a published schema and 404s the rest", async () => {
+    const app = buildTestApp();
+
+    const ok = await app.request("/schemas/json-labre.schema.json");
+    assert.equal(ok.status, 200);
+    assert.equal(ok.headers.get("content-type"), "application/schema+json");
+    const schema = (await ok.json()) as { $id: string };
+    assert.match(schema.$id, /json-labre\.schema\.json$/);
+
+    const missing = await app.request("/schemas/nope.schema.json");
+    assert.equal(missing.status, 404);
+
+    const traversal = await app.request("/schemas/..%2Fpackage.json");
+    assert.equal(traversal.status, 404);
+  });
+
   it("MCP ping returns empty success", async () => {
     const app = buildTestApp();
     const response = (await rpcCall(app, {
