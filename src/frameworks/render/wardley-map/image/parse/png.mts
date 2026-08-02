@@ -448,8 +448,13 @@ export function projectToWardleyMap(
     if (png !== null && geometry !== null) {
       const gx = geometry.evoToX(c.evolution);
       const gy = geometry.visToY(c.visibility);
+      // Wide sampling here too: gx/gy inherit the model's SCALAR estimation
+      // error (±0.02 ≈ ±20px on a default canvas), and the tight window can
+      // land on the label's ink and veto a dot it never saw (measured live:
+      // a green dot lost to a 23px drift). The wide loop only concludes
+      // `default` once the largest ring stayed chroma-free.
       const resolved = arbitrate(
-        sampleDotColor(png, gx, gy, declared),
+        sampleDotColorWide(png, gx, gy, declared),
         `(${Math.round(gx)}, ${Math.round(gy)})`,
         false,
       );
