@@ -57,7 +57,11 @@ MAP_START
       "name": "the label text, copied verbatim",
       "type": "component",
       "evolution": 0.42,
-      "visibility": 0.17
+      "visibility": 0.17,
+      "color": "#e05252",
+      "inertia": true,
+      "evolvesTo": 0.68,
+      "pipeline": { "evoStart": 0.35, "evoEnd": 0.8 }
     }
   ],
   "relations": [
@@ -65,6 +69,10 @@ MAP_START
   ]
 }
 MAP_END
+
+The four decorator fields (`color`, `inertia`, `evolvesTo`, `pipeline`) are
+OPTIONAL: include one ONLY when the visual evidence below is actually drawn.
+Most components have none of them.
 
 Field rules:
 
@@ -78,6 +86,18 @@ Field rules:
 - `relations` — `consumer` and `supplier` MUST both be spelled exactly like a
   `name` in `components`. Emit one entry per line drawn on the image. Drop a
   line whose two endpoints you cannot both identify rather than guessing.
+- `color` — only when the DOT (or its box) is drawn in a clearly non-default
+  color that distinguishes it from the other components; ALWAYS a hex value
+  (e.g. `#e05252`), never a color name — the renderer resolves hex only.
+  Never report the color of a band, zone or legend.
+- `inertia` — `true` only when an inertia marker is drawn: a short thick
+  vertical bar (a "wall") on or right next to the dot.
+- `evolvesTo` — the evolution in [0, 1] of the TIP of a movement arrow
+  (often red, usually pointing right) that starts at this component. Only
+  when such an arrow is clearly drawn; never infer movement.
+- `pipeline` — only when a horizontal rectangle/bracket spans a maturity
+  range around this component (a pipeline). Report the evolution of its left
+  and right edges.
 - If the image is not a Wardley Map, or nothing is legible, return the object
   with an empty `title`, an empty `components` array and an empty `relations`
   array. Do not apologise, do not explain — just return the empty object.

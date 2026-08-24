@@ -42,8 +42,9 @@
 // legacy convention.
 //
 // ── Known limitations (warnings, never a crash) ────────────────────────────
-//   - pipelines, evolvesTo arrows, inertia, notes, annotations and flow labels
-//     are not extracted at all; the model is told to ignore them.
+//   - notes, annotations and flow labels are not extracted; the model is told
+//     to ignore them. Colors, inertia walls, movement (evolve) arrows and
+//     pipeline bands ARE extracted when clearly drawn (optional fields).
 //   - subtypes (userNeed / market / ecosystem / …) and natures are not
 //     recovered: everything is `component` or `anchor`.
 //   - relation types (DependsOn / Flow / Constraint) are not recovered; the
@@ -58,6 +59,7 @@ import { z } from 'zod';
 import { BaseStrategy, type StrategyResult } from '#core/ast/base-strategy.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
 import { WardleyMapSchema, type WardleyMap } from '#schemas/wardley-map.schema.mjs';
+import { validateComponent } from '@formicoidea/wardley-map-renderer';
 import type { LLMCall } from '#types/llm.mjs';
 import { getStrategyVisionLLM } from '#lib/llm/registry.mjs';
 import { uniqueSlug } from '#lib/owm/canonical-ids.mjs';
@@ -96,12 +98,20 @@ export interface RenderWardleyMapImageParsePngResult {
 // ── Stage 1: the intermediate representation ───────────────────────────────
 
 /** One node as the vision model reports it. Strict on purpose: an out-of-range
- *  or non-numeric scalar is a transcription failure, not something to repair. */
+ *  or non-numeric scalar is a transcription failure, not something to repair.
+ *  The decorator fields are optional and only present when actually drawn
+ *  (color, inertia wall, movement arrow, pipeline band). */
 const VisionComponentSchema = z.object({
   name: z.string().min(1),
   type: z.enum(['component', 'anchor']).default('component'),
   evolution: z.number().min(0).max(1),
   visibility: z.number().min(0).max(1),
+  color: z.string().min(1).optional(),
+  inertia: z.boolean().optional(),
+  evolvesTo: z.number().min(0).max(1).optional(),
+  pipeline: z
+    .object({ evoStart: z.number().min(0).max(1), evoEnd: z.number().min(0).max(1) })
+    .optional(),
 });
 
 /** One dependency, by NAME — the model never sees our ids. */
@@ -185,11 +195,34 @@ export interface ProjectionOutcome {
  * Intermediate → canonical WardleyMap. Pure and total: every rejection is a
  * warning, the function never throws.
  */
+/**
+ * Canonical `color` is resolved by the renderer as hex-or-Tailwind-name, with a
+ * BLACK fallback for anything else — so a disobedient model answering "red"
+ * would silently repaint the component black. The prompt demands `#rrggbb`;
+ * this guard enforces it deterministically, dropping (with a warning) instead
+ * of forwarding a value the renderer would misread. Follow-up: color does not
+ * need a model at all — once the dot's pixel location is known, sampling the
+ * PNG pixel is exact and deterministic; this guard is where that sampler will
+ * plug in.
+ */
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
 export function projectToWardleyMap(extraction: VisionExtraction): ProjectionOutcome {
   const warnings: string[] = [];
 
   const names = extraction.components.map((c) => c.name);
   const { ids, firstIdByName } = buildIds(names);
+
+  for (const c of extraction.components) {
+    if (c.pipeline !== undefined && c.type === 'anchor') {
+      warnings.push(`pipeline band on anchor "${c.name}" ignored (anchors cannot carry pipelineGeometry)`);
+    }
+    if (c.color !== undefined && !HEX_COLOR.test(c.color)) {
+      warnings.push(
+        `color "${c.color}" on "${c.name}" dropped: not #rrggbb — the renderer would repaint it black`,
+      );
+    }
+  }
 
   const seenNames = new Set<string>();
   for (const name of names) {
@@ -205,11 +238,40 @@ export function projectToWardleyMap(extraction: VisionExtraction): ProjectionOut
   const components = extraction.components.map((c, i) => ({
     id: ids[i],
     label: { name: c.name },
-    type: c.type,
+    // A pipeline band promotes the node to the canonical `pipeline` type —
+    // the renderer refuses pipelineGeometry on any other type (validateMap).
+    type: c.pipeline !== undefined && c.type === 'component' ? ('pipeline' as const) : c.type,
     position: {
       evolution: { scalar: c.evolution },
       visibility: { scalar: c.visibility },
     },
+    ...(c.color !== undefined && HEX_COLOR.test(c.color) ? { color: c.color } : {}),
+    ...(c.inertia === true ? { inertia: true } : {}),
+    // A movement arrow moves along X: the target keeps the component's row.
+    // The renderer draws the inertia wall from the TARGET's flag — mirror it.
+    ...(c.evolvesTo !== undefined
+      ? {
+          evolvesTo: [
+            {
+              position: {
+                evolution: { scalar: c.evolvesTo },
+                visibility: { scalar: c.visibility },
+              },
+              ...(c.inertia === true ? { inertia: true } : {}),
+            },
+          ],
+        }
+      : {}),
+    ...(c.pipeline !== undefined && c.type === 'component'
+      ? {
+          pipelineGeometry: {
+            evoStart: Math.min(c.pipeline.evoStart, c.pipeline.evoEnd),
+            evoEnd: Math.max(c.pipeline.evoStart, c.pipeline.evoEnd),
+            visStart: c.visibility,
+            visEnd: c.visibility,
+          },
+        }
+      : {}),
   }));
 
   // Case/whitespace-tolerant name → id index for relation resolution.
@@ -255,6 +317,18 @@ export function projectToWardleyMap(extraction: VisionExtraction): ProjectionOut
         `transcribed map is not schema-valid: ${validated.error.issues.map((i) => i.message).join('; ')}`,
       ],
     };
+  }
+
+  // Output oracle: every component must be STRUCTURALLY valid at render — a
+  // projection the renderer would refuse (e.g. pipelineGeometry on a
+  // non-pipeline type) is a bug in this file. validateComponent only (the
+  // map-level validateMap adds editorial advisories like "should have an
+  // anchor" that are properties of the source image, not projection bugs).
+  // Surfaced as warnings, never a crash (degradation-first).
+  for (const component of validated.data.components) {
+    for (const issue of validateComponent(component)) {
+      warnings.push(`render-validity: ${issue}`);
+    }
   }
   return { map: validated.data, warnings };
 }
@@ -388,7 +462,7 @@ export class RenderWardleyMapImageParsePngStrategy extends BaseStrategy<
         text:
           `Map transcribed from an image by a vision model: ${map.components.length} component(s), ` +
           `${map.relations.length} relation(s). Positions are visual estimates, and subtypes, ` +
-          'natures, relation types and pipelines are not recovered — treat it as a draft to review, ' +
+          'natures and relation types are not recovered — treat it as a draft to review, ' +
           'not as a faithful round-trip.',
         by: METHOD_ID,
         type: 'other',
