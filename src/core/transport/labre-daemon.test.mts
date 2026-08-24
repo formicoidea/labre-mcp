@@ -5,7 +5,36 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 // Side-effect: registers prompt parsers consumed by some strategies.
 import "#lib/prompts/init.mjs";
-import { buildStrategyRegistry, selectAuthMiddleware } from "./labre-daemon.mjs";
+import {
+  buildStrategyRegistry,
+  isSupabaseIssuedToken,
+  selectAuthMiddleware,
+} from "./labre-daemon.mjs";
+
+const SUPABASE_ISSUER = "https://proj.supabase.co/auth/v1";
+
+/** Unsigned JWT shell — `decodeJwt` never checks the signature. */
+function jwtWithIssuer(iss: string): string {
+  const part = (o: object): string => Buffer.from(JSON.stringify(o)).toString("base64url");
+  return `${part({ alg: "HS256", typ: "JWT" })}.${part({ iss })}.not-a-real-signature`;
+}
+
+describe("isSupabaseIssuedToken — bundle refresh routing", () => {
+  it("accepts a Supabase session token", () => {
+    assert.equal(isSupabaseIssuedToken(jwtWithIssuer(SUPABASE_ISSUER), SUPABASE_ISSUER), true);
+  });
+
+  it("rejects an OAuth-AS token — PostgREST cannot verify its signature", () => {
+    // The regression this guards: forwarding it made every OAuth-connector
+    // call log `listing failed … No suitable key or wrong key type`.
+    const asToken = jwtWithIssuer("https://proj.supabase.co/functions/v1/oauth-as");
+    assert.equal(isSupabaseIssuedToken(asToken, SUPABASE_ISSUER), false);
+  });
+
+  it("rejects a bearer that is not a decodable JWT", () => {
+    assert.equal(isSupabaseIssuedToken("lab_deadbeef", SUPABASE_ISSUER), false);
+  });
+});
 
 describe("labre-daemon boot wiring", () => {
   it("buildStrategyRegistry populates the core registry with every framework strategy", () => {

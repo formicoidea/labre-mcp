@@ -6,12 +6,13 @@
 // resolve methodIds at call time.
 
 import { fileURLToPath } from "node:url";
+import { decodeJwt } from "jose";
 import type { ToolRegistry } from "./mcp-handler.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { startHttpServer, type OnAuthenticatedHook, type OAuthResourceConfig } from "./http-server.mjs";
 import { buildSupabaseAuthMiddleware, tryExtractBearerToken } from "./supabase-auth.mjs";
 import { buildJwksAuthMiddleware } from "./jwks-auth.mjs";
-import { buildMultiIssuerAuthMiddleware } from "./multi-issuer-auth.mjs";
+import { buildMultiIssuerAuthMiddleware, supabaseIssuerOf } from "./multi-issuer-auth.mjs";
 import { buildApiKeyAuthMiddleware, routeBearerAuth, API_KEY_PREFIX } from "./api-key-auth.mjs";
 import { parseAuthDoors } from "./auth-modes.mjs";
 import { registerBootHealthChecks } from "./boot-health-checks.mjs";
@@ -176,6 +177,24 @@ function readBundlesTtlSeconds(): number | undefined {
 // CALLER's bearer token (RLS authorizes) — the daemon itself holds no Supabase
 // credential beyond the public anon key. Without the anon key the source is
 // simply off and the daemon serves shipped/user recipes only.
+/**
+ * Supabase session tokens are the ONLY population Supabase RLS can authorize:
+ * PostgREST verifies signatures against the project's own key. An OIDC /
+ * OAuth-AS bearer authenticates fine here (multi-issuer-auth.mts routes it to
+ * its own JWKS) but PostgREST rejects it with "No suitable key or wrong key
+ * type", so forwarding one only burns a round-trip and logs a degradation on
+ * every such call. Routes on the same UNVERIFIED `iss` claim the auth
+ * middleware uses — by the time this runs the token is already cryptographically
+ * verified, and `iss` only decides whether Supabase could possibly accept it.
+ */
+export function isSupabaseIssuedToken(token: string, supabaseIssuer: string): boolean {
+  try {
+    return decodeJwt(token).iss === supabaseIssuer;
+  } catch {
+    return false;
+  }
+}
+
 function selectBundleRefreshHook(
   authed: boolean,
 ): { hook?: OnAuthenticatedHook; bootLine: string } {
@@ -196,13 +215,16 @@ function selectBundleRefreshHook(
     ttlSeconds,
     shippedRoot: SHIPPED_ROOT,
   });
+  const supabaseIssuer = supabaseIssuerOf(supabaseUrl);
   const hook: OnAuthenticatedHook = async (headers) => {
     // The token is read from the (already authenticated) request headers and
     // handed straight to the refresh — never stored on the context or logged.
     // lab_ API keys are not JWTs: the bundle RLS layer cannot use them, so
     // those requests skip the refresh (bundles stay fresh via JWT callers).
     const token = tryExtractBearerToken(headers);
-    if (token && !token.startsWith(API_KEY_PREFIX)) await source.refreshIfStale(token);
+    if (!token || token.startsWith(API_KEY_PREFIX)) return;
+    if (!isSupabaseIssuedToken(token, supabaseIssuer)) return;
+    await source.refreshIfStale(token);
   };
   return { hook, bootLine: `on (lazy, TTL ${ttlSeconds ?? 300}s, caller-token RLS)` };
 }
