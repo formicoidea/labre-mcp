@@ -13,7 +13,12 @@ import {
   RenderWardleyMapImageParsePngStrategy,
   parseVisionExtraction,
   projectToWardleyMap,
+  type VisionExtraction,
 } from './png.mjs';
+import { RenderWardleyMapImageEmitPngStrategy } from '../emit/png.mjs';
+import { decodePng, type DecodedPng } from '#lib/png/decode.mjs';
+import { WardleyMapSchema } from '#schemas/wardley-map.schema.mjs';
+import { computeMapGeometry } from '@formicoidea/wardley-map-renderer';
 import type { RequestContext } from '#core/context/request-context.mjs';
 import type { LLMCall, LLMCallOptions } from '#types/llm.mjs';
 import { setLLMCallForTesting, resetLLMRegistryCache } from '#lib/llm/registry.mjs';
@@ -266,6 +271,226 @@ describe('projectToWardleyMap', () => {
   });
 });
 
+// ── Pixel arbitration of declared colors ───────────────────────────────────
+
+/** White canvas with `paint` overriding some pixels — a DecodedPng needs no
+ *  encoding round-trip, the struct is enough. */
+function syntheticPng(
+  width: number,
+  height: number,
+  paint: (x: number, y: number) => [number, number, number] | null,
+): DecodedPng {
+  const pixels = Buffer.alloc(width * height * 4, 0xff);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const p = paint(x, y);
+      if (p === null) continue;
+      const i = (y * width + x) * 4;
+      pixels[i] = p[0];
+      pixels[i + 1] = p[1];
+      pixels[i + 2] = p[2];
+    }
+  }
+  return { width, height, pixels };
+}
+
+/** Solid disk of `color` centred on (cx, cy). */
+function disk(color: [number, number, number], cx: number, cy: number, r = 4) {
+  return (x: number, y: number): [number, number, number] | null =>
+    (x - cx) ** 2 + (y - cy) ** 2 <= r * r ? color : null;
+}
+
+function dotComponent(over: Record<string, unknown>): VisionExtraction['components'][number] {
+  return { name: 'Dot', type: 'component', evolution: 0.5, visibility: 0.5, ...over };
+}
+
+describe('projectToWardleyMap · color sampling', () => {
+  it('keeps a declared color confirmed by a solid-filled dot', () => {
+    const png = syntheticPng(40, 40, disk([0xe0, 0x52, 0x52], 20, 20));
+    const { map, warnings } = projectToWardleyMap(
+      { title: '', components: [dotComponent({ color: '#e05252', px: 20, py: 20 })], relations: [] },
+      png,
+    );
+    assert.equal(map!.components[0].color, '#e05252');
+    assert.deepEqual(warnings, []);
+  });
+
+  it('confirms a declared color from anti-aliased white-blended tints alone', () => {
+    // No pure pixel anywhere — only a 60% coverage tint of #e05252, which is
+    // what a 1px-stroked ring actually looks like: 255 − 0.6·(255−c) per
+    // channel → (236, 151, 151).
+    const tint: [number, number, number] = [236, 151, 151];
+    const png = syntheticPng(40, 40, (x, y) => (y === 15 && x >= 18 && x <= 22 ? tint : null));
+    const { map, warnings } = projectToWardleyMap(
+      { title: '', components: [dotComponent({ color: '#e05252', px: 20, py: 20 })], relations: [] },
+      png,
+    );
+    assert.equal(map!.components[0].color, '#e05252');
+    assert.deepEqual(warnings, []);
+  });
+
+  it('lets the sampled pixels win over a diverging declaration, with a warning', () => {
+    const png = syntheticPng(40, 40, disk([0x33, 0x66, 0xcc], 20, 20));
+    const { map, warnings } = projectToWardleyMap(
+      { title: '', components: [dotComponent({ color: '#e05252', px: 20, py: 20 })], relations: [] },
+      png,
+    );
+    assert.equal(map!.components[0].color, '#3366cc');
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /declared #e05252 diverges .* sampled #3366cc wins/);
+  });
+
+  it('vetoes a color declared on a default-styled (black-stroked) dot', () => {
+    // Greys are what a black default stroke anti-aliases into: chroma 0, and
+    // inconsistent with any chromatic declaration.
+    const png = syntheticPng(40, 40, disk([80, 80, 80], 20, 20));
+    const { map, warnings } = projectToWardleyMap(
+      { title: '', components: [dotComponent({ color: '#e05252', px: 20, py: 20 })], relations: [] },
+      png,
+    );
+    assert.equal(map!.components[0].color, undefined);
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /default-styled dot/);
+  });
+
+  it('replaces a non-hex declaration with the sampled value when the dot is localised', () => {
+    const png = syntheticPng(40, 40, disk([0x00, 0xaa, 0x55], 20, 20));
+    const { map, warnings } = projectToWardleyMap(
+      { title: '', components: [dotComponent({ color: 'green', px: 20, py: 20 })], relations: [] },
+      png,
+    );
+    assert.equal(map!.components[0].color, '#00aa55');
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /"green" .* not #rrggbb: replaced by #00aa55/);
+  });
+
+  it('widens the window progressively on a foreign image before vetoing', () => {
+    // Foreign geometry: nothing at the calibrated spot, and the dot sits 20px
+    // away from the model's px/py — outside the tight 12px window, inside the
+    // 32px one. The old single-window sampler would have falsely vetoed this.
+    const png = syntheticPng(200, 200, disk([0xe0, 0x52, 0x52], 150, 60));
+    const { map, warnings } = projectToWardleyMap(
+      { title: '', components: [dotComponent({ color: '#e05252', px: 130, py: 60 })], relations: [] },
+      png,
+    );
+    assert.equal(map!.components[0].color, '#e05252');
+    assert.deepEqual(warnings, []);
+  });
+
+  it('keeps the declared color when px/py fall outside the image', () => {
+    const png = syntheticPng(40, 40, () => null);
+    const { map, warnings } = projectToWardleyMap(
+      { title: '', components: [dotComponent({ color: '#e05252', px: 999, py: 999 })], relations: [] },
+      png,
+    );
+    assert.equal(map!.components[0].color, '#e05252');
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /outside the image/);
+  });
+});
+
+// ── The round-trip oracle ──────────────────────────────────────────────────
+//
+// The one place a DETERMINISTIC oracle exists for parse:png: a color emitted
+// by the REAL emit:png strategy must come back exactly through the sampler,
+// with px/py computed from the renderer's own geometry — no LLM anywhere.
+// (The rest of parse:png quality remains an eval question, per the header.)
+
+describe('pixel-color oracle: emit:png → sample → exact color round-trip', () => {
+  const oracleMap = WardleyMapSchema.parse({
+    title: 'Oracle',
+    components: [
+      { id: 'kettle', label: { name: 'Kettle' }, type: 'component', position: { evolution: { scalar: 0.35 }, visibility: { scalar: 0.6 } }, color: '#e05252' },
+      { id: 'power', label: { name: 'Power' }, type: 'component', position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.85 } } },
+    ],
+    relations: [],
+  });
+
+  // Render once for the whole suite (resvg + font loading dominate the cost).
+  let fixture: Promise<{ png: DecodedPng; centers: Map<string, { x: number; y: number }> }> | null = null;
+  function renderOnce() {
+    fixture ??= (async () => {
+      const emitted = await new RenderWardleyMapImageEmitPngStrategy().evaluate(oracleMap, requestCtx);
+      assert.equal(emitted.result.rendered, true);
+      const png = decodePng(Buffer.from(emitted.result.pngBase64, 'base64'));
+      // The PNG is rasterised at fitTo-width = canvasWidth, so SVG coordinates
+      // ARE pixel coordinates: the renderer's own node geometry gives px/py.
+      const centers = new Map(
+        computeMapGeometry(oracleMap).nodes.map((n) => [n.component.id, { x: n.cx, y: n.cy }]),
+      );
+      return { png, centers };
+    })();
+    return fixture;
+  }
+
+  function kettleExtraction(px: number, py: number, color = '#e05252'): VisionExtraction {
+    return {
+      title: 'Oracle',
+      components: [
+        { name: 'Kettle', type: 'component', evolution: 0.35, visibility: 0.6, color, px, py },
+      ],
+      relations: [],
+    };
+  }
+
+  it('recovers the exact emitted color, deterministically, without a model', async () => {
+    const { png, centers } = await renderOnce();
+    const k = centers.get('kettle')!;
+    const { map, warnings } = projectToWardleyMap(kettleExtraction(k.x, k.y), png);
+    assert.equal(map!.components[0].color, '#e05252');
+    assert.deepEqual(warnings, []);
+  });
+
+  it('stays exact when the model mislocates the dot by a few pixels', async () => {
+    const { png, centers } = await renderOnce();
+    const k = centers.get('kettle')!;
+    const { map, warnings } = projectToWardleyMap(kettleExtraction(k.x + 4, k.y - 3), png);
+    assert.equal(map!.components[0].color, '#e05252');
+    assert.deepEqual(warnings, []);
+  });
+
+  it('stays exact when the model mislocates the dot by 100px (calibrated geometry)', async () => {
+    // Real vision models land ~130px off: far outside any sane sampling
+    // window. On OUR renders the sampling location is recomputed from the
+    // extracted scalars through the renderer's own geometry, so the model's
+    // px/py is ignored entirely — no veto, no divergence, exact round-trip.
+    const { png, centers } = await renderOnce();
+    const k = centers.get('kettle')!;
+    const { map, warnings } = projectToWardleyMap(kettleExtraction(k.x + 100, k.y - 100), png);
+    assert.equal(map!.components[0].color, '#e05252');
+    assert.deepEqual(warnings, []);
+  });
+
+  it('flags a strong divergence and lets the sampled pixels win', async () => {
+    const { png, centers } = await renderOnce();
+    const k = centers.get('kettle')!;
+    const { map, warnings } = projectToWardleyMap(kettleExtraction(k.x, k.y, '#3355ff'), png);
+    const color = map!.components[0].color!;
+    assert.notEqual(color, '#3355ff');
+    assert.match(color, /^#[0-9a-f]{6}$/);
+    // The dot really is red: the sampled tint must be red-dominant.
+    assert.ok(parseInt(color.slice(1, 3), 16) > parseInt(color.slice(5, 7), 16), color);
+    assert.ok(warnings.some((w) => /declared #3355ff diverges/.test(w)), warnings.join('; '));
+  });
+
+  it('vetoes a color hallucinated on the default-styled component', async () => {
+    const { png, centers } = await renderOnce();
+    const p = centers.get('power')!;
+    const { map, warnings } = projectToWardleyMap(
+      {
+        title: 'Oracle',
+        components: [
+          { name: 'Power', type: 'component', evolution: 0.7, visibility: 0.85, color: '#e05252', px: p.x, py: p.y },
+        ],
+        relations: [],
+      },
+      png,
+    );
+    assert.equal(map!.components[0].color, undefined);
+    assert.ok(warnings.some((w) => /default-styled dot/.test(w)), warnings.join('; '));
+  });
+});
+
 // ── The strategy ───────────────────────────────────────────────────────────
 
 describe('strategy.evaluate', () => {
@@ -350,6 +575,29 @@ describe('strategy.evaluate', () => {
     assert.equal(res.result.map?.components.length, 1);
     assert.ok(res.result.warnings.some((w) => /relation dropped/.test(w)));
     assert.ok(res.insights.some((i) => /partially transcribed/i.test(i.text)));
+  });
+
+  it('keeps declared colors when the source PNG cannot be decoded for sampling', async () => {
+    // PNG_B64 is a deliberately truncated PNG: decodable enough to be sent to
+    // the (stubbed) model, not enough for pixel sampling — the declared color
+    // must survive, with a degradation warning.
+    const { call } = stubLLM(
+      framed({
+        title: 'T',
+        components: [
+          { name: 'A', type: 'component', evolution: 0.5, visibility: 0.5, color: '#e05252', px: 10, py: 10 },
+        ],
+        relations: [],
+      }),
+    );
+    const strat = new RenderWardleyMapImageParsePngStrategy({ llmCall: call });
+    const res = await strat.evaluate({ pngBase64: PNG_B64 }, requestCtx);
+    assert.equal(res.result.parsed, true);
+    assert.equal(res.result.map?.components[0].color, '#e05252');
+    assert.ok(
+      res.result.warnings.some((w) => /color sampling unavailable/.test(w)),
+      res.result.warnings.join('; '),
+    );
   });
 
   it('degrades gracefully when the LLM call itself fails', async () => {
