@@ -22,7 +22,10 @@ import { z } from 'zod';
 import { BaseStrategy, type StrategyResult } from '#core/ast/base-strategy.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
 import { WardleyMapSchema, type WardleyMap } from '#schemas/wardley-map.schema.mjs';
+import { PurposeContextSchema, type PurposeContext } from '#schemas/context.schema.mjs';
+import { TemporalitySchema } from '#schemas/value-chain.schema.mjs';
 import { parse as parseOwm, type UnifiedWardleyMap } from '#lib/vendor/cli-owm/index.mjs';
+import { parseHeaderComments } from '#lib/owm/owm-dsl.mjs';
 import { flipVisibility, uniqueSlug } from '#lib/owm/canonical-ids.mjs';
 
 const METHOD_ID = 'render:wardley-map:owm:parse:dsl';
@@ -36,6 +39,62 @@ export interface RenderWardleyMapOwmParseDslResult {
   map: WardleyMap | null;
   parsed: boolean;
   warnings: string[];
+  /** Raw `// key: value` header pairs, verbatim (source of truth). */
+  header?: Record<string, string>;
+  /** Best-effort projection of the header onto the study Context shape the
+   *  iteration/purpose strategies consume. Only present when a header exists. */
+  context?: PurposeContext;
+}
+
+/** French header-key aliases, folded onto the canonical English keys. The raw
+ *  `header` keeps the spelling as written; only the projections use this. */
+const HEADER_KEY_ALIASES: Record<string, string> = {
+  contexte: 'context',
+  objectif: 'objective',
+  portee: 'scope',
+  'portée': 'scope',
+  perimetre: 'scope',
+  'périmètre': 'scope',
+  temporalite: 'temporality',
+  'temporalité': 'temporality',
+  granularite: 'granularity',
+  'granularité': 'granularity',
+  livrables: 'deliverables',
+};
+
+/** Canonical view of a raw header: alias keys folded, first value wins. */
+function normalizeHeaderKeys(header: Record<string, string>): Record<string, string> {
+  const normalized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(header)) {
+    const canonical = HEADER_KEY_ALIASES[key] ?? key;
+    if (!(canonical in normalized)) normalized[canonical] = value;
+  }
+  return normalized;
+}
+
+/** Header keys with a structured home. Everything else stays raw in `header`. */
+function headerToPurposeContext(
+  header: Record<string, string>,
+  warnings: string[],
+): PurposeContext {
+  const temporality = header.temporality !== undefined
+    ? TemporalitySchema.safeParse(header.temporality)
+    : undefined;
+  if (temporality !== undefined && !temporality.success) {
+    warnings.push(
+      `header temporality "${header.temporality}" is not past|present|future; defaulted to present`,
+    );
+  }
+  return PurposeContextSchema.parse({
+    ...(header.objective !== undefined ? { title: header.objective } : {}),
+    ...(header.scope !== undefined ? { scope: header.scope } : {}),
+    ...(header.angle !== undefined ? { angle: header.angle } : {}),
+    ...(header.granularity !== undefined ? { granularity: header.granularity } : {}),
+    ...(temporality?.success ? { temporality: temporality.data } : {}),
+    ...(header.deliverables !== undefined
+      ? { deliverables: header.deliverables.split(',').map((d) => d.trim()).filter(Boolean) }
+      : {}),
+  });
 }
 
 /** One element as the vendored parser returns it (anchors and components alike). */
@@ -66,18 +125,38 @@ function decodeComponentName(owmName: string): string {
 // Worth a warning: the caller's source carries intent we cannot represent.
 const UNPARSED_KEYWORDS = ['market', 'ecosystem', 'buy', 'build', 'outsource'] as const;
 
-/** Containers the parser fills but the canonical schema has no home for. */
+/** Containers the parser fills but the canonical schema has no home for.
+ *  (pipelines/evolved/evolution graduated to real projections — see below.) */
 const UNPROJECTED_CONTAINERS: ReadonlyArray<{ key: keyof UnifiedWardleyMap; label: string }> = [
-  { key: 'pipelines', label: '`pipeline` declaration(s)' },
-  { key: 'evolved', label: '`evolve` directive(s)' },
   { key: 'submaps', label: '`submap` declaration(s)' },
   { key: 'notes', label: '`note` declaration(s)' },
   { key: 'annotations', label: '`annotation` declaration(s)' },
   { key: 'urls', label: '`url` declaration(s)' },
   { key: 'attitudes', label: 'attitude zone(s) (pioneers/settlers/townplanners)' },
   { key: 'accelerators', label: '`accelerator`/`deaccelerator` marker(s)' },
-  { key: 'evolution', label: 'custom evolution axis label(s)' },
 ];
+
+// The renderer's generic method decorator, instantiated for OWM's inline
+// `(build|buy|outsource)` markers. Category value follows the schema's own
+// example ("buying-policy"); per-category styling lives in the renderConfig.
+const METHOD_CATEGORY = 'buying-policy';
+const METHOD_DECORATORS = ['build', 'buy', 'outsource'] as const;
+
+/** The four default OWM axis labels — a parse always returns them, so only a
+ *  source that really carries an `evolution` directive yields custom phases. */
+function customPhases(owm: UnifiedWardleyMap, dsl: string): string[] | undefined {
+  const hasDirective = dsl.split('\n').some((l) => /^evolution\s/.test(l.trim()));
+  if (!hasDirective) return undefined;
+  // Trim: the vendored extraction keeps spaces around `->` separators, and
+  // phases are display labels (our emitter writes the separator unspaced).
+  // Guard: a directive with fewer than 4 labels leaves undefined slots in the
+  // vendored array — drop them instead of crashing the whole parse.
+  const labels = owm.evolution
+    .filter((l): l is typeof l & { line1: string } => typeof l?.line1 === 'string')
+    .map((l) => (l.line2 ? `${l.line1} ${l.line2}` : l.line1).trim())
+    .filter((s) => s.length > 0);
+  return labels.length > 0 ? labels : undefined;
+}
 
 /**
  * Pure projection OWM parse tree → canonical WardleyMap. Collects every ignored
@@ -100,6 +179,28 @@ function toCanonicalMap(owm: UnifiedWardleyMap, dsl: string, warnings: string[])
     (a, b) => (a.line ?? 0) - (b.line ?? 0),
   );
 
+  // `evolve <name> <maturity>` directives and `pipeline <name> [m1, m2]`
+  // declarations live in their own buckets, keyed by the raw declaration
+  // spelling. First occurrence wins, duplicates are reported.
+  const evolveByName = new Map<string, number>();
+  // any: vendored MapEvolved is Record<string, unknown>; fields probed above.
+  for (const ev of owm.evolved as Array<{ name: string; maturity: number }>) {
+    if (evolveByName.has(ev.name)) {
+      warnings.push(`duplicate \`evolve\` for "${ev.name}"; the first target wins`);
+    } else {
+      evolveByName.set(ev.name, ev.maturity);
+    }
+  }
+  const pipelineByName = new Map<string, { m1: number; m2: number }>();
+  // any: vendored MapPipelines is Record<string, unknown>; fields probed above.
+  for (const p of owm.pipelines as Array<{ name: string; maturity1: number; maturity2: number }>) {
+    if (pipelineByName.has(p.name)) {
+      warnings.push(`duplicate \`pipeline\` for "${p.name}"; the first declaration wins`);
+    } else {
+      pipelineByName.set(p.name, { m1: p.maturity1, m2: p.maturity2 });
+    }
+  }
+
   const usedIds = new Set<string>();
   const idByOwmName = new Map<string, string>();
   const components = elements.map((el) => {
@@ -113,18 +214,30 @@ function toCanonicalMap(owm: UnifiedWardleyMap, dsl: string, warnings: string[])
       idByOwmName.set(el.name, id);
     }
 
-    if (el.evolving === true) {
-      warnings.push(`component "${name}": inline evolve target ignored (no canonical projection)`);
-    }
-    if (el.inertia === true) {
-      warnings.push(`component "${name}": \`inertia\` marker ignored`);
-    }
-
     const hasExplicitLabel =
       lineNumbersTrustworthy &&
       typeof el.line === 'number' &&
       (rawLines[el.line - 1] ?? '').includes('label [');
 
+    const visScalar = flipVisibility(clamp01(el.visibility));
+
+    // OWM decorators: `(build|buy|outsource)` → the renderer's generic method
+    // decorator. `(market|ecosystem)` have no canonical home yet.
+    const activeMethods = METHOD_DECORATORS.filter((d) => el.decorators?.[d] === true);
+    if (activeMethods.length > 1) {
+      warnings.push(`component "${name}": multiple method decorators; keeping (${activeMethods[0]})`);
+    }
+    if (el.decorators?.market === true || el.decorators?.ecosystem === true) {
+      warnings.push(`component "${name}": (market)/(ecosystem) decorator ignored (no canonical projection)`);
+    }
+
+    const evolveTarget = evolveByName.get(el.name);
+    const pipeline = pipelineByName.get(el.name);
+    if (pipeline !== undefined && el.type === 'anchor') {
+      warnings.push(`\`pipeline\` on anchor "${name}" ignored`);
+    }
+
+    const hasPipeline = pipeline !== undefined && el.type !== 'anchor';
     return {
       id,
       label: {
@@ -134,14 +247,60 @@ function toCanonicalMap(owm: UnifiedWardleyMap, dsl: string, warnings: string[])
           : {}),
       },
       // OWM `submap` never reaches here (own bucket); anchors keep their type,
-      // everything else lands on the generic canonical `component`.
-      type: el.type === 'anchor' ? ('anchor' as const) : ('component' as const),
+      // a `pipeline`-decorated component becomes the canonical `pipeline` type
+      // (the renderer refuses pipelineGeometry on any other type), everything
+      // else lands on the generic canonical `component`.
+      type:
+        el.type === 'anchor'
+          ? ('anchor' as const)
+          : hasPipeline
+            ? ('pipeline' as const)
+            : ('component' as const),
       position: {
         evolution: { scalar: clamp01(el.maturity) },
-        visibility: { scalar: flipVisibility(clamp01(el.visibility)) },
+        visibility: { scalar: visScalar },
       },
+      ...(el.inertia === true ? { inertia: true } : {}),
+      ...(activeMethods.length > 0
+        ? { method: { category: METHOD_CATEGORY, recommendation: activeMethods[0] } }
+        : {}),
+      // `evolve` moves along X only: the target keeps the component's
+      // visibility. The renderer draws the inertia wall from the TARGET's
+      // inertia flag, so the component-level marker is mirrored there.
+      ...(evolveTarget !== undefined
+        ? {
+            evolvesTo: [
+              {
+                position: {
+                  evolution: { scalar: clamp01(evolveTarget) },
+                  visibility: { scalar: visScalar },
+                },
+                ...(el.inertia === true ? { inertia: true } : {}),
+              },
+            ],
+          }
+        : {}),
+      // OWM pipeline is a horizontal maturity band at the component's row.
+      ...(hasPipeline
+        ? {
+            pipelineGeometry: {
+              evoStart: clamp01(Math.min(pipeline.m1, pipeline.m2)),
+              evoEnd: clamp01(Math.max(pipeline.m1, pipeline.m2)),
+              visStart: visScalar,
+              visEnd: visScalar,
+            },
+          }
+        : {}),
     };
   });
+
+  // `evolve`/`pipeline` lines naming an undeclared component carry intent we drop.
+  for (const name of evolveByName.keys()) {
+    if (!idByOwmName.has(name)) warnings.push(`\`evolve ${name}\` dropped: not a declared component`);
+  }
+  for (const name of pipelineByName.keys()) {
+    if (!idByOwmName.has(name)) warnings.push(`\`pipeline ${name}\` dropped: not a declared component`);
+  }
 
   const relations: Array<{ id: string; consumer: string; supplier: string }> = [];
   for (const link of owm.links) {
@@ -191,7 +350,33 @@ function toCanonicalMap(owm: UnifiedWardleyMap, dsl: string, warnings: string[])
   }
 
   // Parse to apply renderer defaults and guarantee a schema-valid canonical map.
-  return WardleyMapSchema.parse({ title: owm.title, components, relations });
+  // The `// context:` header value has a first-class home on the canonical map.
+  const context = normalizeHeaderKeys(parseHeaderComments(dsl)).context;
+  const map = WardleyMapSchema.parse({
+    title: owm.title,
+    components,
+    relations,
+    ...(context !== undefined ? { context } : {}),
+  });
+
+  // A custom `evolution A->B->…` directive re-labels the X-axis phases. The
+  // renderConfig is a Zod pipe whose parsed shape is not re-parsable, so it
+  // rides in INPUT shape next to the validated map (render-config-passthrough
+  // idiom, same as the layout strategies). V3 input shape for phase labels:
+  // style.background.phases.default.labels[].text.
+  const phases = customPhases(owm, dsl);
+  return phases !== undefined
+    ? ({
+        ...map,
+        renderConfig: {
+          style: {
+            background: {
+              phases: { default: { labels: phases.map((text) => ({ text })) } },
+            },
+          },
+        },
+      } as WardleyMap)
+    : map;
 }
 
 export class RenderWardleyMapOwmParseDslStrategy extends BaseStrategy<
@@ -246,15 +431,28 @@ export class RenderWardleyMapOwmParseDslStrategy extends BaseStrategy<
       };
     }
 
+    // Deterministic study-context capture: `// key: value` header comments.
+    const header = parseHeaderComments(dsl);
+    const hasHeader = Object.keys(header).length > 0;
+    const context = hasHeader
+      ? headerToPurposeContext(normalizeHeaderKeys(header), warnings)
+      : undefined;
+
     return {
       signals: [
         { name: 'dslBytes', value: dsl.length, source: 'user-input', capturedAt },
         { name: 'componentCount', value: map.components.length, source: 'computed', capturedAt },
         { name: 'relationCount', value: map.relations.length, source: 'computed', capturedAt },
+        { name: 'headerKeyCount', value: Object.keys(header).length, source: 'computed', capturedAt },
       ],
       reasoning: [],
       insights: warnings.map((text) => ({ text, by: METHOD_ID, type: 'other' as const })),
-      result: { map, parsed: true, warnings },
+      result: {
+        map,
+        parsed: true,
+        warnings,
+        ...(hasHeader ? { header, context } : {}),
+      },
     };
   }
 }

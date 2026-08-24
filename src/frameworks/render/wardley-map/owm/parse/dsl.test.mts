@@ -110,18 +110,27 @@ describe('render:wardley-map:owm:parse:dsl (real, deterministic)', () => {
       ].join('\n'),
     );
 
-    // Only the projectable subset survives.
+    // Only the projectable subset survives as components.
     assert.deepEqual(map!.components.map((c) => c.label.name), ['User', 'Kubernetes']);
     assert.equal(map!.relations.length, 1);
+
+    // evolve/pipeline/evolution now PROJECT instead of warning.
+    const kube = map!.components[1];
+    assert.deepEqual(kube.evolvesTo![0].position.evolution, { scalar: 0.85 });
+    assert.equal(kube.pipelineGeometry!.evoStart, 0.4);
+    assert.equal(kube.pipelineGeometry!.evoEnd, 0.8);
+    // any: input-shape renderConfig rides untyped next to the map (passthrough idiom)
+    const labels = (map as any).renderConfig?.style?.background?.phases?.default?.labels;
+    assert.deepEqual(labels?.map((l: { text: string }) => l.text), ['Novel', 'Emerging', 'Good', 'Best']);
+
+    // The widened parse output (input-shape renderConfig included) must stay
+    // schema-valid — the passthrough shape is a legal INPUT.
     assert.ok(WardleyMapSchema.safeParse(map).success);
 
     const joined = warnings.join('\n');
     for (const expected of [
       /`style` directive ignored/,
       /`size` directive ignored/,
-      /custom evolution axis label/,
-      /`evolve` directive/,
-      /`pipeline` declaration/,
       /`note` declaration/,
       /`annotation` declaration/,
       /`submap` declaration/,
@@ -136,12 +145,121 @@ describe('render:wardley-map:owm:parse:dsl (real, deterministic)', () => {
     ]) {
       assert.match(joined, expected);
     }
+    assert.ok(!/`evolve` directive/.test(joined), joined);
+    assert.ok(!/`pipeline` declaration/.test(joined), joined);
+  });
+
+  it('projects inertia and (build|buy|outsource) decorators onto the canonical component', async () => {
+    const { map } = await parseDsl(
+      [
+        'title Decorated',
+        'component Kettle [0.43, 0.35] inertia',
+        'component Power [0.1, 0.7] (outsource)',
+      ].join('\n'),
+    );
+    assert.equal(map!.components[0].inertia, true);
+    assert.equal(map!.components[1].inertia, undefined);
+    assert.deepEqual(map!.components[1].method, {
+      category: 'buying-policy',
+      recommendation: 'outsource',
+    });
   });
 
   it('clamps out-of-range coordinates instead of failing the schema', async () => {
     const { map } = await parseDsl(['title Clamp', 'component Wild [1.4, -0.2]'].join('\n'));
     assert.equal(map!.components[0].position.visibility.scalar, 0);
     assert.equal(map!.components[0].position.evolution.scalar, 0);
+  });
+
+  it('captures `// key: value` header comments into header, context and map.context', async () => {
+    const result = await parseDsl(
+      [
+        'title Spotify',
+        'style plain',
+        '// angle: positionnement stratégique',
+        '// scope: écosystème complet',
+        '// temporality: present',
+        '// objective: cartographier la chaîne de valeur',
+        '// context: Spotify opère un modèle freemium.',
+        '// custom-key: kept raw',
+        'component Catalogue [0.5, 0.6]',
+        '// after-declaration: ignored (header is closed)',
+      ].join('\n'),
+    );
+
+    assert.deepEqual(result.header, {
+      angle: 'positionnement stratégique',
+      scope: 'écosystème complet',
+      temporality: 'present',
+      objective: 'cartographier la chaîne de valeur',
+      context: 'Spotify opère un modèle freemium.',
+      'custom-key': 'kept raw',
+    });
+    // Known keys are projected onto the study Context shape…
+    assert.equal(result.context!.title, 'cartographier la chaîne de valeur');
+    assert.equal(result.context!.angle, 'positionnement stratégique');
+    assert.equal(result.context!.scope, 'écosystème complet');
+    assert.equal(result.context!.temporality, 'present');
+    // …and the `context:` value lands on the canonical map itself.
+    assert.equal(result.map!.context, 'Spotify opère un modèle freemium.');
+  });
+
+  it('folds French header-key aliases onto the canonical projections (accents included)', async () => {
+    const result = await parseDsl(
+      [
+        'title T',
+        '// contexte: chaine de valeur artisanale',
+        '// objectif: comprendre la chaine',
+        // `future` on purpose: an accented key that silently missed would leave
+        // the DEFAULT (`present`), so this assertion cannot pass vacuously.
+        '// temporalité: future',
+        '// portée: la boutique uniquement',
+        'component A [0.5, 0.5]',
+      ].join('\n'),
+    );
+    // Raw header keeps the source spelling; projections use the canonical keys.
+    assert.equal(result.header!['contexte'], 'chaine de valeur artisanale');
+    assert.equal(result.header!['temporalité'], 'future');
+    assert.equal(result.map!.context, 'chaine de valeur artisanale');
+    assert.equal(result.context!.title, 'comprendre la chaine');
+    assert.equal(result.context!.temporality, 'future');
+    assert.equal(result.context!.scope, 'la boutique uniquement');
+  });
+
+  it('keeps reading headers after an `evolution` axis directive', async () => {
+    const result = await parseDsl(
+      [
+        'title T',
+        'evolution A->B->C->D',
+        '// context: après la directive',
+        'component X [0.5, 0.5]',
+      ].join('\n'),
+    );
+    assert.equal(result.map!.context, 'après la directive');
+  });
+
+  it('survives an evolution directive with fewer than 4 labels (no crash, phases kept)', async () => {
+    const result = await parseDsl(
+      ['title T', 'evolution A->B', 'component X [0.5, 0.5]'].join('\n'),
+    );
+    // any: input-shape renderConfig rides untyped next to the map
+    const labels = (result.map as any).renderConfig?.style?.background?.phases?.default?.labels;
+    assert.deepEqual(labels, [{ text: 'A' }, { text: 'B' }]);
+  });
+
+  it('defaults an invalid header temporality to present, with a warning', async () => {
+    const result = await parseDsl(
+      ['title T', '// temporality: someday', 'component A [0.5, 0.5]'].join('\n'),
+    );
+    assert.equal(result.context!.temporality, 'present');
+    assert.ok(result.warnings.some((w) => w.includes('someday')));
+  });
+
+  it('reports no header fields when the source has none', async () => {
+    const result = await parseDsl(['title Bare', 'component A [0.5, 0.5]'].join('\n'));
+    assert.equal(result.header, undefined);
+    assert.equal(result.context, undefined);
+    assert.equal(result.map!.context, undefined);
   });
 
   it('degrades gracefully when the input carries no `dsl` string', async () => {
@@ -183,6 +301,58 @@ const fixtures: Fixture[] = [
         { id: 'rel-1', consumer: 'merchant', supplier: 'checkout' },
         { id: 'rel-2', consumer: 'checkout', supplier: 'card-network' },
       ],
+    }),
+  },
+  {
+    name: 'rich constructs: evolve + inertia + pipeline + method + custom phases',
+    map: {
+      ...WardleyMapSchema.parse({
+        title: 'Rich',
+        components: [
+          { id: 'user', label: { name: 'User' }, type: 'anchor', position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.05 } } },
+          {
+            id: 'kettle', label: { name: 'Kettle' }, type: 'component', inertia: true,
+            position: { evolution: { scalar: 0.35 }, visibility: { scalar: 0.57 } },
+            evolvesTo: [{ position: { evolution: { scalar: 0.62 }, visibility: { scalar: 0.57 } } }],
+          },
+          {
+            // `pipeline` type: the renderer refuses pipelineGeometry elsewhere.
+            id: 'power', label: { name: 'Power' }, type: 'pipeline',
+            method: { category: 'buying-policy', recommendation: 'outsource' },
+            position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.9 } },
+            pipelineGeometry: { evoStart: 0.6, evoEnd: 0.85, visStart: 0.9, visEnd: 0.9 },
+          },
+        ],
+        relations: [
+          { id: 'rel-1', consumer: 'user', supplier: 'kettle' },
+          { id: 'rel-2', consumer: 'kettle', supplier: 'power' },
+        ],
+      }),
+      // Input-shape (V3) renderConfig, attached after the schema parse on purpose
+      // (the passthrough idiom — a parsed-shape renderConfig is not re-parsable).
+      renderConfig: {
+        style: {
+          background: {
+            phases: {
+              default: {
+                labels: [{ text: 'Idee' }, { text: 'Artisanat' }, { text: 'Produit' }, { text: 'Utilite' }],
+              },
+            },
+          },
+        },
+      },
+    } as WardleyMap,
+  },
+  {
+    name: 'map context riding as a `// context:` header comment',
+    map: WardleyMapSchema.parse({
+      title: 'Contextualised',
+      context: 'Freemium platform between rights holders and listeners.',
+      components: [
+        { id: 'listener', label: { name: 'Listener' }, type: 'anchor', position: { evolution: { scalar: 0.85 }, visibility: { scalar: 0.05 } } },
+        { id: 'catalogue', label: { name: 'Catalogue' }, type: 'component', position: { evolution: { scalar: 0.63 }, visibility: { scalar: 0.51 } } },
+      ],
+      relations: [{ id: 'rel-1', consumer: 'listener', supplier: 'catalogue' }],
     }),
   },
   {

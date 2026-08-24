@@ -13,7 +13,7 @@
 | `LABRE_OAUTH_RESOURCE` | URL absolue | *(Opt-in, avec `LABRE_OAUTH_AUTH_SERVER`)* URL publique du daemon (ex. `https://framework-mcp.labre.app/mcp`). Active la decouverte OAuth (RFC 9728) : endpoint `/.well-known/oauth-protected-resource` + en-tete `WWW-Authenticate` sur les 401. Le daemon reste serveur de ressources (ne signe aucun token). |
 | `LABRE_OAUTH_AUTH_SERVER` | URL absolue | *(Opt-in, avec `LABRE_OAUTH_RESOURCE`)* URL du serveur d'autorisation = l'app labre (ex. `https://labre.app`). Les deux vars ensemble ou aucune. |
 | `LABRE_MCP_ADMIN_TOKEN` | chaine partagee | *(Opt-in)* Secret d'ops **partage** entre le daemon et son unique consommateur, la console admin Labre. Active `GET /config/llm` (config LLM live, lecture seule). Requete : `Authorization: Bearer <token>`. Absent → `503` (endpoint desactive) ; header manquant/faux → `401`. Distinct de l'auth par utilisateur sur `/mcp`. |
-| `LABRE_DISABLE_MOCKS` | `1` | Ne charge que les 15 strategies reelles au boot (exclut les 70 mocks). |
+| `LABRE_DISABLE_MOCKS` | `1` | Ne charge que les 24 strategies reelles au boot (exclut les 61 mocks). |
 | `WARDLEY_VERBOSE` | `1`, `true`, `yes` | Active les messages debug dans les notifications. Desactive par defaut. |
 | `WARDLEY_EVAL_MODE` | `exclusive`, `parallel` | Mode de routage solution/capability. `exclusive` (defaut) : un seul pipeline. `parallel` : les deux pipelines, resultats fusionnes. |
 | `_WARDLEY_NESTED` | `1` | **Automatique** — Positionne par le serveur au demarrage. Guard anti-recursion. Ne pas modifier. |

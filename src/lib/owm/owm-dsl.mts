@@ -118,6 +118,49 @@ export function formatComponentName(name: string, opts: FormatNameOptions = {}):
   return `"${head} \\n ${tail}"`;
 }
 
+// ─── Header comments ────────────────────────────────────────────────────────
+//
+// Convention: study-context metadata travels as `// key: value` comment lines
+// near the top of the file (before the first declaration). The vendored OWM
+// parser strips comments, so both directions live here: `emitHeaderComment`
+// for emitters and `parseHeaderComments` for parsers.
+
+// Unicode-aware: accented keys (temporalité, portée, …) must match — the
+// strategy layer folds them onto canonical English keys.
+const HEADER_COMMENT = /^\/\/\s*([\p{L}][\p{L}\p{N}_-]*)\s*:\s*(.+)$/u;
+
+/** `// key: value` — one study-context metadata line. Newlines in the value
+ *  would break the line grammar; they are folded to spaces. Callers must not
+ *  emit an EMPTY value: `parseHeaderComments` requires one, so the line would
+ *  silently vanish on the way back and break byte-identity. */
+export function emitHeaderComment(key: string, value: string): string {
+  return `// ${key}: ${value.replace(/\s*\r?\n\s*/g, ' ').trim()}`;
+}
+
+/**
+ * Lift every `// key: value` line appearing BEFORE the first declaration
+ * (anchor/component/link/…; `title`, `style`, `size` and the `evolution`
+ * axis directive do not close the header). First occurrence of a key wins;
+ * keys are lowercased.
+ */
+export function parseHeaderComments(dsl: string): Record<string, string> {
+  const header: Record<string, string> = {};
+  for (const raw of dsl.split('\n')) {
+    const line = raw.trim();
+    if (line.length === 0) continue;
+    const m = HEADER_COMMENT.exec(line);
+    if (m) {
+      const key = m[1].toLowerCase();
+      if (!(key in header)) header[key] = m[2].trim();
+      continue;
+    }
+    if (line.startsWith('//')) continue; // free comment, keep scanning
+    if (/^(title|style|size|evolution)\b/.test(line)) continue; // preamble directives
+    break; // first declaration closes the header block
+  }
+  return header;
+}
+
 // ─── Commands ───────────────────────────────────────────────────────────────
 
 /** `title <text>` — first non-comment line idiomatically. */
@@ -176,13 +219,27 @@ export function emitPipelineBlock(name: string, innerLines: readonly string[]): 
   return `${opener}\n{\n${body}\n}`;
 }
 
+/** The vendored evolve extraction finds the maturity with this pattern — a
+ *  DECIMAL is mandatory (`evolve X 1` never matches) and the FIRST match wins
+ *  (a decimal embedded in the name, e.g. "HTTP 1.1", would steal the slot and
+ *  rebind the directive to the wrong component). Emitters must format the
+ *  maturity through `fmtEvolveMaturity` and refuse names this pattern matches. */
+export const EVOLVE_MATURITY_PATTERN = /\s[0-9]?\.[0-9]+/;
+
+/** Maturity for an `evolve` line: always carries a decimal point so the
+ *  vendored extraction pattern matches (`1` → `1.0`, `0` → `0.0`). */
+export function fmtEvolveMaturity(m: number): string {
+  const r = round2(m);
+  return Number.isInteger(r) ? r.toFixed(1) : String(r);
+}
+
 /** `evolve <name> <new_evo> label [dx, dy]` */
 export function emitEvolve(
   name: string,
   newEvolution: number,
   label?: OwmLabelOffset,
 ): string {
-  const base = `evolve ${formatComponentName(name)} ${round2(newEvolution)}`;
+  const base = `evolve ${formatComponentName(name)} ${fmtEvolveMaturity(newEvolution)}`;
   return label ? `${base} label ${fmtLabel(label)}` : base;
 }
 
@@ -216,9 +273,11 @@ export function emitSize(size: OwmSize): string {
   return `size [${Math.round(size.width)}, ${Math.round(size.height)}]`;
 }
 
-/** `evolution <l1> -> <l2> -> <l3> -> <l4>` — X-axis labels. */
-export function emitEvolutionAxis(labels: [string, string, string, string]): string {
-  return `evolution ${labels.join(' -> ')}`;
+/** `evolution <l1>-><l2>->…` — X-axis phase labels. NO spaces around `->`:
+ *  the vendored XAxisLabels extraction does not trim, so spaced separators
+ *  would leak into the parsed labels and break the byte-exact round-trip. */
+export function emitEvolutionAxis(labels: readonly string[]): string {
+  return `evolution ${labels.join('->')}`;
 }
 
 /** `submap <name> [vis, evo] url(<ref>) label [dx, dy]` */
