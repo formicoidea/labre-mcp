@@ -258,6 +258,22 @@ curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" -d '{
 
 > `runCommand` expose toute la surface du catalogue, **mocks compris** (61 stratégies renvoient un insight `mock strategy for <id>`). Les 25 stratégies réelles sont listées dans [ast-schema.md → État d'implémentation](../architecture/ast-schema.md).
 
+### Commandes de parsing vers le JSON canonique
+
+Les commandes du domaine `render` convergent des entrées divergentes (DSL OWM, SVG, PNG, texte) vers le `WardleyMap` canonique, et l'inverse. Toutes s'invoquent via `runCommand` ; sortie type `{ map, parsed, warnings }` (parse) ou `{ dsl | svg | pngBase64, ... }` (emit).
+
+| Commande | Entrée | Nature | Notes |
+| --- | --- | --- | --- |
+| `render:wardley-map:owm:parse:dsl` | `{ dsl }` | déterministe | Round-trip byte-exact avec `owm:emit:dsl` sur le dialecte émis ; capture les en-têtes `// context:` etc. |
+| `render:wardley-map:owm:emit:dsl` | `WardleyMap` | déterministe | Toute perte est déclarée en insight |
+| `render:wardley-map:image:parse:svg` | `{ svg }` | déterministe | SVG émis par notre renderer ; inversion géométrique exacte |
+| `render:wardley-map:image:emit:svg` | `WardleyMap` | déterministe | `renderToSVG` du renderer |
+| `render:wardley-map:image:parse:png` | `{ pngBase64 }` | **LLM vision** | Nécessite un mapping `render-image-parse-png` vers un modèle vision dans `llm.config.json` ; couleurs arbitrées par les pixels ; positions = estimations visuelles |
+| `render:wardley-map:image:emit:png` | `WardleyMap` | déterministe | `{ pngBase64 }`, ~1 s/rendu |
+| `render:wardley-map:text:lint:default` | `{ text, target? }` | **LLM** | Lint d'une chaîne de valeur quasi structurée vers `json` (défaut) ou `owm` ; refuse (`NOT_A_VALUE_CHAIN`) un texte hors sujet |
+
+Les JSON Schemas du contrat (map canonique, JSON-labre, CommandCall/CommandResult) sont servis par le daemon : `GET /schemas/wardley-map.schema.json`, `json-labre.schema.json`, `command-call.schema.json`, `command-result.schema.json`.
+
 ---
 
 ## runRecipe
@@ -333,3 +349,7 @@ Estime l'evolution d'un **anchor** (user need, haut de la value chain) via la le
 ### generateValueChain — recette multi-etapes (via runRecipe)
 
 Genere une chaine de valeur (layout pour lisibilite, jamais maturite d'evolution). Recette 4 etapes `recipes/wardley/map/generate.recipe.json` (`value-chain:generate:top-down` → `prevent-collision` → `audit:overlap-check` → `owm:emit`), invocable via `runRecipe { recipe: "wardley:map:generate" }` ; outil dedie a cabler (B3). L'etape de generation seule reste appelable via `runCommand { command: "wardley:map:value-chain:generate:top-down" }`.
+
+### textToCanonical — recette (via runRecipe)
+
+Convertit un **texte quasi structure** (liste de composants avec positions, DSL approximatif) en `WardleyMap` canonique : `text:lint:default` (LLM, refuse un texte hors sujet) puis `owm:parse:dsl` quand la cible est `owm`. Invocable via `runRecipe { recipe: "render:map:text-to-canonical", input: { text, target? } }` (`target`: `json` par defaut, ou `owm`). Recette `recipes/render/map/text-to-canonical.recipe.json`. Pour la prose libre (description d'un domaine sans structure), utiliser plutot `wardley:map:generate`.
