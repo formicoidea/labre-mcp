@@ -12,7 +12,7 @@
 | Élément | État |
 |---|---|
 | Outils MCP câblés | `estimateEvolution` (recette `estimate-component-evolution`), `runCommand` (invocation directe de n'importe quel methodId), `__ping__` (smoke). Recettes multi-étapes restantes (evaluateMap, generateValueChain) non encore exposées — roadmap B3. |
-| Stratégies enregistrées | 85 au boot : **24 réelles** + **61 mocks** (`LABRE_DISABLE_MOCKS=1` isole les réelles). Liste des réelles : [ast-schema.md → « État d'implémentation »](../architecture/ast-schema.md). |
+| Stratégies enregistrées | 86 au boot : **25 réelles** + **61 mocks** (`LABRE_DISABLE_MOCKS=1` isole les réelles). Liste des réelles : [ast-schema.md → « État d'implémentation »](../architecture/ast-schema.md). |
 
 ## 2. Points d'entrée
 
@@ -103,14 +103,17 @@ src/
 │   │   │                     _legacy/write/{strategies,routing,pipeline,patent,s-curve}/
 │   │   ├── climate/  doctrine/  gameplay/  iteration/   mock-strategies (surface AST exposée)
 │   ├── common/               registry.mts (réel : place-labels, overlap-check — I/O canonique WardleyMap) ; layout/, toolbox/
-│   ├── render/               wardley-map/{owm,image}/  — 6 réels au contrat canonique : owm/{parse,emit}/dsl (round-trip
+│   ├── render/               wardley-map/{owm,image,text}/  — 7 réels au contrat canonique : owm/{parse,emit}/dsl (round-trip
 │   │   │                     byte-exact via lib/owm + vendored cli-owm ; parse capture en-têtes `// clé: valeur` →
 │   │   │                     result.header + PurposeContext + map.context [alias FR], evolve→evolvesTo, inertia,
 │   │   │                     pipeline→pipelineGeometry, (build|buy|outsource)→method, directive evolution→phases
 │   │   │                     renderConfig V3 ; emit est l'inverse exact),
 │   │   │                     image/emit/{svg,png} (renderToSVG/renderToPNG),
 │   │   │                     image/parse/svg (inversion géométrique calibrée par computeMapGeometry),
-│   │   │                     image/parse/png (LLM vision → JSON intermédiaire strict → projection déterministe)
+│   │   │                     image/parse/png (LLM vision → JSON intermédiaire strict → projection déterministe),
+│   │   │                     text/lint/default (lint LLM de texte quasi-structuré, target json [défaut, sans perte,
+│   │   │                     structured output si le provider le supporte] ou owm [éditable] ;
+│   │   │                     court-circuits déterministes, refus NOT_A_VALUE_CHAIN sur la prose libre)
 │   │   └── wardley-map/acl/  anti-corruption layer : WardleyMap ↔ PositionedValueChain (inverse la convention de visibilité : legacy 0.95=haut ↔ renderer 0=haut)
 │   ├── mocks-registry.mts    enregistre les 61 *.mock-strategy.mts
 │
@@ -166,6 +169,7 @@ Partagé : lib/{llm, degradation, flags, prompts, owm, response-formatter, langu
 - `recipes/wardley/map/generate.recipe.json`
 - `recipes/wardley/map/draw-value-chain.recipe.json` — prompt → chaîne de valeur (X = lisibilité, **pas** d'évolution) → SVG
 - `recipes/wardley/map/estimate-chain-components.recipe.json` — `select-by-type:component` (anchors exclus) → fan-out `llm-direct` per-composant → annotations d'évolution (pas de rendu)
+- `recipes/render/map/text-to-canonical.recipe.json` — texte quasi-structuré → `text:lint:default` (LLM, cosmétique) → `owm:parse:dsl` (déterministe, seul producteur du map + capture d'en-têtes) ; chemin JSON : le map est déjà dans `$.linted.result.map`
 
 > Toutes les recettes livrées ont **≥ 2 étapes** (orchestration). Une commande seule s'appelle directement via l'outil MCP `runCommand` (cf. [tools-reference](../functional/tools-reference.md)) — pas via une recette mono-étape.
 

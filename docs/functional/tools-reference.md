@@ -256,7 +256,7 @@ curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" -d '{
 }'
 ```
 
-> `runCommand` expose toute la surface du catalogue, **mocks compris** (70 stratégies renvoient un insight `mock strategy for <id>`). Les 15 stratégies réelles sont listées dans [ast-schema.md → État d'implémentation](../architecture/ast-schema.md).
+> `runCommand` expose toute la surface du catalogue, **mocks compris** (61 stratégies renvoient un insight `mock strategy for <id>`). Les 25 stratégies réelles sont listées dans [ast-schema.md → État d'implémentation](../architecture/ast-schema.md).
 
 ---
 

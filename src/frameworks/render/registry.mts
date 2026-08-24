@@ -14,6 +14,7 @@ import { RenderWardleyMapImageParsePngStrategy } from './wardley-map/image/parse
 import { RenderWardleyMapImageParseSvgStrategy } from './wardley-map/image/parse/svg.mjs';
 import { RenderWardleyMapOwmEmitDslStrategy } from './wardley-map/owm/emit/dsl.mjs';
 import { RenderWardleyMapOwmParseDslStrategy } from './wardley-map/owm/parse/dsl.mjs';
+import { RenderWardleyMapTextLintStrategy } from './wardley-map/text/lint/default.mjs';
 
 export function registerRenderStrategies(
   registry: StrategyRegistry<BaseStrategy>,
@@ -41,5 +42,9 @@ export function registerRenderStrategies(
   registry.register(
     RenderWardleyMapOwmParseDslStrategy.method,
     RenderWardleyMapOwmParseDslStrategy,
+  );
+  registry.register(
+    RenderWardleyMapTextLintStrategy.method,
+    RenderWardleyMapTextLintStrategy,
   );
 }

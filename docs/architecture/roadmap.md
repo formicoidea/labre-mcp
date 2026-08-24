@@ -6,7 +6,7 @@
 
 ## État courant en une ligne
 
-Daemon HTTP `src/core/transport/labre-daemon.mts` (:6767) — **4 outils MCP câblés** (`estimateEvolution`, `runCommand`, `runRecipe`, `__ping__`) — **85 stratégies** enregistrées dont **24 réelles** et **61 mocks** — kernel sous `src/core/`, utilitaires encore sous `src/lib/`, stratégies réelles encore sous `_legacy/`.
+Daemon HTTP `src/core/transport/labre-daemon.mts` (:6767) — **4 outils MCP câblés** (`estimateEvolution`, `runCommand`, `runRecipe`, `__ping__`) — **86 stratégies** enregistrées dont **25 réelles** et **61 mocks** — kernel sous `src/core/`, utilitaires encore sous `src/lib/`, stratégies réelles encore sous `_legacy/`.
 
 ## Chantiers (Famille B)
 
@@ -32,7 +32,7 @@ Daemon HTTP `src/core/transport/labre-daemon.mts` (:6767) — **4 outils MCP câ
 ### B4 — Promotion des mocks → stratégies réelles
 
 - **Cible** : catalogue [ast-schema.md](ast-schema.md) § 1.2 entièrement réel.
-- **Aujourd'hui** : 61 mocks (`src/frameworks/**/*.mock-strategy.mts`, enregistrés via `registerMocks`) vs 24 réelles. La liste des réelles fait foi dans [ast-schema.md → « État d'implémentation »](ast-schema.md). Dernières promotions : `wardley:map:basemap:generate:default`, `render:wardley-map:image:emit:svg`, `wardley:map:value-chain:organized-y-position:default`, et `wardley:map:value-chain:select-by-type:component` (moteur sélecteur : construit le tableau des nœuds `type:'component'` pour fan-out per-composant — le positionnement de masse est une recette, pas une stratégie monolithique).
+- **Aujourd'hui** : 61 mocks (`src/frameworks/**/*.mock-strategy.mts`, enregistrés via `registerMocks`) vs 25 réelles. La liste des réelles fait foi dans [ast-schema.md → « État d'implémentation »](ast-schema.md). Dernières promotions : `wardley:map:basemap:generate:default`, `render:wardley-map:image:emit:svg`, `wardley:map:value-chain:organized-y-position:default`, et `wardley:map:value-chain:select-by-type:component` (moteur sélecteur : construit le tableau des nœuds `type:'component'` pour fan-out per-composant — le positionnement de masse est une recette, pas une stratégie monolithique).
 - **Action** : implémenter les stratégies prioritaires, basculer leur `StrategyMetadata.status` de `mock` à `experimental`, mettre à jour la liste « État d'implémentation » de l'AST.
 
 ### B5 — Unification de version

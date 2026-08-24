@@ -229,5 +229,16 @@
       "variables": ["mediaType"],
       "parser": { "kind": "delimited", "startMarker": "MAP_START", "endMarker": "MAP_END" }
     }
+  },
+  "render-text-lint": {
+    "default": {
+      "kind": "template",
+      "templateFile": {
+        "system": "prompts/render-text-lint.system.md",
+        "user": "prompts/render-text-lint.user.md"
+      },
+      "variables": ["text", "target"],
+      "parser": { "kind": "delimited", "startMarker": "LINT_START", "endMarker": "LINT_END" }
+    }
   }
 }
