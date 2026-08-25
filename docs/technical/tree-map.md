@@ -61,7 +61,10 @@ src/
 │   │                         capability `vision` (images base64 dans LLMCallOptions ; http-api seul
 │   │                         provider vision, les autres échouent explicitement),
 │   │                         usage-context (collector ALS d'usage LLM par run —
-│   │                         llmCalls + tokens quand le provider les expose)
+│   │                         llmCalls + tokens quand le provider les expose),
+│   │                         ai-call-sentinel (événement `AiCallEmitted` à chaque
+│   │                         invocation d'un call du registre — sonde de l'écart
+│   │                         « appels émis vs lignes ai_calls », métadonnées seules)
 │   ├── prompts/              registry (cache global + branche override ALS + substitution
 │   │                         de variante A/B), config.loader, builders/parsers-registry,
 │   │                         interpolate, init (split .system.md / .user.md),
