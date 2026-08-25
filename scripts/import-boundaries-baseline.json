@@ -1,0 +1,50 @@
+{
+  "_readBy": "scripts/check-import-boundaries.mts — see that file's header for the three rules and their reasoning.",
+  "_why": "Documented deviations from invariant I2 (transport state separate from business state), enumerated 2026-08-25 by the AI-harness audit, chantier CH-06. These crossings exist because the transport layer physically lives INSIDE the kernel tree, at src/core/transport/ (ARCH-14): the daemon and its boot wiring are transport concerns sitting in src/core/, and they reach into src/mcp/ to build the tool registry. The deviation is assumed, not accidental — the guard's job for now is to stop it GROWING.",
+  "_liftedBy": "CH-23 — the labre-mcp façade refactor. It moves transport out of src/core/ and inverts the boot dependency, at which point rule TRANSPORT_TO_MCP no longer applies and every entry below is deleted along with it. Nothing here is a to-do list for a passer-by: shrinking this file is CH-23's work, not a drive-by fix.",
+  "_format": "One object per tolerated finding: {file, rule, specifier, why}. Literal triples only — no wildcard, no 'at most N' threshold, either of which would let a brand-new violation hide behind an old one. An entry matching no finding fails the guard (rule STALE), so this file can never drift away from the tree it describes.",
+  "violations": [
+    {
+      "file": "src/core/recipe/shipped-recipes-validation.test.mts",
+      "rule": "CORE_TO_TRANSPORT",
+      "specifier": "#core/transport/labre-daemon.mjs",
+      "why": "The shipped-recipe validation test builds a full strategy registry, and the only exported builder — buildStrategyRegistry — currently lives in the daemon module rather than in the registry module it belongs to. CH-23 moves that builder into the kernel, which retires this entry."
+    },
+    {
+      "file": "src/core/transport/boot-tool-registry.mts",
+      "rule": "TRANSPORT_TO_MCP",
+      "specifier": "#mcp/estimate-evolution.tool.mjs",
+      "why": "Boot wiring imports the MCP tool descriptor as a VALUE to register it. Legitimate for boot code — illegitimate only because boot code currently sits inside src/core/."
+    },
+    {
+      "file": "src/core/transport/boot-tool-registry.mts",
+      "rule": "TRANSPORT_TO_MCP",
+      "specifier": "#mcp/evaluate-map.tool.mjs",
+      "why": "Same boot wiring, same reason as estimate-evolution.tool.mjs above."
+    },
+    {
+      "file": "src/core/transport/boot-tool-registry.mts",
+      "rule": "TRANSPORT_TO_MCP",
+      "specifier": "#mcp/generate-value-chain.tool.mjs",
+      "why": "Same boot wiring, same reason as estimate-evolution.tool.mjs above."
+    },
+    {
+      "file": "src/core/transport/boot-tool-registry.mts",
+      "rule": "TRANSPORT_TO_MCP",
+      "specifier": "#mcp/run-command.tool.mjs",
+      "why": "Same boot wiring, same reason as estimate-evolution.tool.mjs above."
+    },
+    {
+      "file": "src/core/transport/boot-tool-registry.mts",
+      "rule": "TRANSPORT_TO_MCP",
+      "specifier": "#mcp/run-recipe.tool.mjs",
+      "why": "Same boot wiring, same reason as estimate-evolution.tool.mjs above."
+    },
+    {
+      "file": "src/core/transport/labre-daemon.mts",
+      "rule": "TRANSPORT_TO_MCP",
+      "specifier": "#mcp/shipped-root.mjs",
+      "why": "The daemon resolves the shipped recipes root through a constant that lives in src/mcp/. SHIPPED_ROOT is a packaging fact, not an MCP fact; CH-23 relocates it to the kernel."
+    }
+  ]
+}
