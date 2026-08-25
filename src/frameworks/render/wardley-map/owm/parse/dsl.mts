@@ -13,6 +13,11 @@
 // synthesises a default offset for every component, and adopting it would make
 // the emitter add a `label` directive that was never written.
 //
+// Same rule for the preamble directives (`style`, `size`, `evolution`): the
+// vendored parser fills their containers with DEFAULTS on every parse, so the
+// warning is raised from a scan of the SOURCE LINES (`hasDirective`) — never
+// from the parsed value, which would make every source noisy.
+//
 // Graceful by design (degradation-first): any OWM construction that has no home
 // in the canonical schema is IGNORED and reported in `warnings`; the strategy
 // never throws on a syntactically odd source. A non-string input degrades to
@@ -143,11 +148,24 @@ const UNPROJECTED_CONTAINERS: ReadonlyArray<{ key: keyof UnifiedWardleyMap; labe
 const METHOD_CATEGORY = 'buying-policy';
 const METHOD_DECORATORS = ['build', 'buy', 'outsource'] as const;
 
+/**
+ * Does the SOURCE actually carry a `<keyword> …` preamble directive?
+ *
+ * The vendored parser fills `presentation.style` and the four evolution axis
+ * labels with DEFAULTS on every parse, so a guard on the PARSED value fires for
+ * every source — including irreproachable ones — and drowns the real warnings in
+ * ambient noise. Only the source line is evidence that the author wrote the
+ * directive, exactly like the `label [` scan in `toCanonicalMap`.
+ */
+function hasDirective(rawLines: readonly string[], keyword: string): boolean {
+  const pattern = new RegExp(`^${keyword}\\s`);
+  return rawLines.some((l) => pattern.test(l.trim()));
+}
+
 /** The four default OWM axis labels — a parse always returns them, so only a
  *  source that really carries an `evolution` directive yields custom phases. */
-function customPhases(owm: UnifiedWardleyMap, dsl: string): string[] | undefined {
-  const hasDirective = dsl.split('\n').some((l) => /^evolution\s/.test(l.trim()));
-  if (!hasDirective) return undefined;
+function customPhases(owm: UnifiedWardleyMap, rawLines: readonly string[]): string[] | undefined {
+  if (!hasDirective(rawLines, 'evolution')) return undefined;
   // Trim: the vendored extraction keeps spaces around `->` separators, and
   // phases are display labels (our emitter writes the separator unspaced).
   // Guard: a directive with fewer than 4 labels leaves undefined slots in the
@@ -335,9 +353,14 @@ function toCanonicalMap(owm: UnifiedWardleyMap, dsl: string, warnings: string[])
       warnings.push(`${container.length} ${label} ignored (no canonical projection)`);
     }
   }
-  if (owm.presentation?.style) warnings.push('`style` directive ignored (presentation lives in renderConfig)');
-  const size = owm.presentation?.size;
-  if (size && (size.width > 0 || size.height > 0)) {
+  // Both are guarded on the SOURCE, not on the parsed `presentation`: the
+  // vendored parser fills that container with defaults for every source (see
+  // `hasDirective`), so guarding on the value warns about directives nobody
+  // wrote.
+  if (hasDirective(rawLines, 'style')) {
+    warnings.push('`style` directive ignored (presentation lives in renderConfig)');
+  }
+  if (hasDirective(rawLines, 'size')) {
     warnings.push('`size` directive ignored (canvas size lives in renderConfig)');
   }
   if (owm.errors.length > 0) {
@@ -365,7 +388,7 @@ function toCanonicalMap(owm: UnifiedWardleyMap, dsl: string, warnings: string[])
   // rides in INPUT shape next to the validated map (render-config-passthrough
   // idiom, same as the layout strategies). V3 input shape for phase labels:
   // style.background.phases.default.labels[].text.
-  const phases = customPhases(owm, dsl);
+  const phases = customPhases(owm, rawLines);
   return phases !== undefined
     ? ({
         ...map,

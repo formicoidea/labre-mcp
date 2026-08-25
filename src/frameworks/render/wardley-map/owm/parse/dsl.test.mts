@@ -149,6 +149,50 @@ describe('render:wardley-map:owm:parse:dsl (real, deterministic)', () => {
     assert.ok(!/`pipeline` declaration/.test(joined), joined);
   });
 
+  it('stays completely silent on a source that carries no ignored construction', async () => {
+    // The vendored parser fills `presentation` and the four evolution axis
+    // labels with DEFAULTS on every parse. Guarding the warnings on those
+    // values made EVERY source — this one included — report two ignored
+    // directives nobody ever wrote.
+    const { warnings } = await parseDsl(
+      [
+        'title Irreproachable',
+        'anchor User [0.95, 0.5]',
+        'component Checkout [0.7, 0.6]',
+        'User->Checkout',
+      ].join('\n'),
+    );
+    assert.deepEqual(warnings, []);
+  });
+
+  it('reports the preamble directives the source really carries', async () => {
+    const { warnings } = await parseDsl(
+      [
+        'title Directed',
+        'style wardley',
+        'size [1200, 800]',
+        'component Checkout [0.7, 0.6]',
+      ].join('\n'),
+    );
+    assert.deepEqual(warnings, [
+      '`style` directive ignored (presentation lives in renderConfig)',
+      '`size` directive ignored (canvas size lives in renderConfig)',
+    ]);
+  });
+
+  it('projects a written `evolution` directive instead of warning about it', async () => {
+    // `evolution` is NOT an ignored construction: it projects onto the
+    // renderConfig phase labels. What used to be an ambient warning on every
+    // source is now an actual projection on the sources that declare one.
+    const { map, warnings } = await parseDsl(
+      ['title Phased', 'evolution A->B->C->D', 'component X [0.5, 0.5]'].join('\n'),
+    );
+    assert.deepEqual(warnings, []);
+    // any: input-shape renderConfig rides untyped next to the map
+    const labels = (map as any).renderConfig?.style?.background?.phases?.default?.labels;
+    assert.deepEqual(labels, [{ text: 'A' }, { text: 'B' }, { text: 'C' }, { text: 'D' }]);
+  });
+
   it('projects inertia and (build|buy|outsource) decorators onto the canonical component', async () => {
     const { map } = await parseDsl(
       [

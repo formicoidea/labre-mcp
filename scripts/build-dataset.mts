@@ -558,17 +558,6 @@ const parseSvg = new RenderWardleyMapImageParseSvgStrategy();
 /** Scalar tolerance promised by `render:wardley-map:image:parse:svg`. */
 export const SCALAR_EPSILON = 0.02;
 
-/**
- * Messages the vendored cli-owm parser emits for EVERY source, lossless ones
- * included: it fills `presentation.style` and the four evolution axis labels
- * with defaults, then `parse:dsl` faithfully reports them as unprojected. They
- * carry no information about the map, so they never count as a phantom warning.
- */
-const AMBIENT_OWM_MESSAGES: readonly string[] = [
-  'custom evolution axis label(s) ignored',
-  '`style` directive ignored (presentation lives in renderConfig)',
-];
-
 export interface OwmStats {
   /** emit(parse(emit(map))) === emit(map), character for character. */
   byteExact: boolean;
@@ -788,7 +777,6 @@ function checkLossContract(
   // a defect as a missing one (it is the noise that makes a harness unusable).
   owmMessages.forEach((m, i) => {
     if (claimed.has(key('owm', i))) return;
-    if (AMBIENT_OWM_MESSAGES.some((ambient) => m.text.includes(ambient))) return;
     failures.push(`owm: unexpected ${m.origin}: ${m.text}`);
   });
   svgMessages.forEach((m, i) => {
