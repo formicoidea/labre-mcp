@@ -184,7 +184,11 @@ export function emitComponent(
   return label ? `${base} label ${fmtLabel(label)}` : base;
 }
 
-/** `market <name> [vis, evo] label [dx, dy]` */
+/** `market <name> [vis, evo] label [dx, dy]` — the LINE-keyword form.
+ *  CAUTION: the vendored cli-owm Converter has no extraction strategy for this
+ *  keyword, so a line emitted here parses to nothing. Reach for
+ *  `emitInlineDecorators(['market'])` on a `component` line instead — that is
+ *  the only spelling that round-trips (see the inline decorators section). */
 export function emitMarket(
   name: string,
   coords: OwmCoords,
@@ -194,7 +198,9 @@ export function emitMarket(
   return label ? `${base} label ${fmtLabel(label)}` : base;
 }
 
-/** `ecosystem <name> [vis, evo] label [dx, dy]` */
+/** `ecosystem <name> [vis, evo] label [dx, dy]` — the LINE-keyword form.
+ *  CAUTION: same as `emitMarket` — no vendored extraction strategy reads it.
+ *  Use `emitInlineDecorators(['ecosystem'])` on a `component` line instead. */
 export function emitEcosystem(
   name: string,
   coords: OwmCoords,
@@ -291,10 +297,41 @@ export function emitSubmap(
   return label ? `${base} label ${fmtLabel(label)}` : base;
 }
 
-/** `<method> <name>` — method = buy | build | outsource. */
+/** `<method> <name>` — method = buy | build | outsource. LINE-keyword form;
+ *  the vendored MethodExtractionStrategy has no runner either, so prefer the
+ *  inline `(buy)` decorator below. */
 export type OwmMethod = 'buy' | 'build' | 'outsource';
 export function emitMethod(method: OwmMethod, name: string): string {
   return `${method} ${safeName(name)}`;
+}
+
+// ─── Inline decorators ──────────────────────────────────────────────────────
+
+/**
+ * Markers the vendored parser reads INLINE on a `component` declaration, i.e.
+ * `component X [vis, evo] (market)`. `market`/`ecosystem`/`buy`/… also exist as
+ * line keywords in the OWM documentation, but the vendored Converter runs no
+ * extraction strategy for those lines — the inline form is the ONLY spelling
+ * that survives a parse, and therefore the only one that round-trips.
+ *
+ * The ANCHOR grammar has no decorator slot (AnchorExtractionStrategy runs
+ * setName + setCoords only), so this is a component-declaration suffix.
+ */
+export type OwmInlineDecorator = 'market' | 'ecosystem' | 'build' | 'buy' | 'outsource';
+
+/**
+ * ` (a, b)` — the inline decorator group, or `''` for an empty list.
+ *
+ * ONE parenthesis pair for the WHOLE group, never one pair per decorator: the
+ * vendored detection tests `indexOf('(') < indexOf(kw) && indexOf(')') > indexOf(kw)`
+ * on the raw line, and `indexOf` returns the FIRST occurrence of each paren. So
+ * `(market) (buy)` reads as market alone and `(buy) (market)` as buy alone,
+ * while `(market, buy)` puts both keywords between the same pair and both are
+ * detected. Callers must keep a stable decorator order so the round-trip stays
+ * byte-exact.
+ */
+export function emitInlineDecorators(decorators: readonly OwmInlineDecorator[]): string {
+  return decorators.length === 0 ? '' : ` (${decorators.join(', ')})`;
 }
 
 /** `pioneers/settlers/townplanners [vis, evo] [w, h]` */
@@ -417,18 +454,18 @@ export const OWM_DSL_REFERENCE: Readonly<Record<string, OwmDslEntry>> = Object.f
     parser: 'EvolveExtractionStrategy',
   },
   market: {
-    keyword: 'market',
-    description: 'Competitive crossroad where multiple providers compete.',
-    syntax: 'market <name> [vis, evo] label [dx, dy]',
-    example: 'market Cloud [0.4, 0.7] label [10, 5]',
-    parser: 'MarketExtractionStrategy',
+    keyword: '(market)',
+    description: 'Competitive crossroad where multiple providers compete. Inline decorator on a component declaration — the `market <name> [vis, evo]` line form has no extraction strategy in the vendored parser and does not round-trip.',
+    syntax: 'component <name> [vis, evo] (market)',
+    example: 'component Cloud [0.4, 0.7] (market)',
+    parser: 'marketDecorator (inline, on ComponentExtractionStrategy)',
   },
   ecosystem: {
-    keyword: 'ecosystem',
-    description: 'Interconnected system of components — rendered with ecosystem styling.',
-    syntax: 'ecosystem <name> [vis, evo] label [dx, dy]',
-    example: 'ecosystem AppStore [0.6, 0.65]',
-    parser: 'EcosystemExtractionStrategy',
+    keyword: '(ecosystem)',
+    description: 'Interconnected system of components — rendered with ecosystem styling. Inline decorator on a component declaration; the `ecosystem <name> [vis, evo]` line form does not round-trip.',
+    syntax: 'component <name> [vis, evo] (ecosystem)',
+    example: 'component AppStore [0.6, 0.65] (ecosystem)',
+    parser: 'ecosystemDecorator (inline, on ComponentExtractionStrategy)',
   },
   submap: {
     keyword: 'submap',

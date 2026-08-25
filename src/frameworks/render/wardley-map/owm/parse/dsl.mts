@@ -3,7 +3,8 @@
 // Reads an OWM (onlinewardleymaps.com) DSL source with the vendored cli-owm
 // parser and projects it onto the canonical WardleyMap. Fully deterministic —
 // no LLM, no I/O. Exact inverse of `render:wardley-map:owm:emit:dsl` on the
-// subset that emitter produces (`title`, `anchor`, `component`, `A->B`).
+// subset that emitter produces (`title`, `anchor`, `component` + its inline
+// `(market|ecosystem|build|buy|outsource)` decorators, `A->B`).
 //
 // ROUND-TRIP CONTRACT (ast-schema.md, render domain § 2.3): `emit(parse(dsl))`
 // is byte-identical for any DSL our emitter produced. That is why declaration
@@ -126,9 +127,11 @@ function decodeComponentName(owmName: string): string {
   return name.replace(/\s*\\n\s*/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-// Keywords the vendored Converter has NO extraction strategy for — the lines are
+// Keywords the vendored Converter has NO extraction strategy for — the LINES are
 // silently discarded (they even raise a parse error in LinksExtractionStrategy).
-// Worth a warning: the caller's source carries intent we cannot represent.
+// Worth a warning: the caller's source carries intent we cannot represent. Note
+// that the INLINE spellings of the same words (`component X [v, e] (market)`)
+// DO parse, and are projected onto `subtype`/`method` below.
 const UNPARSED_KEYWORDS = ['market', 'ecosystem', 'buy', 'build', 'outsource'] as const;
 
 /** Containers the parser fills but the canonical schema has no home for.
@@ -147,6 +150,11 @@ const UNPROJECTED_CONTAINERS: ReadonlyArray<{ key: keyof UnifiedWardleyMap; labe
 // example ("buying-policy"); per-category styling lives in the renderConfig.
 const METHOD_CATEGORY = 'buying-policy';
 const METHOD_DECORATORS = ['build', 'buy', 'outsource'] as const;
+
+// OWM's `(market)`/`(ecosystem)` inline decorators map one-to-one onto the two
+// canonical subtypes of the same name. Order is the tie-break when a line
+// carries both (the vendored detection is substring-based, so it can).
+const SUBTYPE_DECORATORS = ['market', 'ecosystem'] as const;
 
 /**
  * Does the SOURCE actually carry a `<keyword> …` preamble directive?
@@ -241,13 +249,14 @@ function toCanonicalMap(owm: UnifiedWardleyMap, dsl: string, warnings: string[])
     const visScalar = flipVisibility(clamp01(el.visibility));
 
     // OWM decorators: `(build|buy|outsource)` → the renderer's generic method
-    // decorator. `(market|ecosystem)` have no canonical home yet.
+    // decorator, `(market|ecosystem)` → the canonical subtype of the same name.
     const activeMethods = METHOD_DECORATORS.filter((d) => el.decorators?.[d] === true);
     if (activeMethods.length > 1) {
       warnings.push(`component "${name}": multiple method decorators; keeping (${activeMethods[0]})`);
     }
-    if (el.decorators?.market === true || el.decorators?.ecosystem === true) {
-      warnings.push(`component "${name}": (market)/(ecosystem) decorator ignored (no canonical projection)`);
+    const activeSubtypes = SUBTYPE_DECORATORS.filter((d) => el.decorators?.[d] === true);
+    if (activeSubtypes.length > 1) {
+      warnings.push(`component "${name}": both (market) and (ecosystem); keeping (${activeSubtypes[0]})`);
     }
 
     const evolveTarget = evolveByName.get(el.name);
@@ -257,6 +266,17 @@ function toCanonicalMap(owm: UnifiedWardleyMap, dsl: string, warnings: string[])
     }
 
     const hasPipeline = pipeline !== undefined && el.type !== 'anchor';
+
+    // The canonical schema forbids a subtype on an `anchor` and restricts a
+    // `pipeline` to {functional, userNeed, solution}, so the projection only
+    // applies to a plain component — otherwise the map would not re-validate.
+    const subtype =
+      el.type !== 'anchor' && !hasPipeline ? activeSubtypes[0] : undefined;
+    if (activeSubtypes.length > 0 && subtype === undefined) {
+      warnings.push(
+        `component "${name}": (${activeSubtypes[0]}) dropped (canonical ${el.type === 'anchor' ? 'anchor' : 'pipeline'} carries no such subtype)`,
+      );
+    }
     return {
       id,
       label: {
@@ -275,6 +295,7 @@ function toCanonicalMap(owm: UnifiedWardleyMap, dsl: string, warnings: string[])
           : hasPipeline
             ? ('pipeline' as const)
             : ('component' as const),
+      ...(subtype !== undefined ? { subtype } : {}),
       position: {
         evolution: { scalar: clamp01(el.maturity) },
         visibility: { scalar: visScalar },

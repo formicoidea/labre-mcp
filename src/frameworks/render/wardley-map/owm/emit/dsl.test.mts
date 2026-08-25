@@ -110,6 +110,94 @@ describe('render:wardley-map:owm:emit:dsl (real, deterministic)', () => {
     assert.ok(!texts.includes('`context`'), texts);
   });
 
+  it('emits market/ecosystem subtypes as inline decorators instead of declaring a loss', async () => {
+    const typed = WardleyMapSchema.parse({
+      title: 'Typed',
+      components: [
+        {
+          id: 'cloud',
+          label: { name: 'Cloud' },
+          type: 'component',
+          subtype: 'market',
+          position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.4 } },
+        },
+        {
+          id: 'store',
+          label: { name: 'AppStore', position: { dx: 10, dy: -5 } },
+          type: 'component',
+          subtype: 'ecosystem',
+          position: { evolution: { scalar: 0.65 }, visibility: { scalar: 0.35 } },
+        },
+        {
+          id: 'need',
+          label: { name: 'Need' },
+          type: 'component',
+          subtype: 'userNeed',
+          position: { evolution: { scalar: 0.2 }, visibility: { scalar: 0.1 } },
+        },
+      ],
+      relations: [],
+    });
+    const out = await emit.evaluate(typed, ctx);
+    assert.deepEqual(out.result.dsl.split('\n'), [
+      'title Typed',
+      'component Cloud [0.6, 0.7] (market)',
+      'component AppStore [0.65, 0.65] label [10, -5] (ecosystem)',
+      'component Need [0.9, 0.2]',
+    ]);
+    // Only `userNeed` — the subtype with no OWM spelling — is declared lost.
+    const texts = out.insights.map((i) => i.text).join('\n');
+    assert.match(texts, /subtype\/nature/);
+    assert.ok(!/occurrences/.test(texts), texts);
+  });
+
+  it('groups a subtype and a method decorator in ONE parenthesis pair', async () => {
+    // The vendored detection compares indexOf('(') / indexOf(')') against the
+    // keyword position, and indexOf returns the FIRST paren of each kind — so
+    // `(market) (buy)` would read as market alone. One group, both keywords.
+    const both = WardleyMapSchema.parse({
+      title: 'Both',
+      components: [
+        {
+          id: 'cloud',
+          label: { name: 'Cloud' },
+          type: 'component',
+          subtype: 'market',
+          method: { category: 'buying-policy', recommendation: 'buy' },
+          inertia: true,
+          position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.4 } },
+        },
+      ],
+      relations: [],
+    });
+    const out = await emit.evaluate(both, ctx);
+    assert.match(out.result.dsl, /^component Cloud \[0\.6, 0\.7\] \(market, buy\) inertia$/m);
+    assert.deepEqual(out.insights, []);
+  });
+
+  it('drops a market subtype it cannot carry (anchor, pipeline) with an insight', async () => {
+    const hostile = WardleyMapSchema.parse({
+      title: 'Hostile',
+      components: [
+        {
+          id: 'pipe',
+          label: { name: 'Pipe' },
+          // A `pipeline` companion line makes parse re-type the component, and
+          // the canonical pipeline subtype set excludes market/ecosystem.
+          type: 'component',
+          subtype: 'market',
+          pipelineGeometry: { evoStart: 0.4, evoEnd: 0.8, visStart: 0.5, visEnd: 0.5 },
+          position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.5 } },
+        },
+      ],
+      relations: [],
+    });
+    const out = await emit.evaluate(hostile, ctx);
+    assert.ok(!out.result.dsl.includes('(market)'), out.result.dsl);
+    assert.match(out.result.dsl, /^pipeline Pipe \[0\.4, 0\.8\]$/m);
+    assert.ok(out.insights.some((i) => i.text.includes('subtype/nature')));
+  });
+
   it('refuses evolve companion lines the vendored grammar would misread (B1/B2)', async () => {
     const mkMap = (name: string, evoTarget: number) => WardleyMapSchema.parse({
       title: 'Guard',

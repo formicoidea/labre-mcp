@@ -41,9 +41,11 @@
 //
 //   construct        │ owm (emit:dsl)              │ svg
 //   ─────────────────┼─────────────────────────────┼──────────────────────────
-//   subtype          │ insight "component taxonomy"│ market/ecosystem: parse:svg
-//                    │                             │   warning (symbol seen)
-//                    │                             │ others: emit:svg insight
+//   subtype          │ market/ecosystem: NOT LOST  │ market/ecosystem: parse:svg
+//                    │   (inline `(market)` /      │   warning (symbol seen)
+//                    │   `(ecosystem)` decorator)  │ others: emit:svg insight
+//                    │ others: insight             │
+//                    │   "component taxonomy"      │
 //   nature           │ insight "component taxonomy"│ emit:svg insight
 //   evolvesTo        │ NOT LOST (`evolve` line)    │ parse:svg warning: layer
 //                    │                             │   dropped
@@ -51,9 +53,10 @@
 //                    │ on a component: NOT LOST    │
 //   relation type    │ insight "relation type/flow"│ NOT LOST (stroke colour)
 //
-// The two "NOT LOST" cells are the reason no `expectedLoss` is recorded for
-// them: their preservation is already asserted by the oracles themselves
-// (byte-identity for the OWM label offset, `relation.type` equality for SVG).
+// The "NOT LOST" cells are the reason no `expectedLoss` is recorded for them:
+// their preservation is already asserted by the oracles themselves
+// (byte-identity for the OWM label offset and the inline subtype decorators,
+// `relation.type` equality for SVG).
 // The four cells that used to read SILENT DROP (the WP5 finding: subtype
 // without a symbol, nature, label offsets vanished through the SVG round-trip
 // without a single message) are now DECLARED by `emit:svg` with the same
@@ -362,6 +365,14 @@ const FUNCTIONAL_NATURES = ['practice', 'data', 'activity', 'knowledge'] as cons
 /** Subtypes the renderer draws with a symbol `parse:svg` recognises but cannot restore. */
 const EXOTIC_SUBTYPES: ReadonlySet<string> = new Set(['market', 'ecosystem']);
 
+/**
+ * Subtypes the OWM DSL carries as an inline `(market)` / `(ecosystem)` decorator
+ * on the component declaration. They round-trip, so NO owm loss is declared for
+ * them — their survival is asserted by the byte-exact oracle itself (a dropped
+ * decorator makes the second emit differ from the first).
+ */
+const OWM_INLINE_SUBTYPES: ReadonlySet<string> = new Set(['market', 'ecosystem']);
+
 const ALL_CONSTRUCTS: readonly LossConstruct[] = [
   'subtype',
   'nature',
@@ -371,13 +382,25 @@ const ALL_CONSTRUCTS: readonly LossConstruct[] = [
 ];
 
 /**
- * `subtype` on a component: OWM declares it at emit. On the SVG side an exotic
- * subtype is drawn with a symbol `parse:svg` warns about; any other subtype has
- * no glyph at all, so `emit:svg` declares the drop itself.
+ * `subtype` on a component. On the OWM side `market`/`ecosystem` ride as inline
+ * decorators and are NOT lost; every other subtype is declared dropped by
+ * `emit:dsl`. On the SVG side an exotic subtype is drawn with a symbol
+ * `parse:svg` warns about; any other subtype has no glyph at all, so `emit:svg`
+ * declares the drop itself.
  */
 function subtypeLosses(target: string, subtype: string): ExpectedLoss[] {
   return [
-    { construct: 'subtype', target, detail: subtype, format: 'owm', expectation: 'insight' },
+    ...(OWM_INLINE_SUBTYPES.has(subtype)
+      ? []
+      : [
+          {
+            construct: 'subtype' as const,
+            target,
+            detail: subtype,
+            format: 'owm' as const,
+            expectation: 'insight' as const,
+          },
+        ]),
     {
       construct: 'subtype',
       target,
@@ -608,6 +631,11 @@ function lossFragments(loss: ExpectedLoss, format: 'owm' | 'svg'): string[] | nu
   if (format === 'owm') {
     switch (loss.construct) {
       case 'subtype':
+        // market/ecosystem are NOT lost on this side (inline decorator), so no
+        // such expectation is ever recorded — this branch only sees the others.
+        return OWM_INLINE_SUBTYPES.has(loss.detail ?? '')
+          ? null
+          : ['component taxonomy (subtype/nature) has no OWM equivalent'];
       case 'nature':
         return ['component taxonomy (subtype/nature) has no OWM equivalent'];
       case 'evolvesTo':

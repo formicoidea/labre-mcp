@@ -209,6 +209,41 @@ describe('render:wardley-map:owm:parse:dsl (real, deterministic)', () => {
     });
   });
 
+  it('projects (market)/(ecosystem) decorators onto the canonical subtype', async () => {
+    // The `market <name> […]` LINE keyword has no vendored extraction strategy;
+    // the inline decorator is the only spelling that survives a parse.
+    const { map, warnings } = await parseDsl(
+      [
+        'title Typed',
+        'component Cloud [0.6, 0.7] (market)',
+        'component AppStore [0.65, 0.65] (ecosystem)',
+        'component Both [0.5, 0.5] (market, buy)',
+        'component Plain [0.4, 0.4]',
+      ].join('\n'),
+    );
+    assert.deepEqual(
+      map!.components.map((c) => c.subtype),
+      ['market', 'ecosystem', 'market', undefined],
+    );
+    // A subtype decorator and a method decorator coexist in one paren group.
+    assert.deepEqual(map!.components[2].method, {
+      category: 'buying-policy',
+      recommendation: 'buy',
+    });
+    assert.deepEqual(warnings, []);
+  });
+
+  it('drops a subtype decorator the canonical type cannot carry', async () => {
+    // The schema restricts a `pipeline` to {functional, userNeed, solution};
+    // keeping the decorator would make the whole parse fail validation.
+    const { map, warnings } = await parseDsl(
+      ['title Pipe', 'component Cloud [0.6, 0.7] (market)', 'pipeline Cloud [0.4, 0.8]'].join('\n'),
+    );
+    assert.equal(map!.components[0].type, 'pipeline');
+    assert.equal(map!.components[0].subtype, undefined);
+    assert.ok(warnings.some((w) => w.includes('(market) dropped')), warnings.join('\n'));
+  });
+
   it('clamps out-of-range coordinates instead of failing the schema', async () => {
     const { map } = await parseDsl(['title Clamp', 'component Wild [1.4, -0.2]'].join('\n'));
     assert.equal(map!.components[0].position.visibility.scalar, 0);
@@ -470,12 +505,33 @@ const fixtures: Fixture[] = [
       ],
     }),
   },
+  {
+    name: 'market / ecosystem subtypes carried by inline decorators',
+    map: WardleyMapSchema.parse({
+      title: 'Typed',
+      components: [
+        { id: 'user', label: { name: 'User' }, type: 'anchor', position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0 } } },
+        { id: 'cloud', label: { name: 'Cloud' }, type: 'component', subtype: 'market', position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.4 } } },
+        { id: 'appstore', label: { name: 'AppStore', position: { dx: 10, dy: -5 } }, type: 'component', subtype: 'ecosystem', method: { category: 'buying-policy', recommendation: 'buy' }, position: { evolution: { scalar: 0.65 }, visibility: { scalar: 0.35 } } },
+      ],
+      relations: [
+        { id: 'rel-1', consumer: 'user', supplier: 'cloud' },
+        { id: 'rel-2', consumer: 'cloud', supplier: 'appstore' },
+      ],
+    }),
+  },
 ];
+
+/** The only two subtypes the OWM DSL carries (inline `(market)`/`(ecosystem)`);
+ *  every other one is a documented loss, so it is not part of the shape. */
+function owmSubtype(c: WardleyMap['components'][number]): string | undefined {
+  return c.subtype === 'market' || c.subtype === 'ecosystem' ? c.subtype : undefined;
+}
 
 function shape(map: WardleyMap) {
   return {
     title: map.title,
-    components: map.components.map((c) => [c.id, c.label.name, c.type]),
+    components: map.components.map((c) => [c.id, c.label.name, c.type, owmSubtype(c)]),
     relations: map.relations.map((r) => [r.id, r.consumer, r.supplier]),
   };
 }

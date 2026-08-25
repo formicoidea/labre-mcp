@@ -110,8 +110,10 @@ src/
 │   ├── render/               wardley-map/{owm,image,text}/  — 7 réels au contrat canonique : owm/{parse,emit}/dsl (round-trip
 │   │   │                     byte-exact via lib/owm + vendored cli-owm ; parse capture en-têtes `// clé: valeur` →
 │   │   │                     result.header + PurposeContext + map.context [alias FR], evolve→evolvesTo, inertia,
-│   │   │                     pipeline→pipelineGeometry, (build|buy|outsource)→method, directive evolution→phases
-│   │   │                     renderConfig V3 ; emit est l'inverse exact),
+│   │   │                     pipeline→pipelineGeometry, (build|buy|outsource)→method,
+│   │   │                     (market|ecosystem)→subtype [décorateurs inline, seule forme round-trippable],
+│   │   │                     directive evolution→phases renderConfig V3 ; warnings style/size/evolution levés
+│   │   │                     depuis les lignes source, pas depuis les défauts du parseur ; emit est l'inverse exact),
 │   │   │                     image/emit/{svg,png} (renderToSVG/renderToPNG),
 │   │   │                     image/parse/svg (inversion géométrique calibrée par computeMapGeometry),
 │   │   │                     image/parse/png (LLM vision → JSON intermédiaire strict → projection déterministe ;
