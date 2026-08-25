@@ -4,7 +4,7 @@
 // Speaks the MCP protocol over newline-delimited JSON-RPC 2.0 on
 // stdin/stdout, the transport Claude Code / the Agent SDK spawn directly
 // (`{ "command": "npx", "args": ["-y", "labre-mcp"] }`). It reuses the exact
-// same `dispatch` + four-tool registry as the HTTP daemon — only the framing
+// same `dispatch` + six-tool registry as the HTTP daemon — only the framing
 // differs, so the surface is identical regardless of how the client connects.
 //
 // Protocol invariant: stdout carries ONLY MCP messages (responses + the
