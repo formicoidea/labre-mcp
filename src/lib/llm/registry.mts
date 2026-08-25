@@ -22,6 +22,7 @@ import { createAgentSdkProvider } from './providers/agent-sdk-provider.mjs';
 import { createHttpApiProvider } from './providers/http-api-provider.mjs';
 import { createCopilotSdkProvider } from './providers/copilot-sdk-provider.mjs';
 import type { LLMCapability, LLMProvider } from './providers/provider.types.mjs';
+import { withAiCallSentinel } from './ai-call-sentinel.mjs';
 import type { LLMCall, StructuredLLMCall, LogprobLLMCall } from '../../types/llm.mjs';
 
 type CallCacheKey = `${string}:${LLMCapability}`;
@@ -121,12 +122,25 @@ function getOrCreate<T>(id: string, cap: LLMCapability, factory: () => T): T {
   return created;
 }
 
-function callFor<T>(id: string, cap: LLMCapability, make: (s: StrategyConfig, p: LLMProvider) => T): T {
+function callFor<T extends (...args: never[]) => unknown>(
+  id: string,
+  cap: LLMCapability,
+  make: (s: StrategyConfig, p: LLMProvider) => T,
+): T {
   const cfg = loadLLMConfig();
   return getOrCreate(id, cap, () => {
     const { strategy, provider, providerId } = resolveStrategy(id, cfg);
     assertSupports(id, cap, providerId, cfg, provider);
-    return make(strategy, provider);
+    // Sentinel seam: every LLM call the registry hands out is counted, once per
+    // invocation (the call itself is cached, the event is not). Test overrides
+    // never reach here — getOrCreate short-circuits on them — so a stubbed call
+    // stays the exact function the test injected and emits nothing.
+    return withAiCallSentinel(make(strategy, provider), {
+      strategy: id,
+      provider: providerId,
+      model: strategy.model,
+      capability: cap,
+    });
   });
 }
 
