@@ -91,9 +91,23 @@ describe("labre-mcp HTTP transport", () => {
       jsonrpc: "2.0",
       id: 3,
       method: "tools/list",
-    })) as { result: { tools: Array<{ name: string }> } };
-    assert.ok(response.result.tools.length >= 1);
-    assert.ok(response.result.tools.some((t) => t.name === "__ping__"));
+    })) as { result: { tools: Array<{ name: string; inputSchema: unknown }> } };
+    // The boot surface is identical over HTTP and stdio (ARCH-14); the exact
+    // list is asserted once in labre-stdio.test.mts.
+    const names = response.result.tools.map((t) => t.name).sort();
+    assert.deepEqual(names, [
+      "__ping__",
+      "estimateEvolution",
+      "evaluateMap",
+      "generateValueChain",
+      "runCommand",
+      "runRecipe",
+    ]);
+    // Every advertised tool carries a JSON Schema — that is what makes the
+    // recipe-backed tools (B3) discoverable rather than runRecipe-only.
+    for (const tool of response.result.tools) {
+      assert.equal(typeof tool.inputSchema, "object", `${tool.name} advertises an inputSchema`);
+    }
   });
 
   it("MCP tools/call invokes the smoke tool", async () => {
