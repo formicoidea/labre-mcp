@@ -217,7 +217,7 @@ describe('build-dataset oracles', () => {
     assert.ok(records.every((r) => r.dsl.startsWith('title ')));
   });
 
-  it('observes every declared loss, and records the silent ones', async () => {
+  it('observes every declared loss, none of them silently', async () => {
     const { records, summary } = await buildDataset(BATCH, 42, false);
     for (const record of records) {
       assert.equal(
@@ -229,12 +229,11 @@ describe('build-dataset oracles', () => {
       assert.ok(record.observedLoss.length >= record.expectedLoss.length, `${record.id}`);
     }
     assert.ok(summary.expectedLosses > 0);
-    // The WP5 finding: the SVG round-trip drops subtype/nature/label offsets
-    // without emitting anything at all.
-    assert.ok(summary.silentDrops > 0, 'the corpus must exercise the silent drops');
-    for (const bucket of Object.keys(summary.silentDropsByConstruct)) {
-      assert.ok(bucket.endsWith('/svg'), `unexpected silent drop bucket ${bucket}`);
-    }
+    // The WP5 silent drops (subtype without a symbol, nature, label offsets
+    // vanishing through the SVG round-trip) are now declared by emit:svg —
+    // a non-zero count here means a loss fell silent again.
+    assert.equal(summary.silentDrops, 0, 'every loss must come with a message');
+    assert.deepEqual(summary.silentDropsByConstruct, {});
   });
 
   it('reproduces the v1 contract with --lossless-only', async () => {

@@ -36,6 +36,48 @@ describe('render:wardley-map:image:emit:svg (real, renderer package)', () => {
     assert.ok(plain.result.svg.includes('Genesis'), 'axis shown by default');
   });
 
+  it('emits no insight for a map inside the round-trippable dialect', async () => {
+    const out = await new RenderWardleyMapImageEmitSvgStrategy().evaluate(map, ctx);
+    assert.deepEqual(out.insights, []);
+  });
+
+  it('declares symbol-less taxonomy and label offsets as insights, one per distinct reason', async () => {
+    const lossy = WardleyMapSchema.parse({
+      title: 'Lossy',
+      components: [
+        // Two symbol-less subtypes → ONE taxonomy insight with an occurrence count.
+        { id: 'a', label: { name: 'A' }, type: 'component', subtype: 'userNeed', position: { evolution: { scalar: 0.2 }, visibility: { scalar: 0.2 } } },
+        { id: 'b', label: { name: 'B' }, type: 'component', subtype: 'functional', nature: 'practice', position: { evolution: { scalar: 0.4 }, visibility: { scalar: 0.4 } } },
+        // Offset on an anchor: unrecoverable from the pixels, declared here.
+        { id: 'c', label: { name: 'C', position: { dx: 10, dy: -8 } }, type: 'anchor', position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.6 } } },
+      ],
+      relations: [],
+    });
+    const out = await new RenderWardleyMapImageEmitSvgStrategy().evaluate(lossy, ctx);
+    assert.equal(out.result.rendered, true);
+    assert.deepEqual(
+      out.insights.map((i) => i.text),
+      [
+        'component taxonomy (subtype/nature) has no distinct SVG symbol and was dropped (2 occurrences)',
+        'label offsets (label.position) are not recoverable from an SVG render and were dropped',
+      ],
+    );
+  });
+
+  it('stays silent on market/ecosystem subtypes (their symbol is parse:svg territory)', async () => {
+    const exotic = WardleyMapSchema.parse({
+      title: 'Exotic',
+      components: [
+        { id: 'm', label: { name: 'M' }, type: 'component', subtype: 'market', position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.3 } } },
+        { id: 'e', label: { name: 'E' }, type: 'component', subtype: 'ecosystem', position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.7 } } },
+      ],
+      relations: [],
+    });
+    const out = await new RenderWardleyMapImageEmitSvgStrategy().evaluate(exotic, ctx);
+    assert.equal(out.result.rendered, true);
+    assert.deepEqual(out.insights, []);
+  });
+
   it('degrades gracefully on non-canonical input (mock upstream)', async () => {
     const out = await new RenderWardleyMapImageEmitSvgStrategy().evaluate(
       { mock: true, methodId: 'whatever' },
