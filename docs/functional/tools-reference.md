@@ -4,20 +4,24 @@ labre-mcp tourne comme un **daemon HTTP** (`src/core/transport/labre-daemon.mts`
 
 ## Surface MCP reellement exposee
 
-**4 outils** sont cables dans `buildBootRegistry()` :
+**6 outils** sont cables dans `buildBootRegistry()` :
 
 | Outil | Role | Schema Zod |
 |---|---|---|
 | `estimateEvolution` | Estime l'evolution d'un composant (via la recipe `estimate-component-evolution`) | `src/schemas/estimate-evolution.schema.mts` |
+| `generateValueChain` | Genere une chaine de valeur depuis une commande en langage naturel et l'emet en DSL OWM (via la recipe `generate`) | `src/schemas/generate-value-chain.schema.mts` |
+| `evaluateMap` | Evalue tous les composants d'une carte OWM existante (via la recipe `evaluate-map`) | `src/schemas/evaluate-map.schema.mts` |
 | `runCommand` | Invoque **n'importe quel methodId** directement → `CommandResult` (output + enveloppe JSON-labre) | `src/schemas/command.schema.mts` |
 | `runRecipe` | Lance une **recette multi-etapes** par ref `<domain>:<tool>:<name>` (shipped, override projet ou bundle) → AST final + enveloppe + artefact | `src/schemas/run-recipe.schema.mts` |
 | `__ping__` | Smoke tool — echo de l'input, valide le transport | (inline) |
+
+`generateValueChain` puis `evaluateMap` forment le parcours nominal : **generer** la chaine de valeur (X = lisibilite), puis la **positionner** dans l'evolution. La sortie DSL du premier est directement l'entree du second.
 
 Les schemas d'entree exposes au client MCP sont **generes a partir des schemas Zod** (`z.toJSONSchema(schema, { io: 'input' })`). Toute modification d'un schema passe par le fichier `src/schemas/*.schema.mts` correspondant.
 
 > **Enveloppe de reponse `Degradable<T>`** : le dispatch enveloppe **chaque** reponse `tools/call` dans `{ result, degraded, degradationEvents }` (couche de degradation, hard rule #18). Dans tous les exemples ci-dessous, **le payload metier se lit sous `result.result`** (ex. `response.result.result.recipeRunId`). Omis dans les corps JSON pour la lisibilite.
 
-> Les flux nommes `evaluateMap`, `identifyCapability`, `estimateAnchorEvolution` et `generateValueChain` ne sont pas (encore) exposes comme **outils dedies** (roadmap [`../architecture/roadmap.md`](../architecture/roadmap.md) B3). Mais leurs strategies sont **deja appelables directement** via `runCommand` avec le methodId correspondant — voir [Flux appelables via runCommand](#flux-appelables-via-runcommand).
+> Les flux nommes `identifyCapability` et `estimateAnchorEvolution` n'ont pas d'**outil dedie** : ce sont des strategies uniques, **deja appelables directement** via `runCommand` avec le methodId correspondant — voir [Flux non exposes comme outils dedies](#flux-non-exposes-comme-outils-dedies).
 
 ---
 
@@ -209,6 +213,104 @@ Le routeur detecte automatiquement "Kubernetes" comme une solution et route vers
 
 ---
 
+## generateValueChain
+
+Genere une **chaine de valeur complete** (anchors, composants, liens, layout) depuis une commande en langage naturel, puis l'emet en DSL OWM. Enveloppe la recette 4 etapes `recipes/wardley/map/generate.recipe.json` :
+
+`wardley:map:value-chain:generate:top-down` → `value-chain:prevent-collision:default` → `value-chain:audit:overlap-check` → `render:wardley-map:owm:emit:dsl`
+
+> **X = lisibilite, jamais maturite.** A cette etape la coordonnee X est un layout de lisibilite ; l'axe d'evolution n'est revele qu'ensuite, par `evaluateMap` (ou les commandes climate `position-*-in-evolution`). Le rendu porte d'ailleurs `display.axisEvolution: false`.
+
+### Schema d'entree
+
+| Parametre | Type | Requis | Description |
+|---|---|---|---|
+| `prompt` | string | **oui** | Commande en langage naturel decrivant la carte a generer (ex. `"Map the value chain of an online tea shop"`) |
+| `context` | string | non | Environnement metier dans lequel la chaine de valeur existe. Distinct d'une `description` de composant : jamais un fallback pour elle. |
+
+Le premier step de la recette consomme un **`WardleyMap` canonique** (basemap) et y relit la commande dans `title` / `context`. L'outil expose la paire en langage naturel et projette lui-meme l'entree sur ce squelette via la strategie deterministe `wardley:map:basemap:generate:default` (aucun LLM) avant de semer `$.input`.
+
+### Exemple
+
+```bash
+curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" -d '{
+  "jsonrpc":"2.0","id":1,"method":"tools/call",
+  "params":{ "name":"generateValueChain", "arguments":{
+    "prompt":"Map the value chain of an online tea shop",
+    "context":"UK retail, 2026"
+  }}
+}'
+```
+
+### Structure de la reponse
+
+```json
+{
+  "recipeRunId": "…",
+  "dsl": "title Map the value chain of an online tea shop\nanchor Customer [0.95, 0.60]\ncomponent Cup of Tea [0.80, 0.55]\nCustomer->Cup of Tea\n",
+  "ast": {
+    "input":    { "title": "…", "context": "…", "components": [], "relations": [] },
+    "chain":    { "result": { "…": "WardleyMap canonique genere par top-down" } },
+    "laid":     { "result": { "…": "labels anti-collision" } },
+    "verified": { "result": { "…": "audit overlap-check" } },
+    "output":   { "result": { "dsl": "…", "emitted": true } }
+  },
+  "envelope": { "signals": [], "reasoning": [], "insights": [], "trace": [] },
+  "events": [],
+  "artifactPath": "~/.labre-mcp/runs/…json"
+}
+```
+
+`dsl` est le raccourci vers `ast.output.result.dsl` ; il vaut `null` si l'etape d'emission n'a rien produit (l'AST complet reste disponible). Comme tous les outils, la reponse est enveloppee dans `Degradable<T>` — le payload se lit sous `result.result`.
+
+---
+
+## evaluateMap
+
+Evalue **tous les composants** d'une carte OWM existante : position dans l'evolution et capability sous-jacente. Enveloppe la recette `recipes/wardley/map/evaluate-map.recipe.json` (1 parse + 2 fan-out paralleles) :
+
+1. `render:wardley-map:owm:parse:dsl` — DSL → `WardleyMap` canonique, en `$.chain` (deterministe) ;
+2. `wardley:map:climate:position-functional-in-evolution:llm-direct` — fan-out **par composant** sur `$.chain.result.map.components`, en `$.evaluations` (passe primaire) ;
+3. `wardley:map:node:identify:default` — meme fan-out, en `$.identified` (observation, enveloppe uniquement).
+
+### Schema d'entree
+
+| Parametre | Type | Requis | Description |
+|---|---|---|---|
+| `dsl` | string | **oui** | Source DSL OWM de la carte a evaluer. C'est le **contenu**, pas un chemin de fichier : le daemon ne lit jamais le systeme de fichiers de l'appelant. Les en-tetes `// cle: valeur` sont conserves et projetes sur le contexte d'etude. |
+
+### Exemple
+
+```bash
+curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" -d '{
+  "jsonrpc":"2.0","id":1,"method":"tools/call",
+  "params":{ "name":"evaluateMap", "arguments":{
+    "dsl":"title Tea Shop\nanchor Business [0.90, 0.60]\ncomponent Cup of Tea [0.80, 0.60]\n"
+  }}
+}'
+```
+
+### Structure de la reponse
+
+```json
+{
+  "recipeRunId": "…",
+  "ast": {
+    "input":       { "dsl": "…" },
+    "chain":       { "result": { "map": { "…": "WardleyMap canonique" }, "parsed": true, "warnings": [] } },
+    "evaluations": [ { "result": { "evolution": 0.72, "confidence": 0.9, "method": "…:llm-direct" } } ],
+    "identified":  [ { "result": { "…": "capability + nature" } } ]
+  },
+  "envelope": { "signals": [], "reasoning": [], "insights": [], "trace": [] },
+  "events": [],
+  "artifactPath": "~/.labre-mcp/runs/…json"
+}
+```
+
+`evaluations` et `identified` sont des **tableaux alignes sur l'ordre des composants parses** (le fan-out utilise `Promise.allSettled` : un composant en echec laisse une entree `{ "error": "…" }` a son index, les autres aboutissent). La carte d'origine n'est pas reecrite : l'outil renvoie l'AST annote, a charge de l'appelant de re-emettre le DSL (`runCommand { command: "render:wardley-map:owm:emit:dsl" }`). Reponse enveloppee dans `Degradable<T>`.
+
+---
+
 ## __ping__
 
 Outil de smoke test : renvoie l'input echoe, sert a valider que le transport HTTP/JSON-RPC fonctionne.
@@ -309,21 +411,13 @@ curl -X POST http://127.0.0.1:6767/mcp -H "content-type: application/json" -d '{
 
 ---
 
-## Flux non encore exposes comme outils dedies
+## Flux non exposes comme outils dedies
 
-Ces flux n'ont pas (encore) d'**outil MCP dedie** (roadmap [`../architecture/roadmap.md`](../architecture/roadmap.md) B3). Deux cas :
+Ces flux n'ont pas d'**outil MCP dedie**. Deux cas :
 - **Strategie unique** → **deja invocable** via `runCommand` avec son methodId (ci-dessous).
-- **Recette multi-etapes** → **deja invocable** via `runRecipe` avec sa ref 3 segments ; l'outil dedie (schema d'entree specifique, ex. `filePath`) reste a cabler (B3).
+- **Recette multi-etapes sans surface propre** → **deja invocable** via `runRecipe` avec sa ref 3 segments.
 
-### evaluateMap — recette multi-etapes (via runRecipe)
-
-Evalue tous les composants d'un fichier `.wm` existant et met a jour leurs positions d'evolution. Recette 2 etapes `recipes/wardley/map/evaluate-map.recipe.json` (parse → fan-out estimation) → outil dedie a cabler (B3).
-
-| Parametre | Type | Requis | Description |
-|---|---|---|---|
-| `filePath` | string | **oui** | Chemin vers le fichier .wm a evaluer |
-| `strategy` | string | non | `"auto"` (defaut) route chaque composant vers une strategie par type. `"report"` fan-out multi-strategies. Un methodId specifique (ex: `"wardley:map:climate:position-functional-in-evolution:s-curve"`) force cette strategie sur tous les composants economiques. Les anchors restent routes vers `wardley:map:climate:position-anchor-in-evolution:default`. |
-| `updateFile` | boolean | non | Met a jour le fichier en place (`true` par defaut) |
+_(Les recettes `evaluate-map` et `generate` ont desormais leur outil dedie — voir [evaluateMap](#evaluatemap) et [generateValueChain](#generatevaluechain).)_
 
 ### identifyCapability — appelable via runCommand
 
@@ -345,10 +439,6 @@ Estime l'evolution d'un **anchor** (user need, haut de la value chain) via la le
 | `name` | string | **oui** | Nom du user need (ex: "Hot Beverage", "Urban Mobility") |
 | `context` | string | **oui** | Contexte metier (requis — l'evaluation d'un anchor est hautement dependante du contexte) |
 | `phase` | integer [1-4] | non | Phase pre-evaluee. Si omise, le LLM l'estime. `1`=Genesis, `2`=Custom, `3`=Product, `4`=Commodity. |
-
-### generateValueChain — recette multi-etapes (via runRecipe)
-
-Genere une chaine de valeur (layout pour lisibilite, jamais maturite d'evolution). Recette 4 etapes `recipes/wardley/map/generate.recipe.json` (`value-chain:generate:top-down` → `prevent-collision` → `audit:overlap-check` → `owm:emit`), invocable via `runRecipe { recipe: "wardley:map:generate" }` ; outil dedie a cabler (B3). L'etape de generation seule reste appelable via `runCommand { command: "wardley:map:value-chain:generate:top-down" }`.
 
 ### textToCanonical — recette (via runRecipe)
 

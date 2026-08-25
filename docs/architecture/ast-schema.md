@@ -142,7 +142,7 @@ Listing **canonique** des commandes spécifiées en v0.1.0. La spécification co
 | `wardley:iteration:purpose:generate:default` | Génération d'un `Context` d'étude (purpose) depuis un `topic` + `intent` libres — LLM avec dégradation en squelette déterministe |
 | `wardley:iteration:purpose:audit-purpose-quality:default` | Audit qualité d'un `Context` (purpose) — checks déterministes + passe LLM sémantique, un `Insight` par dimension |
 
-Toute autre commande des § 1.2 / § 2 est aujourd'hui `status: mock`. Côté **outils** MCP, la surface câblée est `estimateEvolution`, `runCommand` (invocation directe de n'importe quel methodId, réel ou mock), `runRecipe` (invocation d'une recette multi-étapes par référence `<domain>:<tool>:<name>`) et `__ping__` — voir [roadmap.md](roadmap.md) B3.
+Toute autre commande des § 1.2 / § 2 est aujourd'hui `status: mock`. Côté **outils** MCP, la surface câblée est `estimateEvolution`, `generateValueChain` (recette `wardley:map:generate`), `evaluateMap` (recette `wardley:map:evaluate-map`), `runCommand` (invocation directe de n'importe quel methodId, réel ou mock), `runRecipe` (invocation d'une recette multi-étapes par référence `<domain>:<tool>:<name>`) et `__ping__` — voir [roadmap.md](roadmap.md) B3.
 
 ### Domaine `common` (transverse)
 
