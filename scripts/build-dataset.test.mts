@@ -314,15 +314,15 @@ describe('build-dataset loss oracle bites both ways', () => {
     );
   });
 
-  it('leaves the ambient OWM parser noise out of the phantom count', async () => {
-    // `parse:dsl` reports the cli-owm default `style` + evolution axis labels on
-    // EVERY source. Treating those as phantoms would fail every single record.
+  it('records not one message on a lossless map (no ambient parser noise)', async () => {
+    // `parse:dsl` used to report the cli-owm DEFAULT `style` + evolution axis
+    // labels on EVERY source, which forced the harness to whitelist them. The
+    // directive warnings are now raised from the source lines, so a lossless
+    // map goes through both round-trips in complete silence — no whitelist.
     const outcome = await runOracles(generateBaseMap(mapSeed(42, 3)));
     assert.deepEqual(outcome.oracle.failures, []);
-    assert.ok(
-      outcome.owmStats.parseWarnings.length > 0,
-      'the ambient messages are still recorded, just not counted',
-    );
+    assert.deepEqual(outcome.owmStats.parseWarnings, []);
+    assert.deepEqual(outcome.owmStats.emitInsights, []);
   });
 });
 

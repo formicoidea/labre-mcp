@@ -16,10 +16,13 @@
 //
 // DOCUMENTED LOSSES (no OWM equivalent, or no equivalent the vendored parser
 // reads back): component ids (OWM has no ids — parse re-derives them from the
-// label), subtype, nature, description, color, method/inertia/accelerator/step
-// decorators, evolvesTo, pipeline geometry, relation ids/type/flow, anchor label
-// offsets (the OWM anchor grammar has no `label`) and renderConfig. Map `context`
-// is NOT lost: it rides as a `// context: …` header comment (see emitMap).
+// label), nature, description, color, accelerator/step decorators, relation
+// ids/type/flow, anchor label offsets (the OWM anchor grammar has no `label`)
+// and renderConfig. Map `context` is NOT lost: it rides as a `// context: …`
+// header comment (see emitMap). `subtype` is lost EXCEPT `market`/`ecosystem`,
+// which ride as inline `(market)`/`(ecosystem)` decorators on the component
+// declaration — the only spelling the vendored parser reads back (the
+// `market <name> [vis, evo]` line keyword has no extraction strategy).
 //
 // Graceful by design (degradation-first): during the incremental migration an
 // upstream step may still be a mock and hand us a non-canonical object, and a
@@ -37,10 +40,12 @@ import {
   emitEvolutionAxis,
   emitEvolve,
   emitHeaderComment,
+  emitInlineDecorators,
   emitLink,
   emitPipelineLine,
   emitTitle,
   type OwmCoords,
+  type OwmInlineDecorator,
   type OwmLabelOffset,
 } from '#lib/owm/owm-dsl.mjs';
 import { flipVisibility } from '#lib/owm/canonical-ids.mjs';
@@ -70,6 +75,9 @@ const GRAMMAR_HOSTILE = /\[|\]|->|;|\\n|\n/;
 // ecosystem)` by SUBSTRING on the whole line — a label containing them would
 // re-parse with decorators it never had ("inertia dampener" → inertia: true).
 const DECORATOR_HOSTILE = /\binertia\b|\((?:build|buy|outsource|market|ecosystem)\)/i;
+
+/** Single spelling of the taxonomy loss — the harness matches it by substring. */
+const TAXONOMY_LOSS = 'component taxonomy (subtype/nature) has no OWM equivalent and was dropped';
 
 /** Accumulate one insight per distinct loss reason (never one per component). */
 function note(losses: Map<string, number>, reason: string): void {
@@ -137,9 +145,6 @@ function emitMap(map: WardleyMap, losses: Map<string, number>, phases?: string[]
     if (DECORATOR_HOSTILE.test(c.label.name)) {
       note(losses, 'a label contains OWM decorator keywords (inertia / (build|buy|…)); the vendored parser detects them by substring and the round-trip is not byte-stable');
     }
-    if (c.subtype !== undefined || c.nature !== undefined) {
-      note(losses, 'component taxonomy (subtype/nature) has no OWM equivalent and was dropped');
-    }
     if (c.description !== undefined) note(losses, 'component descriptions have no OWM equivalent and were dropped');
     if (c.accelerator || c.deaccelerator || c.step || c.color) {
       note(losses, 'component decorators (accelerator/step/color) have no OWM equivalent and were dropped');
@@ -174,8 +179,10 @@ function emitMap(map: WardleyMap, losses: Map<string, number>, phases?: string[]
 
     if (c.type === 'anchor') {
       // AnchorExtractionStrategy runs setName + setCoords ONLY — the OWM anchor
-      // grammar carries no `label [dx, dy]`, so an offset would be lost on the
-      // way back and break byte-identity. Drop it explicitly instead.
+      // grammar carries neither `label [dx, dy]` nor an inline decorator group,
+      // so an offset (or a taxonomy) would be lost on the way back and break
+      // byte-identity. Drop them explicitly instead.
+      if (c.subtype !== undefined || c.nature !== undefined) note(losses, TAXONOMY_LOSS);
       if (c.label.position) note(losses, 'anchor label offsets have no OWM equivalent and were dropped');
       if (c.inertia || c.method || c.pipelineGeometry) {
         note(losses, 'anchor inertia/method/pipeline markers have no OWM equivalent and were dropped');
@@ -184,6 +191,7 @@ function emitMap(map: WardleyMap, losses: Map<string, number>, phases?: string[]
       continue;
     }
 
+    let emittedPipeline = false;
     if (c.pipelineGeometry !== undefined) {
       const pipelineLine = emitPipelineLine(c.label.name, c.pipelineGeometry.evoStart, c.pipelineGeometry.evoEnd);
       if (pipelineLine.includes('"')) {
@@ -192,17 +200,34 @@ function emitMap(map: WardleyMap, losses: Map<string, number>, phases?: string[]
         note(losses, 'pipelineGeometry dropped: the component name is long enough to be quote-wrapped, which the OWM pipeline grammar cannot reference reliably');
       } else {
         pipelineLines.push(pipelineLine);
+        emittedPipeline = true;
       }
     } else if (c.type === 'pipeline') {
       note(losses, 'pipeline component without pipelineGeometry emitted as a plain component');
     }
 
+    // Inline decorator group, in a FIXED order so the second emit reproduces
+    // the first one byte for byte.
+    const decorators: OwmInlineDecorator[] = [];
+
+    // `subtype` round-trips only for the two OWM draws itself, `(market)` and
+    // `(ecosystem)`, and only on a plain component: a `pipeline` companion line
+    // makes parse re-type the component as `pipeline`, whose canonical subtype
+    // set is {functional, userNeed, solution} — the map would not re-validate.
+    const inlineSubtype =
+      !emittedPipeline && (c.subtype === 'market' || c.subtype === 'ecosystem')
+        ? c.subtype
+        : undefined;
+    if (inlineSubtype !== undefined) decorators.push(inlineSubtype);
+    if ((c.subtype !== undefined && inlineSubtype === undefined) || c.nature !== undefined) {
+      note(losses, TAXONOMY_LOSS);
+    }
+
     // `method` only round-trips for OWM's own (build|buy|outsource) markers.
-    let decorator: string | undefined;
     if (c.method !== undefined) {
       const r = c.method.recommendation;
       if (r === 'build' || r === 'buy' || r === 'outsource') {
-        decorator = r;
+        decorators.push(r);
       } else {
         note(losses, 'method decorators outside (build|buy|outsource) have no OWM equivalent and were dropped');
       }
@@ -212,7 +237,7 @@ function emitMap(map: WardleyMap, losses: Map<string, number>, phases?: string[]
       ? { dx: c.label.position.dx, dy: c.label.position.dy }
       : undefined;
     let line = emitComponent(c.label.name, coords, offset);
-    if (decorator !== undefined) line += ` (${decorator})`;
+    line += emitInlineDecorators(decorators);
     if (c.inertia === true) line += ' inertia';
     lines.push(line);
   }

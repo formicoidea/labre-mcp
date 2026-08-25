@@ -149,6 +149,50 @@ describe('render:wardley-map:owm:parse:dsl (real, deterministic)', () => {
     assert.ok(!/`pipeline` declaration/.test(joined), joined);
   });
 
+  it('stays completely silent on a source that carries no ignored construction', async () => {
+    // The vendored parser fills `presentation` and the four evolution axis
+    // labels with DEFAULTS on every parse. Guarding the warnings on those
+    // values made EVERY source — this one included — report two ignored
+    // directives nobody ever wrote.
+    const { warnings } = await parseDsl(
+      [
+        'title Irreproachable',
+        'anchor User [0.95, 0.5]',
+        'component Checkout [0.7, 0.6]',
+        'User->Checkout',
+      ].join('\n'),
+    );
+    assert.deepEqual(warnings, []);
+  });
+
+  it('reports the preamble directives the source really carries', async () => {
+    const { warnings } = await parseDsl(
+      [
+        'title Directed',
+        'style wardley',
+        'size [1200, 800]',
+        'component Checkout [0.7, 0.6]',
+      ].join('\n'),
+    );
+    assert.deepEqual(warnings, [
+      '`style` directive ignored (presentation lives in renderConfig)',
+      '`size` directive ignored (canvas size lives in renderConfig)',
+    ]);
+  });
+
+  it('projects a written `evolution` directive instead of warning about it', async () => {
+    // `evolution` is NOT an ignored construction: it projects onto the
+    // renderConfig phase labels. What used to be an ambient warning on every
+    // source is now an actual projection on the sources that declare one.
+    const { map, warnings } = await parseDsl(
+      ['title Phased', 'evolution A->B->C->D', 'component X [0.5, 0.5]'].join('\n'),
+    );
+    assert.deepEqual(warnings, []);
+    // any: input-shape renderConfig rides untyped next to the map
+    const labels = (map as any).renderConfig?.style?.background?.phases?.default?.labels;
+    assert.deepEqual(labels, [{ text: 'A' }, { text: 'B' }, { text: 'C' }, { text: 'D' }]);
+  });
+
   it('projects inertia and (build|buy|outsource) decorators onto the canonical component', async () => {
     const { map } = await parseDsl(
       [
@@ -163,6 +207,41 @@ describe('render:wardley-map:owm:parse:dsl (real, deterministic)', () => {
       category: 'buying-policy',
       recommendation: 'outsource',
     });
+  });
+
+  it('projects (market)/(ecosystem) decorators onto the canonical subtype', async () => {
+    // The `market <name> […]` LINE keyword has no vendored extraction strategy;
+    // the inline decorator is the only spelling that survives a parse.
+    const { map, warnings } = await parseDsl(
+      [
+        'title Typed',
+        'component Cloud [0.6, 0.7] (market)',
+        'component AppStore [0.65, 0.65] (ecosystem)',
+        'component Both [0.5, 0.5] (market, buy)',
+        'component Plain [0.4, 0.4]',
+      ].join('\n'),
+    );
+    assert.deepEqual(
+      map!.components.map((c) => c.subtype),
+      ['market', 'ecosystem', 'market', undefined],
+    );
+    // A subtype decorator and a method decorator coexist in one paren group.
+    assert.deepEqual(map!.components[2].method, {
+      category: 'buying-policy',
+      recommendation: 'buy',
+    });
+    assert.deepEqual(warnings, []);
+  });
+
+  it('drops a subtype decorator the canonical type cannot carry', async () => {
+    // The schema restricts a `pipeline` to {functional, userNeed, solution};
+    // keeping the decorator would make the whole parse fail validation.
+    const { map, warnings } = await parseDsl(
+      ['title Pipe', 'component Cloud [0.6, 0.7] (market)', 'pipeline Cloud [0.4, 0.8]'].join('\n'),
+    );
+    assert.equal(map!.components[0].type, 'pipeline');
+    assert.equal(map!.components[0].subtype, undefined);
+    assert.ok(warnings.some((w) => w.includes('(market) dropped')), warnings.join('\n'));
   });
 
   it('clamps out-of-range coordinates instead of failing the schema', async () => {
@@ -426,12 +505,33 @@ const fixtures: Fixture[] = [
       ],
     }),
   },
+  {
+    name: 'market / ecosystem subtypes carried by inline decorators',
+    map: WardleyMapSchema.parse({
+      title: 'Typed',
+      components: [
+        { id: 'user', label: { name: 'User' }, type: 'anchor', position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0 } } },
+        { id: 'cloud', label: { name: 'Cloud' }, type: 'component', subtype: 'market', position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.4 } } },
+        { id: 'appstore', label: { name: 'AppStore', position: { dx: 10, dy: -5 } }, type: 'component', subtype: 'ecosystem', method: { category: 'buying-policy', recommendation: 'buy' }, position: { evolution: { scalar: 0.65 }, visibility: { scalar: 0.35 } } },
+      ],
+      relations: [
+        { id: 'rel-1', consumer: 'user', supplier: 'cloud' },
+        { id: 'rel-2', consumer: 'cloud', supplier: 'appstore' },
+      ],
+    }),
+  },
 ];
+
+/** The only two subtypes the OWM DSL carries (inline `(market)`/`(ecosystem)`);
+ *  every other one is a documented loss, so it is not part of the shape. */
+function owmSubtype(c: WardleyMap['components'][number]): string | undefined {
+  return c.subtype === 'market' || c.subtype === 'ecosystem' ? c.subtype : undefined;
+}
 
 function shape(map: WardleyMap) {
   return {
     title: map.title,
-    components: map.components.map((c) => [c.id, c.label.name, c.type]),
+    components: map.components.map((c) => [c.id, c.label.name, c.type, owmSubtype(c)]),
     relations: map.relations.map((r) => [r.id, r.consumer, r.supplier]),
   };
 }

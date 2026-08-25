@@ -3,7 +3,8 @@
 // Reads an OWM (onlinewardleymaps.com) DSL source with the vendored cli-owm
 // parser and projects it onto the canonical WardleyMap. Fully deterministic —
 // no LLM, no I/O. Exact inverse of `render:wardley-map:owm:emit:dsl` on the
-// subset that emitter produces (`title`, `anchor`, `component`, `A->B`).
+// subset that emitter produces (`title`, `anchor`, `component` + its inline
+// `(market|ecosystem|build|buy|outsource)` decorators, `A->B`).
 //
 // ROUND-TRIP CONTRACT (ast-schema.md, render domain § 2.3): `emit(parse(dsl))`
 // is byte-identical for any DSL our emitter produced. That is why declaration
@@ -12,6 +13,11 @@
 // offset is only lifted when the SOURCE LINE actually carries one — the parser
 // synthesises a default offset for every component, and adopting it would make
 // the emitter add a `label` directive that was never written.
+//
+// Same rule for the preamble directives (`style`, `size`, `evolution`): the
+// vendored parser fills their containers with DEFAULTS on every parse, so the
+// warning is raised from a scan of the SOURCE LINES (`hasDirective`) — never
+// from the parsed value, which would make every source noisy.
 //
 // Graceful by design (degradation-first): any OWM construction that has no home
 // in the canonical schema is IGNORED and reported in `warnings`; the strategy
@@ -121,9 +127,11 @@ function decodeComponentName(owmName: string): string {
   return name.replace(/\s*\\n\s*/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-// Keywords the vendored Converter has NO extraction strategy for — the lines are
+// Keywords the vendored Converter has NO extraction strategy for — the LINES are
 // silently discarded (they even raise a parse error in LinksExtractionStrategy).
-// Worth a warning: the caller's source carries intent we cannot represent.
+// Worth a warning: the caller's source carries intent we cannot represent. Note
+// that the INLINE spellings of the same words (`component X [v, e] (market)`)
+// DO parse, and are projected onto `subtype`/`method` below.
 const UNPARSED_KEYWORDS = ['market', 'ecosystem', 'buy', 'build', 'outsource'] as const;
 
 /** Containers the parser fills but the canonical schema has no home for.
@@ -143,11 +151,29 @@ const UNPROJECTED_CONTAINERS: ReadonlyArray<{ key: keyof UnifiedWardleyMap; labe
 const METHOD_CATEGORY = 'buying-policy';
 const METHOD_DECORATORS = ['build', 'buy', 'outsource'] as const;
 
+// OWM's `(market)`/`(ecosystem)` inline decorators map one-to-one onto the two
+// canonical subtypes of the same name. Order is the tie-break when a line
+// carries both (the vendored detection is substring-based, so it can).
+const SUBTYPE_DECORATORS = ['market', 'ecosystem'] as const;
+
+/**
+ * Does the SOURCE actually carry a `<keyword> …` preamble directive?
+ *
+ * The vendored parser fills `presentation.style` and the four evolution axis
+ * labels with DEFAULTS on every parse, so a guard on the PARSED value fires for
+ * every source — including irreproachable ones — and drowns the real warnings in
+ * ambient noise. Only the source line is evidence that the author wrote the
+ * directive, exactly like the `label [` scan in `toCanonicalMap`.
+ */
+function hasDirective(rawLines: readonly string[], keyword: string): boolean {
+  const pattern = new RegExp(`^${keyword}\\s`);
+  return rawLines.some((l) => pattern.test(l.trim()));
+}
+
 /** The four default OWM axis labels — a parse always returns them, so only a
  *  source that really carries an `evolution` directive yields custom phases. */
-function customPhases(owm: UnifiedWardleyMap, dsl: string): string[] | undefined {
-  const hasDirective = dsl.split('\n').some((l) => /^evolution\s/.test(l.trim()));
-  if (!hasDirective) return undefined;
+function customPhases(owm: UnifiedWardleyMap, rawLines: readonly string[]): string[] | undefined {
+  if (!hasDirective(rawLines, 'evolution')) return undefined;
   // Trim: the vendored extraction keeps spaces around `->` separators, and
   // phases are display labels (our emitter writes the separator unspaced).
   // Guard: a directive with fewer than 4 labels leaves undefined slots in the
@@ -223,13 +249,14 @@ function toCanonicalMap(owm: UnifiedWardleyMap, dsl: string, warnings: string[])
     const visScalar = flipVisibility(clamp01(el.visibility));
 
     // OWM decorators: `(build|buy|outsource)` → the renderer's generic method
-    // decorator. `(market|ecosystem)` have no canonical home yet.
+    // decorator, `(market|ecosystem)` → the canonical subtype of the same name.
     const activeMethods = METHOD_DECORATORS.filter((d) => el.decorators?.[d] === true);
     if (activeMethods.length > 1) {
       warnings.push(`component "${name}": multiple method decorators; keeping (${activeMethods[0]})`);
     }
-    if (el.decorators?.market === true || el.decorators?.ecosystem === true) {
-      warnings.push(`component "${name}": (market)/(ecosystem) decorator ignored (no canonical projection)`);
+    const activeSubtypes = SUBTYPE_DECORATORS.filter((d) => el.decorators?.[d] === true);
+    if (activeSubtypes.length > 1) {
+      warnings.push(`component "${name}": both (market) and (ecosystem); keeping (${activeSubtypes[0]})`);
     }
 
     const evolveTarget = evolveByName.get(el.name);
@@ -239,6 +266,17 @@ function toCanonicalMap(owm: UnifiedWardleyMap, dsl: string, warnings: string[])
     }
 
     const hasPipeline = pipeline !== undefined && el.type !== 'anchor';
+
+    // The canonical schema forbids a subtype on an `anchor` and restricts a
+    // `pipeline` to {functional, userNeed, solution}, so the projection only
+    // applies to a plain component — otherwise the map would not re-validate.
+    const subtype =
+      el.type !== 'anchor' && !hasPipeline ? activeSubtypes[0] : undefined;
+    if (activeSubtypes.length > 0 && subtype === undefined) {
+      warnings.push(
+        `component "${name}": (${activeSubtypes[0]}) dropped (canonical ${el.type === 'anchor' ? 'anchor' : 'pipeline'} carries no such subtype)`,
+      );
+    }
     return {
       id,
       label: {
@@ -257,6 +295,7 @@ function toCanonicalMap(owm: UnifiedWardleyMap, dsl: string, warnings: string[])
           : hasPipeline
             ? ('pipeline' as const)
             : ('component' as const),
+      ...(subtype !== undefined ? { subtype } : {}),
       position: {
         evolution: { scalar: clamp01(el.maturity) },
         visibility: { scalar: visScalar },
@@ -335,9 +374,14 @@ function toCanonicalMap(owm: UnifiedWardleyMap, dsl: string, warnings: string[])
       warnings.push(`${container.length} ${label} ignored (no canonical projection)`);
     }
   }
-  if (owm.presentation?.style) warnings.push('`style` directive ignored (presentation lives in renderConfig)');
-  const size = owm.presentation?.size;
-  if (size && (size.width > 0 || size.height > 0)) {
+  // Both are guarded on the SOURCE, not on the parsed `presentation`: the
+  // vendored parser fills that container with defaults for every source (see
+  // `hasDirective`), so guarding on the value warns about directives nobody
+  // wrote.
+  if (hasDirective(rawLines, 'style')) {
+    warnings.push('`style` directive ignored (presentation lives in renderConfig)');
+  }
+  if (hasDirective(rawLines, 'size')) {
     warnings.push('`size` directive ignored (canvas size lives in renderConfig)');
   }
   if (owm.errors.length > 0) {
@@ -365,7 +409,7 @@ function toCanonicalMap(owm: UnifiedWardleyMap, dsl: string, warnings: string[])
   // rides in INPUT shape next to the validated map (render-config-passthrough
   // idiom, same as the layout strategies). V3 input shape for phase labels:
   // style.background.phases.default.labels[].text.
-  const phases = customPhases(owm, dsl);
+  const phases = customPhases(owm, rawLines);
   return phases !== undefined
     ? ({
         ...map,
