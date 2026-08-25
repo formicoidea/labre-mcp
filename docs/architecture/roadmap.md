@@ -6,7 +6,7 @@
 
 ## État courant en une ligne
 
-Daemon HTTP `src/core/transport/labre-daemon.mts` (:6767) — **4 outils MCP câblés** (`estimateEvolution`, `runCommand`, `runRecipe`, `__ping__`) — **86 stratégies** enregistrées dont **25 réelles** et **61 mocks** — kernel sous `src/core/`, utilitaires encore sous `src/lib/`, stratégies réelles encore sous `_legacy/`.
+Daemon HTTP `src/core/transport/labre-daemon.mts` (:6767) — **6 outils MCP câblés** (`estimateEvolution`, `generateValueChain`, `evaluateMap`, `runCommand`, `runRecipe`, `__ping__`) — **86 stratégies** enregistrées dont **25 réelles** et **61 mocks** — kernel sous `src/core/`, utilitaires encore sous `src/lib/`, stratégies réelles encore sous `_legacy/`.
 
 ## Chantiers (Famille B)
 
@@ -22,12 +22,13 @@ Daemon HTTP `src/core/transport/labre-daemon.mts` (:6767) — **4 outils MCP câ
 - **Aujourd'hui** : ~38 fichiers source réels (toutes les stratégies réelles : s-curve, llm-direct, top-down, identify-capability, properties, anchor…) encore sous `…/_legacy/`. Le registry réel et le walker `loadStrategies()` legacy résolvent vers les mêmes classes.
 - **Action** : extraction physique « V1.5 cleanup » (ARCH-23). Retirer ensuite les alias transitoires `#work-on-evolution/*` et `#work-on-value-chain/*` du `package.json`.
 
-### B3 — Surface d'outils MCP : 1 → N câblés
+### B3 — Surface d'outils MCP : 1 → N câblés — **traité**
 
 - **Cible** : la surface complète du cycle d'étude exposée comme outils/recipes.
 - **Livré** : l'outil générique **`runCommand`** est câblé — il invoque **n'importe quel methodId** (réel ou mock) directement et renvoie un `CommandResult` portant l'enveloppe JSON-labre (`src/mcp/run-command.tool.mts`, schémas `src/schemas/command.schema.mts`). Toute commande **unique** est donc appelable sans recette. Les recettes mono-commande (`anchor-estimate`, `parse`) ont été supprimées au profit de `runCommand`.
 - **Livré (suite)** : l'outil générique **`runRecipe`** est câblé (`src/mcp/run-recipe.tool.mts`) — il invoque **n'importe quelle recette multi-étapes** par référence `<domain>:<tool>:<name>` (shipped + override) et renvoie l'enveloppe JSON-labre + l'AST final + le chemin d'artefact. `buildBootRegistry()` enregistre `__ping__` + `estimateEvolution` + `runCommand` + `runRecipe`. L'**exécution des listeners opt-in** est désormais implémentée dans le runner (`recipe.listeners` : map `stepId → [methodId]`, lancés en fin de run, en parallèle, échecs isolés, insights → enveloppe). Nouvelles recettes shipped : `wardley:map:draw-value-chain` (rendu lisibilité) et `wardley:map:estimate-chain-components` (`select-by-type:component` + fan-out `llm-direct`, annotation-only).
-- **Reste à faire** : promouvoir les stratégies mock encore référencées par ces recettes (`purpose:audit-purpose-quality`, `read:pipeline-opportunity`) — voir B4. (`basemap:generate`, `image:emit:svg` sont désormais réelles ; le positionnement « de masse » d'une chaîne est exprimé en recette — `select-by-type:component` + fan-out `llm-direct` — et non plus en stratégie monolithique.) Optionnel : outils dédiés par flux si une UX nommée est souhaitée au-delà du générique `runRecipe`.
+- **Livré (fin)** : les deux recettes multi-étapes qui restaient accessibles uniquement par `runRecipe` ont désormais leur **outil dédié**, avec un schéma d'entrée Zod explicite (c'est le schéma qui les rend découvrables par un agent) : **`generateValueChain`** (`src/mcp/generate-value-chain.tool.mts` + `…-via-recipe.mts`, schéma `src/schemas/generate-value-chain.schema.mts` → recette `wardley:map:generate`, entrée `{ prompt, context? }` projetée sur le basemap canonique via `basemap:generate:default`, sortie `{ dsl, ast, envelope, events, artifactPath, recipeRunId }`) et **`evaluateMap`** (`src/mcp/evaluate-map.tool.mts` + `…-via-recipe.mts`, schéma `src/schemas/evaluate-map.schema.mts` → recette `wardley:map:evaluate-map`, entrée `{ dsl }`, fan-out sur `$.chain.result.map.components`). `buildBootRegistry()` enregistre donc **6 outils** : `__ping__` + `estimateEvolution` + `generateValueChain` + `evaluateMap` + `runCommand` + `runRecipe`. **B3 est traité** ; `runRecipe` reste la porte générique pour toute autre recette.
+- **Reste à faire** : promouvoir les stratégies mock encore référencées par ces recettes (`purpose:audit-purpose-quality`, `read:pipeline-opportunity`) — voir B4. (`basemap:generate`, `image:emit:svg` sont désormais réelles ; le positionnement « de masse » d'une chaîne est exprimé en recette — `select-by-type:component` + fan-out `llm-direct` — et non plus en stratégie monolithique.)
 
 ### B4 — Promotion des mocks → stratégies réelles
 
@@ -64,4 +65,4 @@ Daemon HTTP `src/core/transport/labre-daemon.mts` (:6767) — **4 outils MCP câ
 Identifiés lors de l'audit qualité, à traiter dans des passes dédiées :
 
 - **P1 — Garde-fous d'équipe** : CI (typecheck + tests unitaires sûrs sur PR), séparation tests unitaires / tests appelant un vrai LLM, linter/formatter (Biome), `CONTRIBUTING.md`.
-- **P2 — Dette** : finir B1/B2, câbler B3, passe de réduction des `any`/`unknown` justifiés (≈364 hors tests) une fois les schémas Zod stabilisés.
+- **P2 — Dette** : finir B1/B2, passe de réduction des `any`/`unknown` justifiés (≈364 hors tests) une fois les schémas Zod stabilisés.

@@ -11,7 +11,7 @@
 
 | Élément | État |
 |---|---|
-| Outils MCP câblés | `estimateEvolution` (recette `estimate-component-evolution`), `runCommand` (invocation directe de n'importe quel methodId), `__ping__` (smoke). Recettes multi-étapes restantes (evaluateMap, generateValueChain) non encore exposées — roadmap B3. |
+| Outils MCP câblés | 6 : `estimateEvolution` (recette `estimate-component-evolution`), `generateValueChain` (recette `generate`), `evaluateMap` (recette `evaluate-map`), `runCommand` (invocation directe de n'importe quel methodId), `runRecipe` (n'importe quelle recette par ref 3 segments), `__ping__` (smoke). Roadmap B3 traité. |
 | Stratégies enregistrées | 86 au boot : **25 réelles** + **61 mocks** (`LABRE_DISABLE_MOCKS=1` isole les réelles). Liste des réelles : [ast-schema.md → « État d'implémentation »](../architecture/ast-schema.md). |
 
 ## 2. Points d'entrée
@@ -127,6 +127,10 @@ src/
 ├── mcp/                      ── Wrappers des outils MCP câblés
 │   ├── estimate-evolution.tool.mts        ToolDefinition estimateEvolution
 │   ├── estimate-evolution-via-recipe.mts  dispatch via le recipe runner
+│   ├── generate-value-chain.tool.mts      ToolDefinition generateValueChain
+│   ├── generate-value-chain-via-recipe.mts  basemap + recette wardley:map:generate
+│   ├── evaluate-map.tool.mts              ToolDefinition evaluateMap
+│   ├── evaluate-map-via-recipe.mts        recette wardley:map:evaluate-map
 │   ├── run-command.tool.mts               ToolDefinition runCommand (methodId direct)
 │   ├── run-recipe.tool.mts                ToolDefinition runRecipe (recette par nom)
 │   ├── shipped-root.mts                   résolution SHIPPED_ROOT (partagé)
