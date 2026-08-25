@@ -86,6 +86,7 @@
     "mcp:stdio:prod": "node dist/core/transport/labre-stdio.mjs",
     "build": "tsc",
     "dev": "tsx --conditions labre-mcp-dev src/core/transport/labre-daemon.mts",
+    "check:boundaries": "tsx --conditions labre-mcp-dev scripts/check-import-boundaries.mts",
     "typecheck": "tsc --noEmit && npm run typecheck:scripts",
     "typecheck:scripts": "tsc -p tsconfig.scripts.json",
     "schemas": "tsx --conditions labre-mcp-dev scripts/export-schemas.mts",

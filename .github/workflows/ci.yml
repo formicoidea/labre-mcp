@@ -20,6 +20,11 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Import-boundary guard (invariant I2, audit CH-06): the kernel must not
+      # import the wire surface. Runs before typecheck because it is the
+      # cheapest check in the job — node stdlib, no network — and a boundary
+      # break is worth failing on immediately.
+      - run: pnpm run check:boundaries
       - run: pnpm run typecheck
       # llm.config.json is gitignored (per-user); a few E2E tests load it.
       # Same step as the documented install: copy the example profile.
