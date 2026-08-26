@@ -66,10 +66,6 @@
       "labre-mcp-dev": "./src/mcp/*",
       "default": "./dist/mcp/*"
     },
-    "#session/*": {
-      "labre-mcp-dev": "./src/session/*",
-      "default": "./dist/session/*"
-    },
     "#work-on-evolution/*": {
       "labre-mcp-dev": "./src/frameworks/wardley/evolution/_legacy/*",
       "default": "./dist/frameworks/wardley/evolution/_legacy/*"

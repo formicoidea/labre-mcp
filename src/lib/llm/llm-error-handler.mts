@@ -52,7 +52,7 @@ export interface ErrorLoggingOptions {
   logger?: string;
   /** LLM model name for context */
   model?: string;
-  /** Message resolver from progress-messages.mjs; falls back to English plain messages */
+  /** Optional localized message resolver; falls back to English plain messages */
   msg?: MessageResolver | null;
 }
 

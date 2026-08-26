@@ -42,7 +42,6 @@ Estime la position d'evolution d'un composant sur l'axe de Wardley (0 = Genesis,
 | `space` | enum | non | Pre-classification : `economic`, `social_good`, `common_good`. Si fourni, by-passe la gate de classification. Si omis, detection automatique depuis name + context. |
 | `strategy` | string | non | `"auto"` (defaut) route vers une strategie par type detecte (anchor / solution / capability). `"report"` fan-out multi-strategies par type. Un methodId specifique (ex: `"wardley:map:climate:position-functional-in-evolution:s-curve"`) by-passe le routing et execute cette strategie. |
 | `mode` | enum | non | `oneshot`, `conversational`, `default`. `default` auto-detecte : oneshot si `space` ou parametres d'evaluation fournis, conversational sinon. |
-| `sessionState` | string | non | Etat serialise d'une session multi-tour. Utilise uniquement en mode `conversational` — renvoyer le `sessionState` de la reponse precedente pour continuer. |
 | `forceEstimate` | boolean | non | Force l'estimation avec les donnees deja collectees (mode conversational). `false` par defaut. |
 | `pipeline` | boolean | non | Active le mode pipeline enrichi : capability pivot + solution SotA + solution legacy, sortie OWM complete avec syntaxe pipeline. `false` par defaut. |
 
@@ -59,10 +58,13 @@ Estime la position d'evolution d'un composant sur l'axe de Wardley (0 = Genesis,
 ### Detection automatique du mode
 
 1. Parametre `mode` explicite (`oneshot` / `conversational`) → utilise ce mode
-2. `sessionState` present → conversational (reprise de conversation)
-3. `space` pre-classifie → oneshot
-4. Parametres d'evaluation suffisants → oneshot
-5. Sinon → conversational
+2. `space` pre-classifie → oneshot
+3. Parametres d'evaluation suffisants → oneshot
+4. Sinon → conversational
+
+> `sessionState` a ete retire de l'entree de l'outil (CH-16) : ARCH-11 fixe V1 en
+> requete/reponse synchrone, aucune session n'a jamais ete construite et le champ
+> n'etait lu nulle part. L'entree est `.strict()` — le passer est desormais refuse.
 
 ### Exemple — oneshot (HTTP)
 
@@ -107,7 +109,7 @@ curl -X POST http://127.0.0.1:6767/mcp \
   }'
 ```
 
-Reponse : question de la phase suivante + `sessionState` a renvoyer au tour suivant.
+Reponse : question de la phase suivante.
 
 ### Exemple — mode conversational (tour 2)
 
@@ -122,7 +124,6 @@ curl -X POST http://127.0.0.1:6767/mcp \
       "name": "estimateEvolution",
       "arguments": {
         "name": "LLM",
-        "sessionState": "<etat serialise du tour 1>",
         "certitude": 0.6,
         "ubiquity": 0.5
       }
@@ -176,7 +177,6 @@ Le routeur detecte automatiquement "Kubernetes" comme une solution et route vers
   },
   "message": "Component \"ERP\" classified as economic. Evaluated with 6 strategy(ies).",
   "formatted": "## Evolution Estimation: ERP\n...",
-  "sessionState": null,
   "nextQuestion": null,
   "phase": null
 }

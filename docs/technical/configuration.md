@@ -85,7 +85,6 @@ Toutes les strategies passent par Claude via le runtime Agent SDK ; `logprob-dis
     "properties-strategy":  { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
     "anchor-evolution":     { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
     "identify-capability":  { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
-    "dual-verification":    { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
     "pipeline-enrichment":  { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" }
   }
 }
@@ -113,7 +112,6 @@ Toutes les strategies passent par le runtime Copilot (subscription). `COPILOT_GI
     "properties-strategy":  { "provider": "copilot",  "model": "gpt-5" },
     "anchor-evolution":     { "provider": "copilot",  "model": "gpt-5" },
     "identify-capability":  { "provider": "copilot",  "model": "gpt-5" },
-    "dual-verification":    { "provider": "copilot",  "model": "gpt-5" },
     "pipeline-enrichment":  { "provider": "copilot",  "model": "gpt-5" }
   }
 }
@@ -143,7 +141,6 @@ Mix des deux providers : Claude pour les strategies a fort effort (structured co
     "properties-strategy":  { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
     "anchor-evolution":     { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
     "identify-capability":  { "provider": "copilot",  "model": "gpt-5" },
-    "dual-verification":    { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" },
     "pipeline-enrichment":  { "provider": "claude",   "model": "claude-sonnet-4-6", "effort": "high" }
   }
 }
@@ -221,7 +218,7 @@ Regles :
 - Les templates utilisent la syntaxe `{{var}}`. Le loader verifie au demarrage que **chaque `{{var}}` du template est declare dans `variables[]`** et inversement (fail-fast sur dérive).
 - **Convention snake_case** pour les noms de variables template (uniforme sur les 16 prompts : `context_line`, `exclude_line`, `current_year`, `property_block`, etc.). Les variables locales JS peuvent rester en camelCase et sont mappees vers snake_case au site d'appel `.build({ context_line: contextLine })`.
 - Les fins de ligne sont normalisees `\r\n` → `\n` a la lecture (garantit un prompt identique byte-for-byte sous Windows/Linux).
-- La cross-validation avec `llm.config.json` est **souple** : certaines strategies (web-search-verification, solution-classification) sont des prompts techniques consommes via un `llmCall` injecte par un parent — pas besoin d'entree LLM dediee.
+- La cross-validation avec `llm.config.json` est **souple** : certaines strategies (solution-classification) sont des prompts techniques consommes via un `llmCall` injecte par un parent — pas besoin d'entree LLM dediee.
 - `getPrompt(strategy, name)` retourne `{ build, parse }`. Le parser est resolu paresseusement — seul `.parse()` exige que le parser soit enregistre.
 - Les parsers sont enregistres au demarrage via `src/lib/prompts/init.mts` (`import '#lib/prompts/init.mjs'`), importe sur le chemin de boot du daemon avant le premier `.parse()`. Chaque `parser.id` declare dans `prompts.config.json` doit pointer vers une fonction enregistree ; sinon `.parse()` throw avec un message explicite pointant la clé manquante.
 

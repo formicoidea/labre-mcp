@@ -46,10 +46,6 @@ export const EstimateEvolutionInputSchema = z.object({
     '"conversational" enables multi-turn interaction that progressively asks clarifying questions. ' +
     '"default" auto-detects: uses one-shot when space or evaluation params are provided, conversational otherwise.'
   ),
-  sessionState: z.string().optional().describe(
-    'Serialized session state from a previous conversational exchange. ' +
-    'Only used when mode is "conversational". Pass the sessionState from the previous response to continue the conversation.'
-  ),
   forceEstimate: z.boolean().default(false).describe(
     'When true, forces estimation with whatever data has been gathered so far. ' +
     'Only used in "conversational" mode when you want to skip remaining questions.'

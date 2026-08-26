@@ -277,22 +277,10 @@ export function createMonBackendLogprobCall(config = {}) {
 
 ---
 
-## Ajouter une langue de notification
+## Ajouter une langue de detection
 
-### Etape 1 : Ajouter au catalogue
-
-Modifier `src/lib/progress-messages.mts` — ajouter la langue a chaque message :
-
-```javascript
-{
-  id: 'tool_start',
-  en: 'Starting {{tool}} for "{{component}}"...',
-  fr: 'Demarrage de {{tool}} pour "{{component}}"...',
-  sv: 'Startar {{tool}} for "{{component}}"...',  // Ajouter ici
-}
-```
-
-### Etape 2 : Ajouter au detecteur
+Le catalogue de messages localises a ete retire (CH-16, sans appelant). Seul le detecteur
+de langue subsiste.
 
 Modifier `src/lib/language-detect.mts` — ajouter une empreinte :
 
