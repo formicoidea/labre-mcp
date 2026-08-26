@@ -145,7 +145,7 @@ describe('runRecipe tool — PostHog feature-flag gate', () => {
           recipe: 'wardley:map:estimate-chain-components',
           input: { title: 'empty', components: [], relations: [] },
         },
-        { ...context, auth: { userId: 'user-42' } },
+        { ...context, userId: 'user-42' },
       )) as RunRecipeResultShape;
 
       // Refusal follows the tool's existing error shape.

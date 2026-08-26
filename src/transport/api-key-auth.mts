@@ -8,7 +8,8 @@
 // Successful validations are cached (default 60 s) so the DB round-trip is
 // amortized across a session; revocation takes effect within one TTL.
 
-import type { RequestContext } from "#core/context/request-context.mjs";
+import type { AuthenticatedContext } from "./auth-context.mjs";
+import { withAuth } from "./auth-context.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { AuthenticationError } from "./auth-middleware.mjs";
 import { tryExtractBearerToken } from "./jwks-auth.mjs";
@@ -63,7 +64,7 @@ export function buildApiKeyAuthMiddleware(options: ApiKeyAuthOptions): AuthMiddl
   const cache = new Map<string, { userId: string; until: number }>();
 
   return {
-    async authenticate(headers, context): Promise<RequestContext> {
+    async authenticate(headers, context): Promise<AuthenticatedContext> {
       const token = tryExtractBearerToken(headers);
       if (!token) throw new AuthenticationError("missing or malformed authorization header");
       if (!token.startsWith(API_KEY_PREFIX)) {
@@ -72,7 +73,7 @@ export function buildApiKeyAuthMiddleware(options: ApiKeyAuthOptions): AuthMiddl
 
       const cached = cache.get(token);
       if (cached && cached.until > Date.now()) {
-        return { ...context, auth: { userId: cached.userId, source: "api-key" } };
+        return withAuth(context, { userId: cached.userId, source: "api-key" });
       }
       cache.delete(token);
 
@@ -90,7 +91,7 @@ export function buildApiKeyAuthMiddleware(options: ApiKeyAuthOptions): AuthMiddl
       cache.set(token, { userId: owner.userId, until: Date.now() + ttlMs });
       // Provenance (issue #33): a lab_ key resolves a userId but is NOT a JWT
       // — no token is threaded (it cannot pass RLS) and the source says so.
-      return { ...context, auth: { userId: owner.userId, source: "api-key" } };
+      return withAuth(context, { userId: owner.userId, source: "api-key" });
     },
   };
 }
@@ -101,7 +102,7 @@ export function buildApiKeyAuthMiddleware(options: ApiKeyAuthOptions): AuthMiddl
  *  JWT middleware for its canonical missing-header error. */
 export function routeBearerAuth(jwt: AuthMiddleware, apiKey: AuthMiddleware): AuthMiddleware {
   return {
-    async authenticate(headers, context): Promise<RequestContext> {
+    async authenticate(headers, context): Promise<AuthenticatedContext> {
       const token = tryExtractBearerToken(headers);
       const middleware = token?.startsWith(API_KEY_PREFIX) ? apiKey : jwt;
       return middleware.authenticate(headers, context);

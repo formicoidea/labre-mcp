@@ -31,7 +31,7 @@
 //     cannot carry a valid signature and still gets its 401 there.)
 
 import { decodeJwt } from "jose";
-import type { RequestContext } from "#core/context/request-context.mjs";
+import type { AuthenticatedContext } from "./auth-context.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { AuthenticationError } from "./auth-middleware.mjs";
 import { buildJwksAuthMiddleware, extractBearerToken, type JwksAuthOptions } from "./jwks-auth.mjs";
@@ -67,7 +67,7 @@ export function buildMultiIssuerAuthMiddleware(options: MultiIssuerAuthOptions):
   const oidc = buildJwksAuthMiddleware({ ...options.oidc, source: "oidc" });
 
   return {
-    async authenticate(headers, context): Promise<RequestContext> {
+    async authenticate(headers, context): Promise<AuthenticatedContext> {
       const token = extractBearerToken(headers);
 
       // Route on the UNVERIFIED iss claim only — never trust anything else

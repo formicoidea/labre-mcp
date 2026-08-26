@@ -125,7 +125,7 @@ export function attachRunTelemetryIfConfigured(options: {
   return attachPostHogTelemetry({
     bus: options.bus,
     flags,
-    distinctId: options.context.auth?.userId ?? "daemon",
+    distinctId: options.context.userId ?? "daemon",
   });
 }
 

@@ -3,9 +3,17 @@
 // real OAuth/API-key authentication without changing handler signatures.
 
 import type { RequestContext } from "#core/context/request-context.mjs";
+import type { AuthenticatedContext } from "./auth-context.mjs";
 
+/** Takes the business context the wire extracted and returns it enriched with
+ *  the AUTH nature (CH-23): `userId` on the business side, the credential
+ *  details on the delivery side. The dispatch strips the latter before any
+ *  handler runs — see auth-context.mts. */
 export interface AuthMiddleware {
-  authenticate(headers: Record<string, string>, context: RequestContext): Promise<RequestContext>;
+  authenticate(
+    headers: Record<string, string>,
+    context: RequestContext,
+  ): Promise<AuthenticatedContext>;
 }
 
 /** Thrown by any AuthMiddleware when a request cannot be authenticated.

@@ -110,7 +110,9 @@ function makeContext(projectRoot: string): RequestContext {
     sessionId: 's-recipe-variant',
     domain: 'wardley',
     artifactDir: path.join(os.tmpdir(), 'labre-recipe-variant-artifacts'),
-    auth: { userId: 'user-42' },
+    // CH-23: the handler receives the BUSINESS context — identity is the
+    // minimal `userId`, stamped by the auth door, not an auth sub-object.
+    userId: 'user-42',
   };
 }
 

@@ -1,23 +1,25 @@
-// RequestContext travels with every tool call. It replaces process.cwd() and
-// implicit env reads at runtime (ARCH-15). The daemon extracts it from the
-// JSON-RPC request body; in-process callers (tests, internal handlers)
-// construct it explicitly.
+// RequestContext — the BUSINESS nature of a call, and the only nature the
+// kernel ever sees. It replaces process.cwd() and implicit env reads at
+// runtime (ARCH-15).
+//
+// SPLIT AT CH-23 (ARCH-27). This type used to carry three natures at once:
+// business (where the work happens), transport (which wire, which client) and
+// auth (who, with what credential — including a raw bearer token). A strategy
+// asking for its project root therefore received, in the same object, a live
+// user JWT it had no business holding, and the kernel's own type could not be
+// constructed without knowing what an issuer is.
+//
+// The auth nature now lives at the delivery seam, in
+// `src/transport/auth-context.mts` (`AuthContext`, `AuthenticatedContext`), and
+// `dispatch` strips it before a handler runs. What survives here is the ONE
+// identity field the business path genuinely needs — `userId`, for quota
+// attribution, RLS-scoped reads and telemetry bucketing. It is a plain opaque
+// id: no token, no role, no issuer, nothing a caller could act with.
+//
+// The transport nature was never a field: it is an argument of the dispatch
+// (`DispatchOptions.transport`) and stays there.
 
 import { z } from "zod";
-
-/** Which auth middleware authenticated the caller. Provenance travels with
- *  the context so tools can gate on the ISSUER FAMILY, not just on the shape
- *  of the credentials: a valid OIDC token at the door is worth nothing against
- *  PostgREST (see multi-issuer-auth.mts).
- *
- *  ⚠ NO TOOL GATES ON THIS TODAY. The one consumer was agentReply, retired in
- *  slice B4 (ADR-0028 amendment 2026-07-18 — the agent turn moved to the app's
- *  reply.ts). The stamp is still produced by every HTTP auth middleware; only
- *  the reader is gone. Kept, not deleted, because whether the daemon should go
- *  on stamping provenance no tool consults is an AUTH decision (red zone),
- *  not a side effect of removing an LLM backend. */
-export const AuthSourceSchema = z.enum(["supabase", "oidc", "api-key"]);
-export type AuthSource = z.infer<typeof AuthSourceSchema>;
 
 export const RequestContextSchema = z.object({
   projectId: z.string().min(1),
@@ -31,43 +33,20 @@ export const RequestContextSchema = z.object({
   // judge an agent's extraction against the original intent. Optional: absent
   // on stdio and simple clients. Never forwarded to telemetry (metadata-only).
   userPrompt: z.string().optional(),
-  // Populated by the auth middleware (e.g. Supabase JWT) on the HTTP
-  // transport; absent on stdio and unauthenticated local dev.
-  auth: z
-    .object({
-      userId: z.string().min(1),
-      role: z.string().optional(),
-      // ⚠ AUTH REVIEW — raw caller bearer, threaded ONLY by the JWT auth modes
-      // (supabase/oidc via jwks-auth.mts). It WAS the RLS pass-through
-      // credential for tools acting AS the caller (agentReply → conversation
-      // reads/writes under RLS).
-      //
-      // ⚠ NO READER SINCE B4 (ADR-0028 amendment 2026-07-18): agentReply was
-      // its only consumer. The remote-bundle refresh does NOT read this field —
-      // it re-extracts the bearer from the request headers itself
-      // (labre-daemon.mts, onAuthenticated hook). So the daemon currently
-      // retains a raw user JWT on every authenticated request and uses it for
-      // nothing. Whether to STOP retaining it is a deliberate AUTH decision
-      // (red zone, CODEOWNERS) left open rather than silently taken here.
-      // Deliberately NEVER set for lab_ API keys
-      // (api-key-auth.mts leaves it undefined — a lab_ key is not a JWT and
-      // resolves no auth.uid(), so it cannot pass RLS). Handling discipline,
-      // mirrors supabase-bundle-source's token invariants: it lives ONLY on the
-      // per-request context, is never logged, and is discarded when the request
-      // settles. Do not persist, forward, or serialise it.
-      token: z.string().min(1).optional(),
-      // Provenance: which middleware authenticated the caller. Set by every
-      // HTTP auth middleware ('supabase' | 'oidc' | 'api-key'); absent only on
-      // in-process/stdio contexts that never crossed an auth middleware.
-      // Conversation tools (agentReply) USED to gate on it — ONLY 'supabase'
-      // can pass RLS, so an 'oidc' caller was refused first-class at the tool
-      // entry instead of failing invisibly downstream (issue #33).
-      // ⚠ That gate went away with agentReply in B4: no tool reads this field
-      // today. The issue-#33 rationale stays valid for whatever conversation
-      // tool comes back — see the note on AuthSourceSchema above.
-      source: AuthSourceSchema.optional(),
-    })
-    .optional(),
+  /**
+   * MINIMAL IDENTITY — the authenticated caller's opaque user id, and nothing
+   * else about them. Stamped by the delivery seam from the AuthContext the auth
+   * middleware produced (never by the caller: `extractContext` drops a
+   * client-supplied `userId`, so identity can only come from a verified
+   * credential or from nowhere at all).
+   *
+   * Its readers are exactly the ones that must attribute a run to a person:
+   * the quota gate and the cost ledger at the delivery seam, the PostHog
+   * distinct id, and any future RLS-scoped read. Absent on stdio, on local
+   * dev and in-process lib-mode calls — every reader treats that as
+   * "anonymous", never as an error.
+   */
+  userId: z.string().min(1).optional(),
 });
 
 export type RequestContext = z.infer<typeof RequestContextSchema>;

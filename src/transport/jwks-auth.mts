@@ -12,9 +12,9 @@
 // then receives a normal IdP-signed JWT and this middleware just works.
 
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
-import type { AuthSource, RequestContext } from "#core/context/request-context.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { AuthenticationError } from "./auth-middleware.mjs";
+import { withAuth, type AuthSource, type AuthenticatedContext } from "./auth-context.mjs";
 
 export interface JwksAuthOptions {
   /** JWKS endpoint, e.g. https://<tenant>.okta.com/oauth2/default/v1/keys.
@@ -77,7 +77,7 @@ export function buildJwksAuthMiddleware(options: JwksAuthOptions): AuthMiddlewar
   const source = options.source ?? "oidc";
 
   return {
-    async authenticate(headers, context): Promise<RequestContext> {
+    async authenticate(headers, context): Promise<AuthenticatedContext> {
       const token = extractBearerToken(headers);
 
       let payload;
@@ -106,25 +106,25 @@ export function buildJwksAuthMiddleware(options: JwksAuthOptions): AuthMiddlewar
       }
 
       const role = typeof payload[roleClaim] === "string" ? (payload[roleClaim] as string) : undefined;
-      // ⚠ AUTH REVIEW — thread the raw, verified bearer onto the context so
-      // downstream tools can act AS the caller under RLS. This is the ONLY
-      // place the token is retained past verification, and ONLY on the JWT
-      // path: the token has just passed full jwtVerify (signature + exp + aud +
-      // issuer), so it is a genuine, live user JWT. It is never logged and
-      // never outlives this request's context (see request-context.mts). The
-      // lab_ API-key middleware (api-key-auth.mts) deliberately does NOT set
-      // it: a lab_ key is opaque, mints no auth.uid(), and cannot pass RLS.
+      // ⚠ AUTH REVIEW — thread the raw, verified bearer onto the AUTH nature
+      // (auth-context.mts), never onto the business one. This is the ONLY place
+      // the token is retained past verification, and ONLY on the JWT path: the
+      // token has just passed full jwtVerify (signature + exp + aud + issuer),
+      // so it is a genuine, live user JWT. It is never logged, is stripped by
+      // the dispatch before any handler runs, and never outlives this request.
+      // The lab_ API-key middleware (api-key-auth.mts) deliberately does NOT
+      // set it: a lab_ key is opaque, mints no auth.uid(), and cannot pass RLS.
       // `source` records WHICH issuer family verified the token.
       //
       // ⚠ THE JUSTIFICATION ABOVE NO LONGER HAS A BENEFICIARY. The downstream
       // tool was agentReply (ADR-0026 Decision 4 path 1), retired in slice B4
       // (ADR-0028 amendment 2026-07-18). Neither `token` nor `source` is read
       // by any tool now. The bundle-source refresh is NOT a reader either: it
-      // pulls the bearer straight from the request headers (labre-daemon.mts),
+      // pulls the bearer straight from the request headers (http-daemon.mts),
       // so it would keep working if this threading were dropped. Retaining an
       // unused raw user JWT is a standing decision to re-examine — an AUTH
-      // change (red zone, CODEOWNERS), deliberately not bundled into B4.
-      return { ...context, auth: { userId: payload.sub, role, token, source } };
+      // change (red zone, CODEOWNERS), kept as-is by CH-23 on purpose.
+      return withAuth(context, { userId: payload.sub, role, token, source });
     },
   };
 }

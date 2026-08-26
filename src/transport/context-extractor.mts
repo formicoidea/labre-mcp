@@ -11,6 +11,15 @@ import { type RequestContext, RequestContextSchema } from "#core/context/request
 
 const DEFAULT_PROJECT_ROOT = process.cwd();
 
+/** Fields a CALLER may never assert about itself. `userId` is stamped by the
+ *  auth middleware from a verified credential (auth-context.mts, `withAuth`) or
+ *  it is absent — a client-supplied one is dropped here, before the middleware
+ *  even runs. Pre-CH-23 the whole `auth` sub-object was equally client-writable
+ *  through this path; the split makes that impossible for the credential
+ *  fields (they are no longer part of the business schema at all) and this
+ *  filter closes the remaining one. */
+const CALLER_FORBIDDEN_FIELDS = ["userId"] as const;
+
 export function extractContext(params: unknown): RequestContext {
   // any: params shape is open at the JSON-RPC layer.
   // Two embed locations are accepted: top-level `params._context` (clean
@@ -21,7 +30,11 @@ export function extractContext(params: unknown): RequestContext {
   for (const ctx of [topLevel, fromArgs]) {
     if (ctx && typeof ctx === "object") {
       const parsed = RequestContextSchema.safeParse(ctx);
-      if (parsed.success) return parsed.data;
+      if (parsed.success) {
+        const clean = { ...parsed.data };
+        for (const field of CALLER_FORBIDDEN_FIELDS) delete clean[field];
+        return clean;
+      }
     }
   }
 

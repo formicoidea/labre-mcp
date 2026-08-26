@@ -175,7 +175,7 @@ describe('run-recipe: prompt-experiment variant assignment (E2E)', () => {
       sessionId: 's-variant',
       domain: 'wardley',
       artifactDir: path.join(os.tmpdir(), 'labre-variant-artifacts'),
-      auth: { userId: 'user-42' },
+      userId: 'user-42', // CH-23: minimal identity on the business context
     };
 
     const out = (await RUN_RECIPE_TOOL.handler(
@@ -227,7 +227,7 @@ describe('run-recipe: prompt-experiment variant assignment (E2E)', () => {
       sessionId: 's-default',
       domain: 'wardley',
       artifactDir: path.join(os.tmpdir(), 'labre-variant-artifacts-default'),
-      auth: { userId: 'user-7' },
+      userId: 'user-7', // CH-23: minimal identity on the business context
     };
 
     const out = (await RUN_RECIPE_TOOL.handler(

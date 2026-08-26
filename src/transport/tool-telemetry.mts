@@ -66,7 +66,7 @@ export interface ToolCallTelemetry {
  * them. The `transport` property is what separates those populations.
  */
 export function telemetryDistinctId(context: RequestContext): string {
-  return context.auth?.userId ?? "daemon";
+  return context.userId ?? "daemon";
 }
 
 /**

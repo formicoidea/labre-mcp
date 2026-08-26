@@ -12,8 +12,8 @@
 // dependency points delivery → transport → kernel, one way.
 
 import { createRequire } from "node:module";
-import type { RequestContext } from "#core/context/request-context.mjs";
 import { ToolRegistry, type ToolDefinition } from "#core/registry/tool-registry.mjs";
+import { toBusinessContext, type AuthenticatedContext } from "./auth-context.mjs";
 import { type JsonRpcRequest, type JsonRpcResponse, JsonRpcErrorCode } from "./json-rpc.schema.mjs";
 import { withMcpDegradation } from "#lib/degradation/index.mjs";
 import type { Degradable } from "#lib/degradation/types.mjs";
@@ -61,7 +61,11 @@ const SERVER_CAPABILITIES = {
 
 export interface DispatchOptions {
   request: JsonRpcRequest;
-  context: RequestContext;
+  /** The context as the AUTH DOOR left it — business nature plus, on an
+   *  authenticated HTTP request, the credential details. The dispatch is the
+   *  seam: it strips the auth nature (`toBusinessContext`) and hands handlers
+   *  the business context alone (CH-23 / ARCH-27). */
+  context: AuthenticatedContext;
   tools: ToolRegistry;
   /**
    * Which wire this request arrived on, forwarded to tool telemetry so the two
@@ -73,7 +77,12 @@ export interface DispatchOptions {
 }
 
 export async function dispatch(options: DispatchOptions): Promise<JsonRpcResponse | null> {
-  const { request, context, tools } = options;
+  const { request, tools } = options;
+  // THE SEAM. Everything below this line — the handler, the listeners it
+  // attaches, every strategy it runs — sees the business nature only. A raw
+  // bearer cannot reach a strategy, an artefact or a log because it is not in
+  // the object they receive.
+  const context = toBusinessContext(options.context);
   const transport: TransportLabel = options.transport ?? "unknown";
   const id = request.id ?? null;
 

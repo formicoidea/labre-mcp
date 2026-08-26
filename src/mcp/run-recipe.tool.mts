@@ -70,7 +70,7 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
     // PostHog is configured; resolved with the SAME distinctId as the flag gate
     // so a user buckets consistently across the gate and the experiment. Fails
     // open to {} on any PostHog trouble (see resolvePromptVariants).
-    const distinctId = context.auth?.userId ?? 'anonymous';
+    const distinctId = context.userId ?? 'anonymous';
     let variants: Record<string, string> = {};
     let recipeVariant: string | undefined;
     if (flags) {
@@ -162,7 +162,7 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
       attachPostHogTelemetry({
         bus,
         flags,
-        distinctId: context.auth?.userId ?? 'daemon',
+        distinctId: context.userId ?? 'daemon',
         variants,
         recipeExperiment: servedVariant
           ? { ref: { domain: framework, tool, name }, servedVariant }
