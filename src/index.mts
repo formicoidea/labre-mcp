@@ -21,7 +21,30 @@
 // `buildStrategyRegistry()` returns the full catalogue (set LABRE_DISABLE_MOCKS=1
 // for real strategies only). `StrategyRegistry` builds a narrower one by hand.
 export { StrategyRegistry } from './core/registry/strategy-registry.mjs';
+export type {
+  StrategyCatalogEntry,
+  StrategyImplementation,
+} from './core/registry/strategy-registry.mjs';
 export { buildStrategyRegistry } from './frameworks/registry-boot.mjs';
+
+// ─── Data catalogues (CH-24 / ARCH-28) ──────────────────────────────────────
+// What the MCP costume (prompts + resources) is SERVED FROM. They are plain
+// data — a grammar constant, a listing of the shipped schemas and recipes, a
+// listing of the prompt registry — so a lib-mode consumer gets the same
+// discovery surface a third-party harness gets over the wire, with no daemon.
+export { GRAMMAR, GRAMMAR_VERSION } from './core/catalog/grammar.mjs';
+export type { Grammar, GrammarSegment } from './core/catalog/grammar.mjs';
+export {
+  listShippedRecipes,
+  listShippedSchemas,
+  readShippedSchema,
+} from './core/catalog/shipped-assets.mjs';
+export type {
+  ShippedRecipeEntry,
+  ShippedSchemaEntry,
+} from './core/catalog/shipped-assets.mjs';
+export { getPromptCatalogEntry, listPromptCatalog } from './lib/prompts/catalog.mjs';
+export type { PromptCatalogEntry } from './lib/prompts/catalog.mjs';
 
 // ─── Execution ──────────────────────────────────────────────────────────────
 // `runCommand` invokes one 5-segment methodId; `runRecipe` orchestrates a
@@ -55,6 +78,20 @@ export type { RequestContext } from './core/context/request-context.mjs';
 // build its own surface without going through MCP.
 export { ToolRegistry } from './core/registry/tool-registry.mjs';
 export type { ToolDefinition } from './core/registry/tool-registry.mjs';
+// The costume's two registries are kernel contracts for the same reason
+// (CH-24): a host composes prompts and resources, a delivery serves them.
+export { PromptRegistry, requireArguments } from './core/registry/prompt-registry.mjs';
+export type {
+  PromptArgumentDefinition,
+  PromptDefinition,
+  PromptMessage,
+  PromptSummary,
+} from './core/registry/prompt-registry.mjs';
+export { ResourceRegistry } from './core/registry/resource-registry.mjs';
+export type {
+  ResourceDefinition,
+  ResourceSummary,
+} from './core/registry/resource-registry.mjs';
 
 // ─── Observation ────────────────────────────────────────────────────────────
 export { createEventBus } from './core/bus/event-bus.mjs';

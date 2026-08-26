@@ -33,11 +33,33 @@ export function validateMethodId(methodId: string): void {
   }
 }
 
+/** What a registered methodId IS, from the catalogue's point of view.
+ *  `mock` means the strategy answers with deterministic scaffold data so a
+ *  recipe can run end-to-end; its output describes the I/O contract a future
+ *  real strategy must honour, and describes nothing about the caller's map. */
+export type StrategyImplementation = "real" | "mock";
+
+/** One catalogue row: the methodId, whether it really computes, and why it
+ *  refuses to resolve when it does. Everything a caller needs to decide
+ *  whether to trust an answer BEFORE spending a call on it. */
+export interface StrategyCatalogEntry {
+  methodId: string;
+  implementation: StrategyImplementation;
+  /** Present only when the strategy is registered but refuses to resolve. */
+  disabledReason?: string;
+}
+
 export class StrategyRegistry<TStrategy extends BaseStrategy = BaseStrategy> {
   private readonly map = new Map<string, StrategyClass<TStrategy>>();
   // methodId → reason. A disabled strategy stays in `map` (it IS part of the
   // catalogue) but is refused at resolution — see get().
   private readonly disabled = new Map<string, string>();
+  // methodIds registered through registerMock(). Provenance is DECLARED at the
+  // composition root that knows it (frameworks/mocks-registry.mts), never
+  // guessed from a class name: a naming convention is not a contract, and the
+  // catalogue this feeds (CH-24) is read by third-party harnesses deciding
+  // whether an answer is real.
+  private readonly mocks = new Set<string>();
 
   register(methodId: string, strategyClass: StrategyClass<TStrategy>): void {
     validateMethodId(methodId);
@@ -53,6 +75,40 @@ export class StrategyRegistry<TStrategy extends BaseStrategy = BaseStrategy> {
           : "no reason given";
       this.disabled.set(methodId, reason);
     }
+  }
+
+  /**
+   * Register a SCAFFOLD strategy — same registration, plus the provenance.
+   * Behaviour on the wire is identical to `register()`; the only difference is
+   * that `catalogue()` reports the entry as `mock`, so a caller can tell a
+   * deterministic placeholder from a real computation without running it.
+   */
+  registerMock(methodId: string, strategyClass: StrategyClass<TStrategy>): void {
+    this.register(methodId, strategyClass);
+    this.mocks.add(methodId);
+  }
+
+  /** True when the methodId was registered as a scaffold (registerMock). */
+  isMock(methodId: string): boolean {
+    return this.mocks.has(methodId);
+  }
+
+  /**
+   * The full catalogue, sorted by methodId: what is registered, what actually
+   * computes, and what refuses to run. This is the kernel-side data the MCP
+   * `labre://methods` resource serves (CH-24 / ARCH-28) and it is deliberately
+   * a plain array of plain objects — no class, no handle, nothing to execute.
+   */
+  catalogue(): StrategyCatalogEntry[] {
+    return this.list().map((methodId) => {
+      const entry: StrategyCatalogEntry = {
+        methodId,
+        implementation: this.mocks.has(methodId) ? "mock" : "real",
+      };
+      const reason = this.disabled.get(methodId);
+      if (reason !== undefined) entry.disabledReason = reason;
+      return entry;
+    });
   }
 
   /**
