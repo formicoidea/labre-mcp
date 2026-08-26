@@ -127,18 +127,6 @@ src/
 │   │                         8-bit truecolor RGB/RGBA non entrelacé, sinon PngDecodeError propre)
 │   │                         — sert l'arbitrage pixel des couleurs dans render/image/parse/png
 │   ├── vendor/cli-owm/       cli-owm@4950f330 (GPL-2.0) vendoré + parser/
-│   ├── vendor/ai-api/        LE CONTRAT AgentAdapter de labre (@labre/ai-api), vendoré —
-│   │                         agent-adapter.mts (copie verbatim + 2 rétrécissements documentés),
-│   │                         ai-command-names.mts (les 36 verbes autorisés),
-│   │                         agent-adapter.parity.test.mts (garde 2 étages : pin local
-│   │                         toujours mordant + diff/hash de la source amont si ../labre
-│   │                         est là)                                          (ARCH-30)
-│   ├── agent/                LA LIAISON labre — caller-supplied-adapter (le cerveau est
-│   │                         l'appelant MCP), ingestion (events → parts ADR-0015, pur),
-│   │                         labre-conversation-client (5 RPC + 1 lecture, sous le JWT de
-│   │                         l'appelant, zéro credential privilégié), agent-turn
-│   │                         (quota → pré-checks → claim → tour → insert → dépense →
-│   │                         release)                                          (ARCH-30)
 │   ├── zod/                  helpers Zod (validateOrThrow…)
 │   ├── errors.mts
 │   ├── language-detect.mts   détection FR/EN
@@ -184,7 +172,7 @@ src/
 │                                ou une ressource                          (ARCH-27/28)
 │   ├── labre-daemon.mts                   racine de composition HTTP (script + npm `mcp`)
 │   ├── labre-stdio.mts                    racine de composition stdio (le `bin` publié)
-│   ├── tool-registry.mts                  buildMcpToolRegistry() — les 7 outils
+│   ├── tool-registry.mts                  buildMcpToolRegistry() — les 6 outils
 │   ├── prompt-registry.mts                buildMcpPromptRegistry() — les 6 prompts de
 │   │                                      méthode + LE CRITÈRE DE SÉLECTION (ARCH-28)
 │   ├── resource-registry.mts              buildMcpResourceRegistry() — les 7 ressources
@@ -198,18 +186,11 @@ src/
 │   ├── evaluate-map-via-recipe.mts        recette wardley:map:evaluate-map
 │   ├── run-command.tool.mts               ToolDefinition runCommand (methodId direct)
 │   ├── run-recipe.tool.mts                ToolDefinition runRecipe (recette par nom)
-│   ├── agent-reply.tool.mts               ToolDefinition agentReply — LA LIAISON labre :
-│   │                                      un tour borné d'une conversation, conduit par
-│   │                                      l'appelant MCP sous SON identité ; ferme deux
-│   │                                      portes (clé lab_, daemon non câblé) avant tout
-│   │                                      appel à labre                        (ARCH-30)
 │   └── resolve-context.mts                résolution RequestContext (partagé)
 │
 ├── schemas/                  ── Schémas Zod (source de vérité runtime)
 │   ├── index.mts             barrel exporté en npm via `exports["./schemas"]` (surface externe)
-│   ├── agent-reply.schema.mts  contrat de fil de agentReply (.strict() : une clé inventée
-   │                           est une erreur, pas un champ ignoré)             (ARCH-30)
-   ├── strategy-bundle.schema.mts  manifeste des strategy bundles v0 (slug, permissions, prompts)
+│   ├── strategy-bundle.schema.mts  manifeste des strategy bundles v0 (slug, permissions, prompts)
 │   └── estimate-evolution, evaluate-map, identify-capability, estimate-anchor-evolution,
 │       generate-value-chain, value-chain, command, run-recipe, inputs, results, patent, parsed-llm,
 │       wardley-map (ré-export du schéma du package @formicoidea/wardley-map-renderer), json-labre (artefact root)

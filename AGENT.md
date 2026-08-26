@@ -4,11 +4,9 @@ labre-mcp helps the user apply practice frameworks — Wardley Maps first, clima
 
 > **MCP is a DELIVERY, not the identity (ARCH-27, applied 2026-08-26).** The repository is three layers and the dependency points one way — **delivery → transport → kernel**: `src/mcp/` (tool descriptors + the two composition roots) → `src/transport/` (HTTP daemon, stdio server, JSON-RPC dispatch, auth doors) → `src/core/` + `src/frameworks/` + `src/lib/` (registry, recipe runner, bus, contracts, strategies). The kernel names no wire and no tool; the transport names no tool. Two mechanical guards hold it: `pnpm check:boundaries` (baseline **must stay empty**) and `src/lib-mode.test.mts` (the lib entry's import graph must reach neither `src/transport/` nor `src/mcp/`).
 
-> **labre is reached through ONE contract (ARCH-30, applied 2026-08-26).** `agentReply` conducts one bounded turn of a labre conversation **under the CALLER's own identity** — a Supabase JWT resolved at the daemon door; a `lab_` API key is refused with a first-class `identity-unsupported` status because it is not a JWT. The brain is the MCP caller: labre-mcp calls no model on this path and holds **no privileged Supabase credential and no provider secret**. The seam is labre's published `AgentAdapter` contract, vendored under `src/lib/vendor/ai-api/` behind a two-tier parity guard. **The rule: any future way of acting inside a labre conversation is another `AgentAdapter` implementation — never a bespoke HTTP client of a labre endpoint, never a second turn engine.** A refusal (quota, revoked agent, uninvited agent, busy conversation) is always a `status` in the tool RESULT, never a JSON-RPC error.
-
 > **The MCP surface is TOOLS + COSTUME (ARCH-28, applied 2026-08-26).** Besides the six executable tools the daemon serves **prompts** (the method — six Wardley prompts handed over as text a third-party harness can run on its own model) and **resources** (the knowledge — grammar, live methodId catalogue with real/mock status, shipped recipes, published JSON Schemas) under the `labre://` URI scheme. Both are composed in `src/mcp/` from kernel data catalogues and are **DATA-ONLY**: nothing executable is loaded at run time, no resource takes a parameter. See `pnpm demo:costume`.
 
-> **V1 status — kernel posed, post-audit refactor in progress.** Architectural decisions are recorded as ADRs in [docs/architecture/decisions.md](/labre-mcp/docs/architecture/decisions.md) (ARCH-01 to ARCH-28). Strategy classes for Wardley currently live under `src/frameworks/wardley/{chain,evolution}/_legacy/` per ARCH-23 (in-place migration). Physical extraction to the canonical `<tool>/<command>/<subdomain>/` layout is scheduled for V1.5 cleanup. There is **one** strategy registry — the core `StrategyRegistry`; the parallel `loadStrategies()` filesystem walker under `_legacy/` was retired in CH-18. The repository directory will eventually be renamed `labre-mcp` (the npm package name and `.mcp.json` server name are already aligned). **Current surface:** the daemon wires **7 MCP tools** — `estimateEvolution`, `generateValueChain` (recipe `wardley:map:generate`), `evaluateMap` (recipe `wardley:map:evaluate-map`), `runCommand` (direct invocation of any 5-segment methodId → `CommandResult` + JSON-labre envelope), `runRecipe` (invocation of any multi-step recipe by `<domain>:<tool>:<name>` ref → JSON-labre envelope), `agentReply` (**the labre liaison**, ARCH-30 — the only tool that runs no strategy) and `__ping__` — plus the ARCH-28 costume (**6 prompts, 7 resources**), and registers **86 strategies (25 real / 61 mock, 1 disabled)**. _(Those counts are no longer transcribed: `registerMock` declares provenance at the composition root, and `resources/read labre://methods` computes them — read that resource rather than trusting this line. Real count rises as mocks are promoted; see roadmap B4/B8.)_ The full gap to the target is tracked in [roadmap.md](/labre-mcp/docs/architecture/roadmap.md).
+> **V1 status — kernel posed, post-audit refactor in progress.** Architectural decisions are recorded as ADRs in [docs/architecture/decisions.md](/labre-mcp/docs/architecture/decisions.md) (ARCH-01 to ARCH-28). Strategy classes for Wardley currently live under `src/frameworks/wardley/{chain,evolution}/_legacy/` per ARCH-23 (in-place migration). Physical extraction to the canonical `<tool>/<command>/<subdomain>/` layout is scheduled for V1.5 cleanup. There is **one** strategy registry — the core `StrategyRegistry`; the parallel `loadStrategies()` filesystem walker under `_legacy/` was retired in CH-18. The repository directory will eventually be renamed `labre-mcp` (the npm package name and `.mcp.json` server name are already aligned). **Current surface:** the daemon wires **6 MCP tools** — `estimateEvolution`, `generateValueChain` (recipe `wardley:map:generate`), `evaluateMap` (recipe `wardley:map:evaluate-map`), `runCommand` (direct invocation of any 5-segment methodId → `CommandResult` + JSON-labre envelope), `runRecipe` (invocation of any multi-step recipe by `<domain>:<tool>:<name>` ref → JSON-labre envelope), and `__ping__` — plus the ARCH-28 costume (**6 prompts, 7 resources**), and registers **86 strategies (25 real / 61 mock, 1 disabled)**. _(Those counts are no longer transcribed: `registerMock` declares provenance at the composition root, and `resources/read labre://methods` computes them — read that resource rather than trusting this line. Real count rises as mocks are promoted; see roadmap B4/B8.)_ The full gap to the target is tracked in [roadmap.md](/labre-mcp/docs/architecture/roadmap.md).
 
 
 # Architecture
@@ -16,7 +14,7 @@ labre-mcp helps the user apply practice frameworks — Wardley Maps first, clima
 Read these first if you're new to the project:
 
 - [ast-schema.md](/labre-mcp/docs/architecture/ast-schema.md) — **pivot grammar** (5-segment methodIds, open command vocabulary, JSON-labre artefact, strategy contract). Authoritative: supersedes/amends several ADRs (ARCH-25).
-- [decisions.md](/labre-mcp/docs/architecture/decisions.md) — 30 ADRs (ARCH-01..30) that ground every other decision. **ARCH-30** is the labre liaison: one contract (`AgentAdapter`), N liaisons, `agentReply` being the first — plus why the vendored contract is guarded rather than trusted, and where the mcp/labre line runs. **ARCH-27** (applied 2026-08-26) is the façade: three layers, the four cuts, and what stays at the delivery. **ARCH-28** is the costume: prompts + resources served from kernel catalogues, the prompt selection criterion, the `labre://` URI scheme, and the DATA-ONLY limit that reserves the plugin runtime for C4/CH-26. ARCH-26 settles who owns the `labre_mcp` Postgres schema: the migration chain stays in labre, this repo holds the mechanical schema contract. **ARCH-29 is 🔴 proposed, not decided** — it re-opens the `bundle = DATA-ONLY` security model for the CH-26 plugin runtime and awaits human arbitration; no executable-plugin code may be written before it moves
+- [decisions.md](/labre-mcp/docs/architecture/decisions.md) — 29 ADRs (ARCH-01..29) that ground every other decision. **ARCH-27** (applied 2026-08-26) is the façade: three layers, the four cuts, and what stays at the delivery. **ARCH-28** is the costume: prompts + resources served from kernel catalogues, the prompt selection criterion, the `labre://` URI scheme, and the DATA-ONLY limit that reserves the plugin runtime for C4/CH-26. ARCH-26 settles who owns the `labre_mcp` Postgres schema: the migration chain stays in labre, this repo holds the mechanical schema contract. **ARCH-29 is 🔴 proposed, not decided** — it re-opens the `bundle = DATA-ONLY` security model for the CH-26 plugin runtime and awaits human arbitration; no executable-plugin code may be written before it moves
 - [plugin-runtime-security.md](/labre-mcp/docs/architecture/plugin-runtime-security.md) — companion to ARCH-29: what DATA-ONLY protects (four named threats), the three options (rich data / minimal loader / Cordis), containment as an orthogonal axis, and the two guards as testable requirements. **Proposal, not current state**
 - [roadmap.md](/labre-mcp/docs/architecture/roadmap.md) — what is **not yet** done (lib/→core, `_legacy/` extraction, tool wiring, mocks→real). Read this to avoid coding against a structure that does not exist yet.
 - [strategies.md](/labre-mcp/docs/architecture/strategies.md) — registry, BaseStrategy contract, result format with signals/reasoning/insights
@@ -54,8 +52,6 @@ labre-mcp/
 │   │
 │   ├── lib/                   # cross-cutting utils — NOT yet under core/ (roadmap B1)
 │   │   └── llm/  prompts/  owm/  degradation/  patent/  vendor/  zod/
-│   │       agent/          the labre liaison: adapter, ingestion, RPC door (ARCH-30)
-│   │       vendor/ai-api/  labre's AgentAdapter contract, vendored + parity-guarded
 │   │
 │   ├── frameworks/
 │   │   ├── registry-boot.mts   buildStrategyRegistry — the frameworks' composition root
@@ -68,12 +64,10 @@ labre-mcp/
 │   ├── mcp/                   # THE DELIVERY — the only layer that names a tool,
 │   │   │                      # a prompt or a resource                   (ARCH-27/28)
 │   │   ├── labre-daemon.mts / labre-stdio.mts   composition roots (bin + npm scripts)
-│   │   ├── tool-registry.mts   buildMcpToolRegistry — the 7 tools
+│   │   ├── tool-registry.mts   buildMcpToolRegistry — the 6 tools
 │   │   ├── prompt-registry.mts   the 6 method prompts + THE SELECTION CRITERION
 │   │   ├── resource-registry.mts the 7 resources + the labre:// URI scheme
 │   │   ├── metering-hooks.mts  labre's quota gate + cost ledger      (ARCH-27, cut 4)
-│   │   ├── agent-reply.tool.mts  THE LABRE LIAISON — one bounded conversation
-│   │   │                      turn under the caller's own identity     (ARCH-30)
 │   │   └── *.tool.mts  *-via-recipe.mts
 │   └── schemas/  types/
 │
@@ -110,16 +104,6 @@ labre-mcp/
 8d. **The kernel never opens a socket and never calls labre's backend.** Metering (quota gate, cost ledger) is installed through `RunHooks` at the delivery seam (`src/mcp/metering-hooks.mts`), never inside the runner. `src/index.mts` is lib mode and its transitive import graph must reach neither `src/transport/` nor `src/mcp/` — `src/lib-mode.test.mts` checks exactly that.
 
 8e. **Auth stops at the dispatch.** `RequestContext` (kernel) carries the business fields plus the minimal `userId`. The credential — role, raw bearer, issuer provenance — lives in `AuthContext` / `AuthenticatedContext` (`src/transport/auth-context.mts`); `dispatch` calls `toBusinessContext` before any handler. Never hand an `AuthenticatedContext` to a tool handler, a listener or a strategy, and never add a credential field to `RequestContext`.
-
-## labre liaison (ARCH-30)
-
-8f. **One contract, N liaisons.** Acting inside a labre conversation goes through labre's `AgentAdapter` contract (`src/lib/vendor/ai-api/`) plus an ingestion path — **never** a bespoke HTTP client of a labre endpoint (`reply.ts` included) and never a second turn engine. A new liaison is a new adapter, not a branch in `agent-turn.mts`. Any other shape is a request to re-open ARCH-30.
-
-8g. **Zero privileged credential, still.** Every labre call goes out under the CALLER's own bearer JWT plus the public anon key. labre-mcp never holds a service-role key, never reads an agent's provider secret (`get_agent_provider_config` is labre's door, not ours), and never mints a token. A `lab_` API key is not a JWT: refuse it with `identity-unsupported`, never guess.
-
-8h. **A refusal is a RESULT, not an exception.** Quota, revocation, an uninvited agent, a busy conversation: all are `status` values a calling agent can branch on. Adding one means adding it to the tool's description string too — the test asserts the vocabulary is published.
-
-8i. **The vendored contract is refreshed as a pair.** Editing `src/lib/vendor/ai-api/*` without re-running `agent-adapter.parity.test.mts` against a real `../labre` checkout and updating `UPSTREAM_SHA256` in the same commit turns a guarded copy into a silent fork.
 
 ## Tests
 
