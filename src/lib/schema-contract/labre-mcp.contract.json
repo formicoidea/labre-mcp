@@ -1,0 +1,168 @@
+{
+  "$comment": [
+    "SCHEMA CONTRACT — the `labre_mcp` Postgres schema, as labre-mcp expects to find it.",
+    "",
+    "WHY THIS FILE EXISTS. The migrations that CREATE this schema live in the labre",
+    "repository (supabase/migrations/), because the Supabase project — and therefore",
+    "the single migration chain the CLI accepts — belongs to labre. But the schema is",
+    "read by THIS repository: src/lib/bundles/supabase-bundle-source.mts reads",
+    "labre_mcp.strategy_bundles, src/core/transport/api-key-auth.mts calls",
+    "labre_mcp.validate_api_key. Nothing mechanical connected the two before ARCH-26:",
+    "a column rename or a dropped grant landed in labre, shipped green there, and broke",
+    "labre-mcp in production. This file is the missing coupling. See ARCH-26 in",
+    "docs/architecture/decisions.md.",
+    "",
+    "HOW IT IS MAINTAINED. Any change to the labre_mcp schema = one migration in labre",
+    "AND one update to this file, in the same batch. The field belongs functionally to",
+    "labre-mcp: the labre side is a cross-review.",
+    "",
+    "PROVENANCE. Extracted from the LIVE local Supabase stack on 2026-08-26 by the",
+    "very introspection query schema-contract.test.mts runs (pg_catalog +",
+    "information_schema, container supabase_db_labre). Not hand-written from the",
+    "migrations — from the state they actually produce.",
+    "",
+    "SCOPE OF THE GRANTS COMPARED. Roles anon / authenticated / service_role only",
+    "(the `postgres` owner is noise), privileges SELECT / INSERT / UPDATE / DELETE only.",
+    "REFERENCES / TRIGGER / TRUNCATE are deliberately out: `anon` still carries those",
+    "three on strategy_bundles as a residue of the public-schema defaults it was",
+    "relocated from (migration 20260711130000). They grant no read and no write; making",
+    "them part of the contract would freeze a wart instead of describing an invariant."
+  ],
+
+  "schema": "labre_mcp",
+  "extractedAt": "2026-08-26",
+  "migrationsOwnedBy": {
+    "repository": "labre",
+    "path": "supabase/migrations/",
+    "files": [
+      "20260707000100_strategy_bundles.sql",
+      "20260711130000_labre_mcp_schema.sql",
+      "20260711130100_labre_mcp_api_keys.sql",
+      "20260715150000_user_entitlements.sql",
+      "20260726094500_revoke_trigger_functions.sql",
+      "20260728120000_revoke_anon_execute_drift.sql"
+    ]
+  },
+
+  "schemaUsage": ["anon", "authenticated", "service_role"],
+
+  "tables": [
+    {
+      "name": "api_keys",
+      "usedBy": [
+        "src/core/transport/api-key-auth.mts — indirectly, through validate_api_key only.",
+        "The daemon never selects this table: it holds no credential that could."
+      ],
+      "rls": true,
+      "columns": [
+        { "name": "id", "type": "uuid", "nullable": false, "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "uuid", "nullable": false, "default": "" },
+        { "name": "name", "type": "text", "nullable": false, "default": "" },
+        { "name": "key_hash", "type": "text", "nullable": false, "default": "" },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "expires_at", "type": "timestamptz", "nullable": true, "default": "" },
+        { "name": "last_used_at", "type": "timestamptz", "nullable": true, "default": "" },
+        { "name": "revoked_at", "type": "timestamptz", "nullable": true, "default": "" }
+      ],
+      "constraints": [
+        "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+        "PRIMARY KEY (id)",
+        "UNIQUE (key_hash)"
+      ],
+      "grants": [
+        "authenticated:SELECT",
+        "service_role:DELETE",
+        "service_role:INSERT",
+        "service_role:SELECT",
+        "service_role:UPDATE"
+      ],
+      "policies": [{ "name": "api_keys owner select", "cmd": "SELECT", "roles": "{authenticated}" }]
+    },
+
+    {
+      "name": "strategy_bundles",
+      "usedBy": [
+        "src/lib/bundles/supabase-bundle-source.mts — reads slug, version, files,",
+        "storage_prefix, updated_at under the CALLER's JWT; `enabled` is what the RLS",
+        "policy filters on, so the policy below is part of the read contract, not decor."
+      ],
+      "rls": true,
+      "columns": [
+        { "name": "id", "type": "uuid", "nullable": false, "default": "gen_random_uuid()" },
+        { "name": "slug", "type": "text", "nullable": false, "default": "" },
+        { "name": "version", "type": "text", "nullable": false, "default": "" },
+        { "name": "manifest", "type": "jsonb", "nullable": false, "default": "" },
+        { "name": "files", "type": "jsonb", "nullable": false, "default": "" },
+        { "name": "storage_prefix", "type": "text", "nullable": false, "default": "" },
+        { "name": "enabled", "type": "bool", "nullable": false, "default": "false" },
+        { "name": "created_by", "type": "uuid", "nullable": true, "default": "" },
+        { "name": "created_at", "type": "timestamptz", "nullable": false, "default": "now()" },
+        { "name": "updated_at", "type": "timestamptz", "nullable": false, "default": "now()" }
+      ],
+      "constraints": [
+        "FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL",
+        "PRIMARY KEY (id)",
+        "UNIQUE (slug, version)"
+      ],
+      "grants": [
+        "authenticated:SELECT",
+        "service_role:DELETE",
+        "service_role:INSERT",
+        "service_role:SELECT",
+        "service_role:UPDATE"
+      ],
+      "policies": [
+        { "name": "strategy_bundles read enabled", "cmd": "SELECT", "roles": "{authenticated}" }
+      ]
+    }
+  ],
+
+  "functions": [
+    {
+      "name": "create_api_key",
+      "args": "key_name text, expires_in_days integer",
+      "definer": true,
+      "execute": ["authenticated"],
+      "usedBy": ["labre UI only — listed so a change to it is not invisible here."]
+    },
+    {
+      "name": "revoke_api_key",
+      "args": "key_id uuid",
+      "definer": true,
+      "execute": ["authenticated"],
+      "usedBy": ["labre UI only — listed so a change to it is not invisible here."]
+    },
+    {
+      "name": "validate_api_key",
+      "args": "api_key text",
+      "definer": true,
+      "execute": ["anon", "authenticated"],
+      "usedBy": [
+        "src/core/transport/api-key-auth.mts — POST /rest/v1/rpc/validate_api_key with",
+        "Content-Profile: labre_mcp, under the PUBLIC anon key. `anon` on this EXECUTE",
+        "line is the daemon's whole door: revoke it and every lab_ bearer 401s. labre's",
+        "CLAUDE.md and supabase/tests/grants_coherence.sql both name it as a deliberate,",
+        "reviewed exception — this contract is the third guard, on the consumer side.",
+        "It returns SETOF (user_id uuid): a zero-row answer means unknown/revoked/expired."
+      ]
+    }
+  ],
+
+  "notInContract": {
+    "storage": [
+      "The `strategy-bundles` Storage bucket (private) and its single policy on",
+      "storage.objects — `strategy_bundles objects read`, SELECT to authenticated where",
+      "bucket_id = 'strategy-bundles' — are also read by supabase-bundle-source.mts.",
+      "They live in the `storage` schema, which is Supabase-managed surface: the same",
+      "reason labre's own grants_coherence.sql audits storage.objects and nothing else",
+      "there. Left out of the mechanical comparison on purpose; named here so the",
+      "dependency is not forgotten. Promote it if a bucket rename ever bites."
+    ],
+    "postgrestExposure": [
+      "`labre_mcp` must appear in the project's PostgREST \"Exposed schemas\" (dashboard",
+      "setting, Settings → API) or every request above 404s regardless of grants. It is",
+      "not a schema object, so no introspection can assert it; migration",
+      "20260711130000 flags it as still MANUAL on prod."
+    ]
+  }
+}

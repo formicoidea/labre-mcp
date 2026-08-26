@@ -369,3 +369,59 @@ The shared type was specified as `src/core/ast/analysis-ref.mts` (`AnalysisRefSc
 - `JSON-labre` is the canonical artefact shape: a métier sub-tree per `wardley.*` aspect (conformant to its tool schema, the renderer schema in the case of `wardley.map`) plus a transverse `envelope` carrying `signals`, `reasoning`, `insights`, `trace` (cf. ARCH-22). The spec also listed `context` and `references` here; neither ever had a producer, and CH-12 removed both from the contract — `context` belongs to the business sub-tree of the command that produces it (`wardley.iteration`), `references` returns with ARCH-24's writer.
 - ADRs are still append-only and immutable; the supersession is marked via the `Status:` header of each impacted ADR. The original decision text is preserved as historical context.
 - The `StrategyMetadata.status` enum in [ast-schema.md § 3.4.3](ast-schema.md) includes the value `"mock"` to mark scaffolded I/O contracts that have no real implementation yet. Mock strategies live under `src/frameworks/**/*.mock-strategy.mts` and are registered via `registerMocks(registry)` after the real strategies at daemon boot, so the MCP catalogue exposes the full v0.1.0 surface from day 1.
+
+---
+
+## ARCH-26 — The `labre_mcp` schema stays in labre's migration chain; labre-mcp guards it with a mechanical contract
+
+**Status:** 🔴 **Proposed — awaiting human arbitration.** Cross-product decision (labre ↔ labre-mcp), red zone: it touches schema ownership, RLS and grants. Nothing has been applied to either repository beyond this ADR and the contract + test it describes; no migration is moved, created or deleted by this change.
+
+**Context:**
+
+The AI-harness audit recorded that "the `labre_mcp` schema migrations live in neither repository" and proposed labre-mcp as their home. **That premise is wrong, and it matters.** The migrations do exist, and they live in **labre**:
+
+| Migration (in `labre/supabase/migrations/`) | What it does to `labre_mcp` |
+| --- | --- |
+| `20260707000100_strategy_bundles.sql` | creates `strategy_bundles` — in `public` at the time |
+| `20260711130000_labre_mcp_schema.sql` | creates the schema, grants `usage`, relocates `strategy_bundles` into it |
+| `20260711130100_labre_mcp_api_keys.sql` | creates `api_keys`, its RLS policy, its grants, and the three RPCs |
+| `20260715150000_user_entitlements.sql` | touches `strategy_bundles` |
+| `20260726094500_revoke_trigger_functions.sql` | names `labre_mcp` in the "no PUBLIC-executable function" rule |
+| `20260728120000_revoke_anon_execute_drift.sql` | exempts `labre_mcp.validate_api_key` from the anon-EXECUTE sweep, deliberately |
+
+So the problem is not homelessness. The problem is **ownership**: this repository codes against a schema whose definition is legislated by another product, and nothing mechanical connects the two.
+
+- `src/lib/bundles/supabase-bundle-source.mts` reads `labre_mcp.strategy_bundles` (`slug`, `version`, `files`, `storage_prefix`, `updated_at`), under the caller's JWT, filtered by an RLS policy on `enabled`.
+- `src/core/transport/api-key-auth.mts` calls `labre_mcp.validate_api_key` over PostgREST with `Content-Profile: labre_mcp`, under the public anon key. The `anon` EXECUTE grant on that one function is the daemon's entire front door.
+
+A column renamed, a policy narrowed, an EXECUTE grant swept up by a hygiene migration: each ships green in labre — its own tests never load this code — and arrives here as a production incident. Between the two repositories there is currently **no test, no type, no CI step, no review rule**. The drift is silent by construction.
+
+There is also a hard operational constraint that shapes the options: **the Supabase CLI maintains one migration chain per project.** Two `supabase/migrations/` directories in two repositories pointing at one database is a well-known operational hazard — interleaved timestamps, a shared `schema_migrations` ledger neither side owns, and a `db push` from either repo able to strand the other. labre's PRs already auto-apply migrations to staging; a second chain would race that.
+
+**Options considered:**
+
+**(a) Move the `labre_mcp` migrations into labre-mcp.** Ownership becomes obvious: the product that reads the schema also legislates it. But it buys the second migration chain described above, against a Supabase project labre-mcp does not own and holds no credential for — and holding no privileged credential is a load-bearing invariant of this daemon ([mcp-data-store-position.md](mcp-data-store-position.md)). It would also split `20260726094500` and `20260728120000`, which sweep `public` and `labre_mcp` in one pass precisely because the rule they enforce is repo-wide. The cost is paid every day; the benefit — a name on a directory — is paid once.
+
+**(b) Status quo, documented.** Cheapest. Leaves the drift silent, which is the entire finding. Rejected: an audit that ends in a paragraph nobody executes has changed nothing.
+
+**(c) Ownership stays split, but the split becomes mechanical.** — **recommended.**
+
+**Decision (proposed):**
+
+1. **The migration chain stays in labre**, where the Supabase project and its single `schema_migrations` ledger live. One chain, one owner, no race.
+
+2. **labre-mcp gains a schema contract**: [`src/lib/schema-contract/labre-mcp.contract.json`](../../src/lib/schema-contract/labre-mcp.contract.json) — the schema this code needs, declared in this repository: tables, columns with type/nullability/default, primary keys, unique and foreign-key constraints, RLS on/off, the RLS policies, the table grants for `anon`/`authenticated`/`service_role`, and the three RPCs with their `SECURITY DEFINER` flag and EXECUTE holders. It is extracted from a **live** database by the very introspection query that verifies it, not transcribed from the migrations — what is guarded is the state they produce, not the SQL that claims to produce it.
+
+3. **The contract is verified by a test**, [`schema-contract.test.mts`](../../src/lib/schema-contract/schema-contract.test.mts), on the ordinary `pnpm test` runner (`tsx --test`). It introspects `pg_catalog`/`information_schema` when a **local** stack answers, and fails on a missing table, column, constraint, grant, policy or function — **and on an unexpected one**, because a role that gains a privilege nobody declared is the drift that hurts. Reaching the database is loopback-only: a `SUPABASE_DB_URL` pointing anywhere else throws rather than connects, and the fallback path (`docker exec`) cannot reach a remote host at all. With no stack the suite **skips loudly** — a warning naming what was not verified — and the diff engine's own tests still run against planted drift, so the guard is never entirely invisible. Not wired into CI: CI has no Supabase stack, and a guard that cannot run there is decoration, not a gate.
+
+4. **Process rule.** Any change to the `labre_mcp` schema is **one migration in labre AND one contract update in labre-mcp, in the same batch.** The field belongs **functionally to labre-mcp**: labre hosts the migration, labre-mcp says what the shape must be, and the labre-side change is a cross-review. A migration that alters `labre_mcp` without a matching labre-mcp PR is incomplete, not merged-and-followed-up.
+
+5. **Reopening trigger.** If labre-mcp ever acquires genuinely MCP-owned mutable state (trigger 2 of [mcp-data-store-position.md](mcp-data-store-position.md)), it gets its own database, and option (a) becomes correct for that database — with its own project, its own chain, and no shared ledger. This ADR governs the current arrangement only: a schema inside labre's project, read by labre-mcp.
+
+**Consequences:**
+
+- Drift becomes a **red test on this side**, hours after it lands rather than at the next production incident. That is the whole point; everything else is bookkeeping.
+- The contract is a **maintenance obligation** — and deliberately a small, mechanical one. A false red is a one-line edit, and the edit is the documentation.
+- **Two things stay outside the mechanical guard**, both named in the contract's `notInContract`: the `strategy-bundles` Storage bucket and its policy on `storage.objects` (Supabase-managed schema — the same boundary labre's own `grants_coherence.sql` respects), and the PostgREST **"Exposed schemas"** dashboard setting, which is not a schema object and which migration `20260711130000` still flags as manual on prod. Neither can be introspected as part of `labre_mcp`; both will break the daemon if changed.
+- **`anon` retains `REFERENCES`, `TRIGGER` and `TRUNCATE` on `strategy_bundles`** — residue of the `public` defaults the table was relocated from. None grants a read or a write, and the contract deliberately does not freeze them; recorded here so the next reader does not rediscover it as a finding.
+- labre gains a **pointer, not a rule enforced from outside**: a paragraph proposed for its `CLAUDE.md` or docs saying that `labre_mcp` is labre-mcp's field and carries a contract elsewhere. Where that paragraph lands is the human's call — nothing was written into labre by this change.

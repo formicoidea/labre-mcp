@@ -56,3 +56,18 @@ The MCP is **deliberately stateless**:
 
 Until one of these fires: PostHog for experiment data, TTL polling for the
 bundle read model, local files for run artifacts.
+
+## The one schema we read but do not own
+
+Owning no database does not mean touching none. The `labre_mcp` Postgres schema
+— `strategy_bundles` (read by the bundle source above) and `api_keys` (reached
+only through the `validate_api_key` RPC that authenticates `lab_` bearers) —
+lives inside **labre's** Supabase project, and its migrations live in **labre's**
+repository. That is deliberate: the Supabase CLI keeps one migration chain per
+project, and the daemon holds no credential to run one anyway.
+
+What that arrangement lacked was any coupling. [ARCH-26](decisions.md) proposes
+the fix — the chain stays in labre, and this repository carries a **schema
+contract** (`src/lib/schema-contract/`) verified against a live local stack, so
+a rename or a revoked grant on the labre side surfaces here as a red test rather
+than as a production 404. **Status: proposed, awaiting human arbitration.**
