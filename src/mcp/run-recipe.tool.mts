@@ -18,6 +18,7 @@ import { getPostHogFlags } from '#lib/flags/state.mjs';
 import { createEventBus } from '#core/bus/event-bus.mjs';
 import { resolveContext } from './resolve-context.mjs';
 import { coerceJsonInput } from './coerce-json-input.mjs';
+import { LABRE_METERING_HOOKS } from './metering-hooks.mjs';
 import { SHIPPED_ROOT } from '#core/shipped-root.mjs';
 
 export interface RunRecipeResult {
@@ -173,6 +174,9 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
     try {
       const outcome = await runRecipe({
         recipe, ast, context: ctx, registry, bus, promptOverrides, activeVariants: variants,
+        // Metering: labre's quota gate + cost ledger, installed HERE (the
+        // delivery seam) rather than inside the runner — CH-23 / ARCH-27.
+        hooks: LABRE_METERING_HOOKS,
       });
       const artifactPath = await artifactHandle.artifactPath;
       return {

@@ -17,6 +17,7 @@ import { attachRunTelemetryIfConfigured } from '#core/listeners/posthog-telemetr
 import { createEventBus } from '#core/bus/event-bus.mjs';
 import { resolveContext } from './resolve-context.mjs';
 import { coerceJsonInput } from './coerce-json-input.mjs';
+import { LABRE_METERING_HOOKS } from './metering-hooks.mjs';
 
 export const RUN_COMMAND_TOOL: ToolDefinition = {
   name: 'runCommand',
@@ -63,6 +64,9 @@ export const RUN_COMMAND_TOOL: ToolDefinition = {
         registry,
         bus,
         ast,
+        // Metering: labre's quota gate + cost ledger, installed HERE (the
+        // delivery seam) rather than inside the runner — CH-23 / ARCH-27.
+        hooks: LABRE_METERING_HOOKS,
       });
       const artifactPath = await artifactHandle.artifactPath;
       return {

@@ -23,8 +23,6 @@ import {
   runWithUsageCollector,
   type LlmUsageAggregate,
 } from "#lib/llm/usage-context.mjs";
-import { reportUsageToLedger } from "#lib/llm/ledger-report.mjs";
-import { assertQuotaOk } from "#lib/llm/quota-guard.mjs";
 
 // The two nondeterministic sources on the path from a recipe to its artefact:
 // the wall clock (every timestamp and every durationMs the runner stamps) and
@@ -54,6 +52,39 @@ function resolveClock(clock: RunClock | undefined): ResolvedClock {
   };
 }
 
+/**
+ * METERING SEAM (CH-23 / ARCH-27, fourth cut). The runner used to call
+ * `assertQuotaOk()` before the first step and `reportUsageToLedger()` after the
+ * last one — two Supabase round-trips hard-wired into the kernel's execution
+ * path. That made the runner un-runnable offline, tied the kernel to labre's
+ * billing schema, and meant an embedded consumer paid for a metering policy it
+ * had never asked for.
+ *
+ * The runner now announces the two moments and installs nothing. A delivery
+ * layer that bills (src/mcp/metering-hooks.mts, wired by the hosted daemon's
+ * tool handlers) passes these; lib mode passes nothing and the kernel makes no
+ * network call other than the LLM's own.
+ *
+ * Both are OPTIONAL and both default to inert — the seam is not a policy.
+ */
+export interface RunHooks {
+  /**
+   * Runs BEFORE the first step, outside the run's try/finally: nothing has
+   * started, so there is no run-end to emit and no subscription to unwind.
+   * THROWING ABORTS THE RUN — this is where a budget gate belongs (the quota
+   * refusal must land before the money is spent, not after).
+   */
+  beforeRun?: () => Promise<void> | void;
+  /**
+   * Runs when the usage collector settles, with this run's LLM usage
+   * (numbers and provider/model identifiers only — never prompt text). Must
+   * not throw and must not block: it is called synchronously from the
+   * collector's callback and the run's return does not wait on it. This is
+   * where a cost ledger writes its rows.
+   */
+  onUsage?: (aggregate: LlmUsageAggregate) => void;
+}
+
 export interface RunOptions {
   recipe: Recipe;
   ast: Record<string, unknown>;
@@ -74,6 +105,9 @@ export interface RunOptions {
   // redirects to the assigned variant. Independent of promptOverrides — either
   // (or both) triggers the ALS wrap below.
   activeVariants?: PromptOverrideStore["activeVariants"];
+  // Optional metering seam (see RunHooks). Absent → the run touches no network
+  // beyond whatever the strategies themselves call.
+  hooks?: RunHooks;
 }
 
 // JSON-labre envelope shape (ast-schema.md v0.1.0 § 2.0).
@@ -220,23 +254,20 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
     }
   };
 
-  // Budget gate (ADR-0032 Decision 2), BEFORE any step runs: on the hosted
-  // daemon the LLM calls below spend labre's own key, so a caller whose labre
-  // AI budget is exhausted is refused here rather than after the money is gone.
-  // A no-op off the hosted daemon (no caller JWT) and fail-open on any doubt.
-  // Outside the try/finally on purpose: nothing has started, so there is no
-  // run-end to emit and no subscription to unwind.
-  await assertQuotaOk();
+  // Metering seam, opening half (CH-23): the delivery layer's budget gate, if
+  // it installed one. Deliberately outside the try/finally — nothing has
+  // started, so there is no run-end to emit and no subscription to unwind — and
+  // deliberately allowed to throw: a refusal must land before the money is
+  // spent. Absent in lib mode, and then this line costs nothing.
+  await options.hooks?.beforeRun?.();
 
   try {
     await runWithUsageCollector(runWithOverrides, (aggregate) => {
       usage = aggregate;
-      // Report this run's spend to labre's cost ledger (ADR-0032 Decision 3).
-      // Fire-and-forget: a no-op unless a caller JWT is in scope (the hosted
-      // daemon), and best-effort inside — it never throws and never blocks the
-      // run's return. Not awaited: the aggregate callback is synchronous and the
-      // run must not wait on a metering write.
-      void reportUsageToLedger(aggregate.records);
+      // Metering seam, closing half: this run's LLM spend, handed to whoever
+      // asked for it (the hosted daemon writes labre's cost ledger here). The
+      // hook contract forbids throwing and blocking; the runner does not await.
+      options.hooks?.onUsage?.(aggregate);
     });
     emitRunEnd();
   } catch (err) {
@@ -263,6 +294,9 @@ export interface RunCommandOptions {
   // attached to the same bus needs the live AST reference (it is mutated in
   // place and read at run-end). The command's input is seeded at `$.input`.
   ast?: Record<string, unknown>;
+  // Metering seam, forwarded verbatim to runRecipe: a single command is metered
+  // exactly like the full recipe it degenerates into.
+  hooks?: RunHooks;
 }
 
 // Run a single command (methodId) directly and get a JSON-labre envelope back.
@@ -296,6 +330,7 @@ export async function runCommand(options: RunCommandOptions): Promise<RunOutcome
     registry: options.registry,
     bus: options.bus,
     clock: options.clock,
+    hooks: options.hooks,
   });
 }
 

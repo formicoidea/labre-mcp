@@ -16,6 +16,7 @@ import { loadRecipe } from '#core/recipe/recipe-loader.mjs';
 import { runRecipe, type JsonLabreEnvelope } from '#core/recipe/recipe-runner.mjs';
 import { buildStrategyRegistry } from '#frameworks/registry-boot.mjs';
 import { attachArtifactWriter } from '#core/listeners/artifact-writer-listener.mjs';
+import { LABRE_METERING_HOOKS } from './metering-hooks.mjs';
 import { attachRunTelemetryIfConfigured } from '#core/listeners/posthog-telemetry-listener.mjs';
 import { createEventBus } from '#core/bus/event-bus.mjs';
 import { WardleyMapBasemapGenerateDefaultStrategy } from '#frameworks/wardley/map/basemap/generate/default.mjs';
@@ -85,7 +86,9 @@ export async function handleGenerateValueChainViaRecipe(
   // accident that only runRecipe forwarded them (invariant I7).
   attachRunTelemetryIfConfigured({ bus, context });
 
-  const outcome = await runRecipe({ recipe, ast, context, registry, bus });
+  // Metering: labre's quota gate + cost ledger, installed HERE (the delivery
+  // seam) rather than inside the runner — CH-23 / ARCH-27.
+  const outcome = await runRecipe({ recipe, ast, context, registry, bus, hooks: LABRE_METERING_HOOKS });
   const artifactPath = await artifactHandle.artifactPath;
 
   return {
