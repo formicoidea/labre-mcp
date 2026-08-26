@@ -770,3 +770,145 @@ only.
 - **The mocks-to-data tranche is unblocked.** It needs no arbitration, improves
   determinism, and deletes an env flag. It is the CH-26 work that can start
   while the human reads this.
+
+---
+
+## ARCH-30 — One contract, N liaisons: `agentReply` is the first, and every next one goes through `AgentAdapter`
+
+**Status:** ❌ **Rejected — product arbitration 2026-08-26 (see ARCH-31).** The implementation was reverted from the integration branch the same day it landed (PR #63 stays as the record). The rejection is not a verdict on the execution — it is a boundary decision: labre-mcp never writes labre business state. Originally recorded as: ✅ Applied for the labre-mcp half — human arbitration C3, 2026-08-25 ("un contrat, N liaisons : `AgentAdapter` reste l'unique contrat ; les liaisons s'ajoutent quand un besoin les paie ; première liaison à payer : `agent.reply`"). Executed by chantier **CH-25** (AI-harness audit, wave 4). Builds on **ARCH-27** (the façade — this is a delivery-layer addition that touches neither `src/core/` nor `src/transport/`) and consumes five labre ADRs: **ADR-0026** (the AgentAdapter contract), **ADR-0021** (read scope + write floor), **ADR-0027** (quotas, the refusal-as-status rule), **ADR-0028** and its 2026-07-18 amendment (agent registration, the personal-LLM pivot), **ADR-0032** (tokens, the hosted-daemon budget gate).
+
+**🔴 The labre half is red zone and it is ALREADY PAID.** Everything this liaison calls — `claim_agent_turn`, `insert_agent_message`, `record_agent_spend`, `release_conversation_turn` — exists in labre's migration chain, `SECURITY DEFINER`, granted to `authenticated`, with the gates ADR-0028 specified. CH-25 adds **no migration, no RPC and no grant**. That is the finding, not a shortcut: the red-zone work was done by PR-A4-1 and PR-A4-6 and has been waiting for a caller ever since. The audit's phrase for it — "4 ADRs, zéro code" — describes a socket, not a hole.
+
+**Context:**
+
+Two things existed and did not meet.
+
+On labre's side, `packages/ai-api` publishes the `AgentAdapter` contract (ADR-0026 Decision 2): `createSession` / `sendTurn` / `cancel`, a normalized four-kind event vocabulary, and the explicit promise that "nothing downstream knows which agent produced the events". The [A1] slice wired labre's own in-app AI behind it and extracted the ingestion point. Then the database grew the whole external-agent surface — the single-flight claim an agent turn shares with the in-app AI, the message RPC that hard-codes the actor and reads the conducting `agent_id` off the claim row, the ledger insert that attributes spend to the agent's owner, the mandatory quiesce on release. The header of the first of those migrations says it plainly: *"There is no caller yet (the labre-mcp adapter + daemon slice wires them next); this is the data layer only."*
+
+On labre-mcp's side, that slice was never written. The audit verified it: **no `agent-reply.tool` anywhere in `src/`**. `reply.ts` remained the only living implementation of the contract, and labre's published language had exactly zero consumers outside the repository that published it. A contract with one implementation is a class with a long name.
+
+What made the gap easy to leave open is that the ADRs talk about it in two voices. ADR-0027 Decision 4 describes `assertAgentQuota` and `agent-turn.mts` as if they were code someone could read; ADR-0028's `agent_id_required` migration says a first-class `'agent-required'` status "shipped alongside this migration". Neither ever existed here. Reading those ADRs as a description of the code is how one ends up re-deriving a design that was already arbitrated — so CH-25 read them as a **specification** and implemented it.
+
+**The confusion this ADR has to clear first:**
+
+ADR-0028's amendment of 2026-07-18 is emphatic — **"Decision A — the turn runs through `reply.ts`, never the daemon"** — and its slice B4 retires the daemon's per-turn provider backend. Taken as a slogan, that forbids this liaison. Taken as what it says, it does not, and the distinction is the whole design:
+
+| | ADR-0028's retired path | This liaison |
+| --- | --- | --- |
+| Who triggers | a human's browser, on `@handle` | the MCP caller itself |
+| Whose brain answers | an LLM provider the owner registered | **the caller's own** — no provider is called |
+| What labre-mcp does | fetch a provider secret, call a model | relay a finished turn |
+| What labre-mcp spends | the owner's provider account | nothing |
+| Why it was wrong / is right | *"we conflated adding an external endpoint with connecting an MCP server"* | the caller **is** an MCP client; there is nothing to conflate |
+
+The amendment retired the daemon as a **detour**: a browser reaching a JSON-RPC service to have it call an HTTP endpoint `reply.ts` could call directly, buying a second deployment, a second env var and a silent no-op when it was unset. Here the daemon is not a detour, it is the door the caller already came through. And the credential that made the retired path delicate — `get_agent_provider_config`, the owner's provider key — **is not read here and must never be**: this liaison calls no model, so it needs no model's secret.
+
+**Decision 1 — The liaison is an MCP tool, and it goes through the contract:**
+
+`agentReply` conducts **one bounded turn** of a labre conversation. It is not an HTTP client of `reply.ts` and it is not a second turn engine: it instantiates an `AgentAdapter`, calls `createSession` + `sendTurn`, and feeds the normalized events to one ingestion routine. Every labre write is an RPC the database gates.
+
+The wire name is **`agentReply`, not `agent.reply`**. Hard rule #24b forbids a dot — one invalid tool name makes claude.ai reject every request of any conversation that includes the connector. `agentReply` is also what labre's own client calls it (ADR-0028 Decision 5), so the ADRs' `agent.reply` is the concept and this is the identifier.
+
+- _Rejected — an HTTP call to `api/conversations/reply.ts`:_ it would make labre-mcp a proxy for a function whose contract is the browser's, re-derive the claim/ingest/release dance outside the contract, and give the C3 arbitration nothing to hold. The point of "one contract, N liaisons" is that the second liaison costs an adapter, not an integration.
+- _Rejected — a bare `insert_agent_message` call with no claim:_ the RPC refuses it (fail-closed: no active external-agent claim, no message), and it would skip the mutual exclusion that keeps one conversation to one running turn.
+
+**Decision 2 — The brain is the caller: `CallerSuppliedAdapter`:**
+
+Every other implementation of this contract owns a model. This one owns none. The agent at the other end of the MCP connection has already thought; its turn arrives as the tool's arguments, and `sendTurn` replays it into the normalized vocabulary — prose, then each proposal, then `turn-end` with usage.
+
+That is not a degenerate adapter, it is what the contract was shaped for. ADR-0026 Decision 2 left `AgentTurnInput.prompt` open with the words *"an adapter whose turn is prompt-driven rather than reading the persisted thread carries it here"*, and the normalization exists precisely so the ingestion point does not care who produced the events. The dividend is concrete: **labre-mcp holds no LLM credential on this path, spends nothing, and cannot leak a provider secret it never reads.**
+
+`capabilities` are `{ streaming: false, interrupt: false }`, honestly: there is nothing to stream (the payload is complete on arrival) and nothing to interrupt (no call is in flight). `cancel` is a genuine idempotent no-op; ADR-0026 Decision 5's "no orphan turn" is honoured by the claim TTL and the orchestrator's release, not by that method.
+
+**Decision 3 — Identity is the caller's, and a `lab_` key is refused WITH A REASON:**
+
+The caller was authenticated at the daemon door. This tool mints nothing, stores nothing, and reads only which bearer that was, through the same transport-scoped `AsyncLocalStorage` the cost ledger already uses. Every call to labre goes out under **that** JWT plus the public anon key — the posture of `supabase-bundle-source.mts` and `ledger-report.mts`. **labre-mcp holds no privileged Supabase credential on this path or any other, and this ADR does not open one.**
+
+A `lab_` personal API key is refused with the first-class status `identity-unsupported` and one sentence explaining why. ADR-0026 Decision 4 states the mechanism: a `lab_` key is not a JWT, `validate_api_key` resolves it to a bare `user_id` and mints no token, so `auth.uid()` is null and every RPC this turn needs is blind. That ADR's path 2 designs the key-authenticated DEFINER RPC family that would serve those callers; ADR-0028 moved it to Future work and it does not exist. Refusing loudly is the only honest option — the alternative is the failure mode the [A2] recette classed MAJOR: a 100% invisible non-reply.
+
+The write posture is **hard-coded and taken from no input**: `scope: 'restricted'`, `writeMode: 'ask'` — ADR-0026 Decision 3's external-agent floor, *"regardless of the conversation's `ai_write_mode`: a guest brain does not inherit the owner's auto"*. ADR-0028's amendment (Decision B) lifts a **personal LLM** off that floor on the argument that the owner registered it and holds its key. An MCP client is not that, so the floor stands here.
+
+**Decision 4 — Quota at `sendTurn`, refusal as a status, and the claim taken later:**
+
+ADR-0026 Decision 4 puts the gate "at `sendTurn`, daemon-side, keyed on `user_id`"; ADR-0027 Decision 4 makes a refusal a **result status, never a JSON-RPC error** — *"the orchestrator's contract is 'never throws for expected outcomes'"*. Both hold: the guard is `lib/llm/quota-guard.mts`, the existing hosted-daemon budget check of ADR-0032 Decision 2, and an exhausted budget comes back as `status: 'quota-exceeded'` carrying `used` / `limit`.
+
+One deliberate improvement on ADR-0027's own sketch. That sketch claimed the turn first, then released through the **bare-delete path** (`p_reason` NULL) specifically so a refused turn would not append a `turn.quiesced` it never earned. Guarding **before** the claim makes the special case disappear: nothing is claimed, so there is nothing to release and no event to suppress. The invariant it protected — "a denied turn never started, so the log must not say it ended" — is satisfied more simply. The database's own in-transaction per-agent cap (`agent_turn_quota_ok`, inside `claim_agent_turn`) is untouched and still binds.
+
+Because `claim_agent_turn` answers a bare boolean that can mean four different things, two of them are read first under the caller's own JWT and named: `agent-revoked` (the `agents` row, member-readable) and `agent-not-invited` (`conversation_agent_shares`, member-readable). What is left is genuinely `busy`. **Those reads are advisory**: they grant nothing, and if they fail the turn proceeds to the claim, which is the gate that decides. The published vocabulary is `replied` · `quota-exceeded` · `agent-revoked` · `agent-not-invited` · `busy` · `identity-unsupported` · `not-configured` · `error`, and the tool's own description lists it so a calling agent can branch on it.
+
+ADR-0028's `'agent-required'` status is **not** in that list, and that is a recorded deviation: the wire schema makes `agentId` mandatory, so an omitted agent is a schema rejection rather than a turn outcome. The status existed because the parameter was once optional; the anonymous path is retired at both ends now.
+
+- _Rejected — surfacing a quota refusal as a JSON-RPC error:_ ADR-0027's own rejection, reused verbatim. A quota refusal is an expected outcome, not a degradation.
+- _Rejected — reusing `'degraded'`:_ that status invites a retry; a quota refusal must not.
+
+**Decision 5 — The contract is VENDORED, and the copy is guarded in two tiers:**
+
+`@labre/ai-api` is `"private": true` with a single source-first export (`"." : "./src/index.ts"`). So an npm dependency is impossible; a `file:`/workspace link would tie a **published** package — one whose lib mode must build with no sibling checkout — to `../labre` being on disk; and a re-declaration from memory would be a second contract drifting silently, the exact thing a published language exists to prevent. Vendoring is the only shape left, and it is only defensible with a mechanical check:
+
+- **Tier 1 — always bites, CI included.** The vendored surface is pinned by value: the event vocabulary, the error taxonomy, the 36-verb command allow-list and its size, plus a compile-time proof that the interface is implementable as written. This proves the copy is **stable**.
+- **Tier 2 — bites harder when `../labre` is reachable.** The upstream source is read, CRLF-normalised, hashed against the recorded provenance, and its `commandSchemas` keys are diffed against the allow-list. This proves the copy is **true**. It skips when the sibling checkout is absent — and **prints that it skipped**, because a green tick meaning "I checked nothing" is a pattern this audit has already found elsewhere in this codebase and does not intend to reproduce.
+
+Refreshing the contract = update the copy, run the test with `../labre` present, update `UPSTREAM_SHA256`, commit both together.
+
+**Two narrowings, recorded rather than hidden:**
+
+1. **`AiCommand` is carried opaquely** (`{ type, params? }`) instead of vendoring the 750-line command catalogue. labre-mcp is a conduit for a proposal, never its executor: under ask mode a human's client applies the command, and **that client is the validator**. What the conduit does enforce is the **verb**, against the vendored allow-list — enough to keep an unknown command out of a persisted message (it would render as a dead button in someone's thread), without vendoring a catalogue that moves weekly. A rejected verb is reported back in the result, never dropped in silence.
+2. **Query verbs are not vendored at all.** A query is something an agent asks labre to READ for it mid-round, and this liaison does not read — see below.
+
+**Decision 6 — The C3 guard: every next liaison goes through `AgentAdapter`:**
+
+The arbitration's second clause is a rule, and this is where it is written down:
+
+> **Any future way for labre-mcp to act inside a labre conversation is an `AgentAdapter` implementation plus an ingestion path — never a bespoke client of a labre endpoint, and never a second turn engine.** A liaison is added when a need pays for it; the contract is not re-opened when it is.
+
+Concretely: a liaison that needed to call a model would be another adapter, not a branch inside this one; a liaison that reads the thread is a separate tool with its own authorization story (below), not an extra field here. A PR that reaches labre by any other shape is a request to re-open this ADR, in the same way a new entry in `import-boundaries-baseline.json` is a request to re-open ARCH-27.
+
+**Where the line runs:**
+
+Delivered, green, on stubs: the tool and its wire schema, the adapter, the pure ingestion, the PostgREST door, the orchestration with all eight statuses, the two-tier parity guard, the parity-matrix row, and the tool-list baselines on both wires.
+
+Deliberately NOT in this liaison, each with its reason:
+
+- **Reading the thread.** To answer, the caller needs context — and it gets it out of band today (a human summoned it, pointing at the conversation). A labre-mcp read surface must resolve ADR-0021's `full`/`restricted` scope, and **no code resolves that scope anywhere yet**; inventing a resolution here would be exactly the "don't re-arbitrate what an ADR settled" trap. This is the natural **second liaison to pay**, and it is a bigger question than it looks: it is the inbound family ADR-0028 parked in Future work.
+- **Streaming and presence** (ADR-0026 Decisions 4/5): no cross-session PubSub, and the Realtime presence join is a browser-adjacent mechanism the daemon has never had.
+- **`agent-always` routing** (ADR-0028 Decision 5): a labre-side responder selection; nothing about it belongs on this wire.
+- **Provider secrets** (`get_agent_provider_config`): not read, by design — see Decision 2.
+- **An end-to-end round against a live labre stack.** The liaison is proved against stubs, and the RPC argument shapes are read off the live migration bodies (including the CH-19 change that made `p_session_id` **text**). What no stub can prove is that a real PostgREST answers those five calls as expected under a real JWT. That recette is the first thing to run at review, and it is named here rather than implied by a green tick.
+
+**Two honesty notes about metering**, because the numbers deserve to be read correctly:
+
+1. **Usage is caller-asserted.** labre-mcp did not make the call and cannot measure it. The ledger row is written through the **existing** agent path (`record_agent_spend`, `source='external-agent'`, attributed to the agent's owner through the claim) — no second ledger, per ADR-0028 Decision 6 — and its model label falls back to the honest string `external-agent` rather than an invented name.
+2. **Consequently, neither token meter binds this turn.** The per-agent daily cap is token-denominated since ADR-0032 Decision 1, so a caller declaring no usage never fills it; and `get_my_ai_usage` sums only `agent_id IS NULL` rows, which an agent row is not. That is **coherent, not a hole**: labre pays nothing for a turn thought by the caller's own brain, and ADR-0032's rule is "labre does not refuse you for spend labre never made". What still binds is the guard at `sendTurn` — reaching labre through the hosted daemon at all is what ADR-0032 Decision 2 gates, and at AI launch that gate becomes the plan gate by itself.
+
+**Consequences:**
+
+- **labre's published language finally has a second consumer**, which is the only way a contract gets tested as a contract. The parity guard is what turns "we copied it" into "we can prove it is the same".
+- **The MCP surface gains a tool that runs no strategy.** `agentReply` is the first entry in the registry that is a liaison rather than a capability, and the first that can refuse for an authorization reason. Both facts are visible in its status vocabulary rather than buried in an error string.
+- **It is advertised on both wires.** A stdio caller reaching it gets `identity-unsupported` with a sentence — worth more than a tool that mysteriously does not exist on one transport.
+- **ARCH-27 is untouched and stays green.** The liaison lives in `src/lib/agent/` (no tool named) and `src/mcp/agent-reply.tool.mts` (the descriptor); `check:boundaries` stays at zero and the lib-mode graph never reaches it.
+- **The labre side needs a human, not a migration.** No schema changes, but the liaison exercises auth-bearing DEFINER RPCs across a product boundary for the first time — mandatory review, and the live-stack recette above is its acceptance test.
+
+---
+
+## ARCH-31 — labre-mcp is a dead end: it writes its accounting, never labre's business state
+
+**Status:** ✅ **Accepted — product arbitration by the human, 2026-08-26.** Supersedes the liaison half of ARCH-30 (rejected above) and AMENDS the C3 arbitration of 2026-08-25: the `AgentAdapter` contract remains labre's single definition of "acting inside a conversation", but **no liaison of that contract will ever live in this repository**.
+
+**Context:**
+
+CH-25 built `agentReply` — an MCP tool through which an external harness conducted a turn of a labre conversation. The execution was disciplined (caller's own JWT, no privileged credential, refusals as statuses) and it revealed that labre's red-zone sockets had been waiting since July. It was reverted anyway, because making the capability concrete made the boundary question concrete, and the product owner arbitrated it:
+
+> labre-mcp is the most stateless possible and is a **dead end** ("une impasse"). An external harness consumes it for its framework knowledge and competences — and comes back out with a result. The labre app consumes it the same way. **Labre assistant stays in control of the conversation.**
+
+Two facts made the rejection principled rather than aesthetic:
+
+1. **The agnosticism invariant.** This repository is a framework-knowledge shell "agnostic to the visualisation tool" (product clarification, 2026-08-25). `agentReply` was labre-specific by definition — the proof is that it had to VENDOR labre's conversation contract into this tree. When a repo must embed another product's language to exist, the coupling its own charter forbids has arrived.
+2. **C3's own condition.** "Liaisons are added when a need pays for them" — and no need had paid for `agentReply`: no external harness asked to write, the app did not consume it. What a need HAS paid for is the opposite flow: metering.
+
+**Decision — the dead-end rule, stated exactly:**
+
+1. **Business state: never.** labre-mcp holds no code path that writes labre's business state — conversations, messages, maps, turns, claims. Not under the caller's JWT, not under any key. A future "external agent writes into a conversation" capability, if a need ever pays for it, is a **labre surface** (labre's own API / the planned `@labre/*` MCP mount point), consuming labre's contract at home, vendored nowhere.
+2. **Accounting state: yes, and owed.** labre-mcp DOES write its own metering into labre's Postgres — `ai_calls` rows, quota checks, `lab_` API-key management. labre is this daemon's administration and billing plane (there is deliberately no separate console): the tokens a client burns through the MCP are tokens that client pays for, and they must be tracked. The known gap — `lab_`-keyed and stdio calls leaving NO ledger row — is therefore a defect to close, not a documented tolerance to keep.
+3. **The July sockets stay dormant, documented.** labre's `claim_agent_turn` / `insert_agent_message` / `release_conversation_turn` RPCs (granted to `authenticated`, no caller) are labre's property and a labre decision: kept dormant for a possible labre-owned door, or revoked by a labre red-zone migration the day the use case is definitively closed. Nothing in this repository calls them.
+
+**Consequences:** the CH-25 commits are reverted from the integration branch (PR #63 remains as the record and the recipe for a future labre-owned door). The "second liaison" (thread reading from here) dies with the first. The successor slice is the metering one: attribute `lab_`-keyed spend to the key's owner via a definer RPC, so the dead end pays its bills.
