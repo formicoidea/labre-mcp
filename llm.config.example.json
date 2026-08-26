@@ -28,6 +28,8 @@
     "purpose-generate":       { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "medium" },
     "audit-purpose-quality":  { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "medium" },
     "render-image-parse-png": { "provider": "opencode", "model": "kimi-k2.5" },
-    "render-text-lint":       { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "low" }
+    "render-text-lint":       { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "low" },
+
+    "bench-placement":        { "provider": "opencode", "model": "kimi-k2.5", "temperature": 0 }
   }
 }
