@@ -13,6 +13,7 @@ import { CommandCallSchema, type CommandResult } from '#schemas/command.schema.m
 import { runCommand } from '#core/recipe/recipe-runner.mjs';
 import { buildStrategyRegistry } from '#core/transport/strategy-registry-boot.mjs';
 import { attachArtifactWriter } from '#core/listeners/artifact-writer-listener.mjs';
+import { attachRunTelemetryIfConfigured } from '#core/listeners/posthog-telemetry-listener.mjs';
 import { createEventBus } from '#core/bus/event-bus.mjs';
 import { resolveContext } from './resolve-context.mjs';
 import { coerceJsonInput } from './coerce-json-input.mjs';
@@ -27,6 +28,16 @@ export const RUN_COMMAND_TOOL: ToolDefinition = {
     'docs/architecture/ast-schema.md. An unknown methodId returns status "error".',
   // any: zod-to-json conversion — the schema is well-typed at the Zod layer
   inputSchema: z.toJSONSchema(CommandCallSchema, { io: 'input' }) as Record<string, unknown>,
+  // Telemetry target (CH-09): the methodId actually addressed. Validated
+  // through the tool's OWN schema field before it can become a PostHog
+  // property — the 5-segment grammar is what bounds its cardinality; an
+  // arbitrary caller string yields no target at all.
+  telemetryTarget(args) {
+    const parsed = CommandCallSchema.shape.command.safeParse(
+      (args as { command?: unknown } | null)?.command,
+    );
+    return parsed.success ? parsed.data : undefined;
+  },
   // Returns a bare CommandResult; the daemon dispatch wraps every handler in
   // withMcpDegradation (Degradable<T>) — do NOT self-wrap here (hard rule #18).
   async handler(args, context): Promise<CommandResult> {
@@ -39,6 +50,10 @@ export const RUN_COMMAND_TOOL: ToolDefinition = {
     // (mutated in place by the runner, read at run-end).
     const ast: Record<string, unknown> = {};
     const artifactHandle = attachArtifactWriter({ bus, context: ctx, getAst: () => ast });
+    // Run-level telemetry (mcp_run_end / mcp_step_error), metadata only. A
+    // command runs through the same kernel as a recipe, so it emits the same
+    // events — CH-09 removed the accident that only runRecipe forwarded them.
+    attachRunTelemetryIfConfigured({ bus, context: ctx });
 
     try {
       const outcome = await runCommand({

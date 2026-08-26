@@ -20,6 +20,8 @@ import {
   promptExperimentFlagKey,
   recipeFlagKey,
 } from "#lib/flags/posthog.mjs";
+import { getPostHogFlags } from "#lib/flags/state.mjs";
+import type { RequestContext } from "../context/request-context.mjs";
 
 export interface AttachPostHogTelemetryOptions {
   bus: EventBus;
@@ -94,6 +96,37 @@ export function attachPostHogTelemetry(
       subscription.unsubscribe();
     },
   };
+}
+
+/**
+ * Attach the forwarder to a run's bus using the process-wide PostHog instance,
+ * or do nothing when none is installed.
+ *
+ * CH-09 / invariant I7. Until this existed, `runRecipe` was the ONLY path that
+ * attached the forwarder — so `mcp_run_end` and `mcp_step_error` described
+ * recipe runs invoked through that one tool, while the identical runs driven by
+ * `runCommand`, `estimateEvolution`, `evaluateMap` and `generateValueChain`
+ * produced no run-level event at all. Same kernel, same bus, same events —
+ * different observability purely by accident of which wrapper you came in
+ * through. Those four paths now call this; `runRecipe` keeps calling
+ * `attachPostHogTelemetry` directly because it already holds the flags instance
+ * and carries the A/B attribution this helper deliberately does not.
+ *
+ * Returns `undefined` when no PostHog is configured, so the caller has nothing
+ * to detach and pays nothing.
+ */
+export function attachRunTelemetryIfConfigured(options: {
+  bus: EventBus;
+  /** The run's context — supplies the distinct id (authenticated user, else "daemon"). */
+  context: RequestContext;
+}): PostHogTelemetryHandle | undefined {
+  const flags = getPostHogFlags();
+  if (!flags) return undefined;
+  return attachPostHogTelemetry({
+    bus: options.bus,
+    flags,
+    distinctId: options.context.auth?.userId ?? "daemon",
+  });
 }
 
 /**

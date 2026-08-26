@@ -21,6 +21,7 @@ import { loadRecipe } from '#core/recipe/recipe-loader.mjs';
 import { runRecipe, type JsonLabreEnvelope } from '#core/recipe/recipe-runner.mjs';
 import { buildStrategyRegistry } from '#core/transport/strategy-registry-boot.mjs';
 import { attachArtifactWriter } from '#core/listeners/artifact-writer-listener.mjs';
+import { attachRunTelemetryIfConfigured } from '#core/listeners/posthog-telemetry-listener.mjs';
 import { createEventBus } from '#core/bus/event-bus.mjs';
 import { resolveContext } from './resolve-context.mjs';
 import { SHIPPED_ROOT } from './shipped-root.mjs';
@@ -63,6 +64,10 @@ export async function handleEvaluateMapViaRecipe(
   // Attached BEFORE the run so the artefact captures every event, including
   // step-start and run-end.
   const artifactHandle = attachArtifactWriter({ bus, context, getAst: () => ast });
+  // Run-level telemetry (mcp_run_end / mcp_step_error), metadata only. Same
+  // kernel, same bus, same events as a runRecipe call — CH-09 removed the
+  // accident that only runRecipe forwarded them (invariant I7).
+  attachRunTelemetryIfConfigured({ bus, context });
 
   const outcome = await runRecipe({ recipe, ast, context, registry, bus });
   const artifactPath = await artifactHandle.artifactPath;

@@ -19,8 +19,10 @@ import { registerBootHealthChecks } from "./boot-health-checks.mjs";
 import { runAllHealthChecks } from "#lib/degradation/index.mjs";
 import { buildSupabaseBundleSource } from "#lib/bundles/supabase-bundle-source.mjs";
 import { SHIPPED_ROOT } from "#mcp/shipped-root.mjs";
-import type { PostHogFlags } from "#lib/flags/posthog.mjs";
 import { setPostHogFlags } from "#lib/flags/state.mjs";
+// Shared with the stdio entrypoint since CH-09 — telemetry belongs to the
+// process, not to the transport.
+import { selectPostHog } from "./boot-posthog.mjs";
 
 // Re-export so existing callers (tests, downstream tooling) can keep
 // importing `buildStrategyRegistry` / `buildBootRegistry` from this module
@@ -229,18 +231,6 @@ function selectBundleRefreshHook(
   return { hook, bootLine: `on (lazy, TTL ${ttlSeconds ?? 300}s, caller-token RLS)` };
 }
 
-// Boot-time PostHog selection (env reads at boot only — same exception as
-// auth). Absent POSTHOG_API_KEY → flags gate and telemetry fully disabled;
-// `posthog-node` stays dynamically imported inside buildPostHog, so an
-// unconfigured daemon (and the stdio transport, which never runs this file)
-// never loads the package.
-async function selectPostHog(): Promise<PostHogFlags | undefined> {
-  const apiKey = process.env.POSTHOG_API_KEY;
-  if (!apiKey) return undefined;
-  const { buildPostHog } = await import("#lib/flags/posthog.mjs");
-  return buildPostHog({ apiKey, host: process.env.POSTHOG_HOST });
-}
-
 async function main(): Promise<void> {
   const port = readPort();
   const auth = selectAuthMiddleware();
@@ -298,6 +288,9 @@ async function main(): Promise<void> {
     setPostHogFlags(posthog);
     // Metadata only — no payloads, no user content.
     posthog.capture("mcp_boot", "daemon", {
+      // Same property as mcp_tool_call carries, so a boot and the calls it
+      // serves join on one dimension (CH-09).
+      transport: "http",
       port: server.port,
       // The actual doors open, sorted so the same config always reports the
       // same string regardless of the env list's order (telemetry cardinality).

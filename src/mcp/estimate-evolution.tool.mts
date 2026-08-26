@@ -12,6 +12,10 @@ import type { ToolDefinition } from "#core/transport/mcp-handler.mjs";
 import { EstimateEvolutionInputSchema } from "#schemas/estimate-evolution.schema.mjs";
 import { handleEstimateEvolutionViaRecipe } from "./estimate-evolution-via-recipe.mjs";
 
+/** The one recipe this tool dispatches — kept beside the tool so the telemetry
+ *  target and the bridge cannot drift apart silently. */
+export const ESTIMATE_EVOLUTION_RECIPE_REF = "wardley:map:estimate-component-evolution";
+
 export const ESTIMATE_EVOLUTION_TOOL: ToolDefinition = {
   name: "estimateEvolution",
   description:
@@ -20,6 +24,9 @@ export const ESTIMATE_EVOLUTION_TOOL: ToolDefinition = {
     "Returns recipeRunId, the AST, the events trace, and the artifact path under ~/.labre-mcp/runs/.",
   // any: zod-to-json conversion — the schema is well-typed at the Zod layer
   inputSchema: z.toJSONSchema(EstimateEvolutionInputSchema, { io: "input" }) as Record<string, unknown>,
+  // Telemetry target (CH-09): this tool dispatches ONE fixed canonical recipe,
+  // so the target is a constant — nothing caller-supplied reaches PostHog.
+  telemetryTarget: () => ESTIMATE_EVOLUTION_RECIPE_REF,
   async handler(args, context) {
     // any: args is the open MCP arguments envelope; the handler validates internally
     return handleEstimateEvolutionViaRecipe({
