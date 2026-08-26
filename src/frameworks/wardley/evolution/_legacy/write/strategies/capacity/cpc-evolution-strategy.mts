@@ -870,7 +870,6 @@ import {
   type StrategyResult,
 } from '#core/ast/base-strategy.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
-import type { LLMCall } from '#types/llm.mjs';
 
 const NEW_METHOD_ID_CPC = 'wardley:map:climate:position-functional-in-evolution:cpc-evolution';
 
