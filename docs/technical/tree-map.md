@@ -105,7 +105,6 @@ src/
 │   ├── language-detect.mts   détection FR/EN
 │   ├── mcp-notifications.mts  émetteur de notifications <channel>
 │   ├── phase-distribution.mts  centroidEvolution / entropyConfidence
-│   ├── progress-messages.mts
 │   └── response-formatter.mts  formatage sortie (FR/EN, markdown)
 │
 ├── frameworks/               ── Domaines métier

@@ -125,17 +125,6 @@
       "parser": { "kind": "custom", "id": "solutionDiscovery" }
     }
   },
-  "web-search-verification": {
-    "default": {
-      "kind": "template",
-      "templateFile": {
-        "system": "prompts/web-search-verification.system.md",
-        "user": "prompts/web-search-verification.user.md"
-      },
-      "variables": ["name", "context_line"],
-      "parser": { "kind": "custom", "id": "webSearchVerification" }
-    }
-  },
   "solution-classification": {
     "default": {
       "kind": "template",

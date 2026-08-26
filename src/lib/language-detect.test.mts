@@ -1,9 +1,8 @@
-// Tests for language detection and localized progress messages
+// Tests for language detection
 //
 // Run: node src/lib/language-detect.test.mjs
 
 import { detectLanguage, extractUserText, detectLanguageFromArgs } from './language-detect.mjs';
-import { createMessageResolver, createMessageResolverFromArgs, MESSAGE_CATALOG } from './progress-messages.mjs';
 
 let passed = 0;
 let failed = 0;
@@ -119,146 +118,6 @@ assertEqual(
   'es',
   'Spanish description args → es'
 );
-
-// ─── Message Resolver Tests ────────────────────────────────────────────────
-
-console.log('\n=== Message Resolver ===\n');
-
-console.log('--- English messages ---');
-const enMsg = createMessageResolver('en');
-assertEqual(
-  enMsg('tool.start', { tool: 'estimateEvolution', component: 'ERP' }),
-  'Starting estimateEvolution for component "ERP"…',
-  'English tool.start message'
-);
-assertEqual(
-  enMsg('tool.end', { tool: 'estimateEvolution', component: 'ERP', duration: 1234 }),
-  'estimateEvolution completed for "ERP" (1234ms)',
-  'English tool.end message'
-);
-
-console.log('\n--- French messages ---');
-const frMsg = createMessageResolver('fr');
-assertEqual(
-  frMsg('tool.start', { tool: 'estimateEvolution', component: 'ERP' }),
-  'Démarrage de estimateEvolution pour le composant « ERP »…',
-  'French tool.start message'
-);
-assertEqual(
-  frMsg('step.classification', { component: 'ERP', space: 'economic' }),
-  'Classification de « ERP » → economic',
-  'French classification message'
-);
-assertEqual(
-  frMsg('error.llm.timeout', { duration: 30000, model: 'kimi-k2.5' }),
-  'Appel LLM expiré après 30000 ms (modèle : kimi-k2.5)',
-  'French timeout error message'
-);
-
-console.log('\n--- Spanish messages ---');
-const esMsg = createMessageResolver('es');
-assertEqual(
-  esMsg('tool.start', { tool: 'estimateEvolution', component: 'ERP' }),
-  'Iniciando estimateEvolution para el componente "ERP"…',
-  'Spanish tool.start message'
-);
-
-console.log('\n--- German messages ---');
-const deMsg = createMessageResolver('de');
-assertEqual(
-  deMsg('tool.start', { tool: 'estimateEvolution', component: 'ERP' }),
-  'Starte estimateEvolution für Komponente „ERP"…',
-  'German tool.start message'
-);
-
-console.log('\n--- Japanese messages ---');
-const jaMsg = createMessageResolver('ja');
-assertEqual(
-  jaMsg('tool.start', { tool: 'estimateEvolution', component: 'ERP' }),
-  'estimateEvolution を開始: コンポーネント「ERP」…',
-  'Japanese tool.start message'
-);
-
-console.log('\n--- Chinese messages ---');
-const zhMsg = createMessageResolver('zh');
-assertEqual(
-  zhMsg('step.strategy', { strategy: 'write:capacity:s-curve', component: 'ERP' }),
-  '正在运行策略「write:capacity:s-curve」:「ERP」…',
-  'Chinese strategy message'
-);
-
-console.log('\n--- Korean messages ---');
-const koMsg = createMessageResolver('ko');
-assertEqual(
-  koMsg('error.llm.api', { status: 500, message: 'Internal Server Error' }),
-  'LLM API 오류 (500): Internal Server Error',
-  'Korean API error message'
-);
-
-// ─── Fallback Tests ────────────────────────────────────────────────────────
-
-console.log('\n=== Fallback Behavior ===\n');
-
-const unknownMsg = createMessageResolver('xx');
-assertEqual(
-  unknownMsg('tool.start', { tool: 'estimateEvolution', component: 'ERP' }),
-  'Starting estimateEvolution for component "ERP"…',
-  'Unknown language falls back to English'
-);
-
-assertEqual(
-  enMsg('nonexistent.message.id', { param: 'value' }),
-  'nonexistent.message.id',
-  'Unknown message ID returns the ID itself'
-);
-
-// ─── createMessageResolverFromArgs Tests ───────────────────────────────────
-
-console.log('\n=== createMessageResolverFromArgs ===\n');
-
-const { msg: frAutoMsg, lang: frAutoLang } = createMessageResolverFromArgs({
-  name: 'ERP',
-  context: 'Logiciel de gestion pour les entreprises françaises',
-});
-assertEqual(frAutoLang, 'fr', 'Auto-detected French from args');
-assertEqual(
-  frAutoMsg('tool.start', { tool: 'estimateEvolution', component: 'ERP' }),
-  'Démarrage de estimateEvolution pour le composant « ERP »…',
-  'Auto French resolver produces French message'
-);
-
-const { msg: enAutoMsg, lang: enAutoLang } = createMessageResolverFromArgs({
-  name: 'ERP',
-  context: 'Enterprise resource planning software',
-});
-assertEqual(enAutoLang, 'en', 'Auto-detected English from args');
-assertEqual(
-  enAutoMsg('tool.start', { tool: 'estimateEvolution', component: 'ERP' }),
-  'Starting estimateEvolution for component "ERP"…',
-  'Auto English resolver produces English message'
-);
-
-// ─── Catalog Completeness Check ────────────────────────────────────────────
-
-console.log('\n=== Catalog Completeness ===\n');
-
-const REQUIRED_LANGUAGES = ['en', 'fr', 'es', 'de', 'pt', 'it', 'nl', 'ja', 'zh', 'ko'];
-let catalogComplete = true;
-
-for (const [msgId, translations] of Object.entries(MESSAGE_CATALOG)) {
-  for (const lang of REQUIRED_LANGUAGES) {
-    if (!translations[lang]) {
-      console.log(`  ✗ Missing translation: ${msgId} → ${lang}`);
-      catalogComplete = false;
-      failed++;
-    }
-  }
-}
-
-if (catalogComplete) {
-  passed++;
-  console.log(`  ✓ All ${Object.keys(MESSAGE_CATALOG).length} messages have all ${REQUIRED_LANGUAGES.length} translations`);
-}
 
 // ─── Summary ───────────────────────────────────────────────────────────────
 

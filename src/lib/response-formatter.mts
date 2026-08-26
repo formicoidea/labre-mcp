@@ -342,7 +342,7 @@ export function formatStrategyResult(method: string, evalResult: StrategyResultL
  * @param {boolean} [options.compact] - If true, use shorter format
  * @returns {string} Markdown-formatted conversational output
  */
-// any: result is a RoutedResponse-like bag; options carry compact/locale tunables
+// any: result is a router-response-like bag; options carry compact/locale tunables
 export function formatResponse(result: any, options: any = {}): string {
   const component = options.component || result.parsedInput || {};
   const compact = options.compact || false;

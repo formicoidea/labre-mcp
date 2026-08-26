@@ -45,7 +45,7 @@ labre-mcp/
 │   │   └── mocks-registry.mts  registers the 70 mock strategies
 │   │
 │   ├── mcp/                   estimate-evolution.tool.mts (the one wired MCP tool, roadmap B3)
-│   └── schemas/  types/  session/  tests/
+│   └── schemas/  types/
 │
 ├── recipes/                   # shipped canonical recipes, ≥2 steps (ARCH-08)
 │   └── wardley/map/*.recipe.json   # single commands → runCommand tool, not a recipe

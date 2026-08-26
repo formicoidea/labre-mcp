@@ -64,11 +64,9 @@ Override via `context.artifactDir` for project-local benchmarks (e.g. checked in
 1. If `<projectRoot>/.labre/project.json` exists and contains a valid `projectId` field, use it. This lets users assign stable IDs that survive across machines and cloned repos.
 2. Otherwise, derive a 16-character SHA-1 hash of the absolute `projectRoot`. This is deterministic per machine but changes if the path moves.
 
-Users can initialise an explicit project marker with [`initProjectMarker`](../../src/core/persistence/project-id-resolver.mts):
-
-```ts
-await initProjectMarker(projectRoot, crypto.randomUUID());
-```
+Users assign an explicit project identity by writing `<projectRoot>/.labre/project.json`
+themselves — `{ "projectId": "<uuid>" }`. The kernel only reads that marker; it ships no
+writer for it.
 
 ## Core listener: artifact-writer
 

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolveProjectId, initProjectMarker, resetProjectIdCache } from "./project-id-resolver.mjs";
+import { resolveProjectId, resetProjectIdCache } from "./project-id-resolver.mjs";
 import { writeArtifact, defaultArtifactDir } from "./artifact-writer.mjs";
 import { attachArtifactWriter } from "../listeners/artifact-writer-listener.mjs";
 import { createEventBus } from "../bus/event-bus.mjs";
@@ -43,17 +43,6 @@ describe("resolveProjectId", () => {
     assert.equal(id1, id2);
     assert.equal(id1.length, 16); // 16 hex chars
     assert.match(id1, /^[0-9a-f]{16}$/);
-  });
-
-  it("initProjectMarker writes the marker and seeds the cache", async () => {
-    const root = await mkdtemp(join(tmpdir(), "labre-pid-"));
-    await initProjectMarker(root, "my-uuid");
-    const id = await resolveProjectId(root);
-    assert.equal(id, "my-uuid");
-
-    // File on disk should be readable too
-    const raw = await readFile(join(root, ".labre", "project.json"), "utf8");
-    assert.deepEqual(JSON.parse(raw), { projectId: "my-uuid" });
   });
 });
 

@@ -10,14 +10,13 @@
 // explicit project setup.
 
 import { createHash } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { z } from "zod";
 
 export const ProjectMarkerSchema = z.object({
   projectId: z.string().min(1),
 });
-export type ProjectMarker = z.infer<typeof ProjectMarkerSchema>;
 
 const cache = new Map<string, string>();
 
@@ -41,15 +40,6 @@ export async function resolveProjectId(projectRoot: string): Promise<string> {
   const derived = createHash("sha1").update(absolute).digest("hex").slice(0, 16);
   cache.set(absolute, derived);
   return derived;
-}
-
-/** Write a new .labre/project.json with a freshly generated UUID. */
-export async function initProjectMarker(projectRoot: string, projectId: string): Promise<void> {
-  const dir = join(resolve(projectRoot), ".labre");
-  await mkdir(dir, { recursive: true });
-  const body: ProjectMarker = { projectId };
-  await writeFile(join(dir, "project.json"), JSON.stringify(body, null, 2), "utf8");
-  cache.set(resolve(projectRoot), projectId);
 }
 
 /** Test-only: clear the projectId cache. */

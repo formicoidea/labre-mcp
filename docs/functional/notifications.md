@@ -90,19 +90,10 @@ Fallback : anglais si aucune langue n'est detectee avec suffisamment de confianc
 
 ## Catalogue de messages
 
-Le fichier `src/lib/progress-messages.mts` contient 40+ messages localises avec interpolation de variables :
-
-```javascript
-// Exemple de message
-{
-  id: 'tool_start',
-  en: 'Starting {{tool}} for "{{component}}"...',
-  fr: 'Demarrage de {{tool}} pour "{{component}}"...',
-  // ... 8 autres langues
-}
-```
-
-Variables disponibles : `{{tool}}`, `{{component}}`, `{{strategy}}`, `{{evolution}}`, `{{confidence}}`, `{{model}}`, `{{count}}`, `{{elapsed}}`.
+Il n'y en a plus. Le catalogue localise (`src/lib/progress-messages.mts`) a ete retire par
+CH-16 : aucun appelant ne l'utilisait. `classifyAndLogLLMError` accepte toujours un
+resolveur `msg` optionnel — a la charge de l'appelant de le fournir — et retombe sur
+l'anglais quand il est absent.
 
 ## Gestion des erreurs LLM
 

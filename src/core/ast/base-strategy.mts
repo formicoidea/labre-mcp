@@ -60,14 +60,9 @@ export interface StrategyResult<TResult = unknown> {
   result: TResult;
 }
 
+// Each concrete subclass declares its own `static get method()` returning its
+// 5-segment methodId; the registry reads it at registration time.
 export abstract class BaseStrategy<TInput = unknown, TResult = unknown> {
-  // Each concrete subclass overrides this to return its 5-segment methodId.
-  static get method(): string {
-    throw new Error(
-      "BaseStrategy.method must be overridden by the subclass with a 5-segment methodId",
-    );
-  }
-
   abstract evaluate(
     input: TInput,
     context: RequestContext,

@@ -142,7 +142,7 @@ User files take precedence by name. Same merge model applies to `llm.config.json
 - **Core** — always active, non-disablable (degradation tracker, artifact writer, notification emitter)
 - **Opt-in** — declared per recipe in the `listeners` array
 
-**Consequences:** RxJS becomes a kernel dependency. Listener strategies subscribe via `eventBus.subscribe(filter)` returning `AsyncIterable<PipelineEvent>`. The interface stays stable so V2 persistence (DuckDB sink) is a non-breaking addition.
+**Consequences:** RxJS becomes a kernel dependency. Listeners subscribe via `eventBus.observe(filter)` returning `Observable<PipelineEvent>`. (The `AsyncIterable` face, `eventBus.subscribe(filter)`, was written for listener strategies that never landed and was removed by CH-16 with zero callers.) The interface stays stable so V2 persistence (DuckDB sink) is a non-breaking addition.
 
 ---
 
