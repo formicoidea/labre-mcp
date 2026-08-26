@@ -9,6 +9,6 @@
     "customConditions": ["labre-mcp-dev"],
     "types": ["node"]
   },
-  "include": ["scripts/**/*"],
+  "include": ["scripts/**/*", "bench/**/*"],
   "exclude": ["node_modules", "dist"]
 }

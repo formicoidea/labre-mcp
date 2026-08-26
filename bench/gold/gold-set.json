@@ -1,0 +1,826 @@
+{
+  "generator": "bench/gold/build-gold-set.mts",
+  "generatedFrom": [
+    "maps/myMaps/tea-shop-hot-beverages.wm",
+    "maps/myMaps/spotify-streaming.wm",
+    "maps/myMaps/s2e-epargne-salariale.wm"
+  ],
+  "tolerance": 0.1,
+  "maps": {
+    "tea-shop": {
+      "key": "tea-shop",
+      "title": "Tea Shop – Hot Beverages",
+      "context": "An independent tea shop serving hot beverages to walk-in customers, from the counter to the supply of tea and utilities.",
+      "sourceFile": "maps/myMaps/tea-shop-hot-beverages.wm",
+      "nodes": [
+        {
+          "id": "hot-beverage",
+          "label": "Hot Beverage",
+          "type": "anchor",
+          "visibility": 0.06
+        },
+        {
+          "id": "served-beverage",
+          "label": "Served Beverage",
+          "type": "component",
+          "visibility": 0.1
+        },
+        {
+          "id": "tea-menu",
+          "label": "Tea Menu",
+          "type": "component",
+          "visibility": 0.15
+        },
+        {
+          "id": "counter-service",
+          "label": "Counter Service",
+          "type": "component",
+          "visibility": 0.2
+        },
+        {
+          "id": "seating-area",
+          "label": "Seating Area",
+          "type": "component",
+          "visibility": 0.28
+        },
+        {
+          "id": "payment-processing",
+          "label": "Payment Processing",
+          "type": "component",
+          "visibility": 0.32
+        },
+        {
+          "id": "brewing-process",
+          "label": "Brewing Process",
+          "type": "component",
+          "visibility": 0.42
+        },
+        {
+          "id": "cups-crockery",
+          "label": "Cups & Crockery",
+          "type": "component",
+          "visibility": 0.48
+        },
+        {
+          "id": "brewing-equipment",
+          "label": "Brewing Equipment",
+          "type": "component",
+          "visibility": 0.56
+        },
+        {
+          "id": "hot-water",
+          "label": "Hot Water",
+          "type": "component",
+          "visibility": 0.62
+        },
+        {
+          "id": "tea-stock",
+          "label": "Tea Stock",
+          "type": "component",
+          "visibility": 0.75
+        },
+        {
+          "id": "tea-supplier",
+          "label": "Tea Supplier",
+          "type": "component",
+          "visibility": 0.87
+        },
+        {
+          "id": "water-supply",
+          "label": "Water Supply",
+          "type": "component",
+          "visibility": 0.85
+        },
+        {
+          "id": "electricity-supply",
+          "label": "Electricity Supply",
+          "type": "component",
+          "visibility": 0.96
+        }
+      ],
+      "edges": [
+        {
+          "consumer": "hot-beverage",
+          "supplier": "served-beverage"
+        },
+        {
+          "consumer": "hot-beverage",
+          "supplier": "tea-menu"
+        },
+        {
+          "consumer": "hot-beverage",
+          "supplier": "counter-service"
+        },
+        {
+          "consumer": "hot-beverage",
+          "supplier": "seating-area"
+        },
+        {
+          "consumer": "served-beverage",
+          "supplier": "brewing-process"
+        },
+        {
+          "consumer": "served-beverage",
+          "supplier": "cups-crockery"
+        },
+        {
+          "consumer": "served-beverage",
+          "supplier": "counter-service"
+        },
+        {
+          "consumer": "tea-menu",
+          "supplier": "tea-stock"
+        },
+        {
+          "consumer": "counter-service",
+          "supplier": "brewing-process"
+        },
+        {
+          "consumer": "counter-service",
+          "supplier": "payment-processing"
+        },
+        {
+          "consumer": "brewing-process",
+          "supplier": "hot-water"
+        },
+        {
+          "consumer": "brewing-process",
+          "supplier": "tea-stock"
+        },
+        {
+          "consumer": "brewing-process",
+          "supplier": "brewing-equipment"
+        },
+        {
+          "consumer": "brewing-equipment",
+          "supplier": "electricity-supply"
+        },
+        {
+          "consumer": "hot-water",
+          "supplier": "water-supply"
+        },
+        {
+          "consumer": "hot-water",
+          "supplier": "brewing-equipment"
+        },
+        {
+          "consumer": "tea-stock",
+          "supplier": "tea-supplier"
+        }
+      ]
+    },
+    "spotify": {
+      "key": "spotify",
+      "title": "Chaîne de valeur de Spotify, plateforme de streaming musical",
+      "context": "Spotify, the global music streaming platform: a freemium intermediary between rights holders (labels, artists) and listeners, from content ingestion to the end-user experience.",
+      "sourceFile": "maps/myMaps/spotify-streaming.wm",
+      "nodes": [
+        {
+          "id": "auditeur",
+          "label": "Auditeur",
+          "type": "anchor",
+          "visibility": 0.05
+        },
+        {
+          "id": "e-couter-de-la-musique",
+          "label": "Écouter de la musique",
+          "type": "component",
+          "visibility": 0.17
+        },
+        {
+          "id": "de-couvrir-du-contenu",
+          "label": "Découvrir du contenu",
+          "type": "component",
+          "visibility": 0.17
+        },
+        {
+          "id": "ge-rer-sa-bibliothe-que",
+          "label": "Gérer sa bibliothèque",
+          "type": "component",
+          "visibility": 0.23
+        },
+        {
+          "id": "acce-der-au-service",
+          "label": "Accéder au service",
+          "type": "component",
+          "visibility": 0.21
+        },
+        {
+          "id": "interface-utilisateur",
+          "label": "Interface utilisateur",
+          "type": "component",
+          "visibility": 0.4
+        },
+        {
+          "id": "lecteur-audio",
+          "label": "Lecteur audio",
+          "type": "component",
+          "visibility": 0.34
+        },
+        {
+          "id": "catalogue-musical",
+          "label": "Catalogue musical",
+          "type": "component",
+          "visibility": 0.51
+        },
+        {
+          "id": "moteur-de-recommandation",
+          "label": "Moteur de recommandation",
+          "type": "component",
+          "visibility": 0.34
+        },
+        {
+          "id": "algorithmes-de-personnalisation",
+          "label": "Algorithmes de personnalisation",
+          "type": "component",
+          "visibility": 0.53
+        },
+        {
+          "id": "donne-es-comportementales",
+          "label": "Données comportementales",
+          "type": "component",
+          "visibility": 0.7
+        },
+        {
+          "id": "podcasts-audio-non-musical",
+          "label": "Podcasts & audio non-musical",
+          "type": "component",
+          "visibility": 0.7
+        },
+        {
+          "id": "gestion-des-licences",
+          "label": "Gestion des licences",
+          "type": "component",
+          "visibility": 0.68
+        },
+        {
+          "id": "relations-labels-artistes",
+          "label": "Relations labels & artistes",
+          "type": "component",
+          "visibility": 0.85
+        },
+        {
+          "id": "infrastructure-de-streaming",
+          "label": "Infrastructure de streaming",
+          "type": "component",
+          "visibility": 0.51
+        },
+        {
+          "id": "re-seau-de-distribution-cdn",
+          "label": "Réseau de distribution (CDN)",
+          "type": "component",
+          "visibility": 0.68
+        },
+        {
+          "id": "he-bergement-cloud",
+          "label": "Hébergement cloud",
+          "type": "component",
+          "visibility": 0.85
+        },
+        {
+          "id": "mode-le-freemium",
+          "label": "Modèle freemium",
+          "type": "component",
+          "visibility": 0.38
+        },
+        {
+          "id": "re-gie-publicitaire",
+          "label": "Régie publicitaire",
+          "type": "component",
+          "visibility": 0.55
+        },
+        {
+          "id": "gestion-des-abonnements",
+          "label": "Gestion des abonnements",
+          "type": "component",
+          "visibility": 0.55
+        }
+      ],
+      "edges": [
+        {
+          "consumer": "auditeur",
+          "supplier": "e-couter-de-la-musique"
+        },
+        {
+          "consumer": "auditeur",
+          "supplier": "de-couvrir-du-contenu"
+        },
+        {
+          "consumer": "auditeur",
+          "supplier": "ge-rer-sa-bibliothe-que"
+        },
+        {
+          "consumer": "auditeur",
+          "supplier": "acce-der-au-service"
+        },
+        {
+          "consumer": "e-couter-de-la-musique",
+          "supplier": "interface-utilisateur"
+        },
+        {
+          "consumer": "e-couter-de-la-musique",
+          "supplier": "lecteur-audio"
+        },
+        {
+          "consumer": "e-couter-de-la-musique",
+          "supplier": "catalogue-musical"
+        },
+        {
+          "consumer": "de-couvrir-du-contenu",
+          "supplier": "interface-utilisateur"
+        },
+        {
+          "consumer": "de-couvrir-du-contenu",
+          "supplier": "moteur-de-recommandation"
+        },
+        {
+          "consumer": "de-couvrir-du-contenu",
+          "supplier": "catalogue-musical"
+        },
+        {
+          "consumer": "ge-rer-sa-bibliothe-que",
+          "supplier": "interface-utilisateur"
+        },
+        {
+          "consumer": "ge-rer-sa-bibliothe-que",
+          "supplier": "donne-es-comportementales"
+        },
+        {
+          "consumer": "acce-der-au-service",
+          "supplier": "mode-le-freemium"
+        },
+        {
+          "consumer": "moteur-de-recommandation",
+          "supplier": "algorithmes-de-personnalisation"
+        },
+        {
+          "consumer": "moteur-de-recommandation",
+          "supplier": "catalogue-musical"
+        },
+        {
+          "consumer": "algorithmes-de-personnalisation",
+          "supplier": "donne-es-comportementales"
+        },
+        {
+          "consumer": "catalogue-musical",
+          "supplier": "gestion-des-licences"
+        },
+        {
+          "consumer": "catalogue-musical",
+          "supplier": "podcasts-audio-non-musical"
+        },
+        {
+          "consumer": "gestion-des-licences",
+          "supplier": "relations-labels-artistes"
+        },
+        {
+          "consumer": "lecteur-audio",
+          "supplier": "infrastructure-de-streaming"
+        },
+        {
+          "consumer": "infrastructure-de-streaming",
+          "supplier": "re-seau-de-distribution-cdn"
+        },
+        {
+          "consumer": "re-seau-de-distribution-cdn",
+          "supplier": "he-bergement-cloud"
+        },
+        {
+          "consumer": "mode-le-freemium",
+          "supplier": "re-gie-publicitaire"
+        },
+        {
+          "consumer": "mode-le-freemium",
+          "supplier": "gestion-des-abonnements"
+        }
+      ]
+    },
+    "s2e": {
+      "key": "s2e",
+      "title": "S2E – Service Inter Épargne Entreprise",
+      "context": "A French employee-savings service (epargne salariale) operated inside a banking group: account keeping, fund management and regulatory compliance for employees and their employers.",
+      "sourceFile": "maps/myMaps/s2e-epargne-salariale.wm",
+      "nodes": [
+        {
+          "id": "salarie-e-pargnant",
+          "label": "Salarié Épargnant",
+          "type": "anchor",
+          "visibility": 0.05
+        },
+        {
+          "id": "e-pargne-salariale",
+          "label": "Épargne Salariale",
+          "type": "component",
+          "visibility": 0.1
+        },
+        {
+          "id": "consultation-comptes",
+          "label": "Consultation Comptes",
+          "type": "component",
+          "visibility": 0.15
+        },
+        {
+          "id": "versements-arbitrages",
+          "label": "Versements & Arbitrages",
+          "type": "component",
+          "visibility": 0.18
+        },
+        {
+          "id": "de-blocage-anticipe",
+          "label": "Déblocage Anticipé",
+          "type": "component",
+          "visibility": 0.22
+        },
+        {
+          "id": "gestion-des-dispositifs",
+          "label": "Gestion des Dispositifs",
+          "type": "component",
+          "visibility": 0.3
+        },
+        {
+          "id": "tenue-de-comptes",
+          "label": "Tenue de Comptes",
+          "type": "component",
+          "visibility": 0.35
+        },
+        {
+          "id": "information-conseil",
+          "label": "Information & Conseil",
+          "type": "component",
+          "visibility": 0.28
+        },
+        {
+          "id": "gestion-des-flux-entreprise",
+          "label": "Gestion des Flux Entreprise",
+          "type": "component",
+          "visibility": 0.32
+        },
+        {
+          "id": "fonds-d-e-pargne-fcpe",
+          "label": "Fonds d'Épargne (FCPE)",
+          "type": "component",
+          "visibility": 0.45
+        },
+        {
+          "id": "gestion-d-actifs",
+          "label": "Gestion d'Actifs",
+          "type": "component",
+          "visibility": 0.52
+        },
+        {
+          "id": "conformite-re-glementaire",
+          "label": "Conformité Réglementaire",
+          "type": "component",
+          "visibility": 0.48
+        },
+        {
+          "id": "plateforme-digitale-portail-app",
+          "label": "Plateforme Digitale (Portail/App)",
+          "type": "component",
+          "visibility": 0.4
+        },
+        {
+          "id": "moteur-de-calcul",
+          "label": "Moteur de Calcul",
+          "type": "component",
+          "visibility": 0.58
+        },
+        {
+          "id": "re-fe-rentiel-entreprises-salarie-s",
+          "label": "Référentiel Entreprises & Salariés",
+          "type": "component",
+          "visibility": 0.62
+        },
+        {
+          "id": "syste-me-d-information",
+          "label": "Système d'Information",
+          "type": "component",
+          "visibility": 0.68
+        },
+        {
+          "id": "infrastructure-it",
+          "label": "Infrastructure IT",
+          "type": "component",
+          "visibility": 0.82
+        },
+        {
+          "id": "re-seau-bancaire-bpce",
+          "label": "Réseau Bancaire BPCE",
+          "type": "component",
+          "visibility": 0.75
+        },
+        {
+          "id": "re-glementation-code-du-travail-amf",
+          "label": "Réglementation (Code du Travail, AMF)",
+          "type": "component",
+          "visibility": 0.9
+        },
+        {
+          "id": "marche-s-financiers",
+          "label": "Marchés Financiers",
+          "type": "component",
+          "visibility": 0.92
+        }
+      ],
+      "edges": [
+        {
+          "consumer": "salarie-e-pargnant",
+          "supplier": "e-pargne-salariale"
+        },
+        {
+          "consumer": "e-pargne-salariale",
+          "supplier": "consultation-comptes"
+        },
+        {
+          "consumer": "e-pargne-salariale",
+          "supplier": "versements-arbitrages"
+        },
+        {
+          "consumer": "e-pargne-salariale",
+          "supplier": "de-blocage-anticipe"
+        },
+        {
+          "consumer": "consultation-comptes",
+          "supplier": "plateforme-digitale-portail-app"
+        },
+        {
+          "consumer": "consultation-comptes",
+          "supplier": "tenue-de-comptes"
+        },
+        {
+          "consumer": "versements-arbitrages",
+          "supplier": "gestion-des-dispositifs"
+        },
+        {
+          "consumer": "versements-arbitrages",
+          "supplier": "tenue-de-comptes"
+        },
+        {
+          "consumer": "de-blocage-anticipe",
+          "supplier": "conformite-re-glementaire"
+        },
+        {
+          "consumer": "de-blocage-anticipe",
+          "supplier": "gestion-des-dispositifs"
+        },
+        {
+          "consumer": "information-conseil",
+          "supplier": "plateforme-digitale-portail-app"
+        },
+        {
+          "consumer": "gestion-des-flux-entreprise",
+          "supplier": "tenue-de-comptes"
+        },
+        {
+          "consumer": "gestion-des-flux-entreprise",
+          "supplier": "re-fe-rentiel-entreprises-salarie-s"
+        },
+        {
+          "consumer": "gestion-des-dispositifs",
+          "supplier": "fonds-d-e-pargne-fcpe"
+        },
+        {
+          "consumer": "gestion-des-dispositifs",
+          "supplier": "conformite-re-glementaire"
+        },
+        {
+          "consumer": "fonds-d-e-pargne-fcpe",
+          "supplier": "gestion-d-actifs"
+        },
+        {
+          "consumer": "fonds-d-e-pargne-fcpe",
+          "supplier": "marche-s-financiers"
+        },
+        {
+          "consumer": "plateforme-digitale-portail-app",
+          "supplier": "syste-me-d-information"
+        },
+        {
+          "consumer": "tenue-de-comptes",
+          "supplier": "moteur-de-calcul"
+        },
+        {
+          "consumer": "tenue-de-comptes",
+          "supplier": "re-fe-rentiel-entreprises-salarie-s"
+        },
+        {
+          "consumer": "moteur-de-calcul",
+          "supplier": "syste-me-d-information"
+        },
+        {
+          "consumer": "syste-me-d-information",
+          "supplier": "infrastructure-it"
+        },
+        {
+          "consumer": "gestion-d-actifs",
+          "supplier": "marche-s-financiers"
+        },
+        {
+          "consumer": "re-seau-bancaire-bpce",
+          "supplier": "infrastructure-it"
+        },
+        {
+          "consumer": "conformite-re-glementaire",
+          "supplier": "re-glementation-code-du-travail-amf"
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "id": "tea-shop:served-beverage",
+      "mapKey": "tea-shop",
+      "componentId": "served-beverage",
+      "component": "Served Beverage",
+      "description": "",
+      "context": "An independent tea shop serving hot beverages to walk-in customers, from the counter to the supply of tea and utilities.",
+      "date": "2026",
+      "truth": {
+        "evolution": 0.85,
+        "stage": "commodity"
+      }
+    },
+    {
+      "id": "spotify:de-couvrir-du-contenu",
+      "mapKey": "spotify",
+      "componentId": "de-couvrir-du-contenu",
+      "component": "Découvrir du contenu",
+      "description": "",
+      "context": "Spotify, the global music streaming platform: a freemium intermediary between rights holders (labels, artists) and listeners, from content ingestion to the end-user experience.",
+      "date": "2026",
+      "truth": {
+        "evolution": 0.6,
+        "stage": "product"
+      }
+    },
+    {
+      "id": "s2e:consultation-comptes",
+      "mapKey": "s2e",
+      "componentId": "consultation-comptes",
+      "component": "Consultation Comptes",
+      "description": "",
+      "context": "A French employee-savings service (epargne salariale) operated inside a banking group: account keeping, fund management and regulatory compliance for employees and their employers.",
+      "date": "2026",
+      "truth": {
+        "evolution": 0.22,
+        "stage": "custom"
+      }
+    },
+    {
+      "id": "spotify:re-gie-publicitaire",
+      "mapKey": "spotify",
+      "componentId": "re-gie-publicitaire",
+      "component": "Régie publicitaire",
+      "description": "",
+      "context": "Spotify, the global music streaming platform: a freemium intermediary between rights holders (labels, artists) and listeners, from content ingestion to the end-user experience.",
+      "date": "2026",
+      "truth": {
+        "evolution": 0.15,
+        "stage": "genesis"
+      }
+    },
+    {
+      "id": "spotify:e-couter-de-la-musique",
+      "mapKey": "spotify",
+      "componentId": "e-couter-de-la-musique",
+      "component": "Écouter de la musique",
+      "description": "",
+      "context": "Spotify, the global music streaming platform: a freemium intermediary between rights holders (labels, artists) and listeners, from content ingestion to the end-user experience.",
+      "date": "2026",
+      "truth": {
+        "evolution": 0.82,
+        "stage": "commodity"
+      }
+    },
+    {
+      "id": "s2e:information-conseil",
+      "mapKey": "s2e",
+      "componentId": "information-conseil",
+      "component": "Information & Conseil",
+      "description": "",
+      "context": "A French employee-savings service (epargne salariale) operated inside a banking group: account keeping, fund management and regulatory compliance for employees and their employers.",
+      "date": "2026",
+      "truth": {
+        "evolution": 0.64,
+        "stage": "product"
+      }
+    },
+    {
+      "id": "s2e:versements-arbitrages",
+      "mapKey": "s2e",
+      "componentId": "versements-arbitrages",
+      "component": "Versements & Arbitrages",
+      "description": "",
+      "context": "A French employee-savings service (epargne salariale) operated inside a banking group: account keeping, fund management and regulatory compliance for employees and their employers.",
+      "date": "2026",
+      "truth": {
+        "evolution": 0.22,
+        "stage": "custom"
+      }
+    },
+    {
+      "id": "s2e:e-pargne-salariale",
+      "mapKey": "s2e",
+      "componentId": "e-pargne-salariale",
+      "component": "Épargne Salariale",
+      "description": "",
+      "context": "A French employee-savings service (epargne salariale) operated inside a banking group: account keeping, fund management and regulatory compliance for employees and their employers.",
+      "date": "2026",
+      "truth": {
+        "evolution": 0.78,
+        "stage": "commodity"
+      }
+    },
+    {
+      "id": "spotify:ge-rer-sa-bibliothe-que",
+      "mapKey": "spotify",
+      "componentId": "ge-rer-sa-bibliothe-que",
+      "component": "Gérer sa bibliothèque",
+      "description": "",
+      "context": "Spotify, the global music streaming platform: a freemium intermediary between rights holders (labels, artists) and listeners, from content ingestion to the end-user experience.",
+      "date": "2026",
+      "truth": {
+        "evolution": 0.65,
+        "stage": "product"
+      }
+    },
+    {
+      "id": "s2e:conformite-re-glementaire",
+      "mapKey": "s2e",
+      "componentId": "conformite-re-glementaire",
+      "component": "Conformité Réglementaire",
+      "description": "",
+      "context": "A French employee-savings service (epargne salariale) operated inside a banking group: account keeping, fund management and regulatory compliance for employees and their employers.",
+      "date": "2026",
+      "truth": {
+        "evolution": 0.3,
+        "stage": "custom"
+      }
+    },
+    {
+      "id": "tea-shop:tea-menu",
+      "mapKey": "tea-shop",
+      "componentId": "tea-menu",
+      "component": "Tea Menu",
+      "description": "",
+      "context": "An independent tea shop serving hot beverages to walk-in customers, from the counter to the supply of tea and utilities.",
+      "date": "2026",
+      "truth": {
+        "evolution": 0.85,
+        "stage": "commodity"
+      }
+    },
+    {
+      "id": "s2e:gestion-des-flux-entreprise",
+      "mapKey": "s2e",
+      "componentId": "gestion-des-flux-entreprise",
+      "component": "Gestion des Flux Entreprise",
+      "description": "",
+      "context": "A French employee-savings service (epargne salariale) operated inside a banking group: account keeping, fund management and regulatory compliance for employees and their employers.",
+      "date": "2026",
+      "truth": {
+        "evolution": 0.67,
+        "stage": "product"
+      }
+    },
+    {
+      "id": "spotify:acce-der-au-service",
+      "mapKey": "spotify",
+      "componentId": "acce-der-au-service",
+      "component": "Accéder au service",
+      "description": "",
+      "context": "Spotify, the global music streaming platform: a freemium intermediary between rights holders (labels, artists) and listeners, from content ingestion to the end-user experience.",
+      "date": "2026",
+      "truth": {
+        "evolution": 0.78,
+        "stage": "commodity"
+      }
+    },
+    {
+      "id": "spotify:interface-utilisateur",
+      "mapKey": "spotify",
+      "componentId": "interface-utilisateur",
+      "component": "Interface utilisateur",
+      "description": "",
+      "context": "Spotify, the global music streaming platform: a freemium intermediary between rights holders (labels, artists) and listeners, from content ingestion to the end-user experience.",
+      "date": "2026",
+      "truth": {
+        "evolution": 0.62,
+        "stage": "product"
+      }
+    },
+    {
+      "id": "s2e:de-blocage-anticipe",
+      "mapKey": "s2e",
+      "componentId": "de-blocage-anticipe",
+      "component": "Déblocage Anticipé",
+      "description": "",
+      "context": "A French employee-savings service (epargne salariale) operated inside a banking group: account keeping, fund management and regulatory compliance for employees and their employers.",
+      "date": "2026",
+      "truth": {
+        "evolution": 0.75,
+        "stage": "commodity"
+      }
+    }
+  ]
+}

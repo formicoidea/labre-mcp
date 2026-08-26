@@ -55,6 +55,12 @@ pnpm-debug.log*
 # ── Synthetic round-trip dataset (npm run dataset) ──
 dataset/
 
+# ── Placement bench run artefacts (bench/run-pilot.mts) ──
+# One file per campaign. Evidence of a run, not a tracked source: the tracked
+# reference is bench/gold/gold-set.json. Attach a run to a PR or an ADR by hand
+# when it is the thing being argued about.
+bench/runs/
+
 # ── Test & coverage ───────────────────────────
 coverage/
 .nyc_output/
