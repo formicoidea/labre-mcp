@@ -1,6 +1,6 @@
 # Transport
 
-> Cross-references: [ADR-11](decisions.md#arch-11--v1-is-synchronous-requestresponse-only) (sync only), [ADR-14](decisions.md#arch-14--daemon-http-localhost-transport-saas-ready-by-design) (HTTP daemon), [ADR-15](decisions.md#arch-15--processcwd-forbidden-at-runtime-context-propagated-explicitly) (context propagation).
+> Cross-references: [ADR-11](decisions.md#arch-11--v1-is-synchronous-requestresponse-only) (sync only), [ADR-14](decisions.md#arch-14--daemon-http-localhost-transport-saas-ready-by-design) (HTTP daemon), [ADR-15](decisions.md#arch-15--processcwd-forbidden-at-runtime-context-propagated-explicitly) (context propagation), [ADR-27](decisions.md#arch-27--the-façade-labre-mcp-is-a-kernel-with-deliveries-mcp-is-one-of-them) (the façade — the transport names nothing), [ADR-28](decisions.md#arch-28--the-mcp-costume-prompts-and-resources-served-from-the-kernel-data-only) (the costume).
 
 ## Overview
 
@@ -18,8 +18,16 @@ Hono app  ────►  auth middleware  ────►  context extractor  
                                                                      ├─ initialize
                                                                      ├─ ping
                                                                      ├─ tools/list
-                                                                     └─ tools/call → tool registry → recipe runner → AST
+                                                                     ├─ tools/call     → tool registry     → recipe runner → AST
+                                                                     ├─ prompts/list   ┐
+                                                                     ├─ prompts/get    ├ the COSTUME (ARCH-28)
+                                                                     ├─ resources/list │ → prompt / resource registry
+                                                                     └─ resources/read ┘   → kernel data catalogues
 ```
+
+Every method above the dashed line and below it passes the SAME auth door: the
+middleware runs once, for the whole `POST /mcp`, before the dispatcher is
+reached. There is no per-method exemption.
 
 ## Endpoints
 
@@ -38,17 +46,52 @@ The `/mcp` endpoint accepts these MCP methods:
 - `notifications/*` — one-way (no JSON-RPC id); returns HTTP 204.
 - `tools/list` — list registered tools.
 - `tools/call` — invoke a tool by name with arguments.
+- `prompts/list` — list the published METHOD prompts (ARCH-28).
+- `prompts/get` — render one prompt with the caller's arguments. Unknown name → `-32602`; missing required argument → `-32602` naming the argument.
+- `resources/list` — list the published KNOWLEDGE documents (ARCH-28).
+- `resources/read` — read one document by `labre://` URI. Unknown URI → `-32002` (MCP's reserved `ResourceNotFound`).
+
+## The costume — prompts and resources (ARCH-28)
+
+`initialize` advertises `prompts` / `resources` **only when the composition root handed the dispatch a registry for them**; a delivery that serves tools alone advertises neither and answers `MethodNotFound`. Neither declares `listChanged` — both catalogues are fixed for the life of the process.
+
+**Prompts (6).** The method behind the Wardley strategies, handed over as text a third-party harness can run on its own model: `identify-capability`, `anchor-evolution`, `historical-evolution__with-capability`, `publication-analysis`, `write-chain__top-down`, `purpose-generate`. The selection criterion is stated in the module header of [`src/mcp/prompt-registry.mts`](../../src/mcp/prompt-registry.mts) and in ARCH-28. Each declares its variables as MCP arguments; exactly one — the prompt's primary subject — is `required`. MCP prompt messages have no `system` role, so the invariant system half is returned as the FIRST user message and the interpolated user half as the second.
+
+**Resources (7), under one URI scheme:**
+
+```
+labre://<category>[/<id>]
+
+labre://grammar          the 5-segment addressing rules (regex included)
+labre://methods          the LIVE methodId catalogue: real / mock / disabled + counts
+labre://recipes          the shipped recipes, with the refs runRecipe accepts
+labre://schemas/<id>     one published JSON Schema (<id> = filename minus .schema.json):
+                         command-call, command-result, json-labre, wardley-map
+```
+
+A URI names a **category**, never a version or a path on disk. `schemas/` is the only category with an id segment, and its ids come from the shipped directory listing — no caller string is ever resolved into a path. The schema category **mirrors `GET /schemas/:file`**: same directory, same filename allowlist, so the two surfaces cannot disagree.
+
+Nothing is parameterised: `resources/read` takes a URI and nothing else. A parameterised resource would be a tool wearing a URI, and run-time-loaded content is C4 / CH-26, not this.
+
+Telemetry: these four methods emit `mcp_costume_call` (not `mcp_tool_call` — a free catalogue read is not a tool call), with `method`, `transport`, `durationMs`, `status`, and `target` only when the entry actually resolved. Pinned by the parity matrix in [`tool-telemetry-matrix.test.mts`](../../src/mcp/tool-telemetry-matrix.test.mts).
+
+See the costume live, with no port and no model:
+
+```bash
+pnpm demo:costume
+```
 
 ## Boot path
 
 The canonical entrypoint is the HTTP daemon in [`src/mcp/labre-daemon.mts`](../../src/mcp/labre-daemon.mts), launched by `pnpm mcp` (dev) or `pnpm mcp:prod` (post-`pnpm build`). The daemon:
 
-1. `src/mcp/labre-daemon.mts` builds the strategy registry via `buildStrategyRegistry()` (`src/frameworks/registry-boot.mts`) and the MCP tool registry, then hands BOTH to `startHttpDaemon` (`src/transport/http-daemon.mts`). Since ARCH-27 the transport composes nothing.
+1. `src/mcp/labre-daemon.mts` builds the strategy registry via `buildStrategyRegistry()` (`src/frameworks/registry-boot.mts`), the MCP tool registry, and — since ARCH-28 — the prompt and resource registries, then hands them ALL to `startHttpDaemon` (`src/transport/http-daemon.mts`). Since ARCH-27 the transport composes nothing.
 2. Builds the MCP tool registry via `buildMcpToolRegistry()` — six tools: `__ping__` (smoke), `estimateEvolution` (recipe `estimate-component-evolution`), `generateValueChain` (recipe `generate`), `evaluateMap` (recipe `evaluate-map`), `runCommand` (generic direct invocation of any 5-segment methodId → `CommandResult`), and `runRecipe` (generic invocation of any multi-step recipe by `<domain>:<tool>:<name>` ref → JSON-labre envelope + final AST + artefact path).
-3. Boots the HTTP server on `LABRE_HTTP_PORT` (default `6767`).
-4. Logs the registered tool list and the strategy methodIds.
+3. Builds the costume via `buildMcpPromptRegistry()` + `buildMcpResourceRegistry({ strategies })` — the SAME strategy registry instance, so `labre://methods` describes the catalogue this process will actually resolve against (including the effect of `LABRE_DISABLE_MOCKS`). A costume declaration that names a prompt the registry does not hold fails the boot.
+4. Boots the HTTP server on `LABRE_HTTP_PORT` (default `6767`).
+5. Logs the registered tools, prompts, resources and strategy methodIds.
 
-The `.mcp.json` at the repo root may declare the labre-mcp server either over HTTP (`"type": "http"`, `"url": "http://127.0.0.1:6767/mcp"` — Claude Code connects to a running daemon) or over stdio (`{ "command": "npx", "args": ["-y", "labre-mcp"] }` — Claude Code spawns `src/mcp/labre-stdio.mts`, the published `bin`). Both composition roots build the SAME six-tool registry (ARCH-27), so the surface is identical.
+The `.mcp.json` at the repo root may declare the labre-mcp server either over HTTP (`"type": "http"`, `"url": "http://127.0.0.1:6767/mcp"` — Claude Code connects to a running daemon) or over stdio (`{ "command": "npx", "args": ["-y", "labre-mcp"] }` — Claude Code spawns `src/mcp/labre-stdio.mts`, the published `bin`). Both composition roots build the SAME six tools and the SAME costume (ARCH-27 / ARCH-28), so the surface is identical — asserted across both wires in [`costume-over-the-wire.test.mts`](../../src/mcp/costume-over-the-wire.test.mts).
 
 ## Configuration
 

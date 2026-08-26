@@ -91,6 +91,7 @@
     "typecheck:scripts": "tsc -p tsconfig.scripts.json",
     "schemas": "tsx --conditions labre-mcp-dev scripts/export-schemas.mts",
     "dataset": "tsx --conditions labre-mcp-dev scripts/build-dataset.mts",
+    "demo:costume": "tsx --conditions labre-mcp-dev scripts/demo-costume.mts",
     "test": "tsx --conditions labre-mcp-dev --test \"src/**/*.test.mts\"",
     "prepublishOnly": "npm run typecheck && npm run build",
     "ci:version": "npm version patch -m \"release: v%s\"",

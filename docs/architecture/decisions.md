@@ -487,3 +487,68 @@ The repository is three layers and the dependency points ONE way — **delivery 
 - **The delivery-level integration tests moved with their subject.** The three suites that exercise the MCP surface OVER a wire (`http-transport`, `stdio-transport`, `boot-parser-registration`) now live in `src/mcp/`; the transport keeps the unit tests that need no tool to run (auth doors, JWKS, api-key, health checks). That is not cosmetic — it is what makes the TRANSPORT_TO_MCP rule true for tests as well as for production code.
 - **The kernel is still not a published package** (option (b) stays on the table). The boundary is a directory boundary held by a guard, not by npm. The reopening trigger is an external consumer that needs to vendor the kernel without the deliveries.
 - **`src/lib/` is still not under `src/core/`** (roadmap B1) and `_legacy/` strategies have still not been extracted (ARCH-23). CH-23 deliberately did not touch either: they are orthogonal to the façade, and bundling them would have made a layering change unreviewable.
+
+---
+
+## ARCH-28 — The MCP costume: prompts and resources, served from the kernel, DATA-ONLY
+
+**Status:** ✅ **Accepted — executed by chantier CH-24 (AI-harness audit, wave 4).** Builds on **ARCH-27** (the façade) without amending it, and is the first delivery-side change that had to obey it. It reserves nothing from **C4 / CH-26** (the plugin runtime), whose arbitration is still open.
+
+**Context:**
+
+The audit's finding was one sentence: labre-mcp had "remained an execution proxy — capabilities = tools only (`mcp-handler`); MCP costume (prompts / resources) MISSING". The consequence is easy to state and was easy to miss. A third-party harness — Claude Code, a CLI, another agent — that connected to this daemon received **six executable tools and nothing else**. It could RUN the framework and could not LEARN it:
+
+- **No method.** How a practitioner separates a component's capability from the solution implementing it, how an anchor is placed on the evolution axis, in what order a value chain is written — all of that existed, as prose, inside `prompts/*.system.md`, reachable only from inside a strategy's own LLM call. A harness with its own model could not obtain it.
+- **No knowledge.** `runCommand` takes a 5-segment methodId. The grammar of that id lived in a 1500-line French pivot document; the list of ids that actually exist lived in a registry with no listing; whether a given id really computes or answers deterministic scaffold data lived nowhere at all. The JSON Schemas were served over `GET /schemas/:file`, an HTTP path nothing advertises and stdio cannot reach. The shipped recipes had no listing at all: `loadRecipe` answers "give me this one" and cannot answer "what do you have".
+
+MCP has had `prompts/*` and `resources/*` since the beginning. The gap was not protocol knowledge; it was that nothing in this repository could ENUMERATE itself.
+
+**Options considered:**
+
+**(a) Ship the costume as static files served by the transport.** Fastest. Rejected: it puts product content inside the wire, which is exactly the crossing ARCH-27 spent a chantier removing, and it guarantees a hand-maintained second copy of the grammar and the catalogue — the copy that drifts.
+
+**(b) Make the costume executable: let a prompt run a strategy, let a resource take parameters.** Tempting, and genuinely more powerful — a resource that could answer "the catalogue filtered to `wardley:map:`" is more useful than one that returns everything. Rejected **for this chantier**, on a boundary rather than on taste: a parameterised resource is a tool wearing a URI, and loading executable content at run time is the subject of C4 / CH-26, which the human has not arbitrated. Building it here would pre-empt that arbitration in code.
+
+**(c) Kernel-owned data catalogues, delivery-owned composition, transport-owned protocol.** — **chosen.** It is the shape ARCH-27 already prescribes, applied to a second surface.
+
+**Decision:**
+
+1. **The kernel gains data catalogues.** `listPromptCatalog()` (`src/lib/prompts/catalog.mts`), `listShippedSchemas` / `readShippedSchema` / `listShippedRecipes` (`src/core/catalog/shipped-assets.mts`), `GRAMMAR` (`src/core/catalog/grammar.mts`) and `StrategyRegistry.catalogue()`. All four answer the question nothing could answer before — *what is there* — and all four are plain data: no handle, nothing to execute, no server anywhere in the graph. They are exported from lib mode, so an embedding consumer gets the same discovery surface a third-party harness gets over the wire.
+
+2. **Implementation provenance becomes part of the catalogue.** `StrategyRegistry.registerMock()` is a second registration verb with identical behaviour and one added fact. A harness must be able to tell a deterministic scaffold from a real computation **before** it spends a call trusting the answer, and `mock` was previously knowable only from a class-name prefix — a naming convention, not a contract. Provenance is now declared at the composition root that knows it (`src/frameworks/mocks-registry.mts`), so promoting a mock means deleting its line there, which is exactly what flips the catalogue.
+
+3. **`PromptRegistry` and `ResourceRegistry` join `ToolRegistry` as kernel contracts.** Same shape, same reasoning (ARCH-27, cut 2): the kernel owns the type, `src/mcp/` composes an instance, the transport receives it filled and names nothing in it. A `ResourceDefinition.read()` takes **no argument, by contract** — that is the data-only limit of this ADR stated as a type rather than as a paragraph.
+
+4. **The dispatch serves four read-only methods** — `prompts/list`, `prompts/get`, `resources/list`, `resources/read` — and both registries are **optional at that seam**. `initialize` advertises a `prompts` / `resources` capability only for a registry it was actually handed: a capability is a promise, and one made for a surface that will answer `MethodNotFound` is a lie a client acts on. Neither declares `listChanged` — the costume is data shipped with the package and fixed for the life of the process.
+
+5. **Auth needed no change, and that is the finding.** The HTTP transport authenticates the whole `POST /mcp` before dispatch is reached, so the costume rides the same door as `tools/*` with no per-method exemption to write and none to forget. It is pinned by test anyway: all four methods answer `401` / `-32001` without a bearer.
+
+6. **Telemetry gets its own event, `mcp_costume_call`.** These methods consume no model and cost nothing; folding them into `mcp_tool_call` would inflate the very numbers CH-09 exists to make honest. Same instrumentation discipline — emitted once at the dispatch, so a method cannot ship unmeasured — and the same cardinality rule: `target` is set only when the entry RESOLVED from a registry, never from a caller-invented id.
+
+**The prompt selection criterion.** The registry holds around twenty prompts; six are published. A prompt enters the costume when all four hold: it is **template-kind** (it IS data — two markdown files the package ships, not a code builder); it has an **invariant system/user pair** (the system half is the method, and the loader hard-fails if it carries a placeholder — a monolithic legacy prompt has no method to hand over, only one call's phrasing); it instructs a **framework judgement**, not internal machinery (which excludes the CPC patent mapper, the logprob provider workaround, the enrichment plumbing and the render I/O adapters); and every declared variable is **caller-suppliable** (which excludes prompts whose variables — `history_section`, `pacing_guidance`, `property_block`, `codes_list` — are computed upstream). The six: `identify-capability`, `anchor-evolution`, `historical-evolution__with-capability`, `publication-analysis`, `write-chain__top-down`, `purpose-generate`.
+
+Required-vs-optional follows one rule: the prompt's **primary subject** is required, its qualifiers (description, context, date) are optional and interpolate empty — which is the registry's own contract. Rendering goes through `getPrompt().build()` rather than around it, so a bundle override or an active A/B variant applies here exactly as it does inside a strategy: one source of truth, two readers. MCP prompt messages carry no `system` role, so the invariant half is emitted as the FIRST user message.
+
+**The URI scheme.**
+
+```
+labre://<category>[/<id>]
+
+labre://grammar          the 5-segment addressing rules
+labre://methods          the live methodId catalogue (real / mock / disabled)
+labre://recipes          the shipped recipe catalogue, with runRecipe refs
+labre://schemas/<id>     one published JSON Schema, <id> = filename minus .schema.json
+```
+
+Three rules it obeys. A URI **names a category, never a version or a path**, so a file moving or a strategy being promoted changes the content behind a URI and never the URI itself. `schemas/` is the only category with an id segment, and its ids come from the shipped directory listing — **no caller string is ever resolved into a path**. And nothing is parameterised (see option (b)).
+
+The schema category is **mechanical**: it mirrors `schema/`, which is already exactly what the daemon serves on `GET /schemas/:file`, so the two surfaces cannot disagree and a schema added by `pnpm schemas` needs no second edit. The other three categories are one apiece — there is one grammar, one live catalogue, one shipped recipe set.
+
+**Consequences:**
+
+- **The façade paid for itself here.** The costume is two more lines in each composition root and **zero edits to product content in `src/core/` or `src/transport/`**. `pnpm check:boundaries` stayed at an empty baseline throughout, which is the claim ARCH-27 made and this is the first change that could test it.
+- **The parity matrix grew a second half**, same discipline as the first: exact baselines in both directions for the six prompt names and the seven URIs, a per-method proof that the dispatch emits `mcp_costume_call`, and an assertion that it never emits `mcp_tool_call`. A seventh prompt cannot appear unnoticed; one of the six cannot vanish silently either. **`pnpm schemas` adding a file turns the resource baseline red on purpose** — a new public document is a decision, not a side effect.
+- **A costume declaration is checked at BOOT.** An entry naming a prompt the registry does not hold, or forgetting a variable's help text, refuses to start rather than lying to every client that lists it.
+- **The catalogue is now the honest count.** `labre://methods` reports 86 registered methodIds — 25 real, 61 mock, 1 disabled — computed, not transcribed. The numbers in `AGENT.md` had drifted (85 / 19 / 66), and this is why they cannot drift again.
+- **DATA-ONLY is a limit, not a resting state.** Everything here is text this package ships. Three things a harness would reasonably want are deliberately absent and belong to C4 / CH-26: a prompt that can call a strategy, a resource that can be filtered by the caller, and any content loaded at run time from a bundle or a plugin. When that arbitration lands, it extends these registries; it does not replace them.
+- **i18n is not in scope.** This is a machine surface; it is English, like the rest of the code base's technical surface.
