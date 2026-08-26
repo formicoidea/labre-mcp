@@ -3,13 +3,14 @@ import assert from 'node:assert/strict';
 import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { resetLLMConfigCache } from './config.loader.mjs';
+import { loadLLMConfig, resetLLMConfigCache } from './config.loader.mjs';
 import { setPostHogFlags } from '#lib/flags/state.mjs';
 import type { PostHogFlags } from '#lib/flags/posthog.mjs';
 import { AI_CALL_EMITTED_EVENT, AI_CALL_SENTINEL_DISTINCT_ID } from './ai-call-sentinel.mjs';
 import {
   getStrategyLLM,
   getStrategyLogprobLLM,
+  getStrategyVisionLLM,
   resetLLMRegistryCache,
   setLLMCallForTesting,
 } from './registry.mjs';
@@ -41,6 +42,7 @@ function writeConfig(content: unknown): void {
 function fullValidConfig() {
   return {
     defaultProvider: 'claude',
+    defaultModel: 'claude-sonnet-4-6',
     providers: {
       'claude': { kind: 'agent-sdk' },
       'opencode': { kind: 'http-api', baseUrl: 'https://example.com/v1', apiKeyEnv: 'FAKE_KEY' },
@@ -103,6 +105,169 @@ describe('registry', () => {
     setLLMCallForTesting('publication-analysis', 'text', stub);
     const call = getStrategyLLM('publication-analysis');
     assert.equal(call, stub);
+  });
+});
+
+// ─── Explicit fallback route ─────────────────────────────────────────────────
+//
+// The fallback used to take "the model of the FIRST strategy declared for the
+// default provider", so reordering llm.config.json changed which model ran.
+// It now reads `defaultModel`, or fails saying so.
+
+/** Captures console.warn for the duration of `fn`. */
+async function withCapturedWarnings(fn: () => void | Promise<void>): Promise<string[]> {
+  const lines: string[] = [];
+  const original = console.warn;
+  console.warn = (...args: unknown[]) => { lines.push(args.join(' ')); };
+  try {
+    await fn();
+  } finally {
+    console.warn = original;
+  }
+  return lines;
+}
+
+/**
+ * Config whose DEFAULT route is the keyless http-api provider: resolving is
+ * free, and invoking throws locally on the missing key before any network call
+ * (same trick as the sentinel suite below). Nothing here can reach a model.
+ * `strategies` deliberately declares several entries on that same default
+ * provider, each with a DIFFERENT model — that is exactly the shape the old
+ * order-dependent lookup got wrong.
+ */
+function fallbackConfig(firstStrategyModel = 'model-of-the-first-entry') {
+  return {
+    defaultProvider: 'opencode',
+    defaultModel: 'the-declared-default-model',
+    providers: {
+      'opencode': {
+        kind: 'http-api',
+        baseUrl: 'https://example.invalid/v1',
+        apiKeyEnv: 'LABRE_TEST_UNSET_API_KEY',
+      },
+    },
+    strategies: {
+      'first-entry':  { provider: 'opencode', model: firstStrategyModel },
+      'second-entry': { provider: 'opencode', model: 'model-of-the-second-entry' },
+    },
+  };
+}
+
+describe('registry — fallback route', () => {
+  beforeEach(() => {
+    delete process.env.LABRE_TEST_UNSET_API_KEY;
+  });
+
+  afterEach(() => {
+    setPostHogFlags(undefined);
+  });
+
+  /** Resolve an unmapped id and report the model the sentinel saw — the
+   *  observable proof of which route was taken, without touching a provider. */
+  async function resolvedModelFor(id: string): Promise<string> {
+    const captured: CapturedEvent[] = [];
+    setPostHogFlags(fakeFlags(captured));
+    await withCapturedWarnings(async () => {
+      const call = getStrategyLLM(id);
+      await assert.rejects(() => call('hi'), /API key not configured/);
+    });
+    return String(captured[0].properties?.model);
+  }
+
+  it('uses defaultModel, not a model borrowed from another entry', async () => {
+    writeConfig(fallbackConfig());
+    assert.equal(await resolvedModelFor('not-in-the-config'), 'the-declared-default-model');
+  });
+
+  it('resolves the same model whichever order the strategies are declared in', async () => {
+    const seen: string[] = [];
+    for (const firstModel of ['model-A-declared-first', 'model-B-declared-first']) {
+      resetLLMConfigCache();
+      resetLLMRegistryCache();
+      // Only the model of the FIRST declared entry changes between the two
+      // rounds — under the old lookup that alone flipped the fallback.
+      writeConfig(fallbackConfig(firstModel));
+      seen.push(await resolvedModelFor('not-in-the-config'));
+    }
+    assert.deepEqual(seen, ['the-declared-default-model', 'the-declared-default-model']);
+  });
+
+  it('fails with an actionable message when defaultModel is absent', () => {
+    const cfg = fallbackConfig();
+    delete (cfg as Record<string, unknown>).defaultModel;
+    writeConfig(cfg);
+    // Mapped strategies still resolve — only the fallback path errors.
+    assert.equal(typeof getStrategyLLM('first-entry'), 'function');
+    assert.throws(
+      () => getStrategyLLM('not-in-the-config'),
+      /Strategy "not-in-the-config" has no entry .* declare defaultModel or an explicit strategy entry/s,
+    );
+  });
+
+  it('a config without defaultModel still loads (backwards compatible)', () => {
+    const cfg = fallbackConfig();
+    delete (cfg as Record<string, unknown>).defaultModel;
+    writeConfig(cfg);
+    assert.equal(loadLLMConfig().defaultModel, undefined);
+  });
+
+  it('warns once per unmapped strategyId, naming the id and the fallback', async () => {
+    writeConfig(fallbackConfig());
+    const lines = await withCapturedWarnings(() => {
+      getStrategyLLM('unmapped-one');
+      getStrategyLLM('unmapped-one');        // same id, cached call
+      getStrategyLogprobLLM('unmapped-one'); // same id, other capability
+      getStrategyLLM('unmapped-two');
+    });
+    const forOne = lines.filter((l) => l.includes('"unmapped-one"'));
+    assert.equal(forOne.length, 1, `expected exactly one warning, got ${JSON.stringify(lines)}`);
+    assert.match(forOne[0], /no entry in llm\.config\.json/);
+    assert.match(forOne[0], /provider "opencode"/);
+    assert.match(forOne[0], /model "the-declared-default-model"/);
+    assert.equal(lines.filter((l) => l.includes('"unmapped-two"')).length, 1);
+  });
+
+  it('says nothing for a strategy that has an explicit entry', async () => {
+    writeConfig(fallbackConfig());
+    const lines = await withCapturedWarnings(() => { getStrategyLLM('first-entry'); });
+    assert.deepEqual(lines, []);
+  });
+});
+
+// ─── Resolution never precedes the override/cache short-circuit ──────────────
+//
+// Regression guard for the defect that made `render:wardley-map:image:parse:png`
+// unusable: `callFor` read llm.config.json BEFORE consulting the test override,
+// so every resolution threw "Cannot read LLM config" wherever that per-user,
+// git-ignored file is absent — a fresh clone, a git worktree, a CI runner —
+// even for a call a test had explicitly stubbed. The vision strategy swallowed
+// the throw into its degradation path and reported "no vision-capable LLM
+// available", pointing at the provider instead of the missing file.
+
+describe('registry — resolution order vs. missing config', () => {
+  it('serves a test override with no llm.config.json on disk at all', async () => {
+    process.env.WARDLEY_LLM_CONFIG = join(dir, 'absent.llm.config.json');
+    const stub = async () => 'MAP_START{}MAP_END';
+    setLLMCallForTesting('render-image-parse-png', 'vision', stub);
+    const call = getStrategyVisionLLM('render-image-parse-png');
+    assert.equal(call, stub);
+    assert.equal(await call(''), 'MAP_START{}MAP_END');
+  });
+
+  it('still reports the missing file when nothing is stubbed', () => {
+    process.env.WARDLEY_LLM_CONFIG = join(dir, 'absent.llm.config.json');
+    assert.throws(
+      () => getStrategyVisionLLM('render-image-parse-png'),
+      /Cannot read LLM config at/,
+    );
+  });
+
+  it('does not re-read the config for an already resolved call', () => {
+    writeConfig(fullValidConfig());
+    const first = getStrategyLLM('publication-analysis');
+    // The file disappears; the cached call must survive it.
+    rmSync(join(dir, 'llm.config.json'));
+    assert.equal(getStrategyLLM('publication-analysis'), first);
   });
 });
 

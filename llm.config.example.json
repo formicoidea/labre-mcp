@@ -1,5 +1,6 @@
 {
   "defaultProvider": "claude",
+  "defaultModel": "claude-sonnet-4-6",
   "providers": {
     "claude": { "kind": "agent-sdk" },
     "opencode": {
@@ -25,6 +26,8 @@
     "dual-verification":    { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
     "pipeline-enrichment":  { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
     "write-chain":          { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "medium" },
+    "purpose-generate":       { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "medium" },
+    "audit-purpose-quality":  { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "medium" },
     "render-image-parse-png": { "provider": "opencode", "model": "kimi-k2.5" },
     "render-text-lint":       { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "low" }
   }

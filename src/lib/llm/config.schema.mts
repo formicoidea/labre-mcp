@@ -34,6 +34,14 @@ export type StrategyConfig = z.infer<typeof StrategyConfigSchema>;
 
 export const LLMConfigSchema = z.object({
   defaultProvider: z.string().min(1),
+  // Model used when a strategy has no explicit entry in `strategies`. OPTIONAL
+  // for backwards compatibility with configs written before this field existed,
+  // but its absence is not free: the fallback then FAILS with an explicit
+  // message instead of picking a model. The previous behaviour — "the model of
+  // the first declared strategy for the default provider" — made the resolution
+  // depend on the JSON key order, so reordering the file silently changed which
+  // model ran. Never again: either it is declared here, or the fallback errors.
+  defaultModel: z.string().min(1).optional(),
   providers: z.record(z.string(), ProviderConfigSchema),
   strategies: z.record(z.string(), StrategyConfigSchema),
 }).superRefine((cfg, ctx) => {
