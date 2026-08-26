@@ -1,4 +1,5 @@
-// TELEMETRY PARITY MATRIX — invariant I7 (AI-harness audit, CH-09).
+// TELEMETRY PARITY MATRIX — invariant I7 (AI-harness audit, CH-09; extended to
+// the costume by CH-24).
 //
 // WHAT THIS PINS. The audit found telemetry on ONE of the five tool paths:
 // runRecipe emitted, runCommand and the three business tools were mute. That
@@ -32,8 +33,11 @@ import type { PostHogFlags } from "#lib/flags/posthog.mjs";
 import { setPostHogFlags } from "#lib/flags/state.mjs";
 import type { RequestContext } from "#core/context/request-context.mjs";
 import { buildMcpToolRegistry } from "./tool-registry.mjs";
+import { buildMcpPromptRegistry } from "./prompt-registry.mjs";
+import { buildMcpResourceRegistry } from "./resource-registry.mjs";
 import { dispatch } from "#transport/mcp-handler.mjs";
-import { TOOL_CALL_EVENT } from "#transport/tool-telemetry.mjs";
+import { COSTUME_CALL_EVENT, TOOL_CALL_EVENT } from "#transport/tool-telemetry.mjs";
+import { GRAMMAR_URI, METHODS_URI, RECIPES_URI } from "./resource-registry.mjs";
 import { ESTIMATE_EVOLUTION_RECIPE_REF } from "./estimate-evolution.tool.mjs";
 import { EVALUATE_MAP_RECIPE_REF } from "./evaluate-map.tool.mjs";
 import { GENERATE_VALUE_CHAIN_RECIPE_REF } from "./generate-value-chain.tool.mjs";
@@ -242,5 +246,243 @@ describe("telemetry parity matrix (I7) — target extraction", () => {
     assert.equal(RUN_RECIPE_TOOL.telemetryTarget?.({ recipe: "whatever the caller typed" }), undefined);
     assert.equal(RUN_COMMAND_TOOL.telemetryTarget?.({}), undefined);
     assert.equal(RUN_RECIPE_TOOL.telemetryTarget?.(null), undefined);
+  });
+});
+
+// ─── THE COSTUME (CH-24 / ARCH-28) ──────────────────────────────────────────
+//
+// Same discipline, second surface. `prompts/*` and `resources/*` are dispatched
+// methods like `tools/call`, so they are pinned the same way: an EXACT baseline
+// in both directions of what the delivery publishes, and a per-method proof
+// that the dispatch measures it. The costume emits `mcp_costume_call`, not
+// `mcp_tool_call` — folding a free catalogue read into the tool counter would
+// inflate the very numbers CH-09 exists to make honest, so this table also
+// asserts that the two events never cross.
+//
+// NO MODEL IS CALLED here either, and none can be: a prompt renders shipped
+// text, a resource reads a shipped file. That is what makes the costume
+// testable in the CI `test` job at all.
+
+/** The prompt surface, exact. Six names, one selection criterion — the
+ *  criterion is stated in prompt-registry.mts, this is its consequence. */
+const COSTUME_PROMPT_BASELINE = [
+  "anchor-evolution",
+  "historical-evolution__with-capability",
+  "identify-capability",
+  "publication-analysis",
+  "purpose-generate",
+  "write-chain__top-down",
+];
+
+/** The resource surface, exact. Three catalogues plus one URI per published
+ *  JSON Schema — the schema category is mechanical (whatever `schema/` holds),
+ *  so `pnpm schemas` adding a file turns this red ON PURPOSE: a new public
+ *  document is a decision, not a side effect. */
+const COSTUME_RESOURCE_BASELINE = [
+  "labre://grammar",
+  "labre://methods",
+  "labre://recipes",
+  "labre://schemas/command-call",
+  "labre://schemas/command-result",
+  "labre://schemas/json-labre",
+  "labre://schemas/wardley-map",
+];
+
+interface CostumeRow {
+  params: Record<string, unknown> | undefined;
+  /** Expected `status` on the mcp_costume_call event. */
+  status: "ok" | "error";
+  /** Expected `target`, or null when the call resolved no registry entry. */
+  target: string | null;
+}
+
+/** One row per costume method — no more, no less. */
+const COSTUME_MATRIX: Record<string, CostumeRow> = {
+  "prompts/list": { params: undefined, status: "ok", target: null },
+  "prompts/get": {
+    params: { name: "identify-capability", arguments: { component: "kettle" } },
+    status: "ok",
+    target: "identify-capability",
+  },
+  "resources/list": { params: undefined, status: "ok", target: null },
+  "resources/read": { params: { uri: GRAMMAR_URI }, status: "ok", target: GRAMMAR_URI },
+};
+
+async function buildCostume(): Promise<{
+  prompts: ReturnType<typeof buildMcpPromptRegistry>;
+  resources: Awaited<ReturnType<typeof buildMcpResourceRegistry>>;
+}> {
+  return {
+    prompts: buildMcpPromptRegistry(),
+    resources: await buildMcpResourceRegistry(),
+  };
+}
+
+describe("telemetry parity matrix (I7) — the costume baseline", () => {
+  it("publishes exactly the declared prompts", () => {
+    assert.deepEqual(
+      buildMcpPromptRegistry().list().map((p) => p.name),
+      COSTUME_PROMPT_BASELINE,
+      "Costume prompt baseline broken. A prompt was added to (or removed from) " +
+        "COSTUME_PROMPTS without updating this table. Publishing a method to third-party " +
+        "harnesses is a decision: state the selection criterion it meets (prompt-registry.mts " +
+        "header) and add the row — do not delete the assertion.",
+    );
+  });
+
+  it("publishes exactly the declared resources", async () => {
+    const resources = await buildMcpResourceRegistry();
+    assert.deepEqual(
+      resources.list().map((r) => r.uri),
+      COSTUME_RESOURCE_BASELINE,
+      "Costume resource baseline broken. Either a catalogue resource changed, or `schema/` " +
+        "gained/lost a file — the schema category mirrors that directory mechanically. " +
+        "Add or remove the URI here deliberately.",
+    );
+  });
+
+  it("keeps every prompt renderable and every resource readable", async () => {
+    // A listed entry that cannot be served is worse than an absent one: the
+    // client sees it, asks for it, and gets an error it cannot act on.
+    const { prompts, resources } = await buildCostume();
+    for (const summary of prompts.list()) {
+      const prompt = prompts.get(summary.name);
+      assert.ok(prompt, `${summary.name} listed but not resolvable`);
+      const args = Object.fromEntries(
+        summary.arguments.filter((a) => a.required).map((a) => [a.name, `<${a.name}>`]),
+      );
+      const messages = prompt.render(args);
+      assert.ok(messages.length >= 1);
+      // The invariant system half leads (MCP has no system role).
+      assert.equal(messages[0].role, "user");
+      assert.ok(messages[0].text.length > 0);
+    }
+    for (const summary of resources.list()) {
+      const resource = resources.get(summary.uri);
+      assert.ok(resource, `${summary.uri} listed but not resolvable`);
+      const text = await resource.read();
+      assert.ok(text.length > 0, `${summary.uri} read empty`);
+      // Every costume resource is JSON today; parsing is the cheapest proof
+      // that a published document is not a truncated file.
+      JSON.parse(text);
+    }
+  });
+});
+
+describe("telemetry parity matrix (I7) — every costume method emits", () => {
+  for (const [method, row] of Object.entries(COSTUME_MATRIX)) {
+    it(`${method} emits exactly one ${COSTUME_CALL_EVENT}`, async () => {
+      const flags = buildRecordingFlags();
+      setPostHogFlags(flags);
+      const { prompts, resources } = await buildCostume();
+
+      const response = await dispatch({
+        request: { jsonrpc: "2.0", id: 1, method, params: row.params },
+        context,
+        tools: buildMcpToolRegistry(),
+        prompts,
+        resources,
+        transport: "http",
+      });
+      assert.ok(response && "result" in response, `${method} did not succeed`);
+
+      assert.deepEqual(
+        flags.captured.map((c) => c.event),
+        [COSTUME_CALL_EVENT],
+        `${method} must emit exactly one ${COSTUME_CALL_EVENT} and nothing else — ` +
+          `in particular never ${TOOL_CALL_EVENT}: a free catalogue read is not a tool call.`,
+      );
+      const props = flags.captured[0].properties ?? {};
+      assert.equal(props.method, method);
+      assert.equal(props.status, row.status);
+      assert.equal(props.transport, "http");
+      assert.equal(typeof props.durationMs, "number");
+      assert.equal(props.target ?? null, row.target);
+      assert.equal(flags.captured[0].distinctId, "daemon");
+    });
+  }
+
+  it("reports an unknown id as an error and attaches NO target", async () => {
+    // The id came from the caller and nothing bounds it; a PostHog property fed
+    // from it would be a cardinality leak (same rule as tool targets).
+    const flags = buildRecordingFlags();
+    setPostHogFlags(flags);
+    const { prompts, resources } = await buildCostume();
+
+    for (const request of [
+      { method: "prompts/get", params: { name: "no-such-prompt" } },
+      { method: "resources/read", params: { uri: "labre://no-such-resource" } },
+    ]) {
+      const response = await dispatch({
+        request: { jsonrpc: "2.0", id: 1, ...request },
+        context,
+        tools: buildMcpToolRegistry(),
+        prompts,
+        resources,
+        transport: "stdio",
+      });
+      assert.ok(response && "error" in response, `${request.method} should have errored`);
+    }
+
+    assert.deepEqual(flags.captured.map((c) => c.event), [COSTUME_CALL_EVENT, COSTUME_CALL_EVENT]);
+    for (const captured of flags.captured) {
+      assert.equal(captured.properties?.status, "error");
+      assert.equal(captured.properties?.target, undefined);
+    }
+  });
+
+  it("emits nothing at all when no PostHog is configured", async () => {
+    setPostHogFlags(undefined);
+    const { prompts, resources } = await buildCostume();
+    const response = await dispatch({
+      request: { jsonrpc: "2.0", id: 1, method: "resources/read", params: { uri: METHODS_URI } },
+      context,
+      tools: buildMcpToolRegistry(),
+      prompts,
+      resources,
+    });
+    assert.ok(response && "result" in response);
+  });
+});
+
+describe("telemetry parity matrix (I7) — the costume's content", () => {
+  it("the methods catalogue reports real, mock and disabled counts", async () => {
+    const resources = await buildMcpResourceRegistry();
+    const text = await (resources.get(METHODS_URI) as { read: () => Promise<string> }).read();
+    const doc = JSON.parse(text) as {
+      counts: { total: number; real: number; mock: number; disabled: number };
+      methods: Array<{ methodId: string; implementation: string }>;
+    };
+    assert.equal(doc.counts.total, doc.methods.length);
+    assert.equal(doc.counts.real + doc.counts.mock, doc.counts.total);
+    assert.ok(doc.counts.real > 0, "a catalogue with no real strategy would be a scaffold");
+    assert.ok(doc.counts.mock > 0, "mocks exist today — the catalogue must say so");
+  });
+
+  it("the recipe catalogue names refs runRecipe accepts", async () => {
+    const resources = await buildMcpResourceRegistry();
+    const text = await (resources.get(RECIPES_URI) as { read: () => Promise<string> }).read();
+    const doc = JSON.parse(text) as { recipes: Array<{ ref: string }> };
+    assert.ok(doc.recipes.length > 0);
+    for (const recipe of doc.recipes) {
+      assert.equal(
+        RUN_RECIPE_TOOL.telemetryTarget?.({ recipe: recipe.ref }),
+        recipe.ref,
+        `catalogued ref "${recipe.ref}" is not one runRecipe would accept`,
+      );
+    }
+  });
+
+  it("the grammar resource publishes the regex runCommand enforces", async () => {
+    const resources = await buildMcpResourceRegistry();
+    const text = await (resources.get(GRAMMAR_URI) as { read: () => Promise<string> }).read();
+    const doc = JSON.parse(text) as { regex: string; segments: unknown[] };
+    assert.equal(doc.segments.length, 5);
+    // A caller obeying the published regex must produce something runCommand's
+    // own validator accepts — otherwise the costume documents a grammar the
+    // tools do not speak.
+    const example = "wardley:map:value-chain:generate:top-down";
+    assert.ok(new RegExp(doc.regex).test(example));
+    assert.equal(RUN_COMMAND_TOOL.telemetryTarget?.({ command: example }), example);
   });
 });

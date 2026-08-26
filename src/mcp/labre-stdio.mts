@@ -12,11 +12,18 @@ import { fileURLToPath } from "node:url";
 import { startStdioServer } from "#transport/stdio-server.mjs";
 import { buildStrategyRegistry } from "#frameworks/registry-boot.mjs";
 import { buildMcpToolRegistry } from "./tool-registry.mjs";
+import { buildMcpPromptRegistry } from "./prompt-registry.mjs";
+import { buildMcpResourceRegistry } from "./resource-registry.mjs";
 
 export async function main(): Promise<void> {
+  // Same surface as the HTTP root, by construction (invariant I7): the two
+  // wires differ in framing, never in what they expose.
+  const strategies = buildStrategyRegistry();
   await startStdioServer({
     tools: buildMcpToolRegistry(),
-    strategies: buildStrategyRegistry(),
+    prompts: buildMcpPromptRegistry(),
+    resources: await buildMcpResourceRegistry({ strategies }),
+    strategies,
   });
 }
 
