@@ -10,7 +10,10 @@ import { LLMDirectStrategy } from './_legacy/write/strategies/capacity/llm-direc
 import { PublicationAnalysisStrategy } from './_legacy/write/strategies/capacity/publication-analysis-strategy.mjs';
 import { CpcEvolutionStrategyCore } from './_legacy/write/strategies/capacity/cpc-evolution-strategy.mjs';
 import { TimelineBenchmarkStrategyCore } from './_legacy/write/strategies/capacity/timeline-benchmark-strategy.mjs';
-import { LogprobDistributionStrategyCore } from './_legacy/write/strategies/capacity/logprob-distribution-strategy.mjs';
+import {
+  LogprobDistributionStrategy,
+  LogprobDistributionStrategyCore,
+} from './_legacy/write/strategies/capacity/logprob-distribution-strategy.mjs';
 import { PropertiesStrategyCore } from './_legacy/write/strategies/solution/properties-strategy.mjs';
 import { IdentifyCapabilityStrategy } from '#frameworks/wardley/chain/_legacy/write/component/lib/capability/identify-capability.mjs';
 import { EstimateAnchorEvolutionStrategy } from './_legacy/write/strategies/anchor/estimate-anchor-evolution.mjs';
@@ -149,6 +152,72 @@ describe('evolution registry — LLMDirectStrategy', () => {
     for (const sig of out.signals) {
       assert.equal(sig.source, 'user-input');
     }
+  });
+});
+
+describe('evolution registry — timeline-benchmark is registered but refused', () => {
+  // The strategy declares itself disabled: >30 min of LLM latency per run. It
+  // stays in the catalogue — a caller asking for it deserves to be told why it
+  // will not run, not a "no such strategy". Before CH-18 the flag lived only on
+  // the legacy class, which the core registry never reads: the strategy was one
+  // runCommand away from a half-hour run.
+  it('resolution is refused, with the reason in the message', () => {
+    const registry = new StrategyRegistry<BaseStrategy>();
+    registerEvolutionStrategies(registry);
+    assert.throws(
+      () => registry.get('wardley:map:climate:position-functional-in-evolution:timeline-benchmark'),
+      /is disabled: high LLM latency \(>30 min\/run\)/,
+    );
+  });
+
+  it('but it stays listed, and its neighbours still resolve', () => {
+    const registry = new StrategyRegistry<BaseStrategy>();
+    registerEvolutionStrategies(registry);
+    const id = 'wardley:map:climate:position-functional-in-evolution:timeline-benchmark';
+    assert.equal(registry.has(id), true);
+    assert.ok(registry.list().includes(id));
+    assert.match(registry.disabledReason(id) ?? '', />30 min\/run/);
+    // Exactly one strategy in this framework opts out.
+    assert.deepEqual(registry.listDisabled().map((d) => d.methodId), [id]);
+    // The sibling strategies are untouched.
+    assert.equal(
+      registry.get('wardley:map:climate:position-functional-in-evolution:s-curve'),
+      SCurveStrategy,
+    );
+  });
+});
+
+describe('evolution registry — LogprobDistributionStrategy', () => {
+  // Mock returning phase classification with logprobs; "Product" wins.
+  const mockLogprobCall = async () => ({
+    text: 'Product',
+    logprobs: [
+      { token: 'Product', logprob: -0.2 },
+      { token: 'Commodity', logprob: -1.5 },
+      { token: 'Custom', logprob: -2.8 },
+      { token: 'Genesis', logprob: -4.0 },
+    ],
+  });
+
+  it('computes a centroid in the product range from the logprobs', async () => {
+    // any: mock logprob closure
+    const strat = new LogprobDistributionStrategy({ llmLogprobCall: mockLogprobCall as any });
+    const result = await strat.evaluate({
+      name: 'Kubernetes',
+      description: 'Container orchestration platform',
+      context: 'cloud infrastructure',
+    });
+    assert.equal(typeof result.evolution, 'number');
+    assert.ok(
+      result.evolution > 0.3 && result.evolution < 0.7,
+      `logprob evolution should land in the product range, got ${result.evolution}`,
+    );
+    assert.ok(result.confidence >= 0 && result.confidence <= 1);
+    assert.equal(result.method, 'write:capacity:logprob-distribution');
+  });
+
+  it('requires an llmLogprobCall function', () => {
+    assert.throws(() => new LogprobDistributionStrategy({}), /llmLogprobCall/i);
   });
 });
 

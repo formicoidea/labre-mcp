@@ -46,6 +46,22 @@ The kernel exposes a generic [`StrategyRegistry`](../../src/core/registry/strate
 
 The registry validates methodIds at registration time via `validateMethodId()`, which reuses the same regex. Invalid IDs throw before any strategy can be invoked.
 
+This is the **only** strategy registry. The `loadStrategies()` filesystem walker that used to run in parallel under `_legacy/` was retired in CH-18 — no production code called it, and it silently held a safety property the live registry did not (see below).
+
+### Taking a strategy out of service
+
+A strategy class may declare an opt-out:
+
+```typescript
+static get disabled(): StrategyDisabledFlag {
+  return { reason: 'high LLM latency (>30 min/run) — pending optimization' };
+}
+```
+
+The registry reads the flag once, at registration. The strategy stays in the catalogue — `has()`, `list()` and `size()` all still see it, because it IS part of the published surface — but `get()` refuses it and throws `Strategy "<id>" is disabled: <reason>`. Since `get()` is the single resolution point of the kernel (both `runCommand` and the recipe runner go through it), a strategy that opts out cannot be reached from the wire. `disabledReason(methodId)` and `listDisabled()` expose the state without throwing.
+
+Use it for a strategy that is registered, wired and reachable yet must not run: a runaway cost or latency profile, a broken upstream, a half-finished promotion. Currently in force on `wardley:map:climate:position-functional-in-evolution:timeline-benchmark`.
+
 ## Base contract
 
 Every strategy extends [`BaseStrategy<TInput, TResult>`](../../src/core/ast/base-strategy.mts):

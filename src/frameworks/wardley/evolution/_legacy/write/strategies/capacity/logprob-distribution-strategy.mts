@@ -175,13 +175,6 @@ import { getStrategyLogprobLLM } from '#lib/llm/registry.mjs';
 const NEW_METHOD_ID_LOGPROB = 'wardley:map:climate:position-functional-in-evolution:logprob-distribution';
 
 export class LogprobDistributionStrategyCore extends CoreBaseStrategy<ComponentInput, EvolutionResult> {
-  private readonly _llmLogprobCall: import('#types/llm.mjs').LogprobLLMCall | null;
-
-  constructor(options: { llmLogprobCall?: import('#types/llm.mjs').LogprobLLMCall } = {}) {
-    super();
-    this._llmLogprobCall = options.llmLogprobCall ?? null;
-  }
-
   static get method(): string {
     return NEW_METHOD_ID_LOGPROB;
   }
@@ -190,7 +183,7 @@ export class LogprobDistributionStrategyCore extends CoreBaseStrategy<ComponentI
     component: ComponentInput,
     _context: RequestContext,
   ): Promise<StrategyResult<EvolutionResult>> {
-    const llmLogprobCall = this._llmLogprobCall ?? getStrategyLogprobLLM('logprob-distribution');
+    const llmLogprobCall = getStrategyLogprobLLM('logprob-distribution');
     const legacy = new LogprobDistributionStrategy({ llmLogprobCall });
     // any: legacy result carries trace[0].distribution = PhaseDistribution
     const result = await legacy.evaluate(component) as EvolutionResult & {

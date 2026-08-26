@@ -60,6 +60,17 @@ export interface StrategyResult<TResult = unknown> {
   result: TResult;
 }
 
+// Disabled flag, part of the strategy contract. A concrete strategy class may
+// declare `static get disabled()` returning `{ reason }` to take itself out of
+// service without being unregistered: it stays in the catalogue (`has()`,
+// `list()`), but the registry REFUSES to resolve it and says why.
+//
+// Use it for a strategy that is registered, wired and reachable on the wire yet
+// must not run — a runaway cost or latency profile, a broken upstream, a
+// half-finished promotion. Returning `false` (the default: no getter at all)
+// means enabled.
+export type StrategyDisabledFlag = false | { reason: string };
+
 // Each concrete subclass declares its own `static get method()` returning its
 // 5-segment methodId; the registry reads it at registration time.
 export abstract class BaseStrategy<TInput = unknown, TResult = unknown> {

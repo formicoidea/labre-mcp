@@ -147,12 +147,6 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
     return 'write:capacity:timeline-benchmark';
   }
 
-  static get disabled() {
-    return {
-      reason: 'High LLM latency (>30 min/run) — disabled pending optimization',
-    };
-  }
-
   /**
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {Promise<import('./base-strategy.mjs').EvolutionResult>}
@@ -285,13 +279,17 @@ export class TimelineBenchmarkStrategy extends BaseStrategy {
 //
 // Wraps the legacy `TimelineBenchmarkStrategy` in the core BaseStrategy
 // contract. The legacy class stays in place; this adapter handles the
-// StrategyResult wrapping for the kernel recipe runner. Note: the legacy
-// class is marked `disabled` (high LLM latency); the adapter inherits that
-// status implicitly — recipes referencing this strategy will fail until
-// the disabled flag is lifted.
+// StrategyResult wrapping for the kernel recipe runner.
+//
+// The adapter carries the `disabled` flag ITSELF. Inheriting it from the legacy
+// class was never a thing: `disabled` is a static getter on a class the core
+// registry never sees, so between the legacy filesystem walker's retirement and
+// this declaration the strategy was registered, resolvable and runnable — a
+// >30-minute run one tool call away.
 
 import {
   BaseStrategy as CoreBaseStrategy,
+  type StrategyDisabledFlag,
   type StrategyResult,
 } from '#core/ast/base-strategy.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
@@ -301,22 +299,21 @@ import { getStrategyLLM } from '#lib/llm/registry.mjs';
 const NEW_METHOD_ID_TB = 'wardley:map:climate:position-functional-in-evolution:timeline-benchmark';
 
 export class TimelineBenchmarkStrategyCore extends CoreBaseStrategy<ComponentInput, EvolutionResult> {
-  private readonly _llmCall: LLMCall | null;
-
-  constructor(options: { llmCall?: LLMCall } = {}) {
-    super();
-    this._llmCall = options.llmCall ?? null;
-  }
-
   static get method(): string {
     return NEW_METHOD_ID_TB;
+  }
+
+  static get disabled(): StrategyDisabledFlag {
+    return {
+      reason: 'high LLM latency (>30 min/run) — pending optimization',
+    };
   }
 
   async evaluate(
     component: ComponentInput,
     _context: RequestContext,
   ): Promise<StrategyResult<EvolutionResult>> {
-    const llmCall: LLMCall = this._llmCall ?? getStrategyLLM('timeline-benchmark');
+    const llmCall: LLMCall = getStrategyLLM('timeline-benchmark');
     const legacy = new TimelineBenchmarkStrategy({ llmCall });
     // any: legacy result.trace is the milestone history with open-shape entries.
     type Milestone = { name: string; date: number | string; evolution: number; confidence: number; _fallback?: boolean };

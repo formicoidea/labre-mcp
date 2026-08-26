@@ -157,14 +157,6 @@ export type AnchorEvolutionResult = Awaited<ReturnType<typeof estimateAnchorEvol
 export class EstimateAnchorEvolutionStrategy
   extends CoreBaseStrategy<AnchorEvolutionInput, AnchorEvolutionResult>
 {
-  // any: llmCall closure shape is provider-dependent
-  private readonly _llmCall: LLMCall | null;
-
-  constructor(options: { llmCall?: LLMCall } = {}) {
-    super();
-    this._llmCall = options.llmCall ?? null;
-  }
-
   static get method(): string {
     return NEW_METHOD_ID_ANCHOR;
   }
@@ -173,7 +165,7 @@ export class EstimateAnchorEvolutionStrategy
     input: AnchorEvolutionInput,
     _context: RequestContext,
   ): Promise<StrategyResult<AnchorEvolutionResult>> {
-    const llmCall: LLMCall = this._llmCall ?? getStrategyLLM('anchor-evolution');
+    const llmCall: LLMCall = getStrategyLLM('anchor-evolution');
     const result = await estimateAnchorEvolution(input, llmCall);
 
     const capturedAt = new Date().toISOString();

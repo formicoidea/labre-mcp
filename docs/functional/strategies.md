@@ -20,9 +20,15 @@ Les capability strategies (famille `wardley:map:climate:position-functional-in-e
 
 > `sector-agent` (decrit plus bas pour memoire) fait partie de la surface `mock` et n'est pas dans les 25 strategies reelles.
 
-## Auto-decouverte
+## Enregistrement
 
-Les strategies sont decouvertes automatiquement au demarrage via `src/frameworks/wardley/evolution/_legacy/write/strategies/capacity/registry.mts`. Tout fichier `*-strategy.mts` dans ce dossier est charge et enregistre. Aucune modification du registre n'est necessaire pour ajouter une strategie.
+Il y a **un seul registre vivant** : le `StrategyRegistry` du kernel (`src/core/registry/strategy-registry.mts`), peuple au boot par `registerEvolutionStrategies()` (`src/frameworks/wardley/evolution/registry.mts`). Ajouter une strategie = ecrire la classe puis l'inscrire d'une ligne dans ce `register*Strategies()`.
+
+Le marcheur de fichiers `loadStrategies()` qui decouvrait les `*-strategy.mts` a la volee a ete retire (CH-18) : il tournait en parallele du registre vivant sans qu'aucun code de production ne l'appelle.
+
+### Mettre une strategie hors service
+
+Une classe peut declarer `static get disabled() { return { reason: '...' }; }`. Elle reste au catalogue (`has()`, `list()`), mais le registre **refuse de la resoudre** et rend la raison au lieu de lancer le run — c'est le point de passage unique de `runCommand` comme du recipe runner. Exemple en service : `wardley:map:climate:position-functional-in-evolution:timeline-benchmark` (latence LLM >30 min par run).
 
 ## Interface commune
 
@@ -305,9 +311,9 @@ Le resultat solution etend `EvolutionResult` avec des champs supplementaires :
 | `phaseDistribution` | object | Nombre de proprietes par phase `{ 1: n, 2: n, 3: n, 4: n }` |
 | `dominantPhase` | object | Phase la plus frequente `{ phase, count, label }` |
 
-### Auto-decouverte
+### Enregistrement
 
-Les solution strategies suivent le meme pattern que les capability strategies : tout fichier `*-strategy.mts` dans `src/frameworks/wardley/evolution/_legacy/write/strategies/solution/` est decouvert automatiquement par le `registry.mts` de ce dossier.
+Les solution strategies suivent le meme chemin que les capability strategies : `registerEvolutionStrategies()` les inscrit au `StrategyRegistry` du kernel. Le `registry.mts` local a ce dossier, qui les redecouvrait en parallele, a ete retire (CH-18).
 
 ## Fichiers
 
@@ -315,10 +321,8 @@ Tous sous `src/frameworks/wardley/evolution/_legacy/write/strategies/solution/` 
 
 | Module | Role |
 |---|---|
-| `registry.mts` | Auto-decouverte et chargement |
 | `solution-base-strategy.mts` | Classe abstraite (etend `BaseStrategy`) |
 | `properties-strategy.mts` | Evaluation des 12 proprietes |
 | `evolution-properties.json` | Reference des 12 proprietes × 4 phases |
-| `phase-classifier.mts` | Mapping propriete → phase |
 | `aggregate-properties.mts` | Agregation ponderee en evolution |
 | `solution-evolution-result.mts` | Modele de resultat avec validation |
