@@ -44,4 +44,8 @@ export const JsonRpcErrorCode = {
   // Implementation-defined server error (JSON-RPC 2.0 reserves -32000..-32099):
   // authentication failed on the HTTP transport.
   Unauthorized: -32001,
+  // MCP's own reserved code for `resources/read` on a URI the server does not
+  // serve. It is NOT MethodNotFound: the method exists and was understood —
+  // the document does not, and a client distinguishes the two.
+  ResourceNotFound: -32002,
 } as const;

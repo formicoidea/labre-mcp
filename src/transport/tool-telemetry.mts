@@ -85,6 +85,58 @@ export function statusOfResult(result: unknown): ToolCallStatus {
   return "ok";
 }
 
+// ─── The costume (CH-24 / ARCH-28) ──────────────────────────────────────────
+// `prompts/*` and `resources/*` are not tool calls and must not be counted as
+// such: they consume no model, cost nothing, and mixing them into
+// `mcp_tool_call` would inflate the usage numbers CH-09 exists to make honest.
+// They get their own event in the same `mcp_*` family, emitted from the same
+// place for the same reason — a method that has to remember to instrument
+// itself eventually forgets.
+
+/** Event name for one costume method (prompts/resources). */
+export const COSTUME_CALL_EVENT = "mcp_costume_call";
+
+/** The four costume methods. A closed set — that is what bounds the dimension. */
+export type CostumeMethod = "prompts/list" | "prompts/get" | "resources/list" | "resources/read";
+
+export interface CostumeCallTelemetry {
+  method: CostumeMethod;
+  /**
+   * WHICH entry was addressed — a prompt name, a resource URI. Set ONLY when
+   * the entry was actually found in the registry, so the value is drawn from a
+   * closed set the daemon composed rather than from caller input. An unknown id
+   * yields no target: an unbounded PostHog property is a cardinality leak, and
+   * the id a caller invented is the most unbounded string on the wire.
+   */
+  target?: string;
+  transport: TransportLabel;
+  durationMs: number;
+  status: ToolCallStatus;
+  distinctId: string;
+}
+
+/**
+ * Emit one `mcp_costume_call`. Same fail-quiet contract as `captureToolCall`,
+ * and the same privacy rule: metadata only — never the rendered prompt, never
+ * the resource body, never the arguments.
+ */
+export function captureCostumeCall(telemetry: CostumeCallTelemetry): void {
+  try {
+    const flags = getPostHogFlags();
+    if (!flags) return;
+    const properties: Record<string, unknown> = {
+      method: telemetry.method,
+      transport: telemetry.transport,
+      durationMs: telemetry.durationMs,
+      status: telemetry.status,
+    };
+    if (telemetry.target !== undefined) properties.target = telemetry.target;
+    flags.capture(COSTUME_CALL_EVENT, telemetry.distinctId, properties);
+  } catch {
+    // Telemetry must never disturb the call it observes.
+  }
+}
+
 /**
  * Emit one `mcp_tool_call`. Fire-and-forget and never throws: `capture` is
  * already non-blocking, and the try/catch covers a broken or half-initialised

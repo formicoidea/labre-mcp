@@ -16,7 +16,13 @@ import { readFile } from "node:fs/promises";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import type { ServerType } from "@hono/node-server";
-import { dispatch, SERVER_INFO, type ToolRegistry } from "./mcp-handler.mjs";
+import {
+  dispatch,
+  SERVER_INFO,
+  type PromptRegistry,
+  type ResourceRegistry,
+  type ToolRegistry,
+} from "./mcp-handler.mjs";
 import { JsonRpcRequestSchema, JsonRpcErrorCode } from "./json-rpc.schema.mjs";
 import { extractContext } from "./context-extractor.mjs";
 import type { RequestContext } from "#core/context/request-context.mjs";
@@ -55,6 +61,9 @@ export type OnAuthenticatedHook = (
 export interface HttpServerOptions {
   port: number;
   tools: ToolRegistry;
+  /** The MCP costume (CH-24) — optional, passed straight through to dispatch. */
+  prompts?: PromptRegistry;
+  resources?: ResourceRegistry;
   auth?: AuthMiddleware;
   hostname?: string;
   onAuthenticated?: OnAuthenticatedHook;
@@ -68,6 +77,8 @@ export interface RunningServer {
 
 export function buildApp(options: {
   tools: ToolRegistry;
+  prompts?: PromptRegistry;
+  resources?: ResourceRegistry;
   auth: AuthMiddleware;
   onAuthenticated?: OnAuthenticatedHook;
   oauth?: OAuthResourceConfig;
@@ -221,6 +232,11 @@ export function buildApp(options: {
         request: parsed.data,
         context,
         tools: options.tools,
+        // The costume rides the exact same authenticated path as tools/* —
+        // authentication happened above, for the whole POST, before dispatch
+        // is reached (CH-24: no per-method exemption exists to forget).
+        prompts: options.prompts,
+        resources: options.resources,
         // Names the wire for tool telemetry (CH-09) — the stdio entrypoint
         // passes "stdio" at its own dispatch call.
         transport: "http",
@@ -242,6 +258,8 @@ export function buildApp(options: {
 export async function startHttpServer(options: HttpServerOptions): Promise<RunningServer> {
   const app = buildApp({
     tools: options.tools,
+    prompts: options.prompts,
+    resources: options.resources,
     auth: options.auth ?? noopAuthMiddleware,
     onAuthenticated: options.onAuthenticated,
     oauth: options.oauth,

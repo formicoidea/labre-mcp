@@ -19,6 +19,8 @@
 import { createInterface } from "node:readline";
 import { dispatch } from "./mcp-handler.mjs";
 import type { ToolRegistry } from "#core/registry/tool-registry.mjs";
+import type { PromptRegistry } from "#core/registry/prompt-registry.mjs";
+import type { ResourceRegistry } from "#core/registry/resource-registry.mjs";
 import type { StrategyRegistry } from "#core/registry/strategy-registry.mjs";
 import type { BaseStrategy } from "#core/ast/base-strategy.mjs";
 import { JsonRpcRequestSchema, type JsonRpcResponse } from "./json-rpc.schema.mjs";
@@ -31,6 +33,10 @@ import { setPostHogFlags } from "#lib/flags/state.mjs";
 
 export interface StdioDeps {
   tools: ToolRegistry;
+  /** The MCP costume (CH-24) — passed straight through to dispatch, exactly as
+   *  on HTTP, so the two wires expose the same surface (invariant I7). */
+  prompts?: PromptRegistry;
+  resources?: ResourceRegistry;
   auth?: AuthMiddleware;
 }
 
@@ -67,7 +73,14 @@ export async function handleLine(
   const context = await auth.authenticate({}, extractContext(parsed.data.params));
   // "stdio" names the wire for tool telemetry (CH-09): the two transports must
   // emit the same events, and stay TELLABLE APART in the data.
-  return dispatch({ request: parsed.data, context, tools: deps.tools, transport: "stdio" });
+  return dispatch({
+    request: parsed.data,
+    context,
+    tools: deps.tools,
+    prompts: deps.prompts,
+    resources: deps.resources,
+    transport: "stdio",
+  });
 }
 
 function writeMessage(message: JsonRpcResponse): void {
@@ -79,6 +92,9 @@ function writeMessage(message: JsonRpcResponse): void {
 export interface StdioServerDeps {
   tools: ToolRegistry;
   strategies: StrategyRegistry<BaseStrategy>;
+  /** The MCP costume (CH-24 / ARCH-28) — same optionality as on HTTP. */
+  prompts?: PromptRegistry;
+  resources?: ResourceRegistry;
 }
 
 export async function startStdioServer(deps: StdioServerDeps): Promise<void> {
@@ -89,7 +105,7 @@ export async function startStdioServer(deps: StdioServerDeps): Promise<void> {
   console.info = console.log;
   console.debug = console.log;
 
-  const { tools, strategies } = deps;
+  const { tools, strategies, prompts, resources } = deps;
 
   // PostHog feature flags + telemetry — SAME condition as the HTTP daemon
   // (POSTHOG_API_KEY set), because telemetry is a property of the process, not
@@ -103,6 +119,8 @@ export async function startStdioServer(deps: StdioServerDeps): Promise<void> {
     posthog.capture("mcp_boot", "daemon", {
       transport: "stdio",
       tools: tools.list().length,
+      prompts: prompts?.size() ?? 0,
+      resources: resources?.size() ?? 0,
       strategies: strategies.size(),
     });
   }
@@ -112,6 +130,12 @@ export async function startStdioServer(deps: StdioServerDeps): Promise<void> {
   );
   process.stderr.write(
     `[labre-mcp] Tools registered: ${tools.list().map((t) => t.name).join(", ") || "(none)"}\n`,
+  );
+  process.stderr.write(
+    `[labre-mcp] Prompts registered: ${prompts ? prompts.list().map((p) => p.name).join(", ") || "(none)" : "(no prompt registry)"}\n`,
+  );
+  process.stderr.write(
+    `[labre-mcp] Resources registered: ${resources ? resources.list().map((r) => r.uri).join(", ") || "(none)" : "(no resource registry)"}\n`,
   );
   process.stderr.write(`[labre-mcp] Strategies registered: ${strategies.size()}\n`);
   process.stderr.write(
@@ -151,7 +175,7 @@ export async function startStdioServer(deps: StdioServerDeps): Promise<void> {
   // stdout writes from interleaving across concurrent calls.
   const rl = createInterface({ input: process.stdin });
   for await (const line of rl) {
-    const response = await handleLine(line, { tools });
+    const response = await handleLine(line, { tools, prompts, resources });
     if (response !== null) writeMessage(response);
   }
 

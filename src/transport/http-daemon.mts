@@ -9,6 +9,8 @@
 
 import { decodeJwt } from "jose";
 import type { ToolRegistry } from "#core/registry/tool-registry.mjs";
+import type { PromptRegistry } from "#core/registry/prompt-registry.mjs";
+import type { ResourceRegistry } from "#core/registry/resource-registry.mjs";
 import type { StrategyRegistry } from "#core/registry/strategy-registry.mjs";
 import type { BaseStrategy } from "#core/ast/base-strategy.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
@@ -236,12 +238,20 @@ function selectBundleRefreshHook(
 export interface HttpDaemonDeps {
   tools: ToolRegistry;
   strategies: StrategyRegistry<BaseStrategy>;
+  /**
+   * The MCP costume (CH-24 / ARCH-28) — the METHOD surface and the KNOWLEDGE
+   * surface. Optional for the same reason as at the dispatch: a delivery that
+   * serves tools alone is a legitimate delivery, and the handshake then
+   * advertises no capability it cannot honour.
+   */
+  prompts?: PromptRegistry;
+  resources?: ResourceRegistry;
 }
 
 export async function startHttpDaemon(deps: HttpDaemonDeps): Promise<void> {
   const port = readPort();
   const auth = selectAuthMiddleware();
-  const { tools, strategies } = deps;
+  const { tools, strategies, prompts, resources } = deps;
   // Remote bundles are a Supabase feature (RLS + storage): enabled only when
   // the supabase door is open. An oidc/lab_ caller token means nothing to the
   // Supabase RLS layer; the refresh hook simply no-ops usefully for those.
@@ -252,7 +262,16 @@ export async function startHttpDaemon(deps: HttpDaemonDeps): Promise<void> {
   // stays loopback so a local daemon is never exposed by accident.
   const hostname = process.env.LABRE_HTTP_HOST || "127.0.0.1";
   const oauth = readOAuthConfig();
-  const server = await startHttpServer({ port, hostname, tools, auth, onAuthenticated: bundles.hook, oauth });
+  const server = await startHttpServer({
+    port,
+    hostname,
+    tools,
+    prompts,
+    resources,
+    auth,
+    onAuthenticated: bundles.hook,
+    oauth,
+  });
 
   process.stderr.write(
     `[labre-mcp] HTTP server listening on http://${hostname}:${server.port} (POST /mcp)\n`,
@@ -284,6 +303,14 @@ export async function startHttpDaemon(deps: HttpDaemonDeps): Promise<void> {
   process.stderr.write(
     `[labre-mcp] Tools registered: ${tools.list().map((t) => t.name).join(", ") || "(none)"}\n`,
   );
+  // The costume is announced as loudly as the tools: a harness that gets no
+  // method and no knowledge should be able to see WHY in the boot log.
+  process.stderr.write(
+    `[labre-mcp] Prompts registered: ${prompts ? prompts.list().map((p) => p.name).join(", ") || "(none)" : "(no prompt registry)"}\n`,
+  );
+  process.stderr.write(
+    `[labre-mcp] Resources registered: ${resources ? resources.list().map((r) => r.uri).join(", ") || "(none)" : "(no resource registry)"}\n`,
+  );
   process.stderr.write(
     `[labre-mcp] Strategies registered (${strategies.size()}):\n${strategies.list().map((id) => `  - ${id}`).join("\n")}\n`,
   );
@@ -302,6 +329,10 @@ export async function startHttpDaemon(deps: HttpDaemonDeps): Promise<void> {
       // same string regardless of the env list's order (telemetry cardinality).
       auth: auth ? [...doors].sort().join(",") : "none",
       tools: tools.list().length,
+      // The costume's size at boot (CH-24): a zero here explains a harness that
+      // sees no method, without needing the stderr log.
+      prompts: prompts?.size() ?? 0,
+      resources: resources?.size() ?? 0,
       strategies: strategies.size(),
     });
   }
