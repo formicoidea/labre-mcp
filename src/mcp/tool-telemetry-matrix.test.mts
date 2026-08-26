@@ -31,7 +31,7 @@ import assert from "node:assert/strict";
 import type { PostHogFlags } from "#lib/flags/posthog.mjs";
 import { setPostHogFlags } from "#lib/flags/state.mjs";
 import type { RequestContext } from "#core/context/request-context.mjs";
-import { buildBootRegistry } from "#core/transport/boot-tool-registry.mjs";
+import { buildMcpToolRegistry } from "./tool-registry.mjs";
 import { dispatch } from "#core/transport/mcp-handler.mjs";
 import { TOOL_CALL_EVENT } from "#core/transport/tool-telemetry.mjs";
 import { ESTIMATE_EVOLUTION_RECIPE_REF } from "./estimate-evolution.tool.mjs";
@@ -138,7 +138,7 @@ afterEach(() => {
 
 describe("telemetry parity matrix (I7) — the table itself", () => {
   it("covers every registered tool, and only registered tools", () => {
-    const registered = buildBootRegistry()
+    const registered = buildMcpToolRegistry()
       .list()
       .map((tool) => tool.name)
       .sort();
@@ -147,7 +147,7 @@ describe("telemetry parity matrix (I7) — the table itself", () => {
       registered,
       declared,
       "Telemetry parity baseline broken. A tool was added to (or removed from) " +
-        "buildBootRegistry without updating TELEMETRY_MATRIX. Every MCP tool must " +
+        "buildMcpToolRegistry without updating TELEMETRY_MATRIX. Every MCP tool must " +
         "emit telemetry on every transport (invariant I7): add the row and let the " +
         "matrix prove the tool emits — do not delete the assertion.",
     );
@@ -168,7 +168,7 @@ describe("telemetry parity matrix (I7) — every tool emits", () => {
           params: { name: toolName, arguments: row.args },
         },
         context,
-        tools: buildBootRegistry(),
+        tools: buildMcpToolRegistry(),
         transport: "stdio",
       });
 
@@ -206,7 +206,7 @@ describe("telemetry parity matrix (I7) — every tool emits", () => {
         params: { name: "__ping__", arguments: { message: "hello" } },
       },
       context,
-      tools: buildBootRegistry(),
+      tools: buildMcpToolRegistry(),
     });
     assert.ok(response && "result" in response);
   });

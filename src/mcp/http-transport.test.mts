@@ -5,13 +5,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { generateKeyPair, exportJWK, createLocalJWKSet, SignJWT } from "jose";
 import "#lib/prompts/init.mjs";
-import { buildApp } from "./http-server.mjs";
-import { buildBootRegistry } from "./labre-daemon.mjs";
-import { noopAuthMiddleware, AuthenticationError } from "./auth-middleware.mjs";
-import { buildSupabaseAuthMiddleware } from "./supabase-auth.mjs";
+import { buildApp } from "#core/transport/http-server.mjs";
+import { buildMcpToolRegistry } from "./tool-registry.mjs";
+import { noopAuthMiddleware, AuthenticationError } from "#core/transport/auth-middleware.mjs";
+import { buildSupabaseAuthMiddleware } from "#core/transport/supabase-auth.mjs";
 
 function buildTestApp() {
-  return buildApp({ tools: buildBootRegistry(), auth: noopAuthMiddleware });
+  return buildApp({ tools: buildMcpToolRegistry(), auth: noopAuthMiddleware });
 }
 
 async function rpcCall(app: ReturnType<typeof buildApp>, body: unknown): Promise<unknown> {
@@ -266,7 +266,7 @@ describe("labre-mcp GET /config/llm (ops endpoint)", () => {
 
   function buildConfigApp() {
     return buildApp({
-      tools: buildBootRegistry(),
+      tools: buildMcpToolRegistry(),
       auth: noopAuthMiddleware,
       loadConfig: () => STUB_CONFIG,
     });
@@ -327,7 +327,7 @@ describe("labre-mcp HTTP transport with supabase auth", () => {
     const publicJwk = await exportJWK(publicKey);
     const jwks = createLocalJWKSet({ keys: [{ ...publicJwk, alg: "ES256", use: "sig" }] });
     const app = buildApp({
-      tools: buildBootRegistry(),
+      tools: buildMcpToolRegistry(),
       auth: buildSupabaseAuthMiddleware({ supabaseUrl: "https://test.supabase.co", jwks }),
     });
     return { app, privateKey };
@@ -380,7 +380,7 @@ describe("labre-mcp HTTP transport with supabase auth", () => {
   it("onAuthenticated hook runs after auth with the raw headers and enriched context", async () => {
     const seen: Array<{ authorization?: string; userId?: string }> = [];
     const app = buildApp({
-      tools: buildBootRegistry(),
+      tools: buildMcpToolRegistry(),
       auth: {
         async authenticate(_headers, context) {
           return { ...context, auth: { userId: "user-hook-1" } };
@@ -407,7 +407,7 @@ describe("labre-mcp HTTP transport with supabase auth", () => {
 
   it("onAuthenticated hook failure does not fail the request", async () => {
     const app = buildApp({
-      tools: buildBootRegistry(),
+      tools: buildMcpToolRegistry(),
       auth: noopAuthMiddleware,
       onAuthenticated: async () => {
         throw new Error("bundle refresh exploded");
@@ -425,7 +425,7 @@ describe("labre-mcp HTTP transport with supabase auth", () => {
   });
 
   it("noop middleware still accepts header-less requests", async () => {
-    const app = buildApp({ tools: buildBootRegistry(), auth: noopAuthMiddleware });
+    const app = buildApp({ tools: buildMcpToolRegistry(), auth: noopAuthMiddleware });
     const res = await app.request("/mcp", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -455,7 +455,7 @@ describe("labre-mcp OAuth protected-resource discovery (RFC 9728)", () => {
   };
 
   it("serves the protected-resource metadata when configured", async () => {
-    const app = buildApp({ tools: buildBootRegistry(), auth: noopAuthMiddleware, oauth: OAUTH });
+    const app = buildApp({ tools: buildMcpToolRegistry(), auth: noopAuthMiddleware, oauth: OAUTH });
     const res = await app.request("/.well-known/oauth-protected-resource");
     assert.equal(res.status, 200);
     const body = (await res.json()) as { resource: string; authorization_servers: string[] };
@@ -464,7 +464,7 @@ describe("labre-mcp OAuth protected-resource discovery (RFC 9728)", () => {
   });
 
   it("stamps a 401 with WWW-Authenticate pointing at the resource metadata", async () => {
-    const app = buildApp({ tools: buildBootRegistry(), auth: rejectingAuth, oauth: OAUTH });
+    const app = buildApp({ tools: buildMcpToolRegistry(), auth: rejectingAuth, oauth: OAUTH });
     const res = await app.request("/mcp", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -478,7 +478,7 @@ describe("labre-mcp OAuth protected-resource discovery (RFC 9728)", () => {
   });
 
   it("is fully off when unconfigured: no well-known route, plain 401", async () => {
-    const app = buildApp({ tools: buildBootRegistry(), auth: rejectingAuth });
+    const app = buildApp({ tools: buildMcpToolRegistry(), auth: rejectingAuth });
     const wellKnown = await app.request("/.well-known/oauth-protected-resource");
     assert.equal(wellKnown.status, 404);
 

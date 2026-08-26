@@ -1,13 +1,16 @@
-// Daemon entrypoint for labre-mcp HTTP transport (ARCH-14).
-// Boots the HTTP server on the configured port AND the strategy registry
-// (ARCH-03). The strategy registry is populated by importing each
-// framework's `registry.mts`, which calls `registerXxxStrategies(reg)`.
-// MCP tool handlers consume this registry via the recipe runner to
-// resolve methodIds at call time.
+// HTTP daemon for labre-mcp (ARCH-14) — the wire, not the surface.
+//
+// Since CH-23 this module is a FUNCTION, not a script: `startHttpDaemon` takes
+// the already-composed tool registry and strategy registry, reads its own
+// transport configuration (port, host, auth doors, OAuth discovery, remote
+// bundles) from the environment at boot, and serves. It names no tool and no
+// framework. The composition root that decides WHICH tools are served is the
+// delivery-side entrypoint (`src/mcp/labre-daemon.mts`).
 
-import { fileURLToPath } from "node:url";
 import { decodeJwt } from "jose";
-import type { ToolRegistry } from "./mcp-handler.mjs";
+import type { ToolRegistry } from "#core/registry/tool-registry.mjs";
+import type { StrategyRegistry } from "#core/registry/strategy-registry.mjs";
+import type { BaseStrategy } from "#core/ast/base-strategy.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { startHttpServer, type OnAuthenticatedHook, type OAuthResourceConfig } from "./http-server.mjs";
 import { buildSupabaseAuthMiddleware, tryExtractBearerToken } from "./supabase-auth.mjs";
@@ -23,12 +26,6 @@ import { setPostHogFlags } from "#lib/flags/state.mjs";
 // Shared with the stdio entrypoint since CH-09 — telemetry belongs to the
 // process, not to the transport.
 import { selectPostHog } from "./boot-posthog.mjs";
-
-// Re-export so existing callers (tests, downstream tooling) can keep
-// importing `buildBootRegistry` from this module without churn.
-export { buildBootRegistry } from "./boot-tool-registry.mjs";
-import { buildStrategyRegistry } from "#frameworks/registry-boot.mjs";
-import { buildBootRegistry } from "./boot-tool-registry.mjs";
 
 const DEFAULT_PORT = 6767;
 
@@ -228,11 +225,23 @@ function selectBundleRefreshHook(
   return { hook, bootLine: `on (lazy, TTL ${ttlSeconds ?? 300}s, caller-token RLS)` };
 }
 
-async function main(): Promise<void> {
+/**
+ * What the delivery layer hands the daemon. Both registries are built by the
+ * caller — the transport composes nothing (CH-23):
+ *  - `tools` is the MCP surface (`src/mcp/tool-registry.mts`);
+ *  - `strategies` is the framework catalogue (`src/frameworks/registry-boot.mts`),
+ *    used here for the boot report and the `mcp_boot` telemetry count only.
+ *    Tool handlers resolve their own registry at call time.
+ */
+export interface HttpDaemonDeps {
+  tools: ToolRegistry;
+  strategies: StrategyRegistry<BaseStrategy>;
+}
+
+export async function startHttpDaemon(deps: HttpDaemonDeps): Promise<void> {
   const port = readPort();
   const auth = selectAuthMiddleware();
-  const tools: ToolRegistry = buildBootRegistry();
-  const strategies = buildStrategyRegistry();
+  const { tools, strategies } = deps;
   // Remote bundles are a Supabase feature (RLS + storage): enabled only when
   // the supabase door is open. An oidc/lab_ caller token means nothing to the
   // Supabase RLS layer; the refresh hook simply no-ops usefully for those.
@@ -322,14 +331,4 @@ async function main(): Promise<void> {
   };
   process.on("SIGINT", () => void shutdown("SIGINT"));
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
-}
-
-// Only run when executed as a script (not when imported by tests).
-// fileURLToPath handles Windows/Unix path-encoding differences uniformly.
-const isMain = process.argv[1] !== undefined && process.argv[1] === fileURLToPath(import.meta.url);
-if (isMain) {
-  main().catch((err) => {
-    process.stderr.write(`[labre-mcp] Fatal: ${(err as Error).message}\n`);
-    process.exit(1);
-  });
 }

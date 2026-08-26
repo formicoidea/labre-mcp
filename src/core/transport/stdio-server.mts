@@ -1,25 +1,29 @@
-#!/usr/bin/env node
-// Stdio transport entrypoint for labre-mcp (ARCH-14 companion).
+// Stdio transport for labre-mcp (ARCH-14 companion) — the wire, not the surface.
 //
 // Speaks the MCP protocol over newline-delimited JSON-RPC 2.0 on
 // stdin/stdout, the transport Claude Code / the Agent SDK spawn directly
 // (`{ "command": "npx", "args": ["-y", "labre-mcp"] }`). It reuses the exact
-// same `dispatch` + six-tool registry as the HTTP daemon — only the framing
-// differs, so the surface is identical regardless of how the client connects.
+// same `dispatch` and the same registry instance as the HTTP daemon — only the
+// framing differs, so the surface is identical regardless of how the client
+// connects.
+//
+// Since CH-23 the registry ARRIVES as a parameter: `startStdioServer(deps)` is
+// a function, and the composition root that decides which tools are served is
+// the delivery-side entrypoint (`src/mcp/labre-stdio.mts`).
 //
 // Protocol invariant: stdout carries ONLY MCP messages (responses + the
 // fire-and-forget notifications emitted by src/lib/mcp-notifications.mts).
 // Everything else — boot logs, health checks, stray console output — is routed
 // to stderr so it never corrupts the JSON-RPC stream.
 
-import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline";
-import { dispatch, type ToolRegistry } from "./mcp-handler.mjs";
+import { dispatch } from "./mcp-handler.mjs";
+import type { ToolRegistry } from "#core/registry/tool-registry.mjs";
+import type { StrategyRegistry } from "#core/registry/strategy-registry.mjs";
+import type { BaseStrategy } from "#core/ast/base-strategy.mjs";
 import { JsonRpcRequestSchema, type JsonRpcResponse } from "./json-rpc.schema.mjs";
 import { extractContext } from "./context-extractor.mjs";
 import { noopAuthMiddleware, type AuthMiddleware } from "./auth-middleware.mjs";
-import { buildBootRegistry } from "./boot-tool-registry.mjs";
-import { buildStrategyRegistry } from "#frameworks/registry-boot.mjs";
 import { registerBootHealthChecks } from "./boot-health-checks.mjs";
 import { runAllHealthChecks } from "#lib/degradation/index.mjs";
 import { selectPostHog } from "./boot-posthog.mjs";
@@ -70,7 +74,14 @@ function writeMessage(message: JsonRpcResponse): void {
   process.stdout.write(JSON.stringify(message) + "\n");
 }
 
-async function main(): Promise<void> {
+/** What the delivery layer hands the stdio server — same contract as the HTTP
+ *  daemon's `HttpDaemonDeps`: both registries are built by the caller. */
+export interface StdioServerDeps {
+  tools: ToolRegistry;
+  strategies: StrategyRegistry<BaseStrategy>;
+}
+
+export async function startStdioServer(deps: StdioServerDeps): Promise<void> {
   // Guard the protocol channel: redirect any stray console.* writes to stderr.
   // Intentional protocol writes go through process.stdout.write directly
   // (here and in mcp-notifications.mts) and are unaffected.
@@ -78,8 +89,7 @@ async function main(): Promise<void> {
   console.info = console.log;
   console.debug = console.log;
 
-  const tools = buildBootRegistry();
-  const strategies = buildStrategyRegistry();
+  const { tools, strategies } = deps;
 
   // PostHog feature flags + telemetry — SAME condition as the HTTP daemon
   // (POSTHOG_API_KEY set), because telemetry is a property of the process, not
@@ -147,13 +157,4 @@ async function main(): Promise<void> {
 
   // stdin closed (EOF) — the client disconnected. Flush, then exit cleanly.
   await flushAndExit(0);
-}
-
-// Only run when executed as a script (not when imported by tests).
-const isMain = process.argv[1] !== undefined && process.argv[1] === fileURLToPath(import.meta.url);
-if (isMain) {
-  main().catch((err) => {
-    process.stderr.write(`[labre-mcp] Fatal: ${(err as Error).message}\n`);
-    process.exit(1);
-  });
 }

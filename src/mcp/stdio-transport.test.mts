@@ -5,9 +5,9 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { handleLine } from "./labre-stdio.mjs";
-import { buildBootRegistry } from "./boot-tool-registry.mjs";
-import type { JsonRpcResponse } from "./json-rpc.schema.mjs";
+import { handleLine } from "#core/transport/stdio-server.mjs";
+import { buildMcpToolRegistry } from "./tool-registry.mjs";
+import type { JsonRpcResponse } from "#core/transport/json-rpc.schema.mjs";
 
 function resultOf(res: JsonRpcResponse | null): Record<string, unknown> {
   assert.ok(res && "result" in res, "expected a success response");
@@ -22,7 +22,7 @@ function toolPayload<T>(res: JsonRpcResponse | null): T {
 }
 
 test("ping returns an empty result with the matching id", async () => {
-  const tools = buildBootRegistry();
+  const tools = buildMcpToolRegistry();
   const res = await handleLine(
     JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
     { tools },
@@ -31,7 +31,7 @@ test("ping returns an empty result with the matching id", async () => {
 });
 
 test("tools/list advertises the six boot tools", async () => {
-  const tools = buildBootRegistry();
+  const tools = buildMcpToolRegistry();
   const res = await handleLine(
     JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }),
     { tools },
@@ -52,7 +52,7 @@ test("tools/list advertises the six boot tools", async () => {
 });
 
 test("initialize advertises labre-mcp server info", async () => {
-  const tools = buildBootRegistry();
+  const tools = buildMcpToolRegistry();
   const res = await handleLine(
     JSON.stringify({ jsonrpc: "2.0", id: 3, method: "initialize" }),
     { tools },
@@ -62,7 +62,7 @@ test("initialize advertises labre-mcp server info", async () => {
 });
 
 test("tools/call returns MCP content array for the smoke tool", async () => {
-  const tools = buildBootRegistry();
+  const tools = buildMcpToolRegistry();
   const res = await handleLine(
     JSON.stringify({
       jsonrpc: "2.0",
@@ -84,7 +84,7 @@ test("tools/call returns MCP content array for the smoke tool", async () => {
 });
 
 test("malformed JSON yields a -32700 parse error (id null)", async () => {
-  const tools = buildBootRegistry();
+  const tools = buildMcpToolRegistry();
   const res = await handleLine("{ not json", { tools });
   assert.ok(res && "error" in res);
   assert.equal(res.error.code, -32700);
@@ -92,14 +92,14 @@ test("malformed JSON yields a -32700 parse error (id null)", async () => {
 });
 
 test("a structurally invalid request yields -32600", async () => {
-  const tools = buildBootRegistry();
+  const tools = buildMcpToolRegistry();
   const res = await handleLine(JSON.stringify({ id: 9, method: "ping" }), { tools });
   assert.ok(res && "error" in res);
   assert.equal(res.error.code, -32600);
 });
 
 test("notifications produce no response", async () => {
-  const tools = buildBootRegistry();
+  const tools = buildMcpToolRegistry();
   const res = await handleLine(
     JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
     { tools },
@@ -108,13 +108,13 @@ test("notifications produce no response", async () => {
 });
 
 test("blank lines are ignored", async () => {
-  const tools = buildBootRegistry();
+  const tools = buildMcpToolRegistry();
   assert.equal(await handleLine("   ", { tools }), null);
   assert.equal(await handleLine("", { tools }), null);
 });
 
 test("unknown tool yields a method-not-found error", async () => {
-  const tools = buildBootRegistry();
+  const tools = buildMcpToolRegistry();
   const res = await handleLine(
     JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "nope" } }),
     { tools },

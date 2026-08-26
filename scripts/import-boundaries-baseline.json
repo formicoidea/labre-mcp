@@ -1,38 +1,7 @@
 {
   "_readBy": "scripts/check-import-boundaries.mts — see that file's header for the three rules and their reasoning.",
-  "_why": "Documented deviations from invariant I2 (transport state separate from business state), enumerated 2026-08-25 by the AI-harness audit, chantier CH-06. These crossings exist because the transport layer physically lives INSIDE the kernel tree, at src/core/transport/ (ARCH-14): the daemon and its boot wiring are transport concerns sitting in src/core/, and they reach into src/mcp/ to build the tool registry. The deviation is assumed, not accidental — the guard's job for now is to stop it GROWING.",
-  "_liftedBy": "CH-23 — the labre-mcp façade refactor. It moves transport out of src/core/ and inverts the boot dependency, at which point rule TRANSPORT_TO_MCP no longer applies and every entry below is deleted along with it. Nothing here is a to-do list for a passer-by: shrinking this file is CH-23's work, not a drive-by fix.",
-  "_format": "One object per tolerated finding: {file, rule, specifier, why}. Literal triples only — no wildcard, no 'at most N' threshold, either of which would let a brand-new violation hide behind an old one. An entry matching no finding fails the guard (rule STALE), so this file can never drift away from the tree it describes.",
-  "violations": [
-    {
-      "file": "src/core/transport/boot-tool-registry.mts",
-      "rule": "TRANSPORT_TO_MCP",
-      "specifier": "#mcp/estimate-evolution.tool.mjs",
-      "why": "Boot wiring imports the MCP tool descriptor as a VALUE to register it. Legitimate for boot code — illegitimate only because boot code currently sits inside src/core/."
-    },
-    {
-      "file": "src/core/transport/boot-tool-registry.mts",
-      "rule": "TRANSPORT_TO_MCP",
-      "specifier": "#mcp/evaluate-map.tool.mjs",
-      "why": "Same boot wiring, same reason as estimate-evolution.tool.mjs above."
-    },
-    {
-      "file": "src/core/transport/boot-tool-registry.mts",
-      "rule": "TRANSPORT_TO_MCP",
-      "specifier": "#mcp/generate-value-chain.tool.mjs",
-      "why": "Same boot wiring, same reason as estimate-evolution.tool.mjs above."
-    },
-    {
-      "file": "src/core/transport/boot-tool-registry.mts",
-      "rule": "TRANSPORT_TO_MCP",
-      "specifier": "#mcp/run-command.tool.mjs",
-      "why": "Same boot wiring, same reason as estimate-evolution.tool.mjs above."
-    },
-    {
-      "file": "src/core/transport/boot-tool-registry.mts",
-      "rule": "TRANSPORT_TO_MCP",
-      "specifier": "#mcp/run-recipe.tool.mjs",
-      "why": "Same boot wiring, same reason as estimate-evolution.tool.mjs above."
-    }
-  ]
+  "_why": "EMPTY, and that is the point. Until CH-23 this file enumerated seven tolerated crossings of invariant I2 (transport state separate from business state), all caused by the transport physically living INSIDE the kernel tree at src/core/transport/ with its boot wiring reaching up into src/mcp/. CH-23 (ARCH-27) moved transport out of the kernel and inverted the boot dependency: the MCP layer composes its own tools into a kernel-owned registry and hands it to a transport that names no tool. There is nothing left to tolerate.",
+  "_rule": "Keep it empty. A new entry here is not a fix — it is a request to re-open ARCH-27, and it needs the same arbitration the façade got. The guard fails on any crossing that is not listed, and equally on any entry listed that matches nothing (rule STALE), so neither an unnoticed violation nor a stale exemption can survive a CI run.",
+  "_format": "One object per tolerated finding: {file, rule, specifier, why}. Literal triples only — no wildcard, no 'at most N' threshold, either of which would let a brand-new violation hide behind an old one.",
+  "violations": []
 }

@@ -17,7 +17,7 @@
     }
   },
   "bin": {
-    "labre-mcp": "./dist/core/transport/labre-stdio.mjs"
+    "labre-mcp": "./dist/mcp/labre-stdio.mjs"
   },
   "files": [
     "dist",
@@ -76,12 +76,12 @@
     }
   },
   "scripts": {
-    "mcp": "tsx --conditions labre-mcp-dev src/core/transport/labre-daemon.mts",
-    "mcp:prod": "node dist/core/transport/labre-daemon.mjs",
-    "mcp:stdio": "tsx --conditions labre-mcp-dev src/core/transport/labre-stdio.mts",
-    "mcp:stdio:prod": "node dist/core/transport/labre-stdio.mjs",
+    "mcp": "tsx --conditions labre-mcp-dev src/mcp/labre-daemon.mts",
+    "mcp:prod": "node dist/mcp/labre-daemon.mjs",
+    "mcp:stdio": "tsx --conditions labre-mcp-dev src/mcp/labre-stdio.mts",
+    "mcp:stdio:prod": "node dist/mcp/labre-stdio.mjs",
     "build": "tsc",
-    "dev": "tsx --conditions labre-mcp-dev src/core/transport/labre-daemon.mts",
+    "dev": "tsx --conditions labre-mcp-dev src/mcp/labre-daemon.mts",
     "check:boundaries": "tsx --conditions labre-mcp-dev scripts/check-import-boundaries.mts",
     "typecheck": "tsc --noEmit && npm run typecheck:scripts",
     "typecheck:scripts": "tsc -p tsconfig.scripts.json",
