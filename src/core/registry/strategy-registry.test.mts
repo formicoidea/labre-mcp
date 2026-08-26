@@ -12,6 +12,31 @@ class FakeStrategy extends BaseStrategy {
   }
 }
 
+class DisabledStrategy extends BaseStrategy {
+  static get method(): string {
+    return "wardley:chain:write:capacity:slow-one";
+  }
+  static get disabled() {
+    return { reason: "high LLM latency (>30 min/run) — pending optimization" };
+  }
+  async evaluate(): Promise<never> {
+    throw new Error("this must never run");
+  }
+}
+
+class DisabledWithoutReason extends BaseStrategy {
+  static get method(): string {
+    return "wardley:chain:write:capacity:mystery";
+  }
+  // any: deliberately the sloppy shape — a bare truthy flag with no reason
+  static get disabled(): any {
+    return true;
+  }
+  async evaluate(): Promise<never> {
+    throw new Error("this must never run");
+  }
+}
+
 describe("validateMethodId", () => {
   it("accepts a 5-segment id", () => {
     validateMethodId("wardley:chain:write:capacity:s-curve");
@@ -54,5 +79,65 @@ describe("StrategyRegistry", () => {
   it("rejects invalid methodIds at register time", () => {
     const registry = new StrategyRegistry();
     assert.throws(() => registry.register("bad-id", FakeStrategy));
+  });
+});
+
+describe("StrategyRegistry — disabled guard", () => {
+  it("refuses to resolve a disabled strategy, and says why", () => {
+    const registry = new StrategyRegistry();
+    registry.register(DisabledStrategy.method, DisabledStrategy);
+    assert.throws(
+      () => registry.get(DisabledStrategy.method),
+      (err: Error) => {
+        assert.match(err.message, /is disabled: /);
+        assert.match(err.message, />30 min\/run/);
+        assert.match(err.message, /wardley:chain:write:capacity:slow-one/);
+        return true;
+      },
+    );
+  });
+
+  it("keeps a disabled strategy in the catalogue — refused is not unregistered", () => {
+    const registry = new StrategyRegistry();
+    registry.register(DisabledStrategy.method, DisabledStrategy);
+    assert.equal(registry.has(DisabledStrategy.method), true);
+    assert.deepEqual(registry.list(), [DisabledStrategy.method]);
+    assert.equal(registry.size(), 1);
+    assert.deepEqual(registry.listDisabled(), [
+      {
+        methodId: DisabledStrategy.method,
+        reason: "high LLM latency (>30 min/run) — pending optimization",
+      },
+    ]);
+  });
+
+  it("still refuses when the flag carries no reason", () => {
+    const registry = new StrategyRegistry();
+    registry.register(DisabledWithoutReason.method, DisabledWithoutReason);
+    assert.throws(
+      () => registry.get(DisabledWithoutReason.method),
+      /is disabled: no reason given/,
+    );
+  });
+
+  it("leaves an ordinary strategy alone", () => {
+    const registry = new StrategyRegistry();
+    registry.register(FakeStrategy.method, FakeStrategy);
+    registry.register(DisabledStrategy.method, DisabledStrategy);
+    assert.equal(registry.get(FakeStrategy.method), FakeStrategy);
+    assert.equal(registry.disabledReason(FakeStrategy.method), undefined);
+    assert.equal(
+      registry.disabledReason(DisabledStrategy.method),
+      "high LLM latency (>30 min/run) — pending optimization",
+    );
+  });
+
+  it("distinguishes disabled from unknown", () => {
+    const registry = new StrategyRegistry();
+    registry.register(DisabledStrategy.method, DisabledStrategy);
+    assert.throws(
+      () => registry.get("wardley:chain:write:capacity:does-not-exist"),
+      /Unknown strategy/,
+    );
   });
 });

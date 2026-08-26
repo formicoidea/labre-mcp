@@ -870,18 +870,10 @@ import {
   type StrategyResult,
 } from '#core/ast/base-strategy.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
-import type { LLMCall } from '#types/llm.mjs';
 
 const NEW_METHOD_ID_CPC = 'wardley:map:climate:position-functional-in-evolution:cpc-evolution';
 
 export class CpcEvolutionStrategyCore extends CoreBaseStrategy<ComponentInput, EvolutionResult> {
-  private readonly _llmCall: LLMCall | null;
-
-  constructor(options: { llmCall?: LLMCall } = {}) {
-    super();
-    this._llmCall = options.llmCall ?? null;
-  }
-
   static get method(): string {
     return NEW_METHOD_ID_CPC;
   }
@@ -890,7 +882,13 @@ export class CpcEvolutionStrategyCore extends CoreBaseStrategy<ComponentInput, E
     component: ComponentInput,
     _context: RequestContext,
   ): Promise<StrategyResult<EvolutionResult>> {
-    const legacy = new CpcEvolutionStrategy(this._llmCall ? { llmCall: this._llmCall } : {});
+    // No llmCall: through the kernel this strategy has always run LLM-free — the
+    // constructor option that could have supplied one was never passed by anyone.
+    // Its LLM-backed steps (CPC mapping, SotA insight) degrade to null, which is
+    // the behaviour every current caller observes. Wiring getStrategyLLM() here
+    // would turn LLM calls ON in a strategy that makes none today: a separate,
+    // deliberate decision, not a cleanup.
+    const legacy = new CpcEvolutionStrategy({});
     // any: legacy result carries certitude/ubiquity/trace on top of EvolutionResult;
     // trace entries are open-shape (each step contributes a different payload).
     const result = await legacy.evaluate(component) as EvolutionResult & {

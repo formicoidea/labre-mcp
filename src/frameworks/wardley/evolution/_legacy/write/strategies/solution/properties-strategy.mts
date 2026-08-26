@@ -585,16 +585,12 @@ import { getStrategyLLM } from '#lib/llm/registry.mjs';
 
 const NEW_METHOD_ID_PROPERTIES = 'wardley:map:climate:position-solution-in-evolution:property-assessment';
 
+// The legacy strategy has three modes; through the kernel it has only ever run
+// in 'auto'. The constructor option that could have selected another was never
+// passed by any caller, so the mode is a constant of the adapter, not an input.
+const KERNEL_MODE = 'auto';
+
 export class PropertiesStrategyCore extends CoreBaseStrategy<SolutionInput, SolutionEvolutionResult> {
-  private readonly _llmCall: LLMCall | null;
-  private readonly _mode: string;
-
-  constructor(options: { llmCall?: LLMCall; mode?: string } = {}) {
-    super();
-    this._llmCall = options.llmCall ?? null;
-    this._mode = options.mode ?? 'auto';
-  }
-
   static get method(): string {
     return NEW_METHOD_ID_PROPERTIES;
   }
@@ -603,8 +599,8 @@ export class PropertiesStrategyCore extends CoreBaseStrategy<SolutionInput, Solu
     component: SolutionInput,
     _context: RequestContext,
   ): Promise<StrategyResult<SolutionEvolutionResult>> {
-    const llmCall: LLMCall = this._llmCall ?? getStrategyLLM('properties-strategy');
-    const legacy = new PropertiesStrategy({ llmCall, mode: this._mode });
+    const llmCall: LLMCall = getStrategyLLM('properties-strategy');
+    const legacy = new PropertiesStrategy({ llmCall, mode: KERNEL_MODE });
     // any: legacy result carries properties[] with per-property phase + reason.
     // Shape is open across legacy/auto/conversational modes.
     const result = await legacy.evaluate(component) as SolutionEvolutionResult & {
@@ -618,7 +614,7 @@ export class PropertiesStrategyCore extends CoreBaseStrategy<SolutionInput, Solu
       ...(component.context
         ? [{ name: 'context', value: component.context, source: 'user-input' as const, capturedAt }]
         : []),
-      { name: 'mode', value: this._mode, source: 'user-input' as const, capturedAt },
+      { name: 'mode', value: KERNEL_MODE, source: 'computed' as const, capturedAt },
     ];
     // Each property carries its own justification — surface them as insights.
     const insights = (result.properties ?? [])

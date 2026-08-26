@@ -134,14 +134,6 @@ export interface IdentifyCapabilityInput {
 export class IdentifyCapabilityStrategy
   extends CoreBaseStrategy<IdentifyCapabilityInput, ParsedCapabilityResponse>
 {
-  // any: llmCall closure shape is provider-dependent
-  private readonly _llmCall: LLMCall | null;
-
-  constructor(options: { llmCall?: LLMCall } = {}) {
-    super();
-    this._llmCall = options.llmCall ?? null;
-  }
-
   static get method(): string {
     return NEW_METHOD_ID_IDENT;
   }
@@ -150,7 +142,7 @@ export class IdentifyCapabilityStrategy
     component: IdentifyCapabilityInput,
     _context: RequestContext,
   ): Promise<StrategyResult<ParsedCapabilityResponse>> {
-    const llmCall: LLMCall = this._llmCall ?? getStrategyLLM('identify-capability');
+    const llmCall: LLMCall = getStrategyLLM('identify-capability');
     const result = await identifyCapability(component, llmCall);
 
     const capturedAt = new Date().toISOString();
