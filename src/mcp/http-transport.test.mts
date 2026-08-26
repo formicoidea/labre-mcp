@@ -97,6 +97,8 @@ describe("labre-mcp HTTP transport", () => {
     const names = response.result.tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
       "__ping__",
+      // The labre liaison (ARCH-30 / CH-25); the list is sorted, so it leads.
+      "agentReply",
       "estimateEvolution",
       "evaluateMap",
       "generateValueChain",

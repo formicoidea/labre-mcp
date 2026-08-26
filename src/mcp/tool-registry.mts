@@ -20,6 +20,7 @@
 // registering at this shared boot point covers HTTP and stdio alike.
 import "#lib/prompts/init.mjs";
 import { ToolRegistry } from "#core/registry/tool-registry.mjs";
+import { AGENT_REPLY_TOOL } from "./agent-reply.tool.mjs";
 import { ESTIMATE_EVOLUTION_TOOL } from "./estimate-evolution.tool.mjs";
 import { EVALUATE_MAP_TOOL } from "./evaluate-map.tool.mjs";
 import { GENERATE_VALUE_CHAIN_TOOL } from "./generate-value-chain.tool.mjs";
@@ -46,5 +47,12 @@ export function buildMcpToolRegistry(): ToolRegistry {
   registry.register(GENERATE_VALUE_CHAIN_TOOL);
   registry.register(RUN_COMMAND_TOOL);
   registry.register(RUN_RECIPE_TOOL);
+  // The labre liaison (ARCH-30 / CH-25): the only tool here that does not run a
+  // strategy. It conducts one turn of a labre conversation under the CALLER's
+  // own identity, through labre's published AgentAdapter contract. It is
+  // registered on both roots deliberately — a stdio caller reaching it gets a
+  // first-class 'identity-unsupported' with a reason, which is worth more than a
+  // tool that mysteriously does not exist on one transport.
+  registry.register(AGENT_REPLY_TOOL);
   return registry;
 }

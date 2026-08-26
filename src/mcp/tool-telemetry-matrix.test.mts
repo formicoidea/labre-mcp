@@ -98,6 +98,17 @@ const TELEMETRY_MATRIX: Record<string, MatrixRow> = {
     status: "error",
     target: null,
   },
+  // The labre liaison (ARCH-30 / CH-25). Same discipline as every other row:
+  // arguments that fail its own Zod schema, so the handler rejects in memory —
+  // no Supabase call, no network, no JWT. `target` is null BY DECISION, not by
+  // omission: what this call targets is a conversation uuid, and a uuid as a
+  // PostHog property is a cardinality leak (see the tool's header).
+  agentReply: {
+    args: { conversationId: "not-a-uuid" },
+    events: [TOOL_CALL_EVENT],
+    status: "error",
+    target: null,
+  },
 };
 
 interface Captured {
