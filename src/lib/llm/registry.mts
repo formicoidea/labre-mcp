@@ -3,11 +3,18 @@
 // Lookup path:
 //   1. loadLLMConfig() returns the validated LLMConfig
 //   2. resolveStrategy() resolves the strategy entry (falling back to
-//      defaultProvider) and instantiates its provider
+//      defaultProvider + defaultModel) and instantiates its provider
 //   3. the resolved provider is asserted to support the capability this call
 //      needs — implied by which getter the caller used (text / structured /
 //      logprobs)
 //   4. a cached call instance is returned
+//
+// Steps 1-4 all live BEHIND the cache/override short-circuit in `getOrCreate`:
+// a test override, and a call already resolved once, must never re-read the
+// config file. That ordering is load-bearing, not cosmetic — `llm.config.json`
+// is per-user and git-ignored, so a fresh clone, a git worktree or a CI runner
+// has none. Reading it eagerly made every resolution fail there, INCLUDING the
+// ones a test had explicitly stubbed.
 //
 // The (strategy → required capability) contract lives at the CALL SITE: each
 // strategy asks for exactly the capability it needs by calling the matching
@@ -62,14 +69,26 @@ function resolveStrategy(
       providerId: explicit.provider,
     };
   }
-  // Fallback on the default provider. Model must be declared somewhere — we
-  // require the default provider to either have an entry for every strategy
-  // or rely on a strategy-default-model field; for now fall back to the first
-  // declared strategy's model for the default provider, or an explicit default.
+  // No entry for this strategy → fall back on the declared default route.
+  //
+  // The fallback stays available on purpose: strategies without an explicit
+  // entry are the norm, not the exception, and requiring one per strategy would
+  // make every new strategy a config change. What is NOT acceptable is choosing
+  // the model implicitly: `defaultModel` must be declared, or this throws. A
+  // config predating the field still loads (the field is optional) and every
+  // strategy it DOES declare keeps working — only the fallback path errors, and
+  // it says exactly what to add.
+  if (cfg.defaultModel === undefined) {
+    throw new Error(
+      `Strategy "${id}" has no entry in llm.config.json and no fallback model is declared — ` +
+        'declare defaultModel or an explicit strategy entry',
+    );
+  }
   const fallback: StrategyConfig = {
     provider: cfg.defaultProvider,
-    model: findDefaultModelFor(cfg.defaultProvider, cfg),
+    model: cfg.defaultModel,
   };
+  warnFallbackOnce(id, cfg.defaultProvider, cfg.defaultModel);
   return {
     strategy: fallback,
     provider: instantiateProvider(cfg.defaultProvider, cfg),
@@ -77,12 +96,24 @@ function resolveStrategy(
   };
 }
 
-function findDefaultModelFor(providerId: string, cfg: LLMConfig): string {
-  for (const s of Object.values(cfg.strategies)) {
-    if (s.provider === providerId) return s.model;
-  }
-  throw new Error(
-    `No model available for fallback to default provider "${providerId}" — declare at least one strategy using it, or add an explicit entry in llm.config.json`,
+/** strategyIds already reported as unmapped. The call cache alone would nearly
+ *  do it — a resolved call is built once — but only nearly: a resolution that
+ *  throws downstream (unsupported capability) never reaches the cache and would
+ *  warn again on every retry. */
+const warnedFallbacks = new Set<string>();
+
+/**
+ * Signal ONCE per strategyId that it resolved through the fallback. An unmapped
+ * id used to pass in complete silence, which is how a strategy can run for
+ * months against a model nobody chose for it. stderr, never stdout: the stdio
+ * MCP transport owns stdout and any stray byte there corrupts the protocol.
+ */
+function warnFallbackOnce(id: string, providerId: string, model: string): void {
+  if (warnedFallbacks.has(id)) return;
+  warnedFallbacks.add(id);
+  console.warn(
+    `[llm] strategy "${id}" has no entry in llm.config.json — falling back to ` +
+      `provider "${providerId}" / model "${model}". Add a strategies["${id}"] entry to pin it.`,
   );
 }
 
@@ -127,8 +158,11 @@ function callFor<T extends (...args: never[]) => unknown>(
   cap: LLMCapability,
   make: (s: StrategyConfig, p: LLMProvider) => T,
 ): T {
-  const cfg = loadLLMConfig();
+  // Config read INSIDE the factory, so `getOrCreate`'s override/cache
+  // short-circuit runs first (see the header comment): stubbing a call must not
+  // require an `llm.config.json` on disk.
   return getOrCreate(id, cap, () => {
+    const cfg = loadLLMConfig();
     const { strategy, provider, providerId } = resolveStrategy(id, cfg);
     assertSupports(id, cap, providerId, cfg, provider);
     // Sentinel seam: every LLM call the registry hands out is counted, once per
@@ -178,4 +212,5 @@ export function resetLLMRegistryCache(): void {
   callCache.clear();
   providerCache.clear();
   testOverrides.clear();
+  warnedFallbacks.clear();
 }

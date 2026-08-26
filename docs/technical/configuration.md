@@ -31,6 +31,7 @@ Structure :
 ```json
 {
   "defaultProvider": "claude",
+  "defaultModel": "claude-sonnet-4-6",
   "providers": {
     "claude": { "kind": "agent-sdk" },
     "opencode":   { "kind": "http-api",    "baseUrl": "https://opencode.ai/zen/v1", "apiKeyEnv": "OPENCODE_API_KEY" },
@@ -47,17 +48,20 @@ Structure :
 Regles :
 
 - Les **secrets** ne vivent jamais dans le JSON. Le provider reference l'env var par son nom (`apiKeyEnv` pour une cle API HTTP, `authEnv` pour un token GitHub Copilot).
-- Une strategie absente du JSON tombe automatiquement sur le `defaultProvider`.
-- La config est validee **au chargement** : si une strategie necessite une capability (`text`, `structured`, `logprobs`) que le provider assigne ne supporte pas, le demarrage echoue avec un message explicite.
+- Une strategie absente du JSON tombe sur le couple `defaultProvider` + **`defaultModel`**, et ce repli est **signale** : un `console.warn` une seule fois par strategyId inconnu, nommant l'id et la route utilisee. `defaultModel` est optionnel dans le schema (les configs anterieures se chargent toujours), mais son absence rend le repli **impossible** : la resolution echoue alors avec `declare defaultModel or an explicit strategy entry`. Le modele du repli n'est jamais deduit des autres entrees — l'ordre des cles du JSON n'a aucun effet sur la resolution.
+- La config est validee **au chargement** : si une strategie necessite une capability (`text`, `structured`, `logprobs`, `vision`) que le provider assigne ne supporte pas, la resolution echoue avec un message explicite.
+- La config n'est lue qu'**a la premiere resolution reelle** d'un appel, jamais avant : un appel deja resolu (cache) ou stubbe en test ne retouche pas le fichier. Consequence voulue : les tests unitaires n'exigent pas de `llm.config.json` sur disque.
 - Un provider declare mais non reference par une strategie n'est jamais instancie — il reste disponible en option sans consommer de credit ni bloquer le demarrage.
 
 Matrice des capabilities par type de provider :
 
-| Provider kind | text | structured | logprobs |
-|---|:---:|:---:|:---:|
-| `agent-sdk`   | ✓ | ✓ | ✗ |
-| `http-api`    | ✓ | ✗ | ✓ |
-| `copilot-sdk` | ✓ | ✓ | ✗ |
+| Provider kind | text | structured | logprobs | vision |
+|---|:---:|:---:|:---:|:---:|
+| `agent-sdk`   | ✓ | ✓ | ✗ | ✗ |
+| `http-api`    | ✓ | ✗ | ✓ | ✓ |
+| `copilot-sdk` | ✓ | ✓ | ✗ | ✗ |
+
+> `vision` est une capability de **transport** : elle dit que le provider sait mettre une image dans la requete, pas que le **modele** vise sait la lire. Une strategie vision (`render-image-parse-png`) doit donc etre routee a la main vers un modele multimodal — le repli `defaultProvider` ne peut pas la satisfaire tant que ce provider est `agent-sdk` ou `copilot-sdk`, et echoue alors avec `does not support image input`.
 
 ### Profils de configuration
 
@@ -70,6 +74,7 @@ Toutes les strategies passent par Claude via le runtime Agent SDK ; `logprob-dis
 ```json
 {
   "defaultProvider": "claude",
+  "defaultModel": "claude-sonnet-4-6",
   "providers": {
     "claude":   { "kind": "agent-sdk" },
     "opencode": { "kind": "http-api",    "baseUrl": "https://opencode.ai/zen/v1", "apiKeyEnv": "OPENCODE_API_KEY" },
@@ -98,6 +103,7 @@ Toutes les strategies passent par le runtime Copilot (subscription). `COPILOT_GI
 ```json
 {
   "defaultProvider": "copilot",
+  "defaultModel": "gpt-5",
   "providers": {
     "claude":   { "kind": "agent-sdk" },
     "opencode": { "kind": "http-api",    "baseUrl": "https://opencode.ai/zen/v1", "apiKeyEnv": "OPENCODE_API_KEY" },
@@ -128,6 +134,7 @@ Mix des deux providers : Claude pour les strategies a fort effort (structured co
 ```json
 {
   "defaultProvider": "claude",
+  "defaultModel": "claude-sonnet-4-6",
   "providers": {
     "claude":   { "kind": "agent-sdk" },
     "opencode": { "kind": "http-api",    "baseUrl": "https://opencode.ai/zen/v1", "apiKeyEnv": "OPENCODE_API_KEY" },
