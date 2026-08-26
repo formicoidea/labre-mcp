@@ -7,7 +7,7 @@
 // no-op auth middleware (auth-middleware.mts) becomes the gating point.
 
 import { randomUUID } from "node:crypto";
-import { type RequestContext, RequestContextSchema } from "../context/request-context.mjs";
+import { type RequestContext, RequestContextSchema } from "#core/context/request-context.mjs";
 
 const DEFAULT_PROJECT_ROOT = process.cwd();
 

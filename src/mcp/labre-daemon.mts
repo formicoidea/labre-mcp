@@ -15,7 +15,7 @@
 // not touching the kernel.
 
 import { fileURLToPath } from "node:url";
-import { startHttpDaemon } from "#core/transport/http-daemon.mjs";
+import { startHttpDaemon } from "#transport/http-daemon.mjs";
 import { buildStrategyRegistry } from "#frameworks/registry-boot.mjs";
 import { buildMcpToolRegistry } from "./tool-registry.mjs";
 

@@ -12,8 +12,8 @@
 // dependency points delivery → transport → kernel, one way.
 
 import { createRequire } from "node:module";
-import type { RequestContext } from "../context/request-context.mjs";
-import { ToolRegistry, type ToolDefinition } from "../registry/tool-registry.mjs";
+import type { RequestContext } from "#core/context/request-context.mjs";
+import { ToolRegistry, type ToolDefinition } from "#core/registry/tool-registry.mjs";
 import { type JsonRpcRequest, type JsonRpcResponse, JsonRpcErrorCode } from "./json-rpc.schema.mjs";
 import { withMcpDegradation } from "#lib/degradation/index.mjs";
 import type { Degradable } from "#lib/degradation/types.mjs";
@@ -43,7 +43,7 @@ interface CallToolResult {
 // Read at module load — the allowed exception to hard rule #20 (import.meta.url,
 // not cwd). Path resolves to the package root in both dev (src/) and dist/.
 // any: require() of package.json is untyped; we read a single field.
-const pkg = createRequire(import.meta.url)("../../../package.json") as { version: string };
+const pkg = createRequire(import.meta.url)("../../package.json") as { version: string };
 
 export const SERVER_INFO = {
   name: "labre-mcp",

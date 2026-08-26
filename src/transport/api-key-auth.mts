@@ -8,7 +8,7 @@
 // Successful validations are cached (default 60 s) so the DB round-trip is
 // amortized across a session; revocation takes effect within one TTL.
 
-import type { RequestContext } from "../context/request-context.mjs";
+import type { RequestContext } from "#core/context/request-context.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { AuthenticationError } from "./auth-middleware.mjs";
 import { tryExtractBearerToken } from "./jwks-auth.mjs";

@@ -1,46 +1,43 @@
 #!/usr/bin/env tsx
 // Import-boundary guard — invariant I2, "transport state stays separate from
-// business state" (AI-harness audit, CH-06).
+// business state" (AI-harness audit, CH-06; the façade, CH-23 / ARCH-27).
 //
-// WHAT THE KERNEL IS SUPPOSED TO BE. `src/core/` is the kernel: registry,
-// recipe runner, bus, ast, context, persistence. It is the part that survives
-// a change of framework AND a change of wire protocol. `src/mcp/` is the wire
-// surface — tool descriptors, JSON coercion, MCP-shaped input/output. The
-// dependency may only ever point one way: mcp knows about core, core knows
-// nothing about mcp. The day that inverts, "run this strategy" stops being
-// callable except through an MCP `tools/call`, and the kernel is no longer a
-// kernel.
+// THE THREE LAYERS. `src/core/` is the kernel: registry, recipe runner, bus,
+// ast, context, persistence. It is the part that survives a change of framework
+// AND a change of wire protocol. `src/transport/` is the wire: HTTP daemon,
+// stdio server, JSON-RPC dispatch, auth doors — protocol, no product.
+// `src/mcp/` is the DELIVERY: the tool descriptors, the JSON coercion, and the
+// two composition roots where a tool surface meets a wire.
 //
-// WHY THIS FILE SHIPS RED. Today the transport layer physically lives INSIDE
-// the kernel, at `src/core/transport/` (ARCH-14). That is a known misplacement:
-// the daemon, the HTTP server, the auth middleware and the boot wiring are
-// transport concerns sitting in the business tree, and the boot wiring reaches
-// straight into `src/mcp/` — in VALUE, not in type — to build its tool
-// registry. The guard does not pretend otherwise. It enumerates every existing
-// crossing in scripts/import-boundaries-baseline.json, tolerates exactly
-// those, and fails on any NEW one. The baseline is lifted by CH-23, the façade
-// refactor that moves transport out of core and inverts the boot dependency.
+// The dependency may only ever point one way — delivery → transport → kernel.
+// The day it inverts, "run this strategy" stops being callable except through
+// an MCP `tools/call`, and the kernel is no longer a kernel.
 //
-// THREE RULES. The first two are the boundary as it must hold TODAY; the third
-// is the one CH-23 exists to repay.
+// THIS FILE SHIPS GREEN, WITH AN EMPTY BASELINE. Until CH-23 the transport
+// physically lived INSIDE the kernel at `src/core/transport/` (ARCH-14), and
+// its boot wiring reached straight into `src/mcp/` — in VALUE, not in type — to
+// build its tool registry: seven crossings, all enumerated in
+// scripts/import-boundaries-baseline.json and tolerated there. ARCH-27 moved
+// the transport out and inverted the boot dependency, so the file is now empty
+// and MUST stay empty. A new entry is a request to re-open ARCH-27.
 //
-//   CORE_TO_MCP        `src/core/` outside transport must not import
-//                      `src/mcp/`. Green today, and this is the rule that
-//                      actually matters: it keeps the kernel proper clean
-//                      while transport is being moved out from under it.
+// THREE RULES.
 //
-//   CORE_TO_TRANSPORT  `src/core/` outside transport must not import
-//                      `src/core/transport/`. A kernel module reaching for the
-//                      daemon is the same inversion wearing a different hat,
-//                      and it is what would make CH-23's extraction hurt.
+//   CORE_TO_MCP        `src/core/` must not import `src/mcp/`. The kernel must
+//                      not know the delivery surface: a kernel module that
+//                      depends on a tool descriptor is only reachable through a
+//                      tools/call.
 //
-//   TRANSPORT_TO_MCP   `src/core/transport/` must not import `src/mcp/`. This
-//                      is the crossing the audit named (`boot-tool-registry`
-//                      imports five tool descriptors as values). It is only a
-//                      violation BECAUSE transport is currently inside core —
-//                      once CH-23 moves transport out, the boot wiring is
-//                      allowed to know the tools it wires, and this rule
-//                      retires along with its baseline entries.
+//   CORE_TO_TRANSPORT  `src/core/` must not import `src/transport/`. Same
+//                      inversion wearing a different hat — a kernel that needs
+//                      a server cannot be embedded as a library.
+//
+//   TRANSPORT_TO_MCP   `src/transport/` must not import `src/mcp/`. The wire
+//                      serves whatever registry it is handed; the moment it
+//                      names a tool, swapping the delivery means editing the
+//                      transport. This is the crossing the audit named
+//                      (`boot-tool-registry` imported five tool descriptors as
+//                      values) and the one CH-23 inverted.
 //
 // Run it locally exactly as CI does:  pnpm check:boundaries
 
@@ -51,9 +48,13 @@ import { fileURLToPath } from "node:url";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BASELINE = "scripts/import-boundaries-baseline.json";
 
-const PERIMETER = "src/core";
-const TRANSPORT = "src/core/transport";
+// Both trees are scanned: the kernel AND the wire. Before CH-23 the second was
+// a subdirectory of the first, which is precisely why the rules needed an
+// exception list; now they are siblings and the rules are unconditional.
+const CORE = "src/core";
+const TRANSPORT = "src/transport";
 const MCP = "src/mcp";
+const PERIMETERS = [CORE, TRANSPORT];
 const EXTENSIONS = [".mts", ".ts", ".mjs", ".js"];
 
 type Rule = "CORE_TO_MCP" | "CORE_TO_TRANSPORT" | "TRANSPORT_TO_MCP";
@@ -221,29 +222,29 @@ function violationFor(fromFile: string, specifier: string): { rule: Rule; messag
   const target = resolveTarget(fromFile, specifier);
   if (target === null) return null;
 
+  const inCore = under(file, CORE);
   const inTransport = under(file, TRANSPORT);
 
-  if (!inTransport && under(target, MCP)) {
+  if (inCore && under(target, MCP)) {
     return {
       rule: "CORE_TO_MCP",
       message:
-        `imports \`${specifier}\` → ${target}. The kernel must not know the wire ` +
-        `surface: src/mcp/ holds MCP tool descriptors and MCP-shaped I/O, and a ` +
-        `kernel module that depends on them can no longer be called except ` +
-        `through a tools/call. Depend on the core contract instead and let the ` +
-        `MCP layer adapt.`,
+        `imports \`${specifier}\` → ${target}. The kernel must not know the ` +
+        `delivery surface: src/mcp/ holds MCP tool descriptors and MCP-shaped ` +
+        `I/O, and a kernel module that depends on them can no longer be called ` +
+        `except through a tools/call. Depend on the core contract instead ` +
+        `(#core/registry/tool-registry.mjs) and let the MCP layer adapt.`,
     };
   }
 
-  if (!inTransport && under(target, TRANSPORT)) {
+  if (inCore && under(target, TRANSPORT)) {
     return {
       rule: "CORE_TO_TRANSPORT",
       message:
         `imports \`${specifier}\` → ${target}. Transport (daemon, HTTP server, ` +
-        `auth, boot wiring) is misplaced inside src/core/ today and CH-23 moves ` +
-        `it out; a kernel module that reaches for it turns that move into a ` +
-        `breaking change. Extract what you need into a kernel module both sides ` +
-        `can import.`,
+        `stdio server, auth doors) is a wire concern; a kernel module that ` +
+        `reaches for it cannot be embedded as a library. Extract what you need ` +
+        `into a kernel module both sides can import.`,
     };
   }
 
@@ -251,10 +252,10 @@ function violationFor(fromFile: string, specifier: string): { rule: Rule; messag
     return {
       rule: "TRANSPORT_TO_MCP",
       message:
-        `imports \`${specifier}\` → ${target}. src/core/transport/ sits inside ` +
-        `the kernel tree, so this is core→mcp by physical location. CH-23 lifts ` +
-        `the rule by moving transport out of core; until then, do not add a ` +
-        `sixth crossing to the five the baseline already carries.`,
+        `imports \`${specifier}\` → ${target}. The transport serves whatever ` +
+        `registry it is handed (see HttpDaemonDeps / StdioServerDeps): the ` +
+        `moment it names a tool, swapping the delivery means editing the wire. ` +
+        `Compose the tool in src/mcp/tool-registry.mts and pass the registry in.`,
     };
   }
 
@@ -288,12 +289,14 @@ const failures: Finding[] = [];
 const tolerated: Finding[] = [];
 let scanned = 0;
 
-let files: string[];
-try {
-  files = walk(join(repoRoot, PERIMETER));
-} catch {
-  console.error(`::error::perimeter '${PERIMETER}' not found — run from the repository root`);
-  process.exit(1);
+const files: string[] = [];
+for (const perimeter of PERIMETERS) {
+  try {
+    walk(join(repoRoot, perimeter), files);
+  } catch {
+    console.error(`::error::perimeter '${perimeter}' not found — run from the repository root`);
+    process.exit(1);
+  }
 }
 
 for (const file of files) {
@@ -327,7 +330,7 @@ for (const k of stale) {
 
 if (tolerated.length > 0) {
   console.log(
-    `import boundaries: ${tolerated.length} documented deviation(s), tolerated by ${BASELINE} (lifted by CH-23):`,
+    `import boundaries: ${tolerated.length} documented deviation(s), tolerated by ${BASELINE} — the baseline MUST be empty since ARCH-27:`,
   );
   for (const t of tolerated) {
     console.log(`  - ${t.file}:${t.line} [${t.rule}] ${t.specifier}`);
@@ -337,7 +340,7 @@ if (tolerated.length > 0) {
 const failed = failures.length > 0 || stale.length > 0;
 if (!failed) {
   console.log(
-    `import boundaries: OK (${scanned} files under ${PERIMETER}/, ${baselineEntries.length} baselined)`,
+    `import boundaries: OK (${scanned} files under ${PERIMETERS.map((p) => p + "/").join(" + ")}, ${baselineEntries.length} baselined)`,
   );
 }
 process.exit(failed ? 1 : 0);

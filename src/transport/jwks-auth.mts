@@ -12,7 +12,7 @@
 // then receives a normal IdP-signed JWT and this middleware just works.
 
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
-import type { AuthSource, RequestContext } from "../context/request-context.mjs";
+import type { AuthSource, RequestContext } from "#core/context/request-context.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { AuthenticationError } from "./auth-middleware.mjs";
 

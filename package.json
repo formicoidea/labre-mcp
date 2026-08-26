@@ -46,6 +46,10 @@
       "labre-mcp-dev": "./src/core/*",
       "default": "./dist/core/*"
     },
+    "#transport/*": {
+      "labre-mcp-dev": "./src/transport/*",
+      "default": "./dist/transport/*"
+    },
     "#frameworks/*": {
       "labre-mcp-dev": "./src/frameworks/*",
       "default": "./dist/frameworks/*"

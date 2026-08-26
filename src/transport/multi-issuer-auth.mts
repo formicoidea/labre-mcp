@@ -31,7 +31,7 @@
 //     cannot carry a valid signature and still gets its 401 there.)
 
 import { decodeJwt } from "jose";
-import type { RequestContext } from "../context/request-context.mjs";
+import type { RequestContext } from "#core/context/request-context.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { AuthenticationError } from "./auth-middleware.mjs";
 import { buildJwksAuthMiddleware, extractBearerToken, type JwksAuthOptions } from "./jwks-auth.mjs";

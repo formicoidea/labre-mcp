@@ -7,7 +7,7 @@
 // an artefact under ~/.labre-mcp/runs/. Use `runCommand` for a single methodId.
 
 import { z } from 'zod';
-import type { ToolDefinition } from '#core/transport/mcp-handler.mjs';
+import type { ToolDefinition } from '#core/registry/tool-registry.mjs';
 import { RunRecipeCallSchema } from '#schemas/run-recipe.schema.mjs';
 import { loadRecipe, getBundlePrompts } from '#core/recipe/recipe-loader.mjs';
 import { runRecipe, type JsonLabreEnvelope } from '#core/recipe/recipe-runner.mjs';

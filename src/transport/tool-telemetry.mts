@@ -27,7 +27,7 @@
 // so this event carries no `$feature/` property on any path.
 
 import { getPostHogFlags } from "#lib/flags/state.mjs";
-import type { RequestContext } from "../context/request-context.mjs";
+import type { RequestContext } from "#core/context/request-context.mjs";
 
 /** Event name for one MCP tool invocation. Same `mcp_*` family as
  *  `mcp_run_end` / `mcp_step_error` / `mcp_boot`. */

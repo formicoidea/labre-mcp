@@ -7,7 +7,7 @@
 // description, the bridge module runs the recipe.
 
 import { z } from 'zod';
-import type { ToolDefinition } from '#core/transport/mcp-handler.mjs';
+import type { ToolDefinition } from '#core/registry/tool-registry.mjs';
 import { GenerateValueChainInputSchema } from '#schemas/generate-value-chain.schema.mjs';
 import { handleGenerateValueChainViaRecipe } from './generate-value-chain-via-recipe.mjs';
 

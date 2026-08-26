@@ -8,7 +8,7 @@
 // the canonical recipe through the kernel runner.
 
 import { z } from "zod";
-import type { ToolDefinition } from "#core/transport/mcp-handler.mjs";
+import type { ToolDefinition } from "#core/registry/tool-registry.mjs";
 import { EstimateEvolutionInputSchema } from "#schemas/estimate-evolution.schema.mjs";
 import { handleEstimateEvolutionViaRecipe } from "./estimate-evolution-via-recipe.mjs";
 

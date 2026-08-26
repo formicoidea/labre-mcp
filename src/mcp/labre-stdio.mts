@@ -9,7 +9,7 @@
 // or the server below prints goes to stderr.
 
 import { fileURLToPath } from "node:url";
-import { startStdioServer } from "#core/transport/stdio-server.mjs";
+import { startStdioServer } from "#transport/stdio-server.mjs";
 import { buildStrategyRegistry } from "#frameworks/registry-boot.mjs";
 import { buildMcpToolRegistry } from "./tool-registry.mjs";
 

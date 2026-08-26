@@ -7,7 +7,7 @@
 // schema + description, the bridge module runs the recipe.
 
 import { z } from 'zod';
-import type { ToolDefinition } from '#core/transport/mcp-handler.mjs';
+import type { ToolDefinition } from '#core/registry/tool-registry.mjs';
 import { EvaluateMapInputSchema } from '#schemas/evaluate-map.schema.mjs';
 import { handleEvaluateMapViaRecipe } from './evaluate-map-via-recipe.mjs';
 

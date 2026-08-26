@@ -19,7 +19,7 @@ import {
   type JWTVerifyGetKey,
   type CryptoKey,
 } from "jose";
-import type { RequestContext } from "../context/request-context.mjs";
+import type { RequestContext } from "#core/context/request-context.mjs";
 import { AuthenticationError } from "./auth-middleware.mjs";
 import { buildMultiIssuerAuthMiddleware, supabaseIssuerOf } from "./multi-issuer-auth.mjs";
 

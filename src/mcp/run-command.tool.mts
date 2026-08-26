@@ -8,7 +8,7 @@
 // recipes unnecessary: call the command directly instead.
 
 import { z } from 'zod';
-import type { ToolDefinition } from '#core/transport/mcp-handler.mjs';
+import type { ToolDefinition } from '#core/registry/tool-registry.mjs';
 import { CommandCallSchema, type CommandResult } from '#schemas/command.schema.mjs';
 import { runCommand } from '#core/recipe/recipe-runner.mjs';
 import { buildStrategyRegistry } from '#frameworks/registry-boot.mjs';

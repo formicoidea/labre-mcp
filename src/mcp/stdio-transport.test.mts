@@ -5,9 +5,9 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { handleLine } from "#core/transport/stdio-server.mjs";
+import { handleLine } from "#transport/stdio-server.mjs";
 import { buildMcpToolRegistry } from "./tool-registry.mjs";
-import type { JsonRpcResponse } from "#core/transport/json-rpc.schema.mjs";
+import type { JsonRpcResponse } from "#transport/json-rpc.schema.mjs";
 
 function resultOf(res: JsonRpcResponse | null): Record<string, unknown> {
   assert.ok(res && "result" in res, "expected a success response");

@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { SignJWT, generateKeyPair, exportJWK, createLocalJWKSet } from "jose";
 import { buildJwksAuthMiddleware } from "./jwks-auth.mjs";
 import { AuthenticationError } from "./auth-middleware.mjs";
-import type { RequestContext } from "../context/request-context.mjs";
+import type { RequestContext } from "#core/context/request-context.mjs";
 
 const CONTEXT: RequestContext = {
   projectId: "p",

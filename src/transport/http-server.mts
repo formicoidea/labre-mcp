@@ -19,7 +19,7 @@ import type { ServerType } from "@hono/node-server";
 import { dispatch, SERVER_INFO, type ToolRegistry } from "./mcp-handler.mjs";
 import { JsonRpcRequestSchema, JsonRpcErrorCode } from "./json-rpc.schema.mjs";
 import { extractContext } from "./context-extractor.mjs";
-import type { RequestContext } from "../context/request-context.mjs";
+import type { RequestContext } from "#core/context/request-context.mjs";
 import type { AuthMiddleware } from "./auth-middleware.mjs";
 import { noopAuthMiddleware, AuthenticationError } from "./auth-middleware.mjs";
 import { loadLLMConfig } from "#lib/llm/config.loader.mjs";
@@ -85,7 +85,7 @@ export function buildApp(options: {
   // Strict filename allowlist (no dots outside the suffix) → no path traversal.
   // schema/ sits at the package root, three levels above this module in both
   // src/ and dist/ layouts.
-  const schemaDir = new URL("../../../schema/", import.meta.url);
+  const schemaDir = new URL("../../schema/", import.meta.url);
   app.get("/schemas/:file", async (c) => {
     const file = c.req.param("file");
     if (!/^[a-z0-9-]+\.schema\.json$/.test(file)) {

@@ -5,10 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { generateKeyPair, exportJWK, createLocalJWKSet, SignJWT } from "jose";
 import "#lib/prompts/init.mjs";
-import { buildApp } from "#core/transport/http-server.mjs";
+import { buildApp } from "#transport/http-server.mjs";
 import { buildMcpToolRegistry } from "./tool-registry.mjs";
-import { noopAuthMiddleware, AuthenticationError } from "#core/transport/auth-middleware.mjs";
-import { buildSupabaseAuthMiddleware } from "#core/transport/supabase-auth.mjs";
+import { noopAuthMiddleware, AuthenticationError } from "#transport/auth-middleware.mjs";
+import { buildSupabaseAuthMiddleware } from "#transport/supabase-auth.mjs";
 
 function buildTestApp() {
   return buildApp({ tools: buildMcpToolRegistry(), auth: noopAuthMiddleware });

@@ -8,7 +8,7 @@ import {
   type JWTVerifyGetKey,
   type CryptoKey,
 } from "jose";
-import type { RequestContext } from "../context/request-context.mjs";
+import type { RequestContext } from "#core/context/request-context.mjs";
 import { buildSupabaseAuthMiddleware } from "./supabase-auth.mjs";
 import { AuthenticationError } from "./auth-middleware.mjs";
 
