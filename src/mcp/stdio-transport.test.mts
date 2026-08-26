@@ -30,7 +30,7 @@ test("ping returns an empty result with the matching id", async () => {
   assert.deepEqual(res, { jsonrpc: "2.0", id: 1, result: {} });
 });
 
-test("tools/list advertises the seven boot tools", async () => {
+test("tools/list advertises the six boot tools", async () => {
   const tools = buildMcpToolRegistry();
   const res = await handleLine(
     JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }),
@@ -47,10 +47,6 @@ test("tools/list advertises the seven boot tools", async () => {
       "generateValueChain",
       "runCommand",
       "runRecipe",
-      // The labre liaison (ARCH-30 / CH-25) — advertised on BOTH wires on
-      // purpose: a stdio caller reaching it gets a first-class
-      // 'identity-unsupported' carrying a reason, not a mysteriously absent tool.
-      "agentReply",
     ].sort(),
   );
 });
