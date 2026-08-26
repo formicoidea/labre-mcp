@@ -374,7 +374,7 @@ The shared type was specified as `src/core/ast/analysis-ref.mts` (`AnalysisRefSc
 
 ## ARCH-26 — The `labre_mcp` schema stays in labre's migration chain; labre-mcp guards it with a mechanical contract
 
-**Status:** 🔴 **Proposed — awaiting human arbitration.** Cross-product decision (labre ↔ labre-mcp), red zone: it touches schema ownership, RLS and grants. Nothing has been applied to either repository beyond this ADR and the contract + test it describes; no migration is moved, created or deleted by this change.
+**Status:** ✅ **Accepted — human arbitration 2026-08-26** (option (c) as recommended). Cross-product decision (labre ↔ labre-mcp), red zone: it touches schema ownership, RLS and grants. Nothing was applied to either repository beyond this ADR and the contract + test it describes; no migration is moved, created or deleted by this change.
 
 **Context:**
 
@@ -406,7 +406,7 @@ There is also a hard operational constraint that shapes the options: **the Supab
 
 **(c) Ownership stays split, but the split becomes mechanical.** — **recommended.**
 
-**Decision (proposed):**
+**Decision (accepted 2026-08-26):**
 
 1. **The migration chain stays in labre**, where the Supabase project and its single `schema_migrations` ledger live. One chain, one owner, no race.
 

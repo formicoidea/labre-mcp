@@ -10,7 +10,7 @@ labre-mcp is an MCP (Model Context Protocol) server that helps the user apply pr
 Read these first if you're new to the project:
 
 - [ast-schema.md](/labre-mcp/docs/architecture/ast-schema.md) — **pivot grammar** (5-segment methodIds, open command vocabulary, JSON-labre artefact, strategy contract). Authoritative: supersedes/amends several ADRs (ARCH-25).
-- [decisions.md](/labre-mcp/docs/architecture/decisions.md) — 26 ADRs (ARCH-01..26) that ground every other decision. ARCH-26 is 🔴 **proposed, not accepted**: it asks the human to arbitrate who owns the `labre_mcp` Postgres schema, whose migrations live in the labre repo
+- [decisions.md](/labre-mcp/docs/architecture/decisions.md) — 26 ADRs (ARCH-01..26) that ground every other decision. ARCH-26 (accepted 2026-08-26) settles who owns the `labre_mcp` Postgres schema: the migration chain stays in labre, this repo holds the mechanical schema contract
 - [roadmap.md](/labre-mcp/docs/architecture/roadmap.md) — what is **not yet** done (lib/→core, `_legacy/` extraction, tool wiring, mocks→real). Read this to avoid coding against a structure that does not exist yet.
 - [strategies.md](/labre-mcp/docs/architecture/strategies.md) — registry, BaseStrategy contract, result format with signals/reasoning/insights
 - [recipes.md](/labre-mcp/docs/architecture/recipes.md) — recipe schema, listeners, auto-fanout, shipped+override loader
