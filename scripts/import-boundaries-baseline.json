@@ -5,12 +5,6 @@
   "_format": "One object per tolerated finding: {file, rule, specifier, why}. Literal triples only — no wildcard, no 'at most N' threshold, either of which would let a brand-new violation hide behind an old one. An entry matching no finding fails the guard (rule STALE), so this file can never drift away from the tree it describes.",
   "violations": [
     {
-      "file": "src/core/recipe/shipped-recipes-validation.test.mts",
-      "rule": "CORE_TO_TRANSPORT",
-      "specifier": "#core/transport/labre-daemon.mjs",
-      "why": "The shipped-recipe validation test builds a full strategy registry, and the only exported builder — buildStrategyRegistry — currently lives in the daemon module rather than in the registry module it belongs to. CH-23 moves that builder into the kernel, which retires this entry."
-    },
-    {
       "file": "src/core/transport/boot-tool-registry.mts",
       "rule": "TRANSPORT_TO_MCP",
       "specifier": "#mcp/estimate-evolution.tool.mjs",
@@ -39,12 +33,6 @@
       "rule": "TRANSPORT_TO_MCP",
       "specifier": "#mcp/run-recipe.tool.mjs",
       "why": "Same boot wiring, same reason as estimate-evolution.tool.mjs above."
-    },
-    {
-      "file": "src/core/transport/labre-daemon.mts",
-      "rule": "TRANSPORT_TO_MCP",
-      "specifier": "#mcp/shipped-root.mjs",
-      "why": "The daemon resolves the shipped recipes root through a constant that lives in src/mcp/. SHIPPED_ROOT is a packaging fact, not an MCP fact; CH-23 relocates it to the kernel."
     }
   ]
 }

@@ -19,7 +19,7 @@ import { JsonRpcRequestSchema, type JsonRpcResponse } from "./json-rpc.schema.mj
 import { extractContext } from "./context-extractor.mjs";
 import { noopAuthMiddleware, type AuthMiddleware } from "./auth-middleware.mjs";
 import { buildBootRegistry } from "./boot-tool-registry.mjs";
-import { buildStrategyRegistry } from "./strategy-registry-boot.mjs";
+import { buildStrategyRegistry } from "#frameworks/registry-boot.mjs";
 import { registerBootHealthChecks } from "./boot-health-checks.mjs";
 import { runAllHealthChecks } from "#lib/degradation/index.mjs";
 import { selectPostHog } from "./boot-posthog.mjs";

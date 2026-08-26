@@ -17,7 +17,7 @@ import { randomUUID } from 'node:crypto';
 import '#lib/prompts/init.mjs';
 import { GENERATE_VALUE_CHAIN_TOOL } from './generate-value-chain.tool.mjs';
 import { GenerateValueChainInputSchema } from '#schemas/generate-value-chain.schema.mjs';
-import { SHIPPED_ROOT } from './shipped-root.mjs';
+import { SHIPPED_ROOT } from '#core/shipped-root.mjs';
 import type { GenerateValueChainViaRecipeResult } from './generate-value-chain-via-recipe.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
 

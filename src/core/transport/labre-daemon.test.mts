@@ -5,11 +5,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 // Side-effect: registers prompt parsers consumed by some strategies.
 import "#lib/prompts/init.mjs";
-import {
-  buildStrategyRegistry,
-  isSupabaseIssuedToken,
-  selectAuthMiddleware,
-} from "./labre-daemon.mjs";
+import { buildStrategyRegistry } from "#frameworks/registry-boot.mjs";
+import { isSupabaseIssuedToken, selectAuthMiddleware } from "./labre-daemon.mjs";
 
 const SUPABASE_ISSUER = "https://proj.supabase.co/auth/v1";
 

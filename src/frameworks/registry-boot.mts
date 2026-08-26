@@ -1,4 +1,4 @@
-// Strategy registry boot wiring.
+// Strategy registry boot wiring — the frameworks' own composition root.
 //
 // Extracted from labre-daemon.mts to break the circular dependency that
 // used to form when the recipe runner (loaded via the MCP tool handler in
@@ -6,11 +6,18 @@
 // `buildStrategyRegistry`. Both the daemon and the recipe handler now
 // depend on this leaf module instead.
 //
+// CH-23 moved it OUT of src/core/transport/ and into src/frameworks/, where it
+// belongs: composing every framework's strategies is a framework concern, not
+// a wire concern. The kernel keeps the empty `StrategyRegistry` class and knows
+// no framework; the transport keeps no framework knowledge at all; a lib-mode
+// consumer calls this function directly and gets a full registry with no
+// server anywhere in the graph.
+//
 // Side-effects-imports every framework's register function so adding a
 // new framework only means appending one import + one call below.
 
-import { StrategyRegistry } from "../registry/strategy-registry.mjs";
-import type { BaseStrategy } from "../ast/base-strategy.mjs";
+import { StrategyRegistry } from "#core/registry/strategy-registry.mjs";
+import type { BaseStrategy } from "#core/ast/base-strategy.mjs";
 import { registerEvolutionStrategies } from "#frameworks/wardley/evolution/registry.mjs";
 import { registerChainStrategies } from "#frameworks/wardley/chain/registry.mjs";
 import { registerIterationStrategies } from "#frameworks/wardley/iteration/registry.mjs";

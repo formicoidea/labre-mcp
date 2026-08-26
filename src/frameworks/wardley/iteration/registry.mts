@@ -5,7 +5,7 @@
 // are promoted here one at a time; each promotion deletes the matching
 // `.mock-strategy.mts` and its two lines in mocks-registry.mts.
 //
-// `strategy-registry-boot.mts` calls `registerIterationStrategies(coreRegistry)`
+// `#frameworks/registry-boot.mts` calls `registerIterationStrategies(coreRegistry)`
 // at boot, before the mocks fill the rest of the catalogue.
 
 import type { StrategyRegistry } from '#core/registry/strategy-registry.mjs';

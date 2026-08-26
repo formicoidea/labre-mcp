@@ -11,14 +11,14 @@ import type { ToolDefinition } from '#core/transport/mcp-handler.mjs';
 import { RunRecipeCallSchema } from '#schemas/run-recipe.schema.mjs';
 import { loadRecipe, getBundlePrompts } from '#core/recipe/recipe-loader.mjs';
 import { runRecipe, type JsonLabreEnvelope } from '#core/recipe/recipe-runner.mjs';
-import { buildStrategyRegistry } from '#core/transport/strategy-registry-boot.mjs';
+import { buildStrategyRegistry } from '#frameworks/registry-boot.mjs';
 import { attachArtifactWriter } from '#core/listeners/artifact-writer-listener.mjs';
 import { attachPostHogTelemetry } from '#core/listeners/posthog-telemetry-listener.mjs';
 import { getPostHogFlags } from '#lib/flags/state.mjs';
 import { createEventBus } from '#core/bus/event-bus.mjs';
 import { resolveContext } from './resolve-context.mjs';
 import { coerceJsonInput } from './coerce-json-input.mjs';
-import { SHIPPED_ROOT } from './shipped-root.mjs';
+import { SHIPPED_ROOT } from '#core/shipped-root.mjs';
 
 export interface RunRecipeResult {
   recipe: string;

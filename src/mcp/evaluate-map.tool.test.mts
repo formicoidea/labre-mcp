@@ -15,7 +15,7 @@ import { randomUUID } from 'node:crypto';
 import '#lib/prompts/init.mjs';
 import { EVALUATE_MAP_TOOL } from './evaluate-map.tool.mjs';
 import { EvaluateMapInputSchema } from '#schemas/evaluate-map.schema.mjs';
-import { SHIPPED_ROOT } from './shipped-root.mjs';
+import { SHIPPED_ROOT } from '#core/shipped-root.mjs';
 import type { EvaluateMapViaRecipeResult } from './evaluate-map-via-recipe.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
 

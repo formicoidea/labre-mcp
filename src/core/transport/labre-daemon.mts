@@ -18,19 +18,16 @@ import { parseAuthDoors } from "./auth-modes.mjs";
 import { registerBootHealthChecks } from "./boot-health-checks.mjs";
 import { runAllHealthChecks } from "#lib/degradation/index.mjs";
 import { buildSupabaseBundleSource } from "#lib/bundles/supabase-bundle-source.mjs";
-import { SHIPPED_ROOT } from "#mcp/shipped-root.mjs";
+import { SHIPPED_ROOT } from "#core/shipped-root.mjs";
 import { setPostHogFlags } from "#lib/flags/state.mjs";
 // Shared with the stdio entrypoint since CH-09 — telemetry belongs to the
 // process, not to the transport.
 import { selectPostHog } from "./boot-posthog.mjs";
 
 // Re-export so existing callers (tests, downstream tooling) can keep
-// importing `buildStrategyRegistry` / `buildBootRegistry` from this module
-// without churn. The tool registry is now built in the transport-agnostic
-// boot-tool-registry module, shared with the stdio entrypoint.
-export { buildStrategyRegistry } from "./strategy-registry-boot.mjs";
+// importing `buildBootRegistry` from this module without churn.
 export { buildBootRegistry } from "./boot-tool-registry.mjs";
-import { buildStrategyRegistry } from "./strategy-registry-boot.mjs";
+import { buildStrategyRegistry } from "#frameworks/registry-boot.mjs";
 import { buildBootRegistry } from "./boot-tool-registry.mjs";
 
 const DEFAULT_PORT = 6767;

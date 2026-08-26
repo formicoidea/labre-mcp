@@ -11,7 +11,7 @@ import { z } from 'zod';
 import type { ToolDefinition } from '#core/transport/mcp-handler.mjs';
 import { CommandCallSchema, type CommandResult } from '#schemas/command.schema.mjs';
 import { runCommand } from '#core/recipe/recipe-runner.mjs';
-import { buildStrategyRegistry } from '#core/transport/strategy-registry-boot.mjs';
+import { buildStrategyRegistry } from '#frameworks/registry-boot.mjs';
 import { attachArtifactWriter } from '#core/listeners/artifact-writer-listener.mjs';
 import { attachRunTelemetryIfConfigured } from '#core/listeners/posthog-telemetry-listener.mjs';
 import { createEventBus } from '#core/bus/event-bus.mjs';

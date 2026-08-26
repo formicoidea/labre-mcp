@@ -19,12 +19,12 @@
 import { EstimateEvolutionInputSchema } from '../schemas/estimate-evolution.schema.mjs';
 import { loadRecipe } from '#core/recipe/recipe-loader.mjs';
 import { runRecipe } from '#core/recipe/recipe-runner.mjs';
-import { buildStrategyRegistry } from '#core/transport/strategy-registry-boot.mjs';
+import { buildStrategyRegistry } from '#frameworks/registry-boot.mjs';
 import { attachArtifactWriter } from '#core/listeners/artifact-writer-listener.mjs';
 import { attachRunTelemetryIfConfigured } from '#core/listeners/posthog-telemetry-listener.mjs';
 import { createEventBus } from '#core/bus/event-bus.mjs';
 import { resolveContext } from './resolve-context.mjs';
-import { SHIPPED_ROOT } from './shipped-root.mjs';
+import { SHIPPED_ROOT } from '#core/shipped-root.mjs';
 
 export interface EstimateEvolutionViaRecipeResult {
   recipeRunId: string;

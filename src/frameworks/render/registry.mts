@@ -1,6 +1,6 @@
 // Framework registry for the `render` domain (real strategies).
 //
-// At daemon boot, `strategy-registry-boot.mts` calls
+// At daemon boot, `#frameworks/registry-boot.mts` calls
 // `registerRenderStrategies(coreRegistry)` to populate the shared registry.
 // Render strategies bridge the canonical WardleyMap to renderable artifacts
 // (SVG, OWM DSL, …) through the anti-corruption layer.

@@ -15,7 +15,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import "#lib/prompts/init.mjs";
 import { RecipeSchema } from "./recipe.schema.mjs";
-import { buildStrategyRegistry } from "#core/transport/labre-daemon.mjs";
+import { buildStrategyRegistry } from "#frameworks/registry-boot.mjs";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "..", "..", "..", "..");
 const recipesRoot = join(repoRoot, "recipes");
