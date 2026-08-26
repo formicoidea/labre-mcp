@@ -552,3 +552,221 @@ The schema category is **mechanical**: it mirrors `schema/`, which is already ex
 - **The catalogue is now the honest count.** `labre://methods` reports 86 registered methodIds — 25 real, 61 mock, 1 disabled — computed, not transcribed. The numbers in `AGENT.md` had drifted (85 / 19 / 66), and this is why they cannot drift again.
 - **DATA-ONLY is a limit, not a resting state.** Everything here is text this package ships. Three things a harness would reasonably want are deliberately absent and belong to C4 / CH-26: a prompt that can call a strategy, a resource that can be filtered by the caller, and any content loaded at run time from a bundle or a plugin. When that arbitration lands, it extends these registries; it does not replace them.
 - **i18n is not in scope.** This is a machine surface; it is English, like the rest of the code base's technical surface.
+## ARCH-29 — Plugin runtime security model: DATA-ONLY is load-bearing
+
+**Status:** 🔴 **Proposed — awaiting human arbitration.** Written by chantier
+**CH-26** (AI-harness audit, wave 4), first tranche: the security ADR, zero
+code. It instructs the human's **C4** arbitration (2026-08-25) — *"a hot plugin
+runtime, with two non-negotiable guards: (a) an explicit re-design of the
+`bundle = DATA-ONLY, no executable code` security model; (b) every plugin
+activation is a traced event with a pinned version, otherwise replay dies"* —
+and it does **not** render it. It builds on **ARCH-27** (a plugin runtime fills
+a kernel-owned registry composed by a delivery) and would amend **ARCH-08** and
+the bundle contract of [remote-admin-contracts.md](../technical/remote-admin-contracts.md)
+only if an executable option is retained. Full evidence, threat model and option
+analysis: [plugin-runtime-security.md](plugin-runtime-security.md).
+
+**Context:**
+
+Today the catalogue is compiled into the binary. `buildStrategyRegistry()` is
+six lines — five framework register calls plus the mocks behind
+`LABRE_DISABLE_MOCKS` (`src/frameworks/registry-boot.mts:39-50`) — and
+`mocks-registry.mts` is 61 hand-written imports and 61 hand-written
+registrations (`src/frameworks/mocks-registry.mts:15-79`, `:82-142`). The
+catalogue is **86 strategies: 25 real, 61 mocks** ([roadmap.md](roadmap.md); the
+CH-26 backlog says 66 — the tree says 61). CH-26 wants a framework to arrive
+without a daemon release.
+
+What stands in the way is not inertia, it is a rule that is doing real work.
+`src/schemas/strategy-bundle.schema.mts:3` states it in its first paragraph:
+*"A strategy bundle is a DATA-ONLY package (no executable code)"*. A bundle is
+`manifest.json` + one `recipe.json` + optional split prompt pairs, the manifest
+schema is `.strict()`, and the loader's only verbs are `JSON.parse`
+(`src/lib/bundles/bundle-loader.mts:81`) and a string read (`:96-107`) — no
+`import()`, no `Function`, no `vm`, no `eval`. Every step of every bundle recipe
+names a strategy the binary already contains (`:125-130`); every prompt override
+must shadow a shipped one (`:200`); a bundle may never shadow a shipped recipe
+(`:196-206`). A bundle **recombines and rewords**; it cannot add or replace a
+capability.
+
+Around that inert payload sits real hardening: the daemon holds no credential
+and fetches with the **caller's** JWT on a per-refresh client it discards
+(`src/lib/bundles/supabase-bundle-source.mts:107-121`, `:273-284`); every file
+is sha256-re-verified and one mismatch rejects the whole bundle (`:235-246`);
+the row is `service_role`-write-only against `authenticated:SELECT`
+(`src/lib/schema-contract/labre-mcp.contract.json`, `strategy_bundles.grants`);
+bad bundles degrade in isolation and the swap is atomic (`:317-347`).
+
+**Four threats DATA-ONLY currently makes impossible**, each of which an
+executable runtime reopens: **T1** arbitrary execution on the machine of a stdio
+user, whose trust boundary *is* the spawning process; **T2** exfiltration of the
+calling user's bearer — in a daemon that deliberately holds no privileged
+credential, the caller's JWT is the most valuable secret in the process, and the
+token that authorises loading a plugin is the token that plugin can steal;
+**T3** artefact corruption, including retroactive edits to the very record that
+would expose it; **T4** telemetry spoofing on an in-process bus, poisoning the
+experiment store that [mcp-data-store-position.md](mcp-data-store-position.md)
+makes the reason for having no experiments database.
+
+**ARCH-27's dispatch seam does not cover this, and must not be cited as if it
+did.** Stripping the auth nature before calling a handler means no bearer is *in
+the object a strategy receives*. It is a shape guarantee, and it holds because a
+strategy is code we wrote. In-process code we did not write reaches the same
+heap, the other in-flight `AuthContext`s and `process.env` regardless.
+
+**Two facts decide more than they look:**
+
+1. **The 61 mocks are 61 copies of one program.** Every one is a 44-line file
+   ignoring its input and returning `{ mock: true, methodId }` plus a
+   `capturedAt`; all 61 match that `result` line byte for byte. They are **100 %
+   expressible as data**. Whatever a hot runtime is for, it is not for them.
+2. **Nothing records which code produced an artefact.** `ArtifactBody`
+   (`src/core/persistence/artifact-writer.mts:16-28`) carries no version, no
+   hash, no plugin list, and `PipelineEvent.phase`
+   (`src/core/bus/event.schema.mts:14`) has four step phases and no lifecycle
+   phase. While the code is the binary, provenance is implicit in the npm
+   version. The moment a plugin can change what a methodId *does* without the
+   daemon version moving, artefacts become unattributable and **I3 dies
+   quietly** — a replay against different code has no way to notice. I3's known
+   hole is already here: `capturedAt` escapes the injected `RunClock`
+   ([recipes.md](recipes.md) § I3), and `new Date()` appears 61 times in the
+   mocks and 26 times in real framework code.
+
+Also recorded because an executable option would inherit it:
+**`manifest.permissions` is decor.** The enum
+`['llm','bigquery','network','render']`
+(`src/schemas/strategy-bundle.schema.mts:39`) is read in exactly one place, to
+check that a bundle declaring prompts also declares `llm`
+(`src/lib/bundles/bundle-loader.mts:143-147`). Nothing enforces `network`.
+Harmless for inert data; actively misleading on an executable payload.
+
+**Options considered:**
+
+**(a) Extended status quo — richer DATA-ONLY bundles.** Declarative fixture
+strategies (methodId → constant payload, which covers all 61 mocks exactly),
+declarative config strategies, recipe sets, richer prompt layering. Attack
+surface added: ~none — the parser widens, nothing executes, and today's seal and
+isolation keep holding *by construction*. Cost: low, mostly one-off, and it
+closes an I3 leak for free (a fixture's `capturedAt` comes from the injected
+clock). **What it forbids:** genuinely new computation. A framework plugin under
+(a) is a framework whose logic we already shipped.
+
+**(b) Minimal in-house loader.** Signed, hash-pinned JS modules via dynamic
+`import()`, capabilities injected rather than ambient. This must be sold
+honestly: an import allowlist **is not a sandbox** — an imported ES module
+shares the realm and reaches `globalThis`, `process` and every live object graph
+including other requests' auth. **(b) buys supply-chain control and essentially
+no runtime containment.** Cost: high and recurring — a signing key and its
+custody (nothing in either repo signs anything today), verification, revocation,
+pinning, activation events, and `permissions` promoted from decor to an enforced
+gate. Proportionate **iff** plugins are first-party only.
+
+**(c) Cordis.** Evaluated on its own documentation, not by reputation. It is a
+"meta-framework of spatiotemporal composability": `Context` as both DI scope and
+lifecycle manager, demand-driven injection (a plugin declares required services
+and does not run until they exist), effect tracking that unwinds everything a
+plugin registered on dispose, and HMR. That lifecycle half is genuinely the part
+`StrategyRegistry` lacks — it throws on duplicates and has no `unregister`
+(`src/core/registry/strategy-registry.mts:44-46`). But its README and reference
+docs mention **no sandboxing, isolation, permissions, signing, integrity or
+trust boundary**: a Cordis plugin is ordinary Node code with full host
+privileges. **Cordis is a composition framework, not a sandbox** — it does not
+claim otherwise; the claim would be ours. It also states its API is not yet
+stable and may change without notice, and adopting it replaces the six-line
+composition root at `src/frameworks/registry-boot.mts:39` with a third-party
+`Context`. It solves a problem we do not have yet and none of the problem we do,
+and it does not remove (b)'s signing work — it adds a dependency on top of it.
+
+**Containment is an orthogonal axis, not a fourth option** — needed by both (b)
+and (c), provided by neither. Worker threads give a separate realm (killing the
+direct form of T2) but keep `fs` / `net` / `child_process`. Node's `--permission`
+model is process-wide, so it cannot express "the kernel writes artefacts, the
+plugin does not" — exactly the distinction T3 needs. V8 isolates are the first
+real boundary and the first real cost (native addon, serialisation, a
+security-critical bridge we would own). **The rule worth writing down: the
+containment requirement is set by who may author a plugin, not by what a plugin
+does.**
+
+**The two guards, as requirements a test can fail on:**
+
+**G1 — activation is traced, version pinned.** `PipelineEvent` gains a
+`plugin-activated` phase carrying `{ id, version, contentHash }`; `ArtifactBody`
+gains a `codeProvenance` block, **present and empty** for a binary-only run
+rather than absent; **replay refuses** when an artefact's provenance names a
+plugin hash the process does not have loaded, failing loudly with both hashes
+instead of replaying against different code; and a plugin receives the run clock
+— no `capturedAt` from its own `new Date()`.
+
+**G2 — the model is written before the first executable byte.** No module
+reachable from a plugin path gains `import()` / `Function` / `vm` / `eval` / an
+isolate binding before this ADR's status moves off 🔴, enforced by a grep-level
+gate in the `check:boundaries` family. `manifest.permissions` is either enforced
+or deleted. Revocation goes through the existing CH-18 `disabled` guard
+(`src/core/registry/strategy-registry.mts:58-76`), the kernel's single
+resolution point — one refusal channel, not two.
+
+**Recommendation (proposed, not decided):**
+
+**Take (a) now, and make (b) — never (c) alone — conditional on a named
+requirement (a) cannot meet.** Three reasons, in order of weight:
+
+1. **The evidence says the near-term work does not need code.** All 61 mocks are
+   data. Migrating them retires `mocks-registry.mts` *and* `LABRE_DISABLE_MOCKS`
+   *and* 61 stray `new Date()` calls, which strengthens I3 rather than
+   endangering it. That is the best cost/benefit tranche in CH-26 and it is
+   available under every option, so it should be done first regardless.
+2. **The cost of (b)/(c) is a permanent obligation, not a build.** DATA-ONLY is
+   not one control; it is a categorical argument — the payload is inert,
+   therefore no control is needed. Replacing it means owning a set of controls
+   that must each stay green forever, in the most exposed process we run.
+3. **Cordis is the wrong shape of answer.** It would be a serious candidate for
+   the *lifecycle* problem if we already had a safe execution story. We do not,
+   and it does not provide one.
+
+**Switching criteria — what forces an executable option:** name **one concrete
+strategy** a framework needs that (a) cannot express — a parser for a format we
+do not parse, an estimator with real arithmetic, a renderer we do not have. Not
+"a framework might one day want to compute": one methodId, one behaviour. If
+that exists, go to **(b) plus containment sized by authorship**: first-party
+only → signing, pinning, provenance, worker-thread isolation; third-party ever →
+an isolate or a separate process, and nothing weaker described as if it were
+equivalent. (c) enters only if plugin *lifetimes* become genuinely complex —
+overlapping, interdependent, hot-swapped — and only on top of a settled
+execution model, never as one.
+
+**Migration path if an executable option is retained:** scoped registration plus
+owner-aware revocation through the existing `disabled` channel; mocks to data
+first; frameworks last, one at a time, and only after G1's provenance and replay
+tests are green on a real framework end to end; the runtime plugs at the ARCH-27
+seam and `pnpm check:boundaries` stays on an **empty** baseline — a new entry is
+a request to reopen ARCH-27. Details in
+[plugin-runtime-security.md](plugin-runtime-security.md) § 6.
+
+**What this ADR does NOT decide:**
+
+It proposes; the human arbitrates. It does not choose (a), (b) or (c) — the
+recommendation above is an argument, not a decision. It does not authorise any
+code: the status is 🔴 precisely so that G2 has something to point at. It does
+not settle **who may author a plugin**, which deployment must support hot
+plugins (stdio carries T1 to end-user machines; HTTP-only shrinks the problem),
+what "framework plugin" means for EDGY / Cynefin / BPMN, or whether a signing
+key is operationally acceptable — four questions listed in
+[plugin-runtime-security.md](plugin-runtime-security.md) § 7 whose answers set
+most of the cost. Until the status moves, CH-26 ships the DATA-ONLY tranches
+only.
+
+**Consequences (of recording it, whatever is arbitrated):**
+
+- **The DATA-ONLY rule stops being folklore.** It was one comment line in a
+  schema file. It is now four named threats with the code paths that make them
+  impossible today — so a future PR that weakens it has to argue against
+  something.
+- **Two invariants are documented as red before CH-26 touches them.** Artefacts
+  carry no code provenance and `PipelineEvent` has no lifecycle phase. Both are
+  survivable while the code is the binary; both are prerequisites, not
+  follow-ups, the moment it is not.
+- **`manifest.permissions` is on the record as unenforced.** Whatever is
+  decided, it must be enforced or removed. It will not be quietly inherited.
+- **The mocks-to-data tranche is unblocked.** It needs no arbitration, improves
+  determinism, and deletes an env flag. It is the CH-26 work that can start
+  while the human reads this.
