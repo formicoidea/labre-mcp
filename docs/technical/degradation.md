@@ -29,16 +29,16 @@ Tout est expose via `src/lib/degradation/index.mts` :
 
 ## Convention obligatoire
 
-**L'enveloppement est central, au dispatch.** `mcp-handler.dispatch` (`src/core/transport/mcp-handler.mts`, branche `tools/call`) enveloppe **chaque** handler dans `withMcpDegradation(toolName, …)` — les handlers ne s'auto-wrappent **pas**. Donc **toute** reponse `tools/call` est un `Degradable<T>` (`{ result, degraded, degradationEvents }`) ; le payload metier se lit sous `result.result`. Par ailleurs :
+**L'enveloppement est central, au dispatch.** `mcp-handler.dispatch` (`src/transport/mcp-handler.mts`, branche `tools/call`) enveloppe **chaque** handler dans `withMcpDegradation(toolName, …)` — les handlers ne s'auto-wrappent **pas**. Donc **toute** reponse `tools/call` est un `Degradable<T>` (`{ result, degraded, degradationEvents }`) ; le payload metier se lit sous `result.result`. Par ailleurs :
 
 - Tout appel a un service externe (LLM, BigQuery, web search, fichier reseau) DOIT passer par `tryDegradeAmbient` (pas de `try { ... } catch {}` muet) — le collector ambient est pose par le dispatch (AsyncLocalStorage).
-- Les health-checks sont enregistres au boot via `registerBootHealthChecks()` (`src/core/transport/boot-health-checks.mts`) et executes par le daemon ; toute nouvelle dependance externe y ajoute son check (`registerHealthCheck`). Verifs de presence config/env uniquement (pas de reseau).
+- Les health-checks sont enregistres au boot via `registerBootHealthChecks()` (`src/transport/boot-health-checks.mts`) et executes par le daemon ; toute nouvelle dependance externe y ajoute son check (`registerHealthCheck`). Verifs de presence config/env uniquement (pas de reseau).
 - Toute strategie / module appele depuis un outil peut acceder au collector via `getCurrentCollector()` — pas besoin de threader le collector dans les signatures.
 
 ## Cycle de vie d'une invocation
 
 ```
-client MCP --POST /mcp tools/call--> daemon (src/core/transport/)
+client MCP --POST /mcp tools/call--> daemon (src/transport/)
                               |
                               v
                        withMcpDegradation(toolName, handler)

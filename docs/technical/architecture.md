@@ -8,19 +8,19 @@
 
 ## Vue d'ensemble
 
-labre-mcp est un serveur MCP exposé via un **daemon HTTP** (`src/core/transport/labre-daemon.mts`)
+labre-mcp est un serveur MCP exposé via un **daemon HTTP** (`src/mcp/labre-daemon.mts`)
 qui écoute sur `127.0.0.1:6767`. Le protocole applicatif est JSON-RPC 2.0 sur `POST /mcp`
 (méthodes `initialize`, `ping`, `tools/list`, `tools/call`, `notifications/*`), avec en plus
 `GET /health` et `GET /version`. Le démarrage se fait via `pnpm mcp`.
 
 Au boot, le daemon construit deux registres :
 
-- **Registre d'outils MCP** (`buildBootRegistry()` dans `labre-daemon.mts`) — 3 outils :
+- **Registre d'outils MCP** (`buildMcpToolRegistry()` dans `src/mcp/tool-registry.mts`) — 3 outils :
   `__ping__` (smoke), `estimateEvolution` (recette `estimate-component-evolution`), et `runCommand`
   (invocation directe de n'importe quel methodId → `CommandResult` + enveloppe). Le câblage des
   recettes multi-étapes restantes (evaluateMap, generateValueChain) est suivi en
   [roadmap.md](../architecture/roadmap.md) (item B3).
-- **Registre de stratégies** (`src/core/transport/strategy-registry-boot.mts`) — 86 stratégies
+- **Registre de stratégies** (`src/frameworks/registry-boot.mts`) — 86 stratégies
   au boot : 25 réelles + 61 mocks. `LABRE_DISABLE_MOCKS=1` ne charge que les 25 réelles.
 
 Chaque outil MCP résout son traitement via une **recipe** (`recipes/<domain>/<tool>/*.recipe.json`)
@@ -32,7 +32,7 @@ qui orchestre des appels de stratégies par `methodId`. Les `methodId` suivent l
 ```mermaid
 flowchart TD
     Daemon["labre-daemon.mts (HTTP)\nPOST /mcp : initialize | ping | tools/list | tools/call | notifications/*"]
-    Daemon --> Tools["buildBootRegistry()\n__ping__ + estimateEvolution"]
+    Daemon --> Tools["buildMcpToolRegistry()\n__ping__ + estimateEvolution"]
     Tools --> Recipe["Recipe runner\nrecipes/<domain>/<tool>/*.recipe.json"]
     Recipe --> Reg["Strategy registry\n(methodId 5 segments → stratégie)"]
 
@@ -54,7 +54,7 @@ réponse `tools/call` est un `Degradable<T>` (`{ result, degraded, degradationEv
 métier se lit sous `result.result`. Un `DegradationCollector` ambient (AsyncLocalStorage) est posé par
 le dispatch, et `tryDegradeAmbient` y route les échecs d'appels externes (BigQuery / LLM / web search).
 Les **health-checks** de présence config/env sont enregistrés et exécutés au boot
-(`src/core/transport/boot-health-checks.mts`), loggés sur stderr. Voir [degradation.md](degradation.md).
+(`src/transport/boot-health-checks.mts`), loggés sur stderr. Voir [degradation.md](degradation.md).
 
 ## Parallélisation des appels indépendants
 

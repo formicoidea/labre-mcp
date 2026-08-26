@@ -184,7 +184,7 @@ User files take precedence by name. Same merge model applies to `llm.config.json
 
 ## ARCH-14 — Daemon HTTP localhost transport, SaaS-ready by design
 
-**Status:** Accepted
+**Status:** Amended by ARCH-27 — the transport decision itself stands (HTTP daemon on localhost, stdio alongside it), but the daemon is no longer a kernel module: it moved out of `src/core/transport/` to `src/transport/`, it no longer builds its own tool registry, and MCP over HTTP is now one delivery among possible others. See ARCH-27.
 
 **Context:** The current MCP server runs per-project via stdio. This conflicts with using the Claude Agent SDK (which spawns sub-processes that collide with active Claude Code sessions). It also makes the trajectory to a hosted multi-tenant service expensive (different transport, different state model).
 
@@ -196,7 +196,7 @@ User files take precedence by name. Same merge model applies to `llm.config.json
 
 ## ARCH-15 — `process.cwd()` forbidden at runtime; context propagated explicitly
 
-**Status:** Accepted
+**Status:** Amended by ARCH-27 — the invariant stands unchanged (no `process.cwd()` at request time; every call carries its context), but the context is no longer ONE object carrying three natures. The kernel receives the business nature plus a minimal `userId`; the auth nature (role, raw bearer, issuer provenance) lives at the delivery seam and is stripped by the dispatch. See ARCH-27, third cut.
 
 **Context:** A daemon serves multiple projects. Implicit `process.cwd()` resolution is meaningless and dangerous.
 
@@ -425,3 +425,65 @@ There is also a hard operational constraint that shapes the options: **the Supab
 - **Two things stay outside the mechanical guard**, both named in the contract's `notInContract`: the `strategy-bundles` Storage bucket and its policy on `storage.objects` (Supabase-managed schema — the same boundary labre's own `grants_coherence.sql` respects), and the PostgREST **"Exposed schemas"** dashboard setting, which is not a schema object and which migration `20260711130000` still flags as manual on prod. Neither can be introspected as part of `labre_mcp`; both will break the daemon if changed.
 - **`anon` retains `REFERENCES`, `TRIGGER` and `TRUNCATE` on `strategy_bundles`** — residue of the `public` defaults the table was relocated from. None grants a read or a write, and the contract deliberately does not freeze them; recorded here so the next reader does not rediscover it as a finding.
 - labre gains a **pointer, not a rule enforced from outside**: a paragraph proposed for its `CLAUDE.md` or docs saying that `labre_mcp` is labre-mcp's field and carries a contract elsewhere. Where that paragraph lands is the human's call — nothing was written into labre by this change.
+
+---
+
+## ARCH-27 — The façade: labre-mcp is a kernel with deliveries; MCP is one of them
+
+**Status:** ✅ **Applied — human arbitration C1, option A, 2026-08-25.** Executed by chantier CH-23 (AI-harness audit, wave 4). This ADR records an arbitration already rendered; it does not ask for one. It amends **ARCH-14** (which placed the transport inside `src/core/`) and **ARCH-15** (which defined a single `RequestContext` carrying auth), and it lifts the CH-06 import-boundary baseline to **zero entries**.
+
+**Context:**
+
+The audit's invariant **I2** — "transport state stays separate from business state" — shipped red, and the guard `scripts/check-import-boundaries.mts` said so out loud: **seven** tolerated crossings enumerated in `scripts/import-boundaries-baseline.json`. They were not seven accidents. They were one architectural fact seen from seven angles: **the transport lived inside the kernel**, at `src/core/transport/` (ARCH-14), and its boot wiring reached UP into `src/mcp/` — in VALUE, not in type — to build its tool registry.
+
+Four consequences, each independently costly:
+
+1. **The kernel could not be embedded.** Importing anything from `src/core/` risked dragging in a Hono server, an auth middleware and a JWKS client. "Run this strategy" was not callable except through a JSON-RPC `tools/call`.
+2. **The wire knew the product.** `boot-tool-registry.mts` named five MCP tool descriptors. Swapping or adding a delivery meant editing the transport.
+3. **`RequestContext` carried three natures at once** — business (project root, session), transport (which client), auth (user id, role, and a raw verified bearer). A geometry strategy asking for its project root received, in the same object, a live user JWT.
+4. **The runner made billing calls.** `core/recipe/recipe-runner.mts` called `assertQuotaOk()` before the first step and `reportUsageToLedger()` after the last: two Supabase round-trips hard-wired into the kernel's execution path, which made it un-runnable offline and tied it to labre's billing schema.
+
+The human's arbitration (2026-08-25, C1 option A) states the product reason: *labre-mcp is a product in its own right, consumable independently by another harness (Claude Code, a CLI, third-party agents), and also consumable by labre's own harness.* MCP is therefore **a delivery, not an identity**, and the lib mode has to open.
+
+**Options considered:**
+
+**(a) Leave it, document it.** The baseline already documented it. Rejected for the same reason ARCH-26 rejected its own status quo: an audit finding that ends in a paragraph nobody executes has changed nothing — and CH-24 (the prompts/resources costume) and CH-26 (the plugin runtime) both have to be BUILT on this seam. Cutting it after they land costs strictly more.
+
+**(b) Extract the kernel into a separate package.** Cleanest boundary, since a published package cannot import what it does not depend on. Rejected for now: two packages means two versions, two release trains and a lockstep bump on every kernel change, for a repository whose whole surface is six tools. The directory boundary plus a mechanical guard buys most of the invariant at none of that cost, and the split stays available the day an external consumer actually vendors the kernel alone.
+
+**(c) One package, three layers, guarded mechanically.** — **chosen (= arbitration A).**
+
+**Decision:**
+
+The repository is three layers and the dependency points ONE way — **delivery → transport → kernel**:
+
+| Layer | Holds | May import |
+| --- | --- | --- |
+| `src/core/` (+ `src/frameworks/`, `src/lib/`, `src/schemas/`) | registry, recipe runner, bus, AST contract, context, persistence, the strategy catalogue | itself |
+| `src/transport/` | HTTP daemon, stdio server, JSON-RPC dispatch, auth doors, boot health checks, tool telemetry | the kernel |
+| `src/mcp/` | the six MCP tool descriptors, the tool composition, the metering policy, the two composition roots | the transport and the kernel |
+
+**Four cuts:**
+
+1. **The transport leaves the kernel.** `src/core/transport/` → `src/transport/`, reached through a new `#transport/*` subpath alias. The kernel no longer contains a server.
+
+2. **The boot dependency is inverted.** `boot-tool-registry.mts` becomes `src/mcp/tool-registry.mts` (`buildMcpToolRegistry`) and is the ONLY module that names a tool. The registry CONTRACT (`ToolDefinition`, `ToolRegistry`) moves into the kernel at `src/core/registry/tool-registry.mts`; `startHttpDaemon` and `startStdioServer` become functions taking an already-filled registry. Two thin composition roots — `src/mcp/labre-daemon.mts` and `src/mcp/labre-stdio.mts` — are where the tool surface, the framework catalogue and the wire meet, and they are the `bin` and the npm scripts. Two supporting relocations fall out: `SHIPPED_ROOT` (a packaging fact, not an MCP fact) to `src/core/shipped-root.mts`, and `buildStrategyRegistry` to `src/frameworks/registry-boot.mts` — composing frameworks is a framework concern, so the kernel now knows no framework either.
+
+3. **`RequestContext` is split by nature.** The kernel's type keeps the business fields plus ONE minimal identity, `userId` — an opaque id for quota attribution, RLS scoping and telemetry bucketing. The auth nature (`userId`, `role`, `token`, `source`) lives at the delivery seam in `src/transport/auth-context.mts` as `AuthContext` / `AuthenticatedContext`; `withAuth` is its single writer and `toBusinessContext` its single reader inward. **`dispatch` IS the seam**: it strips the auth nature before calling a handler, so no bearer can reach a strategy, an artefact or a log — it is not in the object they receive. `auth.token` and `auth.source` are **kept** (human decision, 2026-08-26): they have had no reader since slice B4, but whether the daemon should stop retaining a verified bearer is an AUTH decision (red zone, CODEOWNERS), not a side effect of a layering refactor. What changes is their blast radius. A hardening falls out for free: `extractContext` now drops a client-supplied `userId`, so identity can only come from a verified credential.
+
+4. **Quota and ledger leave the runner.** `RunHooks` (`beforeRun` / `onUsage`) is a seam the runner announces and never fills. labre's policy — the same two calls, unchanged — lives in `src/mcp/metering-hooks.mts` and is passed by the five MCP tool paths. Nothing changes on the wire (both calls were already no-ops without a caller JWT, and that is exactly the population reaching them); what changes is who decides.
+
+**Lib mode** is the deliverable this buys. `src/index.mts` exposes the kernel — catalogue builder, `runCommand` / `runRecipe` with the JSON-labre envelope, recipe loader and schema, strategy and context contracts, tool registry, event bus, artefact writer — and deliberately exposes no daemon, no dispatch and no tool descriptor.
+
+**Two mechanical guards, both required to stay green:**
+
+- `pnpm check:boundaries` walks **both** `src/core/` and `src/transport/`. Its three rules are now unconditional — core imports neither transport nor mcp; transport does not import mcp — and `import-boundaries-baseline.json` is **EMPTY**. Since the guard also fails on a baseline entry matching nothing (rule STALE), neither an unnoticed violation nor a stale exemption survives a run. **A new baseline entry is a request to re-open this ADR.**
+- `src/lib-mode.test.mts` walks the transitive import graph of `src/index.mts` and fails on any file under `src/transport/` or `src/mcp/`, then builds the full catalogue and runs a deterministic command with `fetch` replaced by a throwing stub. A daemon that merely happens not to be started is not a library; a daemon that is not reachable is.
+
+**Consequences:**
+
+- **CH-24 (prompts/resources) and CH-26 (the plugin runtime) build on this seam**, not beside it. A prompt/resource surface is another set of entries in a kernel-owned registry composed by a delivery; a plugin runtime fills that registry at load time. Neither needs to touch `src/core/` or `src/transport/`.
+- **Adding a delivery is writing one file.** A CLI, an in-process embedding for labre's own harness, or a different protocol composes its own registry and calls `startHttpDaemon` / `startStdioServer` / nothing at all.
+- **The delivery-level integration tests moved with their subject.** The three suites that exercise the MCP surface OVER a wire (`http-transport`, `stdio-transport`, `boot-parser-registration`) now live in `src/mcp/`; the transport keeps the unit tests that need no tool to run (auth doors, JWKS, api-key, health checks). That is not cosmetic — it is what makes the TRANSPORT_TO_MCP rule true for tests as well as for production code.
+- **The kernel is still not a published package** (option (b) stays on the table). The boundary is a directory boundary held by a guard, not by npm. The reopening trigger is an external consumer that needs to vendor the kernel without the deliveries.
+- **`src/lib/` is still not under `src/core/`** (roadmap B1) and `_legacy/` strategies have still not been extracted (ARCH-23). CH-23 deliberately did not touch either: they are orthogonal to the façade, and bundling them would have made a layering change unreviewable.

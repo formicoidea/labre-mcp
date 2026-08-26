@@ -36,7 +36,7 @@ Copier `llm.config.example.json` vers `llm.config.json` et choisir un profil (vo
 ## Démarrer le daemon
 
 ```bash
-pnpm run dev           # tsx src/core/transport/labre-daemon.mts
+pnpm run dev           # tsx src/mcp/labre-daemon.mts
 ```
 
 Sortie attendue sur **stderr** :
@@ -49,7 +49,7 @@ Sortie attendue sur **stderr** :
   - …
 ```
 
-`Ctrl+C` pour stopper. En prod : `pnpm run build && pnpm run mcp:prod` (`node dist/core/transport/labre-daemon.mjs`).
+`Ctrl+C` pour stopper. En prod : `pnpm run build && pnpm run mcp:prod` (`node dist/mcp/labre-daemon.mjs`).
 
 ## Smoke test (transport — sans LLM, gratuit)
 
@@ -148,9 +148,9 @@ Voir [notifications.md](functional/notifications.md).
 
 | Script | Commande | Description |
 |---|---|---|
-| `dev` / `mcp` | `tsx src/core/transport/labre-daemon.mts` | Démarre le daemon HTTP (dev, hot des `.mts`) |
+| `dev` / `mcp` | `tsx src/mcp/labre-daemon.mts` | Démarre le daemon HTTP (dev, hot des `.mts`) |
 | `build` | `tsc` | Compile `src/**/*.mts` → `dist/**/*.mjs` |
-| `mcp:prod` | `node dist/core/transport/labre-daemon.mjs` | Lance le bundle compilé |
+| `mcp:prod` | `node dist/mcp/labre-daemon.mjs` | Lance le bundle compilé |
 | `typecheck` | `tsc --noEmit` | Vérification TS stricte |
 | `test` | `tsx --test "src/**/*.test.mts"` | Tests (⚠️ certains appellent un vrai LLM — voir [AGENT.md](../AGENT.md) hard rule #9) |
 

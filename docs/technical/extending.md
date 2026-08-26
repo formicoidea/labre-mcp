@@ -62,7 +62,7 @@ import { MaStrategy } from './_legacy/write/strategies/capacity/ma-strategy.mjs'
 registry.register(MaStrategy.method, MaStrategy);
 ```
 
-Le boot (`src/core/transport/strategy-registry-boot.mts`) appelle chaque
+Le boot (`src/frameworks/registry-boot.mts`) appelle chaque
 `registerXxxStrategies()` au démarrage du daemon.
 
 ### Stratégie mock (placeholder I/O)
@@ -202,13 +202,14 @@ export async function handleMonOutil(args: Record<string, unknown>): Promise<unk
 
 > La plupart des stratégies n'ont **pas besoin** d'un outil MCP dédié : elles sont déjà invocables par methodId via l'outil générique `runCommand`. Ne créez un outil dédié que pour un flux à API propre (paramètres spécifiques, recette multi-étapes).
 
-Le câblage d'un outil MCP se fait dans `buildBootRegistry()`, dans
-`src/core/transport/labre-daemon.mts` :
+Le câblage d’un outil MCP se fait dans `buildMcpToolRegistry()`, dans
+`src/mcp/tool-registry.mts` :
 
 ```typescript
-import { MON_OUTIL_TOOL } from '#mcp/mon-outil.tool.mjs';
+import { ToolRegistry } from '#core/registry/tool-registry.mjs';
+import { MON_OUTIL_TOOL } from './mon-outil.tool.mjs';
 
-export function buildBootRegistry(): ToolRegistry {
+export function buildMcpToolRegistry(): ToolRegistry {
   const registry = new ToolRegistry();
   // ... __ping__, ESTIMATE_EVOLUTION_TOOL, RUN_COMMAND_TOOL ...
   registry.register(MON_OUTIL_TOOL);  // Ajouter ici

@@ -1,8 +1,10 @@
 # Purpose of this code base
 
-labre-mcp is an MCP (Model Context Protocol) server that helps the user apply practice frameworks — Wardley Maps first, climates / doctrines / gameplays / cycle next. The targeted horizon for the Wardley framework is the full strategic study cycle (9 phases: prompt → chain → evolution → climates → invest → doctrine → orientation → strategy → close). The server exposes MCP tools backed by a pluggable registry of strategies orchestrated by the kernel recipe runner.
+labre-mcp helps the user apply practice frameworks — Wardley Maps first, climates / doctrines / gameplays / cycle next. The targeted horizon for the Wardley framework is the full strategic study cycle (9 phases: prompt → chain → evolution → climates → invest → doctrine → orientation → strategy → close). It is a **kernel with deliveries**: a pluggable registry of strategies orchestrated by a recipe runner, served today over MCP (HTTP daemon + stdio) and embeddable directly as a library.
 
-> **V1 status — kernel posed, post-audit refactor in progress.** Architectural decisions are recorded as ADRs in [docs/architecture/decisions.md](/labre-mcp/docs/architecture/decisions.md) (ARCH-01 to ARCH-26). Strategy classes for Wardley currently live under `src/frameworks/wardley/{chain,evolution}/_legacy/` per ARCH-23 (in-place migration). Physical extraction to the canonical `<tool>/<command>/<subdomain>/` layout is scheduled for V1.5 cleanup. There is **one** strategy registry — the core `StrategyRegistry`; the parallel `loadStrategies()` filesystem walker under `_legacy/` was retired in CH-18. The repository directory will eventually be renamed `labre-mcp` (the npm package name and `.mcp.json` server name are already aligned). **Current surface:** the daemon wires **6 MCP tools** — `estimateEvolution`, `generateValueChain` (recipe `wardley:map:generate`), `evaluateMap` (recipe `wardley:map:evaluate-map`), `runCommand` (direct invocation of any 5-segment methodId → `CommandResult` + JSON-labre envelope), `runRecipe` (invocation of any multi-step recipe by `<domain>:<tool>:<name>` ref → JSON-labre envelope), and `__ping__` — and registers **85 strategies (19 real / 66 mock)**. _(real count rises as mocks are promoted; see roadmap B4/B8.)_ The full gap to the target is tracked in [roadmap.md](/labre-mcp/docs/architecture/roadmap.md).
+> **MCP is a DELIVERY, not the identity (ARCH-27, applied 2026-08-26).** The repository is three layers and the dependency points one way — **delivery → transport → kernel**: `src/mcp/` (tool descriptors + the two composition roots) → `src/transport/` (HTTP daemon, stdio server, JSON-RPC dispatch, auth doors) → `src/core/` + `src/frameworks/` + `src/lib/` (registry, recipe runner, bus, contracts, strategies). The kernel names no wire and no tool; the transport names no tool. Two mechanical guards hold it: `pnpm check:boundaries` (baseline **must stay empty**) and `src/lib-mode.test.mts` (the lib entry's import graph must reach neither `src/transport/` nor `src/mcp/`).
+
+> **V1 status — kernel posed, post-audit refactor in progress.** Architectural decisions are recorded as ADRs in [docs/architecture/decisions.md](/labre-mcp/docs/architecture/decisions.md) (ARCH-01 to ARCH-27). Strategy classes for Wardley currently live under `src/frameworks/wardley/{chain,evolution}/_legacy/` per ARCH-23 (in-place migration). Physical extraction to the canonical `<tool>/<command>/<subdomain>/` layout is scheduled for V1.5 cleanup. There is **one** strategy registry — the core `StrategyRegistry`; the parallel `loadStrategies()` filesystem walker under `_legacy/` was retired in CH-18. The repository directory will eventually be renamed `labre-mcp` (the npm package name and `.mcp.json` server name are already aligned). **Current surface:** the daemon wires **6 MCP tools** — `estimateEvolution`, `generateValueChain` (recipe `wardley:map:generate`), `evaluateMap` (recipe `wardley:map:evaluate-map`), `runCommand` (direct invocation of any 5-segment methodId → `CommandResult` + JSON-labre envelope), `runRecipe` (invocation of any multi-step recipe by `<domain>:<tool>:<name>` ref → JSON-labre envelope), and `__ping__` — and registers **85 strategies (19 real / 66 mock)**. _(real count rises as mocks are promoted; see roadmap B4/B8.)_ The full gap to the target is tracked in [roadmap.md](/labre-mcp/docs/architecture/roadmap.md).
 
 
 # Architecture
@@ -10,7 +12,7 @@ labre-mcp is an MCP (Model Context Protocol) server that helps the user apply pr
 Read these first if you're new to the project:
 
 - [ast-schema.md](/labre-mcp/docs/architecture/ast-schema.md) — **pivot grammar** (5-segment methodIds, open command vocabulary, JSON-labre artefact, strategy contract). Authoritative: supersedes/amends several ADRs (ARCH-25).
-- [decisions.md](/labre-mcp/docs/architecture/decisions.md) — 26 ADRs (ARCH-01..26) that ground every other decision. ARCH-26 (accepted 2026-08-26) settles who owns the `labre_mcp` Postgres schema: the migration chain stays in labre, this repo holds the mechanical schema contract
+- [decisions.md](/labre-mcp/docs/architecture/decisions.md) — 27 ADRs (ARCH-01..27) that ground every other decision. **ARCH-27** (applied 2026-08-26) is the façade: three layers, the four cuts, and what stays at the delivery. ARCH-26 settles who owns the `labre_mcp` Postgres schema: the migration chain stays in labre, this repo holds the mechanical schema contract
 - [roadmap.md](/labre-mcp/docs/architecture/roadmap.md) — what is **not yet** done (lib/→core, `_legacy/` extraction, tool wiring, mocks→real). Read this to avoid coding against a structure that does not exist yet.
 - [strategies.md](/labre-mcp/docs/architecture/strategies.md) — registry, BaseStrategy contract, result format with signals/reasoning/insights
 - [recipes.md](/labre-mcp/docs/architecture/recipes.md) — recipe schema, listeners, auto-fanout, shipped+override loader
@@ -24,27 +26,39 @@ Read these first if you're new to the project:
 ```
 labre-mcp/
 ├── src/
-│   ├── core/                  # KERNEL — survives across frameworks
-│   │   ├── registry/      strategy-registry                          (ARCH-03)
-│   │   ├── recipe/        recipe-runner, recipe.schema, recipe-loader (ARCH-06/07/08)
+│   ├── index.mts              # LIB MODE — the kernel's public surface, no server (ARCH-27)
+│   │
+│   ├── core/                  # KERNEL — survives a change of framework AND of wire
+│   │   ├── registry/      strategy-registry, tool-registry (the seam)  (ARCH-03/27)
+│   │   ├── recipe/        recipe-runner (+ RunHooks), recipe.schema, recipe-loader (ARCH-06/07/08)
 │   │   ├── bus/           event-bus (RxJS Subject)                   (ARCH-10)
 │   │   ├── ast/           base-strategy                              (ARCH-22)
-│   │   ├── context/       request-context                            (ARCH-15)
-│   │   ├── transport/     labre-daemon, http-server, mcp-handler, auth (ARCH-14)
+│   │   ├── context/       request-context — BUSINESS nature + userId  (ARCH-15/27)
 │   │   ├── listeners/     artifact-writer-listener (core)            (ARCH-12)
-│   │   └── persistence/   artifact-writer, project-id                (ARCH-12)
+│   │   ├── persistence/   artifact-writer, project-id                (ARCH-12)
+│   │   └── shipped-root.mts   where this package's recipes live
+│   │
+│   ├── transport/             # THE WIRE — knows the kernel, names no tool (ARCH-14/27)
+│   │   └── http-daemon, stdio-server, http-server (Hono), mcp-handler (dispatch =
+│   │      the auth seam), auth-context (AUTH nature), auth doors, boot-health-checks,
+│   │      boot-posthog, tool-telemetry
 │   │
 │   ├── lib/                   # cross-cutting utils — NOT yet under core/ (roadmap B1)
 │   │   └── llm/  prompts/  owm/  degradation/  patent/  vendor/  zod/
 │   │
 │   ├── frameworks/
+│   │   ├── registry-boot.mts   buildStrategyRegistry — the frameworks' composition root
 │   │   ├── wardley/{map,chain,evolution,climate,doctrine,gameplay,iteration,…}
 │   │   │   └── …/_legacy/   real strategies still live here          (ARCH-23, roadmap B2)
 │   │   ├── common/           cross-framework strategies              (ARCH-25)
 │   │   ├── render/           OWM + image rendering
-│   │   └── mocks-registry.mts  registers the 70 mock strategies
+│   │   └── mocks-registry.mts  registers the mock strategies
 │   │
-│   ├── mcp/                   estimate-evolution.tool.mts (the one wired MCP tool, roadmap B3)
+│   ├── mcp/                   # THE DELIVERY — the only layer that names a tool
+│   │   ├── labre-daemon.mts / labre-stdio.mts   composition roots (bin + npm scripts)
+│   │   ├── tool-registry.mts   buildMcpToolRegistry — the 6 tools
+│   │   ├── metering-hooks.mts  labre's quota gate + cost ledger      (ARCH-27, cut 4)
+│   │   └── *.tool.mts  *-via-recipe.mts
 │   └── schemas/  types/
 │
 ├── recipes/                   # shipped canonical recipes, ≥2 steps (ARCH-08)
@@ -70,6 +84,16 @@ labre-mcp/
 6. Use `.mts` (never `.ts`) for ESM strict modules; scripts run via `tsx`, production compiles to `.mjs`
 7. Strict typing by default. `any` / `unknown` require a `// any: <reason>` comment justifying the escape hatch
 8. Zod schemas are the single source of truth for runtime contracts
+
+## Layers (ARCH-27 — the façade)
+
+8b. **The dependency points one way: `src/mcp/` → `src/transport/` → `src/core/`.** The kernel imports neither the transport nor the delivery. The transport imports the kernel but never `src/mcp/`. Enforced by `pnpm check:boundaries`; `scripts/import-boundaries-baseline.json` is empty and **a new entry there is a request to re-open ARCH-27**, not a fix.
+
+8c. **Only `src/mcp/` names a tool.** Composing the MCP surface happens in `src/mcp/tool-registry.mts`; the transport receives an already-filled `ToolRegistry` (`HttpDaemonDeps` / `StdioServerDeps`). Adding a delivery = writing another composition root like `src/mcp/labre-daemon.mts`, never editing the wire.
+
+8d. **The kernel never opens a socket and never calls labre's backend.** Metering (quota gate, cost ledger) is installed through `RunHooks` at the delivery seam (`src/mcp/metering-hooks.mts`), never inside the runner. `src/index.mts` is lib mode and its transitive import graph must reach neither `src/transport/` nor `src/mcp/` — `src/lib-mode.test.mts` checks exactly that.
+
+8e. **Auth stops at the dispatch.** `RequestContext` (kernel) carries the business fields plus the minimal `userId`. The credential — role, raw bearer, issuer provenance — lives in `AuthContext` / `AuthenticatedContext` (`src/transport/auth-context.mts`); `dispatch` calls `toBusinessContext` before any handler. Never hand an `AuthenticatedContext` to a tool handler, a listener or a strategy, and never add a credential field to `RequestContext`.
 
 ## Tests
 

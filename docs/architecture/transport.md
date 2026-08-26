@@ -29,7 +29,7 @@ Hono app  ────►  auth middleware  ────►  context extractor  
 | `GET` | `/version` | Server info: `{ name: "labre-mcp", version }`. |
 | `GET` | `/config/llm` | Read-only live LLM config for the Labre admin console, **opt-in**. Present only when `LABRE_MCP_ADMIN_TOKEN` is set (else `503`); requires `Authorization: Bearer <token>` (`401` otherwise). Returns `{ defaultProvider, providers, strategies }` with a per-provider `hasKey` boolean — never secret values. |
 | `GET` | `/.well-known/oauth-protected-resource` | OAuth discovery (RFC 9728), **opt-in**. Present only when `LABRE_OAUTH_RESOURCE` + `LABRE_OAUTH_AUTH_SERVER` are set. Returns `{ resource, authorization_servers: [<labre AS>] }`. |
-| `POST` | `/mcp` | JSON-RPC 2.0 dispatch. Body must conform to [`JsonRpcRequestSchema`](../../src/core/transport/json-rpc.schema.mts). |
+| `POST` | `/mcp` | JSON-RPC 2.0 dispatch. Body must conform to [`JsonRpcRequestSchema`](../../src/transport/json-rpc.schema.mts). |
 
 The `/mcp` endpoint accepts these MCP methods:
 
@@ -41,14 +41,14 @@ The `/mcp` endpoint accepts these MCP methods:
 
 ## Boot path
 
-The canonical entrypoint is the HTTP daemon in [`src/core/transport/labre-daemon.mts`](../../src/core/transport/labre-daemon.mts), launched by `pnpm mcp` (dev) or `pnpm mcp:prod` (post-`pnpm build`). The daemon:
+The canonical entrypoint is the HTTP daemon in [`src/mcp/labre-daemon.mts`](../../src/mcp/labre-daemon.mts), launched by `pnpm mcp` (dev) or `pnpm mcp:prod` (post-`pnpm build`). The daemon:
 
-1. Builds the strategy registry via `buildStrategyRegistry()`.
-2. Builds the MCP tool registry via `buildBootRegistry()` — six tools: `__ping__` (smoke), `estimateEvolution` (recipe `estimate-component-evolution`), `generateValueChain` (recipe `generate`), `evaluateMap` (recipe `evaluate-map`), `runCommand` (generic direct invocation of any 5-segment methodId → `CommandResult`), and `runRecipe` (generic invocation of any multi-step recipe by `<domain>:<tool>:<name>` ref → JSON-labre envelope + final AST + artefact path).
+1. `src/mcp/labre-daemon.mts` builds the strategy registry via `buildStrategyRegistry()` (`src/frameworks/registry-boot.mts`) and the MCP tool registry, then hands BOTH to `startHttpDaemon` (`src/transport/http-daemon.mts`). Since ARCH-27 the transport composes nothing.
+2. Builds the MCP tool registry via `buildMcpToolRegistry()` — six tools: `__ping__` (smoke), `estimateEvolution` (recipe `estimate-component-evolution`), `generateValueChain` (recipe `generate`), `evaluateMap` (recipe `evaluate-map`), `runCommand` (generic direct invocation of any 5-segment methodId → `CommandResult`), and `runRecipe` (generic invocation of any multi-step recipe by `<domain>:<tool>:<name>` ref → JSON-labre envelope + final AST + artefact path).
 3. Boots the HTTP server on `LABRE_HTTP_PORT` (default `6767`).
 4. Logs the registered tool list and the strategy methodIds.
 
-The `.mcp.json` at the repo root declares the labre-mcp server with HTTP transport (`"type": "http"`, `"url": "http://127.0.0.1:6767/mcp"`), so Claude Code connects to the running daemon rather than spawning a fresh stdio server. There is no stdio entrypoint: the old `src/mcp/mcp-server.mts` was removed during the migration.
+The `.mcp.json` at the repo root may declare the labre-mcp server either over HTTP (`"type": "http"`, `"url": "http://127.0.0.1:6767/mcp"` — Claude Code connects to a running daemon) or over stdio (`{ "command": "npx", "args": ["-y", "labre-mcp"] }` — Claude Code spawns `src/mcp/labre-stdio.mts`, the published `bin`). Both composition roots build the SAME six-tool registry (ARCH-27), so the surface is identical.
 
 ## Configuration
 
@@ -105,13 +105,18 @@ If `_context` is missing, the daemon falls back to dev-mode placeholders (`proje
 
 ## Auth middleware
 
-V1 ships [`noopAuthMiddleware`](../../src/core/transport/auth-middleware.mts) which passes context through untouched. The handler chain is:
+V1 ships [`noopAuthMiddleware`](../../src/transport/auth-middleware.mts) which passes context through untouched. The handler chain is:
 
 ```ts
-context = await auth.authenticate(httpHeaders, contextFromBody);
+// transport: the auth door returns BOTH natures
+const authenticated = await auth.authenticate(httpHeaders, contextFromBody);
+// dispatch: the seam — the credential stops here (ARCH-27, third cut)
+const context = toBusinessContext(authenticated);
 ```
 
-V3 SaaS replaces `noopAuthMiddleware` with a real implementation (OAuth/API key validation, tenant extraction). No tool handler changes.
+Since ARCH-27 the middlewares return an `AuthenticatedContext` (`src/transport/auth-context.mts`): the business context with `userId` stamped on it, plus an `auth` object carrying the role, the verified bearer and the issuer provenance. `dispatch` strips that object before calling a handler, so no tool, listener or strategy can see a credential. Never add a credential field to `RequestContext`.
+
+Real implementations (Supabase / OIDC JWKS / `lab_` API keys) are selected at boot from `LABRE_AUTH`; `noopAuthMiddleware` is the local-dev and stdio default. No tool handler changes either way.
 
 ## OAuth resource-server role (discovery only)
 
@@ -141,4 +146,4 @@ curl -s http://127.0.0.1:6767/mcp \
 # {"jsonrpc":"2.0","id":1,"result":{}}
 ```
 
-For an end-to-end tool call, see [`http-server.test.mts`](../../src/core/transport/http-server.test.mts).
+For an end-to-end tool call, see [`http-transport.test.mts`](../../src/mcp/http-transport.test.mts).

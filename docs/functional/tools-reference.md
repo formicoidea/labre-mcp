@@ -1,10 +1,10 @@
 # Reference des outils MCP
 
-labre-mcp tourne comme un **daemon HTTP** (`src/core/transport/labre-daemon.mts`) ecoutant sur `127.0.0.1:6767`. Les outils sont appeles via `POST /mcp` en JSON-RPC 2.0 (`tools/call`). Endpoints complementaires : `GET /health`, `GET /version`, et les methodes JSON-RPC `initialize`, `ping`, `tools/list`, `notifications/*`.
+labre-mcp tourne comme un **daemon HTTP** (`src/mcp/labre-daemon.mts`) ecoutant sur `127.0.0.1:6767`. Les outils sont appeles via `POST /mcp` en JSON-RPC 2.0 (`tools/call`). Endpoints complementaires : `GET /health`, `GET /version`, et les methodes JSON-RPC `initialize`, `ping`, `tools/list`, `notifications/*`.
 
 ## Surface MCP reellement exposee
 
-**6 outils** sont cables dans `buildBootRegistry()` :
+**6 outils** sont cables dans `buildMcpToolRegistry()` :
 
 | Outil | Role | Schema Zod |
 |---|---|---|

@@ -1,6 +1,6 @@
 # Systeme de notifications
 
-Le daemon HTTP (`src/core/transport/labre-daemon.mts`) emet des notifications de progression pendant l'execution des outils. Ces notifications informent l'utilisateur en temps reel sur l'avancement du traitement. L'API de notification est exposee par le module `src/lib/mcp-notifications.mts`.
+Le daemon HTTP (`src/mcp/labre-daemon.mts`) emet des notifications de progression pendant l'execution des outils. Ces notifications informent l'utilisateur en temps reel sur l'avancement du traitement. L'API de notification est exposee par le module `src/lib/mcp-notifications.mts`.
 
 ## Double emission
 
@@ -132,7 +132,7 @@ const result = await withLLMErrorLogging(
 
 Pour que les notifications apparaissent dans le chat :
 
-1. Le serveur declare `logging: {}` + `experimental: { 'claude/channel': {} }` dans `SERVER_CAPABILITIES` (`src/core/transport/mcp-handler.mts`) — annonce au handshake `initialize`. Rien a faire cote serveur.
+1. Le serveur declare `logging: {}` + `experimental: { 'claude/channel': {} }` dans `SERVER_CAPABILITIES` (`src/transport/mcp-handler.mts`) — annonce au handshake `initialize`. Rien a faire cote serveur.
 2. Lancez Claude Code avec :
    ```bash
    claude --dangerously-load-development-channels server:labre-mcp

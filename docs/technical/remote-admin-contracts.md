@@ -39,7 +39,7 @@ compromise alone cannot inject a bundle (the row is service-role-writable only).
   `AuthenticationError` → HTTP 401 with JSON-RPC error `Unauthorized = -32001`
   (no internal reason leaked). Auth runs BEFORE dispatch; the enriched context
   is what dispatch receives.
-- Boot selection (`labre-daemon.mts` only): `LABRE_AUTH` is a comma-separated
+- Boot selection (`src/transport/http-daemon.mts` only): `LABRE_AUTH` is a comma-separated
   list of doors (`supabase`, `oidc`, `api-key` — see `auth-modes.mts`). Each
   listed door fails closed on its own env: `supabase` needs `SUPABASE_URL`
   (optional `SUPABASE_JWT_AUD`); `oidc` needs `AUTH_JWKS_URL` + `AUTH_AUDIENCE`;
@@ -120,7 +120,7 @@ inherits a bundle's prompts (identity-checked in `getBundlePrompts`).
 ## Contract 4 — PostHog flags & telemetry (labre-mcp, wave 2)
 
 - Key convention `mcp-recipe-<domain>-<tool>-<name>`; gate on the runRecipe
-  tool with `context.auth?.userId ?? "anonymous"`. **Fail-open** (undefined
+  tool with `context.userId ?? "anonymous"`. **Fail-open** (undefined
   flag, PostHog outage, or no config → allowed): flags are rollout controls,
   not a security boundary — auth is.
 - **Prompt experiments (A/B)**: multivariate flags keyed
@@ -162,7 +162,7 @@ inherits a bundle's prompts (identity-checked in `getBundlePrompts`).
   instance, each run attaches the forwarder to its own bus.
 - **Both transports (CH-09)**: the same `POSTHOG_API_KEY` condition installs the
   instance at the HTTP daemon boot AND at the stdio boot (`selectPostHog`,
-  `core/transport/boot-posthog.mts`) — telemetry is a property of the process,
+  `transport/boot-posthog.mts`) — telemetry is a property of the process,
   not of the wire. Before this, stdio installed nothing and every consumer of
   the singleton (recipe forwarder, `AiCallEmitted` sentinel, tool-call wrapper)
   was silently inert on the transport Claude Code actually uses. `posthog-node`

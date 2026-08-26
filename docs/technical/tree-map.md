@@ -16,10 +16,13 @@
 
 ## 2. Points d'entrée
 
-- **Daemon HTTP** : `src/core/transport/labre-daemon.mts` — écoute sur `127.0.0.1:6767` (override `LABRE_HTTP_PORT` / `LABRE_HTTP_HOST`). Endpoints : `POST /mcp` (JSON-RPC : `initialize`, `ping`, `tools/list`, `tools/call`, `notifications/*`), `GET /health`, `GET /version`, `GET /schemas/<fichier>` (JSON Schemas du contrat de donnée, dossier `schema/`), `GET /.well-known/oauth-protected-resource` (découverte OAuth RFC 9728, opt-in via `LABRE_OAUTH_RESOURCE` + `LABRE_OAUTH_AUTH_SERVER` ; daemon = serveur de ressources, AS = app labre).
-- **Entrée stdio** : `src/core/transport/labre-stdio.mts` — JSON-RPC newline-delimited sur stdin/stdout, transport que Claude Code / l'Agent SDK lancent directement (`{ "command": "npx", "args": ["-y", "labre-mcp"] }`). Réutilise le même `dispatch` + `buildBootRegistry()` que le daemon ; stdout est réservé au protocole (réponses + notifications), tout le reste va sur stderr.
-- **Boot** : `buildBootRegistry()` (→ `boot-tool-registry.mts`, partagé HTTP + stdio) enregistre les outils MCP ; `buildStrategyRegistry()` (→ `strategy-registry-boot.mts`) peuple le `StrategyRegistry` via `register{Evolution,Chain,Common}Strategies` + `registerMocks` (sauf `LABRE_DISABLE_MOCKS=1`). C'est le **seul registre de stratégies** : depuis CH-18 il n'existe plus de marcheur de fichiers parallèle sous `_legacy/`. Toute résolution (`runCommand` comme recipe runner) passe par `StrategyRegistry.get()`, qui refuse une stratégie déclarée `disabled` en rendant sa raison.
-- **Scripts npm** : `dev`/`mcp` = `tsx --conditions labre-mcp-dev src/core/transport/labre-daemon.mts` ; `mcp:prod` = `node dist/core/transport/labre-daemon.mjs` ; `mcp:stdio` = `tsx --conditions labre-mcp-dev src/core/transport/labre-stdio.mts` ; `mcp:stdio:prod` = `node dist/core/transport/labre-stdio.mjs` ; `build` = `tsc` ; `typecheck` = `tsc --noEmit` ; `test` = `tsx --conditions labre-mcp-dev --test "src/**/*.test.mts"` ; `schemas` = `tsx --conditions labre-mcp-dev scripts/export-schemas.mts` (régénère `schema/`) ; `dataset` = `tsx --conditions labre-mcp-dev scripts/build-dataset.mts` (harnais dataset round-trip → `dataset/`, gitignoré ; sous PowerShell, npm avale les args `--count`/`--seed` — appeler `npx tsx … scripts/build-dataset.mts --count N` directement).
+> **Trois couches depuis ARCH-27 (CH-23).** La dépendance va dans un seul sens — **`src/mcp/` (livraison) → `src/transport/` (le fil) → `src/core/` + `src/frameworks/` (le cœur)**. Le cœur ne nomme ni fil ni outil ; le transport ne nomme aucun outil ; seul `src/mcp/` compose la surface MCP. Deux gardes mécaniques : `pnpm check:boundaries` (baseline **vide**, une nouvelle entrée = rouvrir ARCH-27) et `src/lib-mode.test.mts` (le graphe d'imports de `src/index.mts` ne doit atteindre ni `src/transport/` ni `src/mcp/`).
+
+- **Mode lib** : `src/index.mts` — le cœur consommé en direct, sans transport : `buildStrategyRegistry()`, `runCommand` / `runRecipe` (enveloppe JSON-labre), `loadRecipe` + `RecipeSchema`, `BaseStrategy`, `RequestContextSchema`, `ToolRegistry`, le bus, l'artefact writer, `SHIPPED_ROOT`. Aucun serveur ne démarre, aucun port n'est ouvert, aucun appel quota/ledger n'est fait (ARCH-27, coupes 1 et 4).
+- **Daemon HTTP** : `src/mcp/labre-daemon.mts` — racine de composition (registre d'outils MCP + catalogue de stratégies + `startHttpDaemon` de `src/transport/http-daemon.mts`). Le daemon écoute sur `127.0.0.1:6767` (override `LABRE_HTTP_PORT` / `LABRE_HTTP_HOST`). Endpoints : `POST /mcp` (JSON-RPC : `initialize`, `ping`, `tools/list`, `tools/call`, `notifications/*`), `GET /health`, `GET /version`, `GET /schemas/<fichier>` (JSON Schemas du contrat de donnée, dossier `schema/`), `GET /.well-known/oauth-protected-resource` (découverte OAuth RFC 9728, opt-in via `LABRE_OAUTH_RESOURCE` + `LABRE_OAUTH_AUTH_SERVER` ; daemon = serveur de ressources, AS = app labre).
+- **Entrée stdio** : `src/mcp/labre-stdio.mts` — même racine de composition sur l'autre fil (`startStdioServer` de `src/transport/stdio-server.mts`), c'est le `bin` du paquet publié. JSON-RPC newline-delimited sur stdin/stdout, transport que Claude Code / l'Agent SDK lancent directement (`{ "command": "npx", "args": ["-y", "labre-mcp"] }`). Réutilise le même `dispatch` + `buildMcpToolRegistry()` que le daemon ; stdout est réservé au protocole (réponses + notifications), tout le reste va sur stderr.
+- **Boot** : `buildMcpToolRegistry()` (→ `src/mcp/tool-registry.mts`, partagé HTTP + stdio) enregistre les outils MCP — **c'est le seul module qui nomme un outil**, le transport reçoit un registre déjà rempli (`HttpDaemonDeps` / `StdioServerDeps`) ; `buildStrategyRegistry()` (→ `src/frameworks/registry-boot.mts`) peuple le `StrategyRegistry` via `register{Evolution,Chain,Common}Strategies` + `registerMocks` (sauf `LABRE_DISABLE_MOCKS=1`). C'est le **seul registre de stratégies** : depuis CH-18 il n'existe plus de marcheur de fichiers parallèle sous `_legacy/`. Toute résolution (`runCommand` comme recipe runner) passe par `StrategyRegistry.get()`, qui refuse une stratégie déclarée `disabled` en rendant sa raison.
+- **Scripts npm** : `dev`/`mcp` = `tsx --conditions labre-mcp-dev src/mcp/labre-daemon.mts` ; `mcp:prod` = `node dist/mcp/labre-daemon.mjs` ; `mcp:stdio` = `tsx --conditions labre-mcp-dev src/mcp/labre-stdio.mts` ; `mcp:stdio:prod` = `node dist/mcp/labre-stdio.mjs` ; `build` = `tsc` ; `typecheck` = `tsc --noEmit` ; `test` = `tsx --conditions labre-mcp-dev --test "src/**/*.test.mts"` ; `schemas` = `tsx --conditions labre-mcp-dev scripts/export-schemas.mts` (régénère `schema/`) ; `dataset` = `tsx --conditions labre-mcp-dev scripts/build-dataset.mts` (harnais dataset round-trip → `dataset/`, gitignoré ; sous PowerShell, npm avale les args `--count`/`--seed` — appeler `npx tsx … scripts/build-dataset.mts --count N` directement).
 - **Subpath imports conditionnels** : le mapping `#core/*`, `#lib/*`, … (package.json `imports`) est `{ "labre-mcp-dev": "./src/*", "default": "./dist/*" }`. Le dev passe `--conditions labre-mcp-dev` (résout vers `src/`, tsx remappe `.mjs`→`.mts`) ; node pur en prod prend `default` (résout vers `dist/`). Sans ça les `.mjs` compilés tentent de résoudre vers `src/*.mjs` inexistant.
 - **Exports npm** : package.json `exports` expose `.` (entrée principale `dist/index.mjs`) et `./schemas` (barrel `src/schemas/index.mts` → `dist/schemas/index.mjs`, même motif conditionnel `development`/`default`). `@formicoidea/labre-mcp/schemas` sert le schéma de manifeste des strategy bundles au frontend d'admin.
 - **`.mcp.json`** : deux modèles possibles — HTTP `{ "type": "http", "url": "http://127.0.0.1:6767/mcp" }` (le daemon doit tourner) ou stdio `{ "command": "npx", "args": ["-y", "labre-mcp"] }` (Claude Code lance le process lui-même, cible de la publication npm).
@@ -29,28 +32,21 @@
 
 ```
 src/
-├── index.mts                 API programmatique (re-exports publics)
+├── index.mts                 MODE LIB — surface publique du cœur, sans transport (ARCH-27)
 │
-├── core/                     ── KERNEL — invariant inter-frameworks
+├── core/                     ── KERNEL — invariant inter-frameworks ET inter-protocoles
 │   ├── registry/             StrategyRegistry (methodId → classe)            (ARCH-03)
-│   ├── recipe/               recipe-runner, recipe.schema, recipe-loader,
+│   │                         tool-registry (ToolDefinition/ToolRegistry — la COUTURE :
+│   │                         une livraison la remplit, un transport la sert)  (ARCH-27)
+│   ├── recipe/               recipe-runner (+ RunHooks : couture quota/ledger, vide par
+│   │                         défaut — ARCH-27 coupe 4), recipe.schema, recipe-loader,
 │   │                         jsonpath-fanout (over: $.path)                  (ARCH-06/07/08)
 │   ├── bus/                  event-bus RxJS + event.schema                   (ARCH-10)
 │   ├── ast/                  base-strategy (contrat { signals,reasoning,insights,result }) (ARCH-22)
-│   ├── context/              request-context (projectId, projectRoot, sessionId, domain) (ARCH-15)
-│   ├── transport/            labre-daemon (HTTP), labre-stdio (stdio), http-server (Hono,
-│   │                         hook onAuthenticated post-auth/pré-dispatch), mcp-handler (dispatch),
-│   │                         boot-tool-registry, json-rpc.schema, context-extractor,
-│   │                         auth-middleware, auth-modes (parse la liste LABRE_AUTH
-│   │                         en portes supabase/oidc/api-key), jwks-auth (cœur OIDC
-│   │                         générique), supabase-auth (preset), api-key-auth (clés
-│   │                         lab_ via RPC validate_api_key + routage par préfixe),
-│   │                         multi-issuer-auth (routage supabase+oidc par claim iss),
-│   │                         boot-health-checks, strategy-registry-boot        (ARCH-14)
-│   │                         boot-posthog (selectPostHog partagé daemon+stdio : la
-│   │                         télémétrie est une propriété du PROCESSUS, pas du transport),
-│   │                         tool-telemetry (mcp_tool_call émis UNE fois au dispatch pour
-│   │                         chaque outil et chaque transport — invariant I7/CH-09)
+│   ├── context/              request-context — nature MÉTIER seule (projectId, projectRoot,
+│   │                         sessionId, domain, userPrompt?) + identité minimale userId?
+│   │                         (quota/RLS/télémétrie). Aucun credential.   (ARCH-15/ARCH-27)
+│   ├── shipped-root.mts      SHIPPED_ROOT — fait d'empaquetage, pas fait MCP  (ARCH-27)
 │   ├── listeners/            artifact-writer-listener (core, toujours actif) (ARCH-12),
 │   │                         posthog-telemetry-listener (run-end/step-error → capture,
 │   │                         attaché par les 5 chemins d'outil quand PostHog est configuré
@@ -60,6 +56,27 @@ src/
 │   │                         (variante servie) + llmCalls/tokens/quality_*
 │   │                         sur run-end — nombres uniquement, jamais de texte)
 │   └── persistence/          artifact-writer, project-id-resolver            (ARCH-12/13)
+│
+├── transport/                ── LE FIL — connaît le cœur, ne nomme AUCUN outil (ARCH-14/27)
+│   │                         http-daemon (startHttpDaemon : port, portes d'auth, découverte
+│   │                         OAuth, bundles distants — reçoit ses registres en paramètre),
+│   │                         stdio-server (startStdioServer + handleLine),
+│   │                         http-server (Hono, hook onAuthenticated post-auth/pré-dispatch),
+│   │                         mcp-handler (dispatch = LA COUTURE : toBusinessContext y retire
+│   │                         la nature auth avant tout handler), json-rpc.schema,
+│   │                         context-extractor (refuse un userId fourni par l'appelant),
+│   │                         auth-context (nature AUTH : AuthContext/AuthenticatedContext,
+│   │                         withAuth/toBusinessContext — token et source vivent ICI),
+│   │                         auth-middleware, auth-modes (parse la liste LABRE_AUTH
+│   │                         en portes supabase/oidc/api-key), jwks-auth (cœur OIDC
+│   │                         générique), supabase-auth (preset), api-key-auth (clés
+│   │                         lab_ via RPC validate_api_key + routage par préfixe),
+│   │                         multi-issuer-auth (routage supabase+oidc par claim iss),
+│   │                         boot-health-checks,
+│   │                         boot-posthog (selectPostHog partagé daemon+stdio : la
+│   │                         télémétrie est une propriété du PROCESSUS, pas du transport),
+│   │                         tool-telemetry (mcp_tool_call émis UNE fois au dispatch pour
+│   │                         chaque outil et chaque transport — invariant I7/CH-09)
 │
 ├── lib/                      ── Utilitaires transverses (PAS encore sous core/ — roadmap B1)
 │   ├── llm/                  registry, config.loader, llm-call, strategy-ids,
@@ -137,8 +154,15 @@ src/
 │   │   │                     court-circuits déterministes, refus NOT_A_VALUE_CHAIN sur la prose libre)
 │   │   └── wardley-map/acl/  anti-corruption layer : WardleyMap ↔ PositionedValueChain (inverse la convention de visibilité : legacy 0.95=haut ↔ renderer 0=haut)
 │   ├── mocks-registry.mts    enregistre les 61 *.mock-strategy.mts
+│   ├── registry-boot.mts     buildStrategyRegistry() — racine de composition des frameworks
+│   │                         (venue de core/transport/ en CH-23 : le cœur ne connaît plus
+│   │                         aucun framework)                                    (ARCH-27)
 │
-├── mcp/                      ── Wrappers des outils MCP câblés
+├── mcp/                      ── LA LIVRAISON — seule couche qui nomme un outil (ARCH-27)
+│   ├── labre-daemon.mts                   racine de composition HTTP (script + npm `mcp`)
+│   ├── labre-stdio.mts                    racine de composition stdio (le `bin` publié)
+│   ├── tool-registry.mts                  buildMcpToolRegistry() — les 6 outils
+│   ├── metering-hooks.mts                 LABRE_METERING_HOOKS (quota + ledger, ARCH-27 coupe 4)
 │   ├── estimate-evolution.tool.mts        ToolDefinition estimateEvolution
 │   ├── estimate-evolution-via-recipe.mts  dispatch via le recipe runner
 │   ├── generate-value-chain.tool.mts      ToolDefinition generateValueChain
@@ -147,7 +171,6 @@ src/
 │   ├── evaluate-map-via-recipe.mts        recette wardley:map:evaluate-map
 │   ├── run-command.tool.mts               ToolDefinition runCommand (methodId direct)
 │   ├── run-recipe.tool.mts                ToolDefinition runRecipe (recette par nom)
-│   ├── shipped-root.mts                   résolution SHIPPED_ROOT (partagé)
 │   └── resolve-context.mts                résolution RequestContext (partagé)
 │
 ├── schemas/                  ── Schémas Zod (source de vérité runtime)
@@ -166,7 +189,7 @@ src/
 ## 4. Graphe de dépendances (haut niveau)
 
 ```
-client MCP ──HTTP──▶ core/transport/labre-daemon ──▶ http-server (Hono) ──▶ mcp-handler.dispatch
+client MCP ──HTTP──▶ mcp/labre-daemon ──▶ transport/http-daemon ──▶ http-server (Hono) ──▶ mcp-handler.dispatch
                                                                                   │ tools/call
                                                                                   ▼
                                                               mcp/estimate-evolution.tool
@@ -183,6 +206,11 @@ client MCP ──HTTP──▶ core/transport/labre-daemon ──▶ http-server
                           frameworks/common/registry                   frameworks/mocks-registry
 
 Partagé : lib/{llm, degradation, flags, prompts, owm, response-formatter, language-detect, mcp-notifications}
+
+Mode lib (ARCH-27) — la même colonne, sans les deux premières cases :
+  hôte (harnais labre, CLI, agent tiers) ──▶ index.mts ──▶ core/recipe/recipe-runner ──▶ core/registry
+                                                       └──▶ frameworks/registry-boot
+  aucun serveur, aucun port, aucun appel quota/ledger (RunHooks non fournis).
 ```
 
 ## 5. Recipes livrées
@@ -202,7 +230,7 @@ Partagé : lib/{llm, degradation, flags, prompts, owm, response-formatter, langu
 
 Un **strategy bundle** est un paquet déclaratif data-only (aucun code exécutable) : `manifest.json` (schéma `src/schemas/strategy-bundle.schema.mts`, `schemaVersion: "0.1"`) + `recipe.json` (une seule recette, `name` = `slug` du manifeste) + paires de prompts optionnelles `prompts/<strategyId>/<name>.{system,user}.md`. Validation : `src/lib/bundles/bundle-loader.mts` (`loadBundleFromFiles` = cœur en mémoire via un lecteur injecté, `loadBundleFromDir` = wrapper local ; `registerBundle` insère la recette dans le lookup de `core/recipe/recipe-loader` — ordre : override projet > bundles en mémoire > shipped, collision avec une recette shipped rejetée). Fixture de dogfooding : `bundles/examples/evaluate-map-example/`.
 
-**Source distante Supabase** (`src/lib/bundles/supabase-bundle-source.mts`) : le daemon ne détient AUCUNE clé Supabase propre (jamais la service-role) — `refreshIfStale(bearerToken)` crée un client éphémère avec le JWT de l'appelant + la clé anon (`@supabase/supabase-js` chargé par `import()` dynamique, jamais côté stdio), RLS autorise. Throttle TTL (défaut 300 s, `LABRE_BUNDLES_TTL_S`) avec sonde légère `max(updated_at)+count` ; chaque fichier re-vérifié sha256 contre le sceau de la table `strategy_bundles` (mismatch/échec de download ⇒ bundle rejeté avec événement de dégradation `slug@version`, les autres passent) ; swap atomique `resetBundleRecipes()` + ré-enregistrement synchrone ; échec total ⇒ l'ancien jeu continue de servir (stale-over-broken), jamais d'erreur dans la requête. Les prompts de bundle sont **actifs** : chaque bundle accepté enregistre ses paires de prompts avec sa recette (`registerBundleRecipe`), et un run de cette recette les superpose aux prompts shipped via le store ALS run-scoped (`src/lib/prompts/override-context.mts` — jamais de mutation du cache global ; seuls les prompts shipped de kind `template` sont shadowables, validé par `assertBundlePromptsOverridable`, bundle rejeté sinon). Câblage : hook `onAuthenticated` de `http-server` monté par `labre-daemon` quand `LABRE_AUTH=supabase` + `SUPABASE_ANON_KEY` ; health check boot `strategy-bundles` (présence de config, pas de sonde réseau). Le token brut n'est jamais stocké ni loggé.
+**Source distante Supabase** (`src/lib/bundles/supabase-bundle-source.mts`) : le daemon ne détient AUCUNE clé Supabase propre (jamais la service-role) — `refreshIfStale(bearerToken)` crée un client éphémère avec le JWT de l'appelant + la clé anon (`@supabase/supabase-js` chargé par `import()` dynamique, jamais côté stdio), RLS autorise. Throttle TTL (défaut 300 s, `LABRE_BUNDLES_TTL_S`) avec sonde légère `max(updated_at)+count` ; chaque fichier re-vérifié sha256 contre le sceau de la table `strategy_bundles` (mismatch/échec de download ⇒ bundle rejeté avec événement de dégradation `slug@version`, les autres passent) ; swap atomique `resetBundleRecipes()` + ré-enregistrement synchrone ; échec total ⇒ l'ancien jeu continue de servir (stale-over-broken), jamais d'erreur dans la requête. Les prompts de bundle sont **actifs** : chaque bundle accepté enregistre ses paires de prompts avec sa recette (`registerBundleRecipe`), et un run de cette recette les superpose aux prompts shipped via le store ALS run-scoped (`src/lib/prompts/override-context.mts` — jamais de mutation du cache global ; seuls les prompts shipped de kind `template` sont shadowables, validé par `assertBundlePromptsOverridable`, bundle rejeté sinon). Câblage : hook `onAuthenticated` de `http-server` monté par `transport/http-daemon` quand `LABRE_AUTH=supabase` + `SUPABASE_ANON_KEY` ; health check boot `strategy-bundles` (présence de config, pas de sonde réseau). Le token brut n'est jamais stocké ni loggé.
 
 ### Contrat de schéma `labre_mcp` (ARCH-26 — proposé)
 

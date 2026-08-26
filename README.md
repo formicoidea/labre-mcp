@@ -71,7 +71,7 @@ For local development or a SaaS-style deployment, the server can run as an HTTP 
 
 ```bash
 npm run build
-npm run mcp:prod          # node dist/core/transport/labre-daemon.mjs
+npm run mcp:prod          # node dist/mcp/labre-daemon.mjs
 ```
 
 It listens on `127.0.0.1:6767` (override with `LABRE_HTTP_PORT` / `LABRE_HTTP_HOST` — set `LABRE_HTTP_HOST=0.0.0.0` behind a PaaS router). Point the client at it with:

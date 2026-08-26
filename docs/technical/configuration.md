@@ -281,7 +281,7 @@ Le fichier `.mcp.json` a la racine enregistre le serveur MCP aupres de Claude Co
 }
 ```
 
-Le daemon HTTP se demarre avec `pnpm mcp` (`tsx src/core/transport/labre-daemon.mts`). Le transport canonique est HTTP — l'ancien serveur stdio a ete supprime (voir [../architecture/transport.md](../architecture/transport.md)).
+Le daemon HTTP se demarre avec `pnpm mcp` (`tsx src/mcp/labre-daemon.mts`). Le transport canonique est HTTP — l'ancien serveur stdio a ete supprime (voir [../architecture/transport.md](../architecture/transport.md)).
 
 | Champ | Description |
 |---|---|
@@ -297,7 +297,7 @@ Pour activer les notifications de progression dans le chat :
 ### 1. Capability serveur
 
 Les capabilities annoncées au `initialize` sont déclarées dans `SERVER_CAPABILITIES`
-(`src/core/transport/mcp-handler.mts`). Sur la branche de plateformisation, le handler
+(`src/transport/mcp-handler.mts`). Sur la branche de plateformisation, le handler
 n'annonce actuellement que `{ tools: {} }` — la capability expérimentale `claude/channel`
 n'est pas (encore) recâblée sur le transport HTTP. Tant qu'elle ne l'est pas, les channels
 ci-dessous ne sont pas émis. Suivi global de la surface transport en

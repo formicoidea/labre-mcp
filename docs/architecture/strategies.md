@@ -42,7 +42,7 @@ Exported as `methodIdSchema` (Zod) from [`src/core/ast/base-strategy.mts`](../..
 
 ## Registry
 
-The kernel exposes a generic [`StrategyRegistry`](../../src/core/registry/strategy-registry.mts) keyed by methodId. Each framework exposes a `register*Strategies(registry)` function (e.g. [`registerEvolutionStrategies`](../../src/frameworks/wardley/evolution/registry.mts), [`registerChainStrategies`](../../src/frameworks/wardley/chain/registry.mts)) that explicitly registers its strategy classes. The daemon's [`buildStrategyRegistry`](../../src/core/transport/labre-daemon.mts) wires them all together at boot.
+The kernel exposes a generic [`StrategyRegistry`](../../src/core/registry/strategy-registry.mts) keyed by methodId. Each framework exposes a `register*Strategies(registry)` function (e.g. [`registerEvolutionStrategies`](../../src/frameworks/wardley/evolution/registry.mts), [`registerChainStrategies`](../../src/frameworks/wardley/chain/registry.mts)) that explicitly registers its strategy classes. The daemon's [`buildStrategyRegistry`](../../src/frameworks/registry-boot.mts) wires them all together at boot.
 
 The registry validates methodIds at registration time via `validateMethodId()`, which reuses the same regex. Invalid IDs throw before any strategy can be invoked.
 

@@ -45,7 +45,7 @@ Deux voies :
 ### 3. Lancer des runs
 
 L'affectation se fait **une fois par run** de l'outil `runRecipe`, avec
-`context.auth.userId` comme distinctId (bucketing stable par utilisateur).
+`context.userId` comme distinctId (bucketing stable par utilisateur).
 
 > Daemon non authentifié : tous les appels partagent le distinctId
 > `anonymous` et tombent donc dans la **même** variante — une expérience
