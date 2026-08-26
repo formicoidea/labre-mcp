@@ -221,6 +221,9 @@ export function buildApp(options: {
         request: parsed.data,
         context,
         tools: options.tools,
+        // Names the wire for tool telemetry (CH-09) — the stdio entrypoint
+        // passes "stdio" at its own dispatch call.
+        transport: "http",
       });
     const response = bearer
       ? await runWithLedgerAuth(bearer, runDispatch)

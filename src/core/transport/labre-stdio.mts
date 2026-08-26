@@ -22,6 +22,8 @@ import { buildBootRegistry } from "./boot-tool-registry.mjs";
 import { buildStrategyRegistry } from "./strategy-registry-boot.mjs";
 import { registerBootHealthChecks } from "./boot-health-checks.mjs";
 import { runAllHealthChecks } from "#lib/degradation/index.mjs";
+import { selectPostHog } from "./boot-posthog.mjs";
+import { setPostHogFlags } from "#lib/flags/state.mjs";
 
 export interface StdioDeps {
   tools: ToolRegistry;
@@ -59,7 +61,9 @@ export async function handleLine(
 
   const auth = deps.auth ?? noopAuthMiddleware;
   const context = await auth.authenticate({}, extractContext(parsed.data.params));
-  return dispatch({ request: parsed.data, context, tools: deps.tools });
+  // "stdio" names the wire for tool telemetry (CH-09): the two transports must
+  // emit the same events, and stay TELLABLE APART in the data.
+  return dispatch({ request: parsed.data, context, tools: deps.tools, transport: "stdio" });
 }
 
 function writeMessage(message: JsonRpcResponse): void {
@@ -77,6 +81,22 @@ async function main(): Promise<void> {
   const tools = buildBootRegistry();
   const strategies = buildStrategyRegistry();
 
+  // PostHog feature flags + telemetry — SAME condition as the HTTP daemon
+  // (POSTHOG_API_KEY set), because telemetry is a property of the process, not
+  // of the transport (CH-09, invariant I7). Installed BEFORE the read loop so
+  // the very first tools/call already sees the singleton.
+  const posthog = await selectPostHog();
+  if (posthog) {
+    setPostHogFlags(posthog);
+    // Metadata only — no payloads, no user content. stdio never authenticates,
+    // so the distinct id is the same constant the rest of the process uses.
+    posthog.capture("mcp_boot", "daemon", {
+      transport: "stdio",
+      tools: tools.list().length,
+      strategies: strategies.size(),
+    });
+  }
+
   process.stderr.write(
     `[labre-mcp] stdio transport ready (newline-delimited JSON-RPC on stdin/stdout)\n`,
   );
@@ -84,6 +104,9 @@ async function main(): Promise<void> {
     `[labre-mcp] Tools registered: ${tools.list().map((t) => t.name).join(", ") || "(none)"}\n`,
   );
   process.stderr.write(`[labre-mcp] Strategies registered: ${strategies.size()}\n`);
+  process.stderr.write(
+    `[labre-mcp] PostHog: ${posthog ? "enabled (recipe flags + telemetry)" : "disabled (POSTHOG_API_KEY not set — flags fail open, no telemetry)"}\n`,
+  );
 
   // Boot health checks (config/env presence only — no network). Never blocks boot.
   registerBootHealthChecks();
@@ -98,6 +121,21 @@ async function main(): Promise<void> {
     );
   }
 
+  // Telemetry lifecycle on stdio (CH-09). posthog-node BUFFERS: capture() only
+  // queues, and a stdio server is killed far more brutally than a daemon — the
+  // client closes the pipe or signals the moment the conversation ends. Without
+  // an explicit flush the last batch of events dies with the process, which
+  // would have made the stdio numbers wrong in a way that LOOKS like low usage
+  // instead of like a bug. Every exit path goes through here.
+  const flushAndExit = async (code: number): Promise<never> => {
+    // shutdown() swallows client errors: a telemetry flush failure must never
+    // turn a clean exit into a crash (same contract as the daemon's shutdown).
+    if (posthog) await posthog.shutdown();
+    process.exit(code);
+  };
+  process.on("SIGINT", () => void flushAndExit(0));
+  process.on("SIGTERM", () => void flushAndExit(0));
+
   // Sequential read loop. `for await` awaits each dispatch before reading the
   // next line, which both honours the V1 synchronous model (ARCH-11) and keeps
   // stdout writes from interleaving across concurrent calls.
@@ -107,8 +145,8 @@ async function main(): Promise<void> {
     if (response !== null) writeMessage(response);
   }
 
-  // stdin closed (EOF) — the client disconnected. Exit cleanly.
-  process.exit(0);
+  // stdin closed (EOF) — the client disconnected. Flush, then exit cleanly.
+  await flushAndExit(0);
 }
 
 // Only run when executed as a script (not when imported by tests).

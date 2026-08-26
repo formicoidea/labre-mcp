@@ -15,6 +15,12 @@ import type { RequestContext } from "../context/request-context.mjs";
 import { type JsonRpcRequest, type JsonRpcResponse, JsonRpcErrorCode } from "./json-rpc.schema.mjs";
 import { withMcpDegradation } from "#lib/degradation/index.mjs";
 import type { Degradable } from "#lib/degradation/types.mjs";
+import {
+  captureToolCall,
+  statusOfResult,
+  telemetryDistinctId,
+  type TransportLabel,
+} from "./tool-telemetry.mjs";
 
 export interface ToolDefinition {
   name: string;
@@ -22,6 +28,20 @@ export interface ToolDefinition {
   // any: per-tool input shape — opaque at the dispatcher level (handler validates)
   inputSchema: Record<string, unknown>;
   handler: (args: unknown, context: RequestContext) => Promise<unknown>;
+  /**
+   * Optional telemetry enrichment (CH-09, invariant I7): name WHAT this call
+   * targeted — a 5-segment methodId for `runCommand`, a 3-segment recipe ref
+   * for the recipe-backed tools. The dispatch emits `mcp_tool_call` for every
+   * tool whether or not this is declared; the target is the one dimension only
+   * the tool can supply.
+   *
+   * The extractor MUST validate the value against the tool's own schema before
+   * returning it (never return a raw caller string): the result becomes a
+   * PostHog property, and an unbounded property is a cardinality leak. Return
+   * `undefined` for anything that does not validate. Throwing is tolerated —
+   * the dispatch treats it as "no target".
+   */
+  telemetryTarget?: (args: unknown) => string | undefined;
 }
 
 interface TextContentBlock {
@@ -82,10 +102,18 @@ export interface DispatchOptions {
   request: JsonRpcRequest;
   context: RequestContext;
   tools: ToolRegistry;
+  /**
+   * Which wire this request arrived on, forwarded to tool telemetry so the two
+   * transports are distinguishable in the data (invariant I7 — parity is a
+   * claim you have to be able to CHECK). Omitted by in-process callers (tests,
+   * internal handlers) → "unknown".
+   */
+  transport?: TransportLabel;
 }
 
 export async function dispatch(options: DispatchOptions): Promise<JsonRpcResponse | null> {
   const { request, context, tools } = options;
+  const transport: TransportLabel = options.transport ?? "unknown";
   const id = request.id ?? null;
 
   // Notifications (no id) — one-way, no response.
@@ -118,13 +146,57 @@ export async function dispatch(options: DispatchOptions): Promise<JsonRpcRespons
         if (!tool) {
           return error(id, JsonRpcErrorCode.MethodNotFound, `Unknown tool: ${params.name}`);
         }
+        // CH-09 / invariant I7: telemetry is enforced HERE, once, for the same
+        // reason degradation is (hard rule #18) — a tool that has to remember
+        // to instrument itself eventually forgets, and four of the five did.
+        // Every tool, on either transport, emits exactly one `mcp_tool_call`.
+        const args = params.arguments ?? {};
+        const startedAt = Date.now();
+        const distinctId = telemetryDistinctId(context);
+        let target: string | undefined;
+        try {
+          target = tool.telemetryTarget?.(args);
+        } catch {
+          // A broken extractor costs the target dimension, never the call.
+          target = undefined;
+        }
+
         // ARCH-22 / hard rule #18: every tool handler is wrapped here, once,
         // so each tools/call response is a Degradable<T> envelope and any
         // tryDegradeAmbient deep in the call tree records into the ambient
         // collector (AsyncLocalStorage). Handlers must NOT self-wrap.
-        const degradable = await withMcpDegradation(params.name, () =>
-          tool.handler(params.arguments ?? {}, context),
-        );
+        let degradable: Degradable<unknown>;
+        try {
+          degradable = await withMcpDegradation(params.name, () => tool.handler(args, context));
+        } catch (err) {
+          // The handler threw (Zod rejection, unhandled fault). There is no
+          // collector to read, so `degraded` is reported false rather than
+          // guessed. Rethrown untouched: the outer catch still turns it into
+          // the same JSON-RPC error as before — telemetry changes nothing on
+          // the wire. No error message is captured (privacy: a Zod message
+          // quotes the caller's input).
+          captureToolCall({
+            tool: tool.name,
+            target,
+            transport,
+            durationMs: Date.now() - startedAt,
+            status: "error",
+            degraded: false,
+            distinctId,
+          });
+          throw err;
+        }
+        captureToolCall({
+          tool: tool.name,
+          target,
+          transport,
+          durationMs: Date.now() - startedAt,
+          // In-band failures (`{ status: 'error' }`) count as errors — see
+          // statusOfResult.
+          status: statusOfResult(degradable.result),
+          degraded: degradable.degraded,
+          distinctId,
+        });
         return success(id, toCallToolResult(degradable));
       }
 

@@ -11,6 +11,10 @@ import type { ToolDefinition } from '#core/transport/mcp-handler.mjs';
 import { GenerateValueChainInputSchema } from '#schemas/generate-value-chain.schema.mjs';
 import { handleGenerateValueChainViaRecipe } from './generate-value-chain-via-recipe.mjs';
 
+/** The one recipe this tool dispatches — kept beside the tool so the telemetry
+ *  target and the bridge cannot drift apart silently. */
+export const GENERATE_VALUE_CHAIN_RECIPE_REF = 'wardley:map:generate';
+
 export const GENERATE_VALUE_CHAIN_TOOL: ToolDefinition = {
   name: 'generateValueChain',
   description:
@@ -26,6 +30,9 @@ export const GENERATE_VALUE_CHAIN_TOOL: ToolDefinition = {
     string,
     unknown
   >,
+  // Telemetry target (CH-09): one fixed canonical recipe → constant target,
+  // nothing caller-supplied reaches PostHog.
+  telemetryTarget: () => GENERATE_VALUE_CHAIN_RECIPE_REF,
   // Returns a bare GenerateValueChainViaRecipeResult; the daemon dispatch wraps every
   // handler in withMcpDegradation (Degradable<T>) — do NOT self-wrap (hard rule #18).
   async handler(args, context) {

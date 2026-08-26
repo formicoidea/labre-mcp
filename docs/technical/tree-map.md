@@ -47,9 +47,15 @@ src/
 │   │                         lab_ via RPC validate_api_key + routage par préfixe),
 │   │                         multi-issuer-auth (routage supabase+oidc par claim iss),
 │   │                         boot-health-checks, strategy-registry-boot        (ARCH-14)
+│   │                         boot-posthog (selectPostHog partagé daemon+stdio : la
+│   │                         télémétrie est une propriété du PROCESSUS, pas du transport),
+│   │                         tool-telemetry (mcp_tool_call émis UNE fois au dispatch pour
+│   │                         chaque outil et chaque transport — invariant I7/CH-09)
 │   ├── listeners/            artifact-writer-listener (core, toujours actif) (ARCH-12),
 │   │                         posthog-telemetry-listener (run-end/step-error → capture,
-│   │                         attaché par runRecipe quand PostHog est configuré ;
+│   │                         attaché par les 5 chemins d'outil quand PostHog est configuré
+│   │                         (attachRunTelemetryIfConfigured ; runRecipe attache en direct
+│   │                         car il porte seul l'attribution A/B) ;
 │   │                         attribution $feature/mcp-prompt-* + $feature/mcp-recipe-*
 │   │                         (variante servie) + llmCalls/tokens/quality_*
 │   │                         sur run-end — nombres uniquement, jamais de texte)
@@ -85,7 +91,8 @@ src/
 │   │                         resolvePromptVariants + resolveRecipeVariant — flags multivariés
 │   │                         mcp-prompt-<strategyId> et mcp-recipe-<ref> (string=variante),
 │   │                         posthog-node en import dynamique), state (singleton posé au boot
-│   │                         du daemon ; clés mcp-recipe-<domain>-<tool>-<name> et
+│   │                         du daemon ET du stdio, même condition POSTHOG_API_KEY ;
+│   │                         clés mcp-recipe-<domain>-<tool>-<name> et
 │   │                         mcp-prompt-<strategyId>)
 │   ├── patent/               bigquery-* , patent-data-source, patent-indicators, mock-patent-source
 │   ├── png/                  decode : décodeur PNG minimal vendoré (node:zlib inflate +

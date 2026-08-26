@@ -42,6 +42,17 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
     'Use runCommand for a single methodId. An unknown recipe returns status "error".',
   // any: zod-to-json conversion — the schema is well-typed at the Zod layer
   inputSchema: z.toJSONSchema(RunRecipeCallSchema, { io: 'input' }) as Record<string, unknown>,
+  // Telemetry target (CH-09): the recipe ref as REQUESTED. When an A/B variant
+  // swaps in another recipe, the served variant is attributed on mcp_run_end
+  // (`$feature/mcp-recipe-<ref>`) — the tool-call event stays the caller's own
+  // view of what it asked for. Validated through the tool's own schema field so
+  // an arbitrary caller string can never become a PostHog property.
+  telemetryTarget(args) {
+    const parsed = RunRecipeCallSchema.shape.recipe.safeParse(
+      (args as { recipe?: unknown } | null)?.recipe,
+    );
+    return parsed.success ? parsed.data : undefined;
+  },
   // Returns a bare RunRecipeResult; the daemon dispatch wraps every handler in
   // withMcpDegradation (Degradable<T>) — do NOT self-wrap here (hard rule #18).
   async handler(args, context): Promise<RunRecipeResult> {
@@ -73,6 +84,21 @@ export const RUN_RECIPE_TOOL: ToolDefinition = {
           ],
         };
       }
+      // ─── A/B SCOPE — ARBITRATED, DO NOT RE-DEBATE (CH-09, invariant I7) ───
+      // Variant assignment (prompt AND recipe) lives on runRecipe ALONE, and
+      // that asymmetry is deliberate, not an oversight the parity work missed.
+      // This is where versioned prompts and named recipe bundles exist: an
+      // experiment needs two addressable things to compare, and only a recipe
+      // ref has them. runCommand addresses one immutable methodId; the three
+      // business tools each dispatch one fixed canonical recipe. There is
+      // nothing to bucket on those paths, so no A/B is wired there and none
+      // should be added without a new arbitration.
+      //
+      // What IS at parity across all five paths: telemetry (every tool emits
+      // mcp_tool_call at the dispatch, plus mcp_run_end / mcp_step_error from
+      // the kernel bus), on both transports. Parity of measurement, not parity
+      // of experimentation.
+      //
       // Recipe-experiment variant (A/B): a string-valued mcp-recipe-<ref> flag
       // selects another recipe of the same domain+tool to run instead. Same
       // distinctId as the gate so a user buckets consistently.

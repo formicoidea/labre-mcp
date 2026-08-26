@@ -29,4 +29,8 @@ jobs:
       # llm.config.json is gitignored (per-user); a few E2E tests load it.
       # Same step as the documented install: copy the example profile.
       - run: cp llm.config.example.json llm.config.json
+      # Includes the telemetry parity matrix (invariant I7, audit CH-09):
+      # src/mcp/tool-telemetry-matrix.test.mts dispatches every registered MCP
+      # tool against a PostHog stub and holds an EXACT baseline, so a new tool
+      # fails the suite until its telemetry is declared and proved.
       - run: pnpm test

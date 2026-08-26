@@ -131,7 +131,13 @@ inherits a bundle's prompts (identity-checked in `getBundlePrompts`).
   (bundle override first, then shipped entry; nonexistent variant → silent
   fallback to `default`, fail-open). Explicit non-default prompt names are
   never substituted.
-- Telemetry: `mcp_boot`, `mcp_run_end`, `mcp_step_error` — metadata and
+- **A/B scope (arbitrated, CH-09)**: variant assignment — prompt AND recipe —
+  lives on the `runRecipe` path ALONE. That is where versioned prompts and
+  named recipe bundles exist; `runCommand` addresses one immutable methodId and
+  the three business tools each dispatch one fixed canonical recipe, so there is
+  nothing to bucket on those paths. Telemetry is at parity across all five;
+  experimentation deliberately is not.
+- Telemetry: `mcp_boot`, `mcp_tool_call`, `mcp_run_end`, `mcp_step_error` — metadata and
   numbers only (recipeRunId, stepId, methodId, durationMs, degraded), never
   payloads, prompts or user content. Fire-and-forget; flush on shutdown.
   Experiment/performance properties:
@@ -142,6 +148,25 @@ inherits a bundle's prompts (identity-checked in `getBundlePrompts`).
     only) and `quality_<name>` — finite-numeric envelope signals harvested at
     run-end (capped at 20 keys, names sanitized to `[a-zA-Z0-9_]`). Numbers
     exclusively; string signal values are never forwarded.
+  - On `mcp_tool_call` (one per `tools/call`, emitted at the dispatch for
+    EVERY tool — CH-09, invariant I7): `tool`, `target` (the methodId for
+    `runCommand`, the recipe ref for the recipe-backed tools; omitted when the
+    caller's value does not validate — cardinality guard), `transport`
+    (`http` | `stdio` | `unknown`), `durationMs`, `status` (`ok` | `error`,
+    reading the tool's in-band `{ status: 'error' }` too), `degraded`. No
+    error message is ever captured: a Zod message quotes the caller's input.
+    `mcp_boot` carries the same `transport` property so a boot joins the calls
+    it served.
 - `posthog-node` via dynamic import; `POSTHOG_API_KEY` absent → fully off.
   There is no global event bus (per-run buses, ARCH-10): boot installs the
   instance, each run attaches the forwarder to its own bus.
+- **Both transports (CH-09)**: the same `POSTHOG_API_KEY` condition installs the
+  instance at the HTTP daemon boot AND at the stdio boot (`selectPostHog`,
+  `core/transport/boot-posthog.mts`) — telemetry is a property of the process,
+  not of the wire. Before this, stdio installed nothing and every consumer of
+  the singleton (recipe forwarder, `AiCallEmitted` sentinel, tool-call wrapper)
+  was silently inert on the transport Claude Code actually uses. `posthog-node`
+  buffers, so the stdio entrypoint flushes on EOF and on SIGINT/SIGTERM.
+- The parity table is pinned in CI by `src/mcp/tool-telemetry-matrix.test.mts`
+  (`test` job): the baseline is exact, so a new MCP tool fails the matrix until
+  its telemetry is declared and proved.

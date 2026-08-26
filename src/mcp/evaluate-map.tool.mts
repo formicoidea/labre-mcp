@@ -11,6 +11,10 @@ import type { ToolDefinition } from '#core/transport/mcp-handler.mjs';
 import { EvaluateMapInputSchema } from '#schemas/evaluate-map.schema.mjs';
 import { handleEvaluateMapViaRecipe } from './evaluate-map-via-recipe.mjs';
 
+/** The one recipe this tool dispatches — kept beside the tool so the telemetry
+ *  target and the bridge cannot drift apart silently. */
+export const EVALUATE_MAP_RECIPE_REF = 'wardley:map:evaluate-map';
+
 export const EVALUATE_MAP_TOOL: ToolDefinition = {
   name: 'evaluateMap',
   description:
@@ -24,6 +28,9 @@ export const EVALUATE_MAP_TOOL: ToolDefinition = {
     'and the artefact path under ~/.labre-mcp/runs/.',
   // any: zod-to-json conversion — the schema is well-typed at the Zod layer
   inputSchema: z.toJSONSchema(EvaluateMapInputSchema, { io: 'input' }) as Record<string, unknown>,
+  // Telemetry target (CH-09): one fixed canonical recipe → constant target,
+  // nothing caller-supplied reaches PostHog.
+  telemetryTarget: () => EVALUATE_MAP_RECIPE_REF,
   // Returns a bare EvaluateMapViaRecipeResult; the daemon dispatch wraps every
   // handler in withMcpDegradation (Degradable<T>) — do NOT self-wrap (hard rule #18).
   async handler(args, context) {
