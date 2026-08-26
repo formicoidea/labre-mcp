@@ -9,22 +9,26 @@
 // exactly one place (the reporter). It is NEVER logged and NEVER enters an
 // event or an envelope.
 //
-// Only the HTTP daemon sets it (around dispatch, when the request carried a
-// JWT). stdio callers, unit tests and the default non-instrumented path see no
-// store, so the reporter that reads it is a silent no-op there — which is the
-// whole point: a run with no caller JWT writes no ledger row.
+// Only the HTTP daemon sets it, around dispatch, with WHATEVER bearer the
+// request carried — a JWT or a `lab_` personal API key. The reporter picks the
+// write path from that shape (ledger-report.mts): PostgREST under the JWT, or
+// the `record_mcp_key_spend` definer RPC for a key. stdio callers, unit tests
+// and the default non-instrumented path see no store, so the reporter is a
+// silent no-op there — which is the whole point: a run with no caller identity
+// writes no ledger row.
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 const storage = new AsyncLocalStorage<{ jwt: string }>();
 
-/** Run `fn` with the caller's bearer JWT available to the ledger reporter. */
+/** Run `fn` with the caller's bearer available to the ledger reporter — a JWT
+ *  or a `lab_` personal API key, whichever the request presented. */
 export function runWithLedgerAuth<T>(jwt: string, fn: () => T): T {
   return storage.run({ jwt }, fn);
 }
 
-/** The caller's JWT if one was set for this async context, else null (stdio,
- *  tests, lab_-key callers that never set it). */
+/** The caller's bearer if one was set for this async context, else null
+ *  (stdio, lib mode, tests — none of which has a labre identity). */
 export function currentLedgerJwt(): string | null {
   return storage.getStore()?.jwt ?? null;
 }

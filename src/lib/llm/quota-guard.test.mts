@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import {
   assertQuotaOk,
   isOverBudget,
+  noteKeyBudgetDenied,
+  forgetKeyBudgetDenial,
+  resetKeyBudgetDenials,
   QuotaExceededError,
 } from './quota-guard.mjs';
 import { runWithLedgerAuth } from './ledger-auth-context.mjs';
@@ -51,11 +54,13 @@ describe('assertQuotaOk', () => {
 
   beforeEach(() => {
     calls = 0;
+    resetKeyBudgetDenials();
     process.env.SUPABASE_URL = 'http://supabase.test';
     process.env.SUPABASE_ANON_KEY = 'anon';
   });
   afterEach(() => {
     globalThis.fetch = realFetch;
+    resetKeyBudgetDenials();
     delete process.env.SUPABASE_URL;
     delete process.env.SUPABASE_ANON_KEY;
   });
@@ -87,10 +92,44 @@ describe('assertQuotaOk', () => {
     assert.equal(calls, 0);
   });
 
-  it('skips lab_ API keys (not a JWT — the RPC sees no auth.uid())', async () => {
+  it('never asks get_my_ai_usage for a lab_ key (not a JWT — the RPC sees no auth.uid())', async () => {
     respond(usage(300000, 300000));
     await runWithLedgerAuth('lab_deadbeef', () => assertQuotaOk());
     assert.equal(calls, 0);
+  });
+
+  it('refuses a lab_ key whose spend labre REFUSED on the previous run — the budget answer is honoured, not re-derived', async () => {
+    respond(usage(1, 300000)); // would allow, if it were consulted at all
+    noteKeyBudgetDenied('lab_spent', 310000, 300000);
+    await assert.rejects(
+      () => runWithLedgerAuth('lab_spent', () => assertQuotaOk()),
+      (e: unknown) =>
+        e instanceof QuotaExceededError && e.used === 310000 && e.limit === 300000,
+    );
+    // The refusal is local: no budget round-trip was made for it.
+    assert.equal(calls, 0);
+  });
+
+  it('refuses only the key that was refused — a memo never spills onto another caller', async () => {
+    noteKeyBudgetDenied('lab_spent', 310000, 300000);
+    await runWithLedgerAuth('lab_other', () => assertQuotaOk());
+  });
+
+  it('forgets the refusal as soon as the budget answers yes again', async () => {
+    noteKeyBudgetDenied('lab_spent', 310000, 300000);
+    forgetKeyBudgetDenial('lab_spent');
+    await runWithLedgerAuth('lab_spent', () => assertQuotaOk());
+  });
+
+  it('degrades OPEN once the memo has expired — a rolling-hour budget refills, so a memo may never become a ban', async () => {
+    const realNow = Date.now;
+    try {
+      noteKeyBudgetDenied('lab_spent', 310000, 300000);
+      Date.now = () => realNow() + 61_000;
+      await runWithLedgerAuth('lab_spent', () => assertQuotaOk());
+    } finally {
+      Date.now = realNow;
+    }
   });
 
   it('degrades OPEN when the budget read fails', async () => {

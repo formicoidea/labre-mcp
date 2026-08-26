@@ -1,11 +1,18 @@
 // AiCallEmitted sentinel — count every LLM call the registry hands out.
 //
-// WHY: labre's invariant "every model spend leaves a ledger line" is only
-// enforced on one path here. `reportUsageToLedger` (ledger-report.mts) writes an
-// `ai_calls` row only when a caller JWT is present, which the HTTP transport
-// sets and stdio never does; `lab_` API-key callers are skipped too, and the
-// quota guard has the same blind spot. So an unknown share of the spend leaves
-// no ledger line at all.
+// WHY: labre's invariant "every model spend leaves a ledger line" was enforced
+// on one path only. `reportUsageToLedger` (ledger-report.mts) wrote an
+// `ai_calls` row only when a caller JWT was present, which the HTTP transport
+// sets and stdio never does; `lab_` API-key callers were skipped too, and the
+// quota guard had the same blind spot. So an unknown share of the spend left no
+// ledger line at all.
+//
+// HALF OF THAT IS NOW CLOSED (2026-08-26). `lab_`-keyed calls are ledgered and
+// budgeted through `labre_mcp.record_mcp_key_spend`, so the gap this sentinel
+// still measures should have shrunk to the population that has NO labre
+// identity at all: stdio and lib mode, which spend the user's own keys and cost
+// labre nothing. A residual gap on the HTTP daemon is now a real defect, not a
+// known limitation — which is exactly what makes the measurement worth keeping.
 //
 // This module does NOT close that hole — it MEASURES it. Every call obtained
 // through the registry emits one `AiCallEmitted` telemetry event per
