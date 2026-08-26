@@ -31,6 +31,11 @@ export interface AttachArtifactWriterOptions {
   writeArtifact?: WriteArtifactFn;
   // Override for tests that want to assert timeout behaviour quickly.
   timeoutMs?: number;
+  // Injected wall clock for the artefact's `startedAt` (attach time) — the one
+  // timestamp of the artefact this listener owns rather than reads off an
+  // event. Same seam as the runner's RunClock: pass the runner's clock to get a
+  // replayable artefact, omit it and get the real one.
+  now?: () => Date;
 }
 
 export interface ArtifactWriterHandle {
@@ -65,7 +70,7 @@ function withTimeout<T>(
 
 export function attachArtifactWriter(options: AttachArtifactWriterOptions): ArtifactWriterHandle {
   const events: PipelineEvent[] = [];
-  const startedAt = new Date().toISOString();
+  const startedAt = (options.now ?? (() => new Date()))().toISOString();
   const writeFn: WriteArtifactFn = options.writeArtifact ?? defaultWriteArtifact;
   const timeoutMs = options.timeoutMs ?? ARTIFACT_WRITE_TIMEOUT_MS;
 

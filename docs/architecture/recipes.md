@@ -69,6 +69,20 @@ Two categories of listener:
 
 Limit (V1): opt-in listeners do not emit bus events and cannot inject new steps into the running recipe. They only observe their parent step's output and emit insights into the envelope. Reactive intervention is V3+.
 
+## Replayable runs (invariant I3)
+
+A run is **replayable**: at fixed LLM outputs, two executions of the same recipe produce the same artefact, modulo the run id and the timestamps. The runner owns exactly two nondeterministic sources, and both are injectable through the optional `clock` option of `runRecipe` / `runCommand`:
+
+```ts
+await runRecipe({ recipe, ast, context, registry, clock: { now: () => fixedDate, newId: () => 'run-1' } });
+```
+
+`RunClock.now` drives every timestamp and every `durationMs` the runner stamps (step-start / step-end / step-error / run-end events, and the `envelope.trace` entries); `RunClock.newId` produces the `recipeRunId`. Both default to the real ones — production callers pass nothing and the path is unchanged. The core artefact-writer listener takes the symmetric `now` seam for the artefact's attach-time `startedAt`.
+
+Scope: the seam covers what the **runner** stamps. A strategy that timestamps its own signals (`capturedAt`) keeps its own clock — out of the runner's reach — so a fully byte-stable artefact also requires the strategies in play to be deterministic.
+
+The invariant is pinned by [`recipe-determinism.test.mts`](../../src/core/recipe/recipe-determinism.test.mts): two runs of a two-step + listener recipe, LLM stubbed at the registry seam, artefacts written to disk by the real writer, compared byte for byte — plus a control run left on the real clock, which must differ.
+
 ## Shipped + user override + bundles (ARCH-08)
 
 Recipes are resolved by [`recipe-loader.mts`](../../src/core/recipe/recipe-loader.mts) in three ranked sources:

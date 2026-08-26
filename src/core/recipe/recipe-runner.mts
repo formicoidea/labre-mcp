@@ -26,6 +26,34 @@ import {
 import { reportUsageToLedger } from "#lib/llm/ledger-report.mjs";
 import { assertQuotaOk } from "#lib/llm/quota-guard.mjs";
 
+// The two nondeterministic sources on the path from a recipe to its artefact:
+// the wall clock (every timestamp and every durationMs the runner stamps) and
+// the run-id factory. Injecting them is what makes a run REPLAYABLE: at fixed
+// LLM outputs, two runs sharing a clock and an id factory produce a strictly
+// identical artefact. Production callers pass nothing and get the real ones.
+//
+// Deliberately narrow: this covers the runner's own stamps, NOT the timestamps
+// a strategy puts on its own signals (`capturedAt`) — those belong to the
+// strategy and are out of the runner's reach.
+export interface RunClock {
+  /** Wall clock. Default: `() => new Date()`. */
+  now?: () => Date;
+  /** Run-id factory. Default: `randomUUID`. */
+  newId?: () => string;
+}
+
+interface ResolvedClock {
+  now: () => Date;
+  newId: () => string;
+}
+
+function resolveClock(clock: RunClock | undefined): ResolvedClock {
+  return {
+    now: clock?.now ?? (() => new Date()),
+    newId: clock?.newId ?? randomUUID,
+  };
+}
+
 export interface RunOptions {
   recipe: Recipe;
   ast: Record<string, unknown>;
@@ -33,6 +61,9 @@ export interface RunOptions {
   registry: StrategyRegistry;
   // Optional pre-existing bus (e.g. for tests) — otherwise one is created.
   bus?: EventBus;
+  // Optional injected clock / run-id factory (replayable runs). Absent → real
+  // wall clock and real UUIDs, i.e. the production path.
+  clock?: RunClock;
   // Optional run-scoped prompt overrides (bundle A/B testing). When present,
   // the whole step-execution phase runs inside runWithPromptOverrides so every
   // step's getPrompt() sees the bundle's prompts; absent → default path,
@@ -50,8 +81,17 @@ export interface RunOptions {
 // StrategyResult into a single envelope returned alongside the AST.
 // The wardley.* sub-trees of JSON-labre are assembled by the caller from
 // the AST keys it owns; the envelope is runner-managed.
+//
+// The envelope carries EXACTLY what the runner can fill. Two fields the spec
+// once listed here — `context` (the study's purpose/scope/angle) and
+// `references[]` (cross-AST pointers, ARCH-24) — were removed: no producer
+// ever wrote them, so every artefact ever emitted published them empty. A
+// field that is always empty is not a contract, it is a promise the caller
+// cannot tell apart from "nothing to report". `context` belongs to the
+// business sub-tree of the command that produces it (`wardley.iteration`, cf.
+// PurposeContext); `references[]` comes back the day ARCH-24's AnalysisRef has
+// a real writer.
 export interface JsonLabreEnvelope {
-  context: Record<string, unknown>;
   signals: StrategyResult["signals"];
   reasoning: StrategyResult["reasoning"];
   insights: StrategyResult["insights"];
@@ -62,7 +102,6 @@ export interface JsonLabreEnvelope {
     startedAt: string;
     completedAt: string;
   }>;
-  references: Array<{ artifactPath: string; jsonPath?: string }>;
 }
 
 export interface RunOutcome {
@@ -74,7 +113,8 @@ export interface RunOutcome {
 }
 
 export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
-  const recipeRunId = randomUUID();
+  const clock = resolveClock(options.clock);
+  const recipeRunId = clock.newId();
   const bus = options.bus ?? createEventBus();
 
   // Capture every event into a flat trace so the caller (and the artefact
@@ -86,12 +126,10 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
 
   // Runner-level envelope accumulator (ast-schema.md v0.1.0 § 2.0).
   const envelope: JsonLabreEnvelope = {
-    context: {},
     signals: [],
     reasoning: [],
     insights: [],
     trace: [],
-    references: [],
   };
 
   // Run-level LLM usage aggregate (CP9), populated by the ALS collector that
@@ -122,7 +160,7 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
       // origin as "the recipe runner of this domain".
       methodId: `${options.recipe.domain}:recipe:orchestration:run:default`,
       phase: "run-end",
-      timestamp: new Date().toISOString(),
+      timestamp: clock.now().toISOString(),
       ...(Object.keys(payload).length > 0 ? { payload } : {}),
     });
   };
@@ -141,6 +179,7 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
         recipeRunId,
         sessionId: options.context.sessionId,
         envelope,
+        clock,
       });
     }
 
@@ -156,6 +195,7 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
       context: options.context,
       registry: options.registry,
       envelope,
+      clock,
     });
   };
 
@@ -216,6 +256,9 @@ export interface RunCommandOptions {
   context: RequestContext;
   registry: StrategyRegistry;
   bus?: EventBus;
+  // Injected clock / run-id factory, forwarded verbatim to runRecipe so a
+  // single command is as replayable as a full recipe.
+  clock?: RunClock;
   // Optional caller-owned AST object. Pass it when an artefact-writer listener
   // attached to the same bus needs the live AST reference (it is mutated in
   // place and read at run-end). The command's input is seeded at `$.input`.
@@ -252,6 +295,7 @@ export async function runCommand(options: RunCommandOptions): Promise<RunOutcome
     context: options.context,
     registry: options.registry,
     bus: options.bus,
+    clock: options.clock,
   });
 }
 
@@ -264,10 +308,11 @@ interface StepExecutionContext {
   recipeRunId: string;
   sessionId: string;
   envelope: JsonLabreEnvelope;
+  clock: ResolvedClock;
 }
 
 async function executeStep(ctx: StepExecutionContext): Promise<void> {
-  const { step, ast, context, registry, bus, recipeRunId, sessionId, envelope } = ctx;
+  const { step, ast, context, registry, bus, recipeRunId, sessionId, envelope, clock } = ctx;
 
   const strategyClass = registry.get(step.tool);
   // any: strategy constructor signature is open by design; framework code is responsible for arg shape
@@ -276,7 +321,7 @@ async function executeStep(ctx: StepExecutionContext): Promise<void> {
   const inputPath = step.in ?? "$";
   const outputPath = step.out ?? "$.lastResult";
 
-  const startedAt = Date.now();
+  const startedAt = clock.now().getTime();
   bus.emit({
     schemaVersion: "1.0",
     recipeRunId,
@@ -304,7 +349,7 @@ async function executeStep(ctx: StepExecutionContext): Promise<void> {
         s.status === "fulfilled" ? s.value : { error: String(s.reason) },
       );
     } catch (err) {
-      emitStepError({ bus, recipeRunId, sessionId, step, startedAt, err });
+      emitStepError({ bus, recipeRunId, sessionId, step, startedAt, err, clock });
       throw err;
     }
   } else {
@@ -312,14 +357,14 @@ async function executeStep(ctx: StepExecutionContext): Promise<void> {
     try {
       result = await strategy.evaluate(input, context);
     } catch (err) {
-      emitStepError({ bus, recipeRunId, sessionId, step, startedAt, err });
+      emitStepError({ bus, recipeRunId, sessionId, step, startedAt, err, clock });
       throw err;
     }
   }
 
   writePath(ast, outputPath, result);
 
-  const completedAt = Date.now();
+  const completedAt = clock.now().getTime();
   bus.emit({
     schemaVersion: "1.0",
     recipeRunId,
@@ -356,8 +401,9 @@ function emitStepError(args: {
   step: RecipeStep;
   startedAt: number;
   err: unknown;
+  clock: ResolvedClock;
 }): void {
-  const completedAt = Date.now();
+  const completedAt = args.clock.now().getTime();
   args.bus.emit({
     schemaVersion: "1.0",
     recipeRunId: args.recipeRunId,
@@ -426,8 +472,9 @@ async function runListeners(opts: {
   context: RequestContext;
   registry: StrategyRegistry;
   envelope: JsonLabreEnvelope;
+  clock: ResolvedClock;
 }): Promise<void> {
-  const { recipe, ast, context, registry, envelope } = opts;
+  const { recipe, ast, context, registry, envelope, clock } = opts;
 
   const outByStep = new Map(recipe.steps.map((s) => [s.stepId, s.out ?? "$.lastResult"]));
   const invocations: ListenerInvocation[] = [];
@@ -442,13 +489,13 @@ async function runListeners(opts: {
 
   const settled = await Promise.allSettled(
     invocations.map(async (inv) => {
-      const startedAt = Date.now();
+      const startedAt = clock.now().getTime();
       const strategyClass = registry.get(inv.methodId);
       // any: strategy constructor signature is open by design (mirrors executeStep)
       const strategy = new (strategyClass as unknown as new () => BaseStrategy)();
       const parentResult = readPath(ast, `${inv.parentOut}.result`);
       const result = await strategy.evaluate(parentResult, context);
-      return { inv, result, startedAt, completedAt: Date.now() };
+      return { inv, result, startedAt, completedAt: clock.now().getTime() };
     }),
   );
 

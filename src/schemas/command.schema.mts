@@ -36,6 +36,13 @@ export type CommandCall = z.infer<typeof CommandCallSchema>;
 // Element shapes are intentionally permissive (e.g. `source`/`type` as strings)
 // so the envelope produced by the runner validates without coupling this
 // schema to the StrategyResult enums.
+//
+// Four channels, all of them actually written by the runner. `context` and
+// `references` used to be published here and were never filled by any producer
+// — an always-empty field is a promise the caller cannot distinguish from
+// "nothing to report", so they were removed rather than kept as decoration
+// (see JsonLabreEnvelope in core/recipe/recipe-runner.mts for the full
+// rationale and the conditions of their return).
 
 const SignalSchema = z.object({
   name: z.string(),
@@ -67,12 +74,10 @@ const TraceEntrySchema = z.object({
 });
 
 export const JsonLabreEnvelopeSchema = z.object({
-  context: z.record(z.string(), z.unknown()),
   signals: z.array(SignalSchema),
   reasoning: z.array(ReasoningSchema),
   insights: z.array(InsightSchema),
   trace: z.array(TraceEntrySchema),
-  references: z.array(z.object({ artifactPath: z.string(), jsonPath: z.string().optional() })),
 });
 
 // --- CommandResult (output envelope) ---------------------------------------

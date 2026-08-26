@@ -56,7 +56,7 @@ describe('JsonLabreSchema', () => {
   it('wraps a wardley.map with the mandatory envelope structure', () => {
     const parsed = JsonLabreSchema.parse({
       wardley: { map: { title: 'T', components: [baseComponent], relations: [] } },
-      envelope: { context: {}, signals: [], reasoning: [], insights: [], trace: [], references: [] },
+      envelope: { signals: [], reasoning: [], insights: [], trace: [] },
     });
     assert.equal(parsed.version, '0.1.0'); // default applied
     assert.equal(parsed.wardley.map?.title, 'T');
@@ -64,7 +64,7 @@ describe('JsonLabreSchema', () => {
 
   it('accepts an empty wardley sub-tree (no command ran yet)', () => {
     const parsed = JsonLabreSchema.parse({
-      envelope: { context: {}, signals: [], reasoning: [], insights: [], trace: [], references: [] },
+      envelope: { signals: [], reasoning: [], insights: [], trace: [] },
     });
     assert.equal(parsed.wardley.map, undefined);
   });

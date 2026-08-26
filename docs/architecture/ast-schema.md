@@ -450,12 +450,10 @@ L'artefact transversal qui circule entre les commandes de labre-mcp s'appelle **
     "iteration": { /* Context + état du cycle */ }
   },
   "envelope": {
-    "context":    { "purpose", "scope", "angle", "temporality", "granularity", "deliverables" },
     "signals":    [ /* ARCH-22 — preuves consommées en entrée */ ],
     "reasoning":  [ /* ARCH-22 — trace LLM verbatim */ ],
     "insights":   [ /* ARCH-22 + listeners — interprétations produites */ ],
-    "trace":      [ { "command", "version", "strategyUsed", "params", "durationMs" } ],
-    "references": [ { "artifactPath", "jsonPath" } ]
+    "trace":      [ { "command", "stepId", "durationMs", "startedAt", "completedAt" } ]
   }
 }
 ```
@@ -464,7 +462,9 @@ Principes :
 - Chaque sous-arbre `wardley.<tool>` est **optionnel** — n'apparaît que si la commande qui l'alimente a été exécutée.
 - Chaque sous-arbre `wardley.<tool>` se conforme à **son propre schéma métier**. Pour `wardley.map`, c'est le schéma renderer (cf. ci-dessous).
 - L'`envelope` agrège tout ce qui est conversationnel et traçable. Elle est **append-only** dans la durée d'une recette : chaque commande ajoute ses entrées, aucune n'efface celles des précédentes.
-- `references[]` reprend la structure `AnalysisRef` (ARCH-24) pour pointer vers des artefacts détaillés (ex. un `WardleyEvolutionAST` complet).
+- L'`envelope` ne publie **que les canaux réellement alimentés** par le runner (CH-12). Deux champs que cette spec listait ici — `context` (purpose/scope/angle) et `references[]` (pointeurs cross-AST, `AnalysisRef` d'ARCH-24) — n'ont jamais eu de producteur : tout artefact émis les publiait vides. Un champ toujours vide n'est pas un contrat, c'est une promesse que l'appelant ne peut pas distinguer de « rien à signaler ». Ils sont donc **retirés** du contrat :
+    - `context` appartient au sous-arbre métier de la commande qui le produit (`wardley.iteration`, cf. `PurposeContext` — sortie de `wardley:iteration:purpose:generate:default`) ;
+    - `references[]` revient le jour où `AnalysisRef` (ARCH-24) a un écrivain réel, et il sera alors réintroduit **avec** son producteur, jamais avant.
 
 #### Norme de communication — `wardley-map.schema.json`
 
@@ -503,7 +503,7 @@ Pour éviter les chevauchements, la règle est :
 | Catégorie | Où ça vit | Exemples |
 | --- | --- | --- |
 | **Donnée attachée à un objet précis** (composant, doctrine, gameplay, …) | JSON métier | `Component.rationale` (justification de positionnement), `EvolutionField.range` (incertitude), `EvolutionField.confidence` (confiance per-élément), `Component.method.preconisation` |
-| **Donnée transverse à toute l'étude** | `envelope` | `context` (purpose/scope/angle), `trace[]` (audit d'exécution), `references[]` (cross-AST) |
+| **Donnée transverse à toute l'étude** | `envelope` | `trace[]` (audit d'exécution). Le contexte d'étude (purpose/scope/angle) vit dans `wardley.iteration`, pas dans l'enveloppe — cf. le principe ci-dessus |
 | **Chaîne analytique de chaque commande** (ARCH-22) | `envelope` | `signals[]`, `reasoning[]`, `insights[]` |
 
 **`signals[]` vs `insights[]`** — sémantique opposée, à ne pas fusionner :
@@ -547,7 +547,7 @@ Domaine **transverse** qui héberge les commandes utiles à plusieurs frameworks
 **Structure en deux parties**  :
 
 1. **Partie métier (domain-specific Wardley)** — Notamment conforme au schéma renderer (`wardley-map.schema.json`, cf. § 2.0) : `title`, `components`, `relations`, `accelerators`, `steps`, mais aussi conforme au autres outils du domaine Wardley. Compréhensible uniquement par les outils du domaine `wardley` et par `render:wardley-map`.
-2. **Partie transverse (cross-domain envelope)** — Champs hors-rendu partagés par l'ensemble des outils du MCP (cf. tableau « Champs hors-rendu » du § 2.0) : `confidence`, `rationale`, `range`, `Insight[]`, `trace`, `context`. Réutilisable par les autres domaines (`edgy`, `cynefin`…) et par les listeners de recipes.
+2. **Partie transverse (cross-domain envelope)** — Champs hors-rendu partagés par l'ensemble des outils du MCP (cf. tableau « Champs hors-rendu » du § 2.0) : `confidence`, `rationale`, `range`, `Insight[]`, `trace`. Réutilisable par les autres domaines (`edgy`, `cynefin`…) et par les listeners de recipes.
 
 **Prérequis** — Aucun.
 
@@ -560,11 +560,11 @@ Domaine **transverse** qui héberge les commandes utiles à plusieurs frameworks
   "$schema":  "labre-mcp/core/JsonLabre.schema.json",
   "version":  "0.1.0",
   "wardley":  { "map": {...}, "doctrine": {...}, "climate": {...}, "gameplay": {...}, "iteration": {...} },
-  "envelope": { "context": {}, "signals": [], "reasoning": [], "insights": [], "trace": [], "references": [] }
+  "envelope": { "signals": [], "reasoning": [], "insights": [], "trace": [] }
 }
 ```
 
-La partie `wardley.map` est strictement validable par le schéma renderer ; les autres sous-arbres `wardley.*` sont validés par leur schéma métier respectif. L'`envelope` est optionnelle dans son contenu mais sa **structure** (présence des 6 clés) est obligatoire pour rester compatible avec les listeners.
+La partie `wardley.map` est strictement validable par le schéma renderer ; les autres sous-arbres `wardley.*` sont validés par leur schéma métier respectif. L'`envelope` est optionnelle dans son contenu mais sa **structure** (présence des 4 clés) est obligatoire pour rester compatible avec les listeners.
 
 ---
 

@@ -23,13 +23,6 @@
     "envelope": {
       "type": "object",
       "properties": {
-        "context": {
-          "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
-          "additionalProperties": {}
-        },
         "signals": {
           "type": "array",
           "items": {
@@ -135,33 +128,13 @@
             ],
             "additionalProperties": false
           }
-        },
-        "references": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "artifactPath": {
-                "type": "string"
-              },
-              "jsonPath": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "artifactPath"
-            ],
-            "additionalProperties": false
-          }
         }
       },
       "required": [
-        "context",
         "signals",
         "reasoning",
         "insights",
-        "trace",
-        "references"
+        "trace"
       ],
       "additionalProperties": false
     }

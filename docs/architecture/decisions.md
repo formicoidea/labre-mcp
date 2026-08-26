@@ -337,7 +337,7 @@ For the evolution tool specifically, the AST is `WardleyEvolutionAST` (γ form):
 
 ## ARCH-24 — `analysisRef` is a structured pointer, not an opaque string
 
-**Status:** Deferred — the `AnalysisRefSchema` was drafted in V1 but never written at runtime; it was removed in the post-v0.1.0 cleanup along with `WardleyChainAST` and `WardleyEvolutionAST`. The structured-pointer shape will be recreated when the recipe runner needs to cross-reference detailed analyses from chain components (currently `envelope.references[]` carries the same intent but is unused).
+**Status:** Deferred — the `AnalysisRefSchema` was drafted in V1 but never written at runtime; it was removed in the post-v0.1.0 cleanup along with `WardleyChainAST` and `WardleyEvolutionAST`. The structured-pointer shape will be recreated when the recipe runner needs to cross-reference detailed analyses from chain components. `envelope.references[]` carried the same intent and was likewise never written: CH-12 removed it from the contract (runner type, Zod schema, published JSON Schema) rather than keep publishing an always-empty field. It comes back **with** its producer, not before.
 
 ---
 
@@ -366,6 +366,6 @@ The shared type was specified as `src/core/ast/analysis-ref.mts` (`AnalysisRefSc
 **Consequences:**
 - Every existing methodId in the codebase (e.g. `wardley:chain:write:map:top-down`, `wardley:evolution:write:capacity:llm-direct`) must be migrated to its new form (e.g. `wardley:map:value-chain:generate:top-down`, `wardley:map:climate:position-functional-in-evolution:llm-direct`). See the migration table in [ast-schema.md](ast-schema.md) § 3.3.
 - The strategy contract is formalised in [ast-schema.md](ast-schema.md) § 3.4 — annexe « Contrat de strategy v0.2 » — which reinforces ARCH-22's `{ signals[], reasoning[], insights[], result }` invariant and adds explicit strategy metadata (cost class, confidence baseline, latency class).
-- `JSON-labre` is the canonical artefact shape: a métier sub-tree per `wardley.*` aspect (conformant to its tool schema, the renderer schema in the case of `wardley.map`) plus a transverse `envelope` carrying `context`, `signals`, `reasoning`, `insights`, `trace`, `references` (cf. ARCH-22 + ARCH-24).
+- `JSON-labre` is the canonical artefact shape: a métier sub-tree per `wardley.*` aspect (conformant to its tool schema, the renderer schema in the case of `wardley.map`) plus a transverse `envelope` carrying `signals`, `reasoning`, `insights`, `trace` (cf. ARCH-22). The spec also listed `context` and `references` here; neither ever had a producer, and CH-12 removed both from the contract — `context` belongs to the business sub-tree of the command that produces it (`wardley.iteration`), `references` returns with ARCH-24's writer.
 - ADRs are still append-only and immutable; the supersession is marked via the `Status:` header of each impacted ADR. The original decision text is preserved as historical context.
 - The `StrategyMetadata.status` enum in [ast-schema.md § 3.4.3](ast-schema.md) includes the value `"mock"` to mark scaffolded I/O contracts that have no real implementation yet. Mock strategies live under `src/frameworks/**/*.mock-strategy.mts` and are registered via `registerMocks(registry)` after the real strategies at daemon boot, so the MCP catalogue exposes the full v0.1.0 surface from day 1.
