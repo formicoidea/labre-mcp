@@ -65,33 +65,49 @@ registry.register(MaStrategy.method, MaStrategy);
 Le boot (`src/frameworks/registry-boot.mts`) appelle chaque
 `registerXxxStrategies()` au démarrage du daemon.
 
-### Stratégie mock (placeholder I/O)
+### Stratégie fixture (placeholder I/O)
 
-Pour matérialiser un `methodId` avant son implémentation réelle, créer un fichier
-`*.mock-strategy.mts` et l'enregistrer via `registerMocks` (`src/frameworks/mocks-registry.mts`).
-Les 61 mocks sont désactivables au boot via `LABRE_DISABLE_MOCKS=1`. La promotion d'un mock
-vers une stratégie réelle est suivie en [roadmap.md](../architecture/roadmap.md) (item B4).
+Pour matérialiser un `methodId` avant son implémentation réelle, **ajouter une ligne** à
+`FIXTURE_METHOD_IDS` dans `src/frameworks/fixtures-registry.mts`. Il n'y a pas de fichier à
+créer : une fixture est une **donnée**, pas du code (ADR ARCH-29, option (a) — bundles
+DATA-ONLY). Les 61 entrées partagent une seule stratégie, donc la forme de leur réponse ne
+peut pas diverger.
 
 ```typescript
-// src/frameworks/<...>/default.mock-strategy.mts
-import { BaseStrategy, type StrategyResult } from '#core/ast/base-strategy.mjs';
-import type { RequestContext } from '#core/context/request-context.mjs';
+// src/frameworks/fixtures-registry.mts
+export const FIXTURE_METHOD_IDS: readonly string[] = [
+  // ...
+  'common:toolbox:list:emit:default',
+];
+```
 
-const METHOD_ID = 'common:toolbox:list:emit:default';
+Toute fixture répond avec l'enveloppe ci-dessous — c'est le contrat d'I/O que la stratégie
+réelle devra honorer en la remplaçant :
 
-export class MockExampleStrategy extends BaseStrategy {
-  static get method(): string { return METHOD_ID; }
-  async evaluate(_input: unknown, _context: RequestContext): Promise<StrategyResult> {
-    const capturedAt = new Date().toISOString();
-    return {
-      signals:   [{ name: 'mock', value: true, source: 'computed', capturedAt }],
-      reasoning: [],
-      insights:  [{ text: `mock strategy for ${METHOD_ID}`, by: METHOD_ID, type: 'other' }],
-      result:    { mock: true, methodId: METHOD_ID },
-    };
-  }
+```json
+{
+  "signals":   [{ "name": "mock", "value": true, "source": "computed", "capturedAt": "…" }],
+  "reasoning": [],
+  "insights":  [{ "text": "mock strategy for <methodId>", "by": "<methodId>", "type": "other" }],
+  "result":    { "mock": true, "methodId": "<methodId>" }
 }
 ```
+
+`capturedAt` vient de **l'horloge du run** (`clockNow()`, `src/core/clock/run-clock-context.mts`),
+jamais d'un `new Date()` local : un rejeu à horloge injectée reproduit l'horodatage à
+l'identique (invariant I3). Un test le vérifie et échoue si un `new Date()` réapparaît sur ce
+chemin.
+
+Les fixtures sont **toujours** enregistrées. Ce qui permet à un appelant de ne pas leur faire
+confiance est la provenance déclarée au catalogue — `implementation: "mock"` dans
+`registry.catalogue()` et dans la ressource `labre://methods` (CH-24) — qui se lit **avant**
+de dépenser un appel. Le drapeau de boot `LABRE_DISABLE_MOCKS` a disparu avec les mocks : il
+doublait le seul canal de refus du kernel, la garde `disabled` du registre (ARCH-29 G2).
+
+**Promouvoir une fixture en stratégie réelle** : supprimer sa ligne de `FIXTURE_METHOD_IDS` et
+enregistrer la vraie classe dans le `registry.mts` de son framework. Cette seule édition fait
+aussi basculer le catalogue de `mock` à `real`. Suivi en
+[roadmap.md](../architecture/roadmap.md) (item B4).
 
 ---
 

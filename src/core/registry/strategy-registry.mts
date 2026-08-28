@@ -55,7 +55,7 @@ export class StrategyRegistry<TStrategy extends BaseStrategy = BaseStrategy> {
   // catalogue) but is refused at resolution — see get().
   private readonly disabled = new Map<string, string>();
   // methodIds registered through registerMock(). Provenance is DECLARED at the
-  // composition root that knows it (frameworks/mocks-registry.mts), never
+  // composition root that knows it (frameworks/fixtures-registry.mts), never
   // guessed from a class name: a naming convention is not a contract, and the
   // catalogue this feeds (CH-24) is read by third-party harnesses deciding
   // whether an answer is real.

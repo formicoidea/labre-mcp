@@ -61,7 +61,7 @@ labre-mcp/
 │   │   │   └── …/_legacy/   real strategies still live here          (ARCH-23, roadmap B2)
 │   │   ├── common/           cross-framework strategies              (ARCH-25)
 │   │   ├── render/           OWM + image rendering
-│   │   └── mocks-registry.mts  registers the mock strategies
+│   │   └── fixtures-registry.mts  the 61 scaffold methodIds, as data      (ARCH-29)
 │   │
 │   ├── mcp/                   # THE DELIVERY — the only layer that names a tool,
 │   │   │                      # a prompt or a resource                   (ARCH-27/28)
@@ -129,7 +129,7 @@ labre-mcp/
 
 18. Degradation is enforced **centrally at the dispatch**: `mcp-handler.dispatch` wraps every tool handler in `withMcpDegradation`, so every `tools/call` response is a `Degradable<T>` (read the business payload at `result.result`) — handlers must NOT self-wrap. External calls (LLM, BigQuery, disk) go through `tryDegradeAmbient` (ambient collector via AsyncLocalStorage). Health checks register + run at boot via `registerBootHealthChecks()` (config/env presence only)
 18b. **The costume is DATA (ARCH-28).** A published prompt renders shipped text; a published resource returns a shipped document and its `read()` takes **no argument**. Never make a resource parameterisable and never load executable content at run time — that is C4 / CH-26 and it is not arbitrated. Adding or removing a prompt or a resource means updating the exact baselines in `src/mcp/tool-telemetry-matrix.test.mts`, in both directions: publishing a method or a document to third-party harnesses is a decision, not a side effect. A new prompt must meet the four selection criteria stated in the header of `src/mcp/prompt-registry.mts`.
-18c. **A mock declares itself.** Register a scaffold strategy with `registry.registerMock(...)`, never `register(...)`: `labre://methods` reports the `real`/`mock` status a third-party harness reads before it trusts an answer, and that provenance can only come from `src/frameworks/mocks-registry.mts`. Promoting a mock = deleting its line there.
+18c. **A scaffold declares itself.** Register one with `registry.registerMock(...)`, never `register(...)`: `labre://methods` reports the `real`/`mock` status a third-party harness reads before it trusts an answer, and that provenance can only come from `src/frameworks/fixtures-registry.mts`. A scaffold is DATA there — one line in `FIXTURE_METHOD_IDS`, no file (ARCH-29 option (a)); promoting it = deleting that line. Its `capturedAt` comes from the run clock (`clockNow()`), never `new Date()`.
 19. Under Windows, MCP servers launched via `npx` need a `cmd /c` wrapper in `.mcp.json` or they fail to start
 20. **`process.cwd()` forbidden at runtime** (ARCH-15) — every tool call carries `context.{projectId, projectRoot, sessionId, domain}`. Reading `process.cwd()` or `process.env.X` outside the daemon boot (top-level config loading) is forbidden
 

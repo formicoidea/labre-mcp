@@ -110,7 +110,7 @@ Listing **canonique** des commandes spécifiées en v0.1.0. La spécification co
 
 > Le catalogue ci-dessous décrit la **surface cible** complète. Aujourd'hui, sur les **86 commandes enregistrées** au boot, seules **25** ont une stratégie réellement implémentée ; les **61 autres** sont des **mocks** — des stratégies d'échafaudage enregistrées pour exposer la surface dès le jour 1 (elles retournent un `insight` « `mock strategy for <methodId>` » et aucun `result` métier). Le champ `StrategyMetadata.status` (§ 3.4.3) porte la distinction : `experimental | stable` = réel, `mock` = échafaudage.
 >
-> **Source de vérité** : le daemon imprime au boot la liste des methodId enregistrés (stderr) ; `LABRE_DISABLE_MOCKS=1` ne boote que les réelles. Tenir cette liste à jour à chaque promotion mock → réel (cf. [roadmap.md](roadmap.md) B4).
+> **Source de vérité** : le daemon imprime au boot la liste des methodId enregistrés (stderr) ; `registry.catalogue()` (et la ressource `labre://methods`) distingue `real` de `mock`. Tenir cette liste à jour à chaque promotion mock → réel (cf. [roadmap.md](roadmap.md) B4).
 
 **Commandes réellement implémentées (25)** :
 

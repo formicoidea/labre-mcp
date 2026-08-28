@@ -511,9 +511,13 @@ are the whole job.
 
 ---
 
-## 7. Open questions the human has to answer
+## 7. Open questions — answered 2026-08-28 (see ARCH-29)
 
-These are the inputs the recommendation depends on. They are not rhetorical.
+These are the inputs the recommendation depended on. **All four were answered
+by the human on 2026-08-28; the answers are recorded in ARCH-29**
+([decisions.md](decisions.md)), which is the single place they live. The
+questions are kept here as originally written so the analysis below stays
+readable against them.
 
 1. **Who may author a plugin?** First-party only, or third parties? This single
    answer sets the containment requirement (§ 4) and therefore most of the cost.

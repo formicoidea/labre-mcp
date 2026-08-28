@@ -18,8 +18,10 @@
 // MCP delivery — `src/mcp/labre-daemon.mts` or the `labre-mcp` bin — not this.
 
 // ─── Strategy catalogue ─────────────────────────────────────────────────────
-// `buildStrategyRegistry()` returns the full catalogue (set LABRE_DISABLE_MOCKS=1
-// for real strategies only). `StrategyRegistry` builds a narrower one by hand.
+// `buildStrategyRegistry()` returns the full catalogue — real strategies AND
+// fixtures. There is no boot flag to hide the fixtures: read `implementation`
+// off `registry.catalogue()` to keep only the real ones. `StrategyRegistry`
+// builds a narrower catalogue by hand.
 export { StrategyRegistry } from './core/registry/strategy-registry.mjs';
 export type {
   StrategyCatalogEntry,

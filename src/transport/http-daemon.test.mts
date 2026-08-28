@@ -35,14 +35,15 @@ describe("isSupabaseIssuedToken — bundle refresh routing", () => {
 
 describe("labre-daemon boot wiring", () => {
   it("buildStrategyRegistry populates the core registry with every framework strategy", () => {
-    // CP10: mocks expand the catalogue. Test the real strategies in isolation
-    // by setting the disable flag; the full catalogue (real + mocks) is
-    // covered in the next test.
-    const prevDisable = process.env.LABRE_DISABLE_MOCKS;
-    process.env.LABRE_DISABLE_MOCKS = "1";
-    const registry = buildStrategyRegistry();
-    process.env.LABRE_DISABLE_MOCKS = prevDisable ?? "";
-    const ids = registry.list();
+    // Fixtures expand the catalogue (CH-26). The real strategies are isolated
+    // through the catalogue's OWN provenance channel — `implementation`, the
+    // same field `labre://methods` serves — not through a boot-time env flag:
+    // since CH-26 there is one refusal channel and no second switch (ARCH-29
+    // G2). The full catalogue (real + fixtures) is covered in the next test.
+    const ids = buildStrategyRegistry()
+      .catalogue()
+      .filter((e) => e.implementation === "real")
+      .map((e) => e.methodId);
     // map climate position-* (9 = 6 functional + 1 solution + 2 anchor)
     // + map node identify (1)
     // + map basemap generate (1)
@@ -50,7 +51,7 @@ describe("labre-daemon boot wiring", () => {
     // + render wardley-map (6 = owm parse/emit + image emit/parse svg + image emit/parse png)
     // + iteration purpose (2 = generate + audit-purpose-quality)
     // + render text lint (1) = 25 total real strategies
-    assert.equal(registry.size(), 25);
+    assert.equal(ids.length, 25);
 
     const expected = [
       // map climate: position-functional-in-evolution (6)
@@ -91,7 +92,7 @@ describe("labre-daemon boot wiring", () => {
     ];
 
     for (const id of expected) {
-      assert.equal(registry.has(id), true, `missing methodId: ${id}`);
+      assert.equal(ids.includes(id), true, `missing real methodId: ${id}`);
     }
 
     // Every id is 5-segment lowercase, no surprises
@@ -110,11 +111,11 @@ describe("labre-daemon boot wiring", () => {
     assert.notEqual(a, b);
   });
 
-  it("buildStrategyRegistry exposes the full v0.1.0 catalogue (real + mocks)", () => {
+  it("buildStrategyRegistry exposes the full v0.1.0 catalogue (real + fixtures)", () => {
     const registry = buildStrategyRegistry();
     // 25 real strategies (CP3-CP6 + basemap/Y-layout + render image emit/parse svg+png + text lint +
     // value-chain select-by-type engine + iteration purpose generate + audit-purpose-quality)
-    // + 61 mock strategies (CP10, image emit/parse png promoted) = 86 total
+    // + 61 fixture strategies (CH-26, image emit/parse png promoted) = 86 total
     // (text:lint:default is NEW surface, not a promoted mock).
     assert.equal(registry.size(), 86);
     // Every registered id is a valid 5-segment methodId.

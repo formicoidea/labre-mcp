@@ -79,7 +79,9 @@ await runRecipe({ recipe, ast, context, registry, clock: { now: () => fixedDate,
 
 `RunClock.now` drives every timestamp and every `durationMs` the runner stamps (step-start / step-end / step-error / run-end events, and the `envelope.trace` entries); `RunClock.newId` produces the `recipeRunId`. Both default to the real ones — production callers pass nothing and the path is unchanged. The core artefact-writer listener takes the symmetric `now` seam for the artefact's attach-time `startedAt`.
 
-Scope: the seam covers what the **runner** stamps. A strategy that timestamps its own signals (`capturedAt`) keeps its own clock — out of the runner's reach — so a fully byte-stable artefact also requires the strategies in play to be deterministic.
+Scope: since CH-26 the seam also reaches a **strategy's** own timestamps. `runRecipe` installs `now` as the run-scoped clock ([`run-clock-context.mts`](../../src/core/clock/run-clock-context.mts)) around the whole run body — steps and listeners — so a strategy reads the injected clock through `clockNow()` and stamps `capturedAt` from it, with no change to the `evaluate()` signature. Every one of the 61 fixture strategies takes that seam; the guard is in [`fixtures-registry.test.mts`](../../src/frameworks/fixtures-registry.test.mts), which fails if a `new Date()` reappears on that path.
+
+What is still out of reach is a strategy that ignores the seam and reads the wall clock itself: `new Date()` remains in real framework code, so a fully byte-stable artefact still requires the strategies in play to be deterministic. The difference is that this is now a per-strategy omission a review can catch, not a structural hole — before CH-26 the scaffold half of the catalogue leaked 61 uncontrolled clock reads by construction.
 
 The invariant is pinned by [`recipe-determinism.test.mts`](../../src/core/recipe/recipe-determinism.test.mts): two runs of a two-step + listener recipe, LLM stubbed at the registry seam, artefacts written to disk by the real writer, compared byte for byte — plus a control run left on the real clock, which must differ.
 

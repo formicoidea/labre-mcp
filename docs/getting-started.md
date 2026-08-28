@@ -27,8 +27,6 @@ OPENCODE_API_KEY=sk-votre-cle-ici
 # Port du daemon (optionnel, défaut 6767)
 # LABRE_HTTP_PORT=6767
 
-# Ne booter que les 25 stratégies réelles (sans les 61 mocks) (optionnel)
-# LABRE_DISABLE_MOCKS=1
 ```
 
 Copier `llm.config.example.json` vers `llm.config.json` et choisir un profil (voir [configuration.md](technical/configuration.md)).

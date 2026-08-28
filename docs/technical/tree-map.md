@@ -12,7 +12,7 @@
 | Élément | État |
 |---|---|
 | Outils MCP câblés | 6 : `estimateEvolution` (recette `estimate-component-evolution`), `generateValueChain` (recette `generate`), `evaluateMap` (recette `evaluate-map`), `runCommand` (invocation directe de n'importe quel methodId), `runRecipe` (n'importe quelle recette par ref 3 segments), `__ping__` (smoke). Roadmap B3 traité. |
-| Stratégies enregistrées | 86 au boot : **25 réelles** + **61 mocks** (`LABRE_DISABLE_MOCKS=1` isole les réelles). Liste des réelles : [ast-schema.md → « État d'implémentation »](../architecture/ast-schema.md). Une d'entre elles est enregistrée mais **hors service** : `…:position-functional-in-evolution:timeline-benchmark` déclare `static get disabled` (latence LLM >30 min/run) et le registre refuse de la résoudre. |
+| Stratégies enregistrées | 86 au boot : **25 réelles** + **61 fixtures** (`src/frameworks/fixtures-registry.mts`, ARCH-29 option (a)). Les fixtures sont toujours enregistrées ; pour isoler les réelles, filtrer `registry.catalogue()` sur `implementation === "real"` — le drapeau `LABRE_DISABLE_MOCKS` a été retiré en CH-26 (il doublait le canal de refus du registre). Liste des réelles : [ast-schema.md → « État d'implémentation »](../architecture/ast-schema.md). Une d'entre elles est enregistrée mais **hors service** : `…:position-functional-in-evolution:timeline-benchmark` déclare `static get disabled` (latence LLM >30 min/run) et le registre refuse de la résoudre — c'est le **seul** canal de refus du kernel (ARCH-29 G2). |
 
 ## 2. Points d'entrée
 
@@ -21,7 +21,7 @@
 - **Mode lib** : `src/index.mts` — le cœur consommé en direct, sans transport : `buildStrategyRegistry()`, `runCommand` / `runRecipe` (enveloppe JSON-labre), `loadRecipe` + `RecipeSchema`, `BaseStrategy`, `RequestContextSchema`, `ToolRegistry`, `PromptRegistry` / `ResourceRegistry`, les catalogues de données (`GRAMMAR`, `listShippedSchemas`/`listShippedRecipes`, `listPromptCatalog`), le bus, l'artefact writer, `SHIPPED_ROOT`. Aucun serveur ne démarre, aucun port n'est ouvert, aucun appel quota/ledger n'est fait (ARCH-27, coupes 1 et 4). Depuis ARCH-28 un hôte embarqué obtient donc **la même surface de découverte** qu'un harnais tiers sur le fil.
 - **Daemon HTTP** : `src/mcp/labre-daemon.mts` — racine de composition (registre d'outils MCP + catalogue de stratégies + `startHttpDaemon` de `src/transport/http-daemon.mts`). Le daemon écoute sur `127.0.0.1:6767` (override `LABRE_HTTP_PORT` / `LABRE_HTTP_HOST`). Endpoints : `POST /mcp` (JSON-RPC : `initialize`, `ping`, `tools/list`, `tools/call`, `prompts/list`, `prompts/get`, `resources/list`, `resources/read`, `notifications/*` — le costume passe la MÊME porte d'auth, l'authentification a lieu pour tout le POST avant le dispatch), `GET /health`, `GET /version`, `GET /schemas/<fichier>` (JSON Schemas du contrat de donnée, dossier `schema/`), `GET /.well-known/oauth-protected-resource` (découverte OAuth RFC 9728, opt-in via `LABRE_OAUTH_RESOURCE` + `LABRE_OAUTH_AUTH_SERVER` ; daemon = serveur de ressources, AS = app labre).
 - **Entrée stdio** : `src/mcp/labre-stdio.mts` — même racine de composition sur l'autre fil (`startStdioServer` de `src/transport/stdio-server.mts`), c'est le `bin` du paquet publié. JSON-RPC newline-delimited sur stdin/stdout, transport que Claude Code / l'Agent SDK lancent directement (`{ "command": "npx", "args": ["-y", "labre-mcp"] }`). Réutilise le même `dispatch` + `buildMcpToolRegistry()` que le daemon ; stdout est réservé au protocole (réponses + notifications), tout le reste va sur stderr.
-- **Boot** : `buildMcpToolRegistry()` (→ `src/mcp/tool-registry.mts`, partagé HTTP + stdio) enregistre les outils MCP — **c'est le seul module qui nomme un outil**, le transport reçoit un registre déjà rempli (`HttpDaemonDeps` / `StdioServerDeps`) ; `buildMcpPromptRegistry()` + `buildMcpResourceRegistry({ strategies })` composent de même le **costume** (ARCH-28) — les registres sont optionnels au dispatch, et `initialize` n'annonce une capacité que pour un registre réellement fourni ; une déclaration de costume qui nomme un prompt absent du registre **fait échouer le boot** plutôt que de mentir au client ; `buildStrategyRegistry()` (→ `src/frameworks/registry-boot.mts`) peuple le `StrategyRegistry` via `register{Evolution,Chain,Common}Strategies` + `registerMocks` (sauf `LABRE_DISABLE_MOCKS=1`). C'est le **seul registre de stratégies** : depuis CH-18 il n'existe plus de marcheur de fichiers parallèle sous `_legacy/`. Toute résolution (`runCommand` comme recipe runner) passe par `StrategyRegistry.get()`, qui refuse une stratégie déclarée `disabled` en rendant sa raison.
+- **Boot** : `buildMcpToolRegistry()` (→ `src/mcp/tool-registry.mts`, partagé HTTP + stdio) enregistre les outils MCP — **c'est le seul module qui nomme un outil**, le transport reçoit un registre déjà rempli (`HttpDaemonDeps` / `StdioServerDeps`) ; `buildMcpPromptRegistry()` + `buildMcpResourceRegistry({ strategies })` composent de même le **costume** (ARCH-28) — les registres sont optionnels au dispatch, et `initialize` n'annonce une capacité que pour un registre réellement fourni ; une déclaration de costume qui nomme un prompt absent du registre **fait échouer le boot** plutôt que de mentir au client ; `buildStrategyRegistry()` (→ `src/frameworks/registry-boot.mts`) peuple le `StrategyRegistry` via `register{Evolution,Chain,Common}Strategies` + `registerFixtures` (inconditionnel depuis CH-26). C'est le **seul registre de stratégies** : depuis CH-18 il n'existe plus de marcheur de fichiers parallèle sous `_legacy/`. Toute résolution (`runCommand` comme recipe runner) passe par `StrategyRegistry.get()`, qui refuse une stratégie déclarée `disabled` en rendant sa raison.
 - **Scripts npm** : `dev`/`mcp` = `tsx --conditions labre-mcp-dev src/mcp/labre-daemon.mts` ; `mcp:prod` = `node dist/mcp/labre-daemon.mjs` ; `mcp:stdio` = `tsx --conditions labre-mcp-dev src/mcp/labre-stdio.mts` ; `mcp:stdio:prod` = `node dist/mcp/labre-stdio.mjs` ; `build` = `tsc` ; `typecheck` = `tsc --noEmit` ; `test` = `tsx --conditions labre-mcp-dev --test "src/**/*.test.mts"` ; `schemas` = `tsx --conditions labre-mcp-dev scripts/export-schemas.mts` (régénère `schema/`) ; `demo:costume` = `tsx --conditions labre-mcp-dev scripts/demo-costume.mts` (handshake + prompts/list + prompts/get + resources/read réels, sans modèle ni port) ; `dataset` = `tsx --conditions labre-mcp-dev scripts/build-dataset.mts` (harnais dataset round-trip → `dataset/`, gitignoré ; sous PowerShell, npm avale les args `--count`/`--seed` — appeler `npx tsx … scripts/build-dataset.mts --count N` directement).
 - **Subpath imports conditionnels** : le mapping `#core/*`, `#lib/*`, … (package.json `imports`) est `{ "labre-mcp-dev": "./src/*", "default": "./dist/*" }`. Le dev passe `--conditions labre-mcp-dev` (résout vers `src/`, tsx remappe `.mjs`→`.mts`) ; node pur en prod prend `default` (résout vers `dist/`). Sans ça les `.mjs` compilés tentent de résoudre vers `src/*.mjs` inexistant.
 - **Exports npm** : package.json `exports` expose `.` (entrée principale `dist/index.mjs`) et `./schemas` (barrel `src/schemas/index.mts` → `dist/schemas/index.mjs`, même motif conditionnel `development`/`default`). `@formicoidea/labre-mcp/schemas` sert le schéma de manifeste des strategy bundles au frontend d'admin.
@@ -163,7 +163,9 @@ src/
 │   │   │                     structured output si le provider le supporte] ou owm [éditable] ;
 │   │   │                     court-circuits déterministes, refus NOT_A_VALUE_CHAIN sur la prose libre)
 │   │   └── wardley-map/acl/  anti-corruption layer : WardleyMap ↔ PositionedValueChain (inverse la convention de visibilité : legacy 0.95=haut ↔ renderer 0=haut)
-│   ├── mocks-registry.mts    enregistre les 61 *.mock-strategy.mts
+│   ├── fixtures-registry.mts les 61 methodId d'échafaudage, en DONNÉES : une liste + une
+│   │                         stratégie partagée (capturedAt = horloge du run). Zéro fichier
+│   │                         par entrée, zéro primitive d'exécution dynamique  (ARCH-29 (a))
 │   ├── registry-boot.mts     buildStrategyRegistry() — racine de composition des frameworks
 │   │                         (venue de core/transport/ en CH-23 : le cœur ne connaît plus
 │   │                         aucun framework)                                    (ARCH-27)
@@ -190,7 +192,8 @@ src/
 │
 ├── schemas/                  ── Schémas Zod (source de vérité runtime)
 │   ├── index.mts             barrel exporté en npm via `exports["./schemas"]` (surface externe)
-│   ├── strategy-bundle.schema.mts  manifeste des strategy bundles v0 (slug, permissions, prompts)
+│   ├── strategy-bundle.schema.mts  manifeste des strategy bundles v0 (slug, prompts ; `permissions`
+│   │                         supprimé et `signature` réservé — ARCH-29 A4/A5)
 │   └── estimate-evolution, evaluate-map, identify-capability, estimate-anchor-evolution,
 │       generate-value-chain, value-chain, command, run-recipe, inputs, results, patent, parsed-llm,
 │       wardley-map (ré-export du schéma du package @formicoidea/wardley-map-renderer), json-labre (artefact root)
@@ -218,7 +221,7 @@ client MCP ──HTTP──▶ mcp/labre-daemon ──▶ transport/http-daemon 
                                        ┌──────────────────────────────────────────┤
                                        ▼                                          ▼
                           frameworks/wardley/evolution/registry        frameworks/wardley/chain/registry
-                          frameworks/common/registry                   frameworks/mocks-registry
+                          frameworks/common/registry                   frameworks/fixtures-registry
 
 Partagé : lib/{llm, degradation, flags, prompts, owm, response-formatter, language-detect, mcp-notifications}
 
@@ -259,7 +262,7 @@ Un **strategy bundle** est un paquet déclaratif data-only (aucun code exécutab
 | `llm.config.example.json` | Gabarit (3 profils, voir [configuration.md](configuration.md)) |
 | `prompts.config.json` | Registre des prompts par stratégie (paires `.system.md` / `.user.md`, parser custom/délimité/keyValue) |
 | `prompts/*.{system,user}.md` | Prompts splités — aucun `{{…}}` dans un `.system.md` (vérifié par le loader) |
-| `.env.example` | Variables d'environnement (`OPENCODE_API_KEY`, `WARDLEY_LLM_CONFIG`, `WARDLEY_PROMPTS_CONFIG`, `LABRE_HTTP_PORT`, `LABRE_HTTP_HOST`, `LABRE_DISABLE_MOCKS`, `LABRE_AUTH`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `LABRE_BUNDLES_TTL_S`…) |
+| `.env.example` | Variables d'environnement (`OPENCODE_API_KEY`, `WARDLEY_LLM_CONFIG`, `WARDLEY_PROMPTS_CONFIG`, `LABRE_HTTP_PORT`, `LABRE_HTTP_HOST`, `LABRE_AUTH`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `LABRE_BUNDLES_TTL_S`…) |
 | `.mcp.json` | Enregistrement du serveur HTTP auprès du client MCP |
 | `promptfooconfig.yaml` | Configuration d'évaluation promptfoo (voir [evaluation.md](../functional/evaluation.md)) |
 | `schema/*.schema.json` | JSON Schemas publiés du contrat de donnée (wardley-map copié du renderer, json-labre, command-call, command-result) — régénérés par `npm run schemas`, servis en `GET /schemas/<fichier>` ([ast-schema.md § 2.0](../architecture/ast-schema.md)) |

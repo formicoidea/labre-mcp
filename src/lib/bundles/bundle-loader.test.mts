@@ -24,7 +24,6 @@ function baseManifest(overrides: Record<string, unknown> = {}): Record<string, u
     slug: 'demo-bundle',
     version: '1.0.0',
     description: 'Temp bundle for loader tests',
-    permissions: ['llm'],
     ...overrides,
   };
 }
@@ -68,7 +67,6 @@ describe('bundle-loader: loadBundleFromDir', () => {
 
     assert.equal(loaded.manifest.slug, 'evaluate-map-example');
     assert.equal(loaded.manifest.schemaVersion, '0.1');
-    assert.deepEqual(loaded.manifest.permissions, ['llm']);
     assert.equal(loaded.recipe.name, 'evaluate-map-example');
     assert.equal(loaded.recipe.domain, 'wardley');
     assert.equal(loaded.recipe.tool, 'map');
@@ -83,12 +81,18 @@ describe('bundle-loader: loadBundleFromDir', () => {
     assert.doesNotMatch(pair.system, /\{\{\w+\}\}/);
   });
 
-  it('deduplicates manifest permissions on parse', async () => {
+  // ARCH-29 A4: `permissions` is deleted, not enforced. The manifest object is
+  // `.strict()`, so a bundle already published against v0.1 would be REJECTED
+  // if the key were simply dropped from the schema — it is accepted and
+  // stripped instead. This test is the compatibility guarantee for the rows
+  // already in `strategy_bundles`.
+  it('accepts a legacy manifest carrying permissions, and strips the field', async () => {
     const dir = await writeTempBundle({
-      manifest: baseManifest({ permissions: ['llm', 'render', 'llm'] }),
+      manifest: baseManifest({ permissions: ['llm', 'render'] }),
     });
     const loaded = await loadBundleFromDir(dir);
-    assert.deepEqual(loaded.manifest.permissions, ['llm', 'render']);
+    assert.equal(loaded.manifest.slug, 'demo-bundle');
+    assert.equal('permissions' in loaded.manifest, false, 'permissions must not survive the parse');
   });
 
   it('rejects a manifest with a missing required field', async () => {
@@ -129,15 +133,27 @@ describe('bundle-loader: loadBundleFromDir', () => {
     await assert.rejects(loadBundleFromDir(dir), /"who"/);
   });
 
-  it('rejects declared prompt pairs when "llm" permission is missing', async () => {
+  // The inverse of the rule ARCH-29 A4 deleted: prompt pairs used to require a
+  // declared "llm" permission. With the enum gone, prompts load on their own.
+  it('loads declared prompt pairs with no permission declaration at all', async () => {
     const dir = await writeTempBundle({
-      manifest: baseManifest({ permissions: ['render'], prompts: { 'demo-strategy': ['default'] } }),
+      manifest: baseManifest({ prompts: { 'demo-strategy': ['default'] } }),
       files: {
         'prompts/demo-strategy/default.system.md': 'You are a demo.',
         'prompts/demo-strategy/default.user.md': 'Do {{thing}}.',
       },
     });
-    await assert.rejects(loadBundleFromDir(dir), /declares prompts but "permissions" is missing "llm"/);
+    const loaded = await loadBundleFromDir(dir);
+    assert.ok(loaded.prompts['demo-strategy']?.['default'], 'prompt pair must load');
+  });
+
+  // ARCH-29 A5: reserved, accepted, and never treated as a control.
+  it('accepts a reserved signature field without verifying anything', async () => {
+    const dir = await writeTempBundle({
+      manifest: baseManifest({ signature: 'not-a-real-signature' }),
+    });
+    const loaded = await loadBundleFromDir(dir);
+    assert.equal(loaded.manifest.signature, 'not-a-real-signature');
   });
 
   it('rejects a recipe whose name differs from the manifest slug', async () => {
