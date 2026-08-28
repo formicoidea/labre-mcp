@@ -1,10 +1,13 @@
 # Plugin runtime — security model
 
 > **Companion to [ARCH-29](decisions.md#arch-29--plugin-runtime-security-model-data-only-is-load-bearing).**
-> Status 🔴 **Proposed — awaiting human arbitration.** Nothing here is decided.
-> This document holds the evidence, the threat model and the option analysis
-> that ARCH-29 summarises. Not a single byte of executable-plugin code exists,
-> and none should be written before the arbitration lands.
+> Status ✅ **Arbitrated 2026-08-28 — option (a) retained: richer DATA-ONLY
+> bundles, no executable plugin runtime.** The § 7 questions are answered in
+> ARCH-29. This document holds the evidence, the threat model and the option
+> analysis; the evidence and the threat model are **current state**, options (b)
+> and (c) are the **refused branches**, kept because the switching criterion may
+> revive them. Not a single byte of executable-plugin code exists, and under (a)
+> none is to be written.
 
 ---
 
@@ -452,9 +455,13 @@ produce byte-identical artefacts — the same shape as
 
 ### G2 — The security model is written before the first executable byte
 
-**R2.1** ARCH-29 is arbitrated (status moves off 🔴) before any module under
-`src/` gains `import()`, `Function`, `vm`, `eval` or a native isolate binding on
-a path reachable from a plugin.
+**R2.1** No module under `src/` gains `import()`, `Function`, `vm`, `eval` or a
+native isolate binding on a path reachable from a plugin.
+*Amended 2026-08-28:* this requirement was worded as "ARCH-29 is arbitrated
+(status moves off 🔴) before…". The arbitration has now landed and retained
+**(a)**, so that wording would satisfy itself and lift the guard — the opposite
+of what (a) decides. Under (a) the rule is unconditional; it lapses only if a
+later arbitration retains an executable option and records it in ARCH-29 first.
 *Guard:* a mechanical rule in the ARCH-27 boundary checker family
 (`scripts/check-import-boundaries.mts`) — a grep-level gate is enough and is
 cheap; the point is that it fails in CI, not that it is clever.
