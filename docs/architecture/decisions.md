@@ -554,7 +554,10 @@ The schema category is **mechanical**: it mirrors `schema/`, which is already ex
 - **i18n is not in scope.** This is a machine surface; it is English, like the rest of the code base's technical surface.
 ## ARCH-29 — Plugin runtime security model: DATA-ONLY is load-bearing
 
-**Status:** 🔴 **Proposed — awaiting human arbitration.** Written by chantier
+**Status:** ✅ **Accepted — option (a), "extended status quo: richer DATA-ONLY
+bundles". Human arbitration 2026-08-28.** No executable plugin runtime. The
+four § 7 questions are answered below and the switching criteria stay live: this
+ADR reopens in full the day one of them changes. Written by chantier
 **CH-26** (AI-harness audit, wave 4), first tranche: the security ADR, zero
 code. It instructs the human's **C4** arbitration (2026-08-25) — *"a hot plugin
 runtime, with two non-negotiable guards: (a) an explicit re-design of the
@@ -699,13 +702,21 @@ instead of replaying against different code; and a plugin receives the run clock
 
 **G2 — the model is written before the first executable byte.** No module
 reachable from a plugin path gains `import()` / `Function` / `vm` / `eval` / an
-isolate binding before this ADR's status moves off 🔴, enforced by a grep-level
-gate in the `check:boundaries` family. `manifest.permissions` is either enforced
-or deleted. Revocation goes through the existing CH-18 `disabled` guard
+isolate binding, enforced by a grep-level gate in the `check:boundaries` family.
+`manifest.permissions` is either enforced or deleted.
+
+**⚠️ G2 was originally worded as "before this ADR's status moves off 🔴". That
+wording is now wrong and has been replaced.** It was written when 🔴 was the only
+thing holding the line, and read literally it would mean the 2026-08-28
+acceptance *lifts* the guard — the exact opposite of what accepting (a) means.
+Under (a) the prohibition is **permanent, not conditional on the status**: it
+lapses only if a future arbitration retains an executable option, and such an
+arbitration must say so in this ADR before any code is written. Revocation goes through the existing CH-18 `disabled` guard
 (`src/core/registry/strategy-registry.mts:58-76`), the kernel's single
 resolution point — one refusal channel, not two.
 
-**Recommendation (proposed, not decided):**
+**Recommendation — ratified 2026-08-28. The argument below was accepted as
+written; it is now the decision, not a proposal.**
 
 **Take (a) now, and make (b) — never (c) alone — conditional on a named
 requirement (a) cannot meet.** Three reasons, in order of weight:
@@ -742,18 +753,58 @@ seam and `pnpm check:boundaries` stays on an **empty** baseline — a new entry 
 a request to reopen ARCH-27. Details in
 [plugin-runtime-security.md](plugin-runtime-security.md) § 6.
 
-**What this ADR does NOT decide:**
+**The arbitration, 2026-08-28 — the four § 7 questions, answered:**
 
-It proposes; the human arbitrates. It does not choose (a), (b) or (c) — the
-recommendation above is an argument, not a decision. It does not authorise any
-code: the status is 🔴 precisely so that G2 has something to point at. It does
-not settle **who may author a plugin**, which deployment must support hot
-plugins (stdio carries T1 to end-user machines; HTTP-only shrinks the problem),
-what "framework plugin" means for EDGY / Cynefin / BPMN, or whether a signing
-key is operationally acceptable — four questions listed in
-[plugin-runtime-security.md](plugin-runtime-security.md) § 7 whose answers set
-most of the cost. Until the status moves, CH-26 ships the DATA-ONLY tranches
-only.
+| Question ([plugin-runtime-security.md](plugin-runtime-security.md) § 7) | Answer |
+| --- | --- |
+| Who may author a plugin? | **First-party only today. Third parties one day.** |
+| Which deployment must support hot plugins? | **HTTP only.** |
+| What does "framework plugin" mean for EDGY / Cynefin / BPMN? | Genuinely new computation — **but no concrete methodId could be named.** |
+| Is a signing key operationally acceptable? | **Overkill while the payload is inert.** |
+
+**What decided (a): the switching criterion was applied and not met.** This ADR
+asks for *one* methodId a DATA-ONLY bundle cannot express — a parser for a format
+we do not parse, an estimator with real arithmetic, a renderer we do not have.
+None could be named on 2026-08-28. The class claim ("a framework will want to
+compute one day") is the argument this ADR pre-emptively refuses, because it
+would buy a permanent obligation with an intuition. **Answer 3 therefore does not
+trigger (b); it is recorded so the next attempt starts from a named requirement.**
+
+**What "HTTP only" buys, immediately: T1 is dead.** No arbitrary execution
+reaching the machine of a stdio user, whose trust boundary *is* the spawning
+process. This is free and holds by a one-line guard, independent of everything
+else here.
+
+**What "third parties one day" fixes: the containment ceiling, not a roadmap.**
+Per this ADR's own rule — *containment is set by who may author, not by what a
+plugin does* — first-party-only sizes at signing, pinning, provenance and
+worker-thread isolation; third-party sizes at a V8 isolate or a separate process.
+**The second is not an increment of the first.** The day a third party may
+publish, ARCH-29 reopens whole; it does not get amended.
+
+**Acceptance elements — what a reader or a test can check:**
+
+- **A1** Status is accepted, option (a). Options (b) and (c) are refused *for
+  now*, on the record, with the criterion that would revive them.
+- **A2** G2 is permanent under (a), not conditional on the 🔴 status — see the
+  correction above.
+- **A3** stdio never loads a bundle. Guard to add; T1 stays impossible by
+  construction rather than by deployment habit.
+- **A4** `manifest.permissions` is **deleted**, not enforced. This ADR requires
+  one or the other whatever is chosen; under (a) nothing executes, so an
+  unenforced permission enum is pure misdirection and goes.
+- **A5** `signature?: string` is reserved in the manifest schema — optional,
+  unverified, uncommented as a control. The schema is `.strict()`, so a field
+  added later would be rejected by every daemon deployed until then; reserving it
+  costs one line and removes a future breaking change. Signing itself stays out:
+  the trust anchor today is the `service_role`-write-only row plus per-file
+  sha256, not a key.
+- **A6** The mocks-to-data tranche is unblocked and needs no further arbitration.
+- **G1 is dormant, not satisfied.** Under (a) there is no plugin activation to
+  trace, so provenance and replay-refusal are **prerequisites of any future
+  (b)** — not follow-ups to this decision. `ArtifactBody` still carries no
+  `codeProvenance` and `PipelineEvent` still has no lifecycle phase; both stay
+  survivable exactly as long as the code is the binary.
 
 **Consequences (of recording it, whatever is arbitrated):**
 
