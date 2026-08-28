@@ -63,18 +63,27 @@ A bundle is **data only** — it composes shipped primitives; it never ships cod
 consumers via the `@formicoidea/labre-mcp/schemas` subpath):
 
 - `schemaVersion: "0.1"`, `slug` (kebab), `version` (semver), `description`
-- `permissions: ("llm" | "bigquery" | "network" | "render")[]`
 - `prompts?: Record<strategyId, promptName[]>`
+- `signature?: string` — **reserved, never verified** (ARCH-29 A5). Declared
+  only because the object is `.strict()`, so adding it later would be rejected
+  by every daemon deployed until then. The trust anchor is the
+  `service_role`-write-only row plus per-file sha256, not a key.
+- ~~`permissions`~~ — **deleted** (ARCH-29 A4). It was read in one place and
+  enforced nothing about `network`. Still ACCEPTED and DISCARDED on parse, so
+  bundles already published against v0.1 keep loading; it is absent from the
+  output type and unreachable from any consumer. `BundlePermissionSchema` /
+  `BundlePermission` are **removed from the `/schemas` export** — a breaking
+  change for labre-admin, which must drop its permissions picker.
 
 Load-time static checks (loader throws; the caller degrades): manifest and
 recipe zod-valid (recipe reuses the existing recipe schema), every declared
 prompt pair present with an invariant system file (no `{{var}}`), step
-methodIds match the 5-segment grammar, prompt pairs require the `llm`
-permission, recipe `name === slug`, no collision with shipped recipe names.
+methodIds match the 5-segment grammar, recipe `name === slug`, no collision
+with shipped recipe names.
 
-<!-- ponytail: permission enforcement is static (declared at load), not a
-runtime capability interception — upgrade to a runtime capability map if
-bundles ever gain broader powers. -->
+The former "prompt pairs require the `llm` permission" check went with the
+field (ARCH-29 A4): it re-stated what the `prompts` block already says, and was
+the enum's only reader.
 
 ## Contract 3 — strategy_bundles storage (labre)
 

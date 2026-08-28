@@ -192,7 +192,8 @@ src/
 │
 ├── schemas/                  ── Schémas Zod (source de vérité runtime)
 │   ├── index.mts             barrel exporté en npm via `exports["./schemas"]` (surface externe)
-│   ├── strategy-bundle.schema.mts  manifeste des strategy bundles v0 (slug, permissions, prompts)
+│   ├── strategy-bundle.schema.mts  manifeste des strategy bundles v0 (slug, prompts ; `permissions`
+│   │                         supprimé et `signature` réservé — ARCH-29 A4/A5)
 │   └── estimate-evolution, evaluate-map, identify-capability, estimate-anchor-evolution,
 │       generate-value-chain, value-chain, command, run-recipe, inputs, results, patent, parsed-llm,
 │       wardley-map (ré-export du schéma du package @formicoidea/wardley-map-renderer), json-labre (artefact root)

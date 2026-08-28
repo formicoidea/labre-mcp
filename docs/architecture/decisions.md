@@ -574,7 +574,11 @@ mock strategies are now 61 lines of data plus one shared strategy
 (`src/frameworks/fixtures-registry.mts`); `mocks-registry.mts`, the 61
 `*.mock-strategy.mts` files and the `LABRE_DISABLE_MOCKS` flag are gone, and
 fixture `capturedAt` comes from the injected run clock, closing the I3 leak this
-ADR named.
+ADR named. The same change renders **A4** and **A5**: `manifest.permissions` is
+deleted (accepted and discarded on parse, so bundles already published against
+v0.1 keep loading against the `.strict()` object; absent from the output type,
+unreachable from any consumer, and its lone reader in the loader is gone), and
+`signature?: string` is reserved — optional, never verified, not a control.
 
 **Context:**
 

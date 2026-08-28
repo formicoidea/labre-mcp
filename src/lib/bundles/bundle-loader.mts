@@ -139,12 +139,11 @@ export async function loadBundleFromFiles(
   const declared = manifest.prompts ?? {};
   const strategyIds = Object.keys(declared);
 
-  // Shipping prompt pairs only makes sense for LLM-calling strategies.
-  if (strategyIds.length > 0 && !manifest.permissions.includes('llm')) {
-    throw new Error(
-      `Bundle ${label}: manifest.json declares prompts but "permissions" is missing "llm"`,
-    );
-  }
+  // The `permissions` check that used to sit here (prompts ⇒ must declare
+  // "llm") is GONE with the field itself — ARCH-29 A4. It was the only reader
+  // of `manifest.permissions` in the codebase, which is exactly why the ADR
+  // called the enum decor: it re-stated a fact the prompts block already
+  // carries, and enforced nothing about bigquery, network or render.
 
   const prompts: Record<string, Record<string, BundlePromptPair>> = {};
   for (const strategyId of strategyIds) {
