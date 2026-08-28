@@ -103,7 +103,7 @@ Multi-command flows are composition, expressed as recipes (see [recipes.md](reci
 2. Create the strategy file. The canonical target layout is `src/frameworks/<domain>/<tool>/<command>/<subdomain>/<name>-strategy.mts`; today the real strategies still live under `…/_legacy/` pending extraction (roadmap B2) — follow the surrounding convention of the framework you extend.
 3. Extend `BaseStrategy<TInput, TResult>` and override `static get method()`.
 4. Implement `evaluate(input, context)` returning `StrategyResult<TResult>`.
-5. Register it in the framework's `register*Strategies(registry)` function (e.g. `src/frameworks/wardley/evolution/registry.mts`). For a scaffold, use a `*.mock-strategy.mts` registered via `registerMocks` (see [extending.md](../technical/extending.md)).
+5. Register it in the framework's `register*Strategies(registry)` function (e.g. `src/frameworks/wardley/evolution/registry.mts`). For a scaffold, add one line to `FIXTURE_METHOD_IDS` in `src/frameworks/fixtures-registry.mts` — a scaffold is data, not a file (see [extending.md](../technical/extending.md)).
 
 Do not omit `signals`, `reasoning`, or `insights` — pass empty arrays if a strategy genuinely has no entries for a category, but capture what is meaningful.
 

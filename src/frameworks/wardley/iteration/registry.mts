@@ -1,12 +1,12 @@
 // Framework registry for Wardley iteration strategies.
 //
 // The iteration tree (wardley:iteration:* — the strategy cycle: purpose + OODA)
-// is still largely scaffolded by mocks (see mocks-registry.mts). Real strategies
-// are promoted here one at a time; each promotion deletes the matching
-// `.mock-strategy.mts` and its two lines in mocks-registry.mts.
+// is still largely scaffolded by fixtures (see fixtures-registry.mts). Real
+// strategies are promoted here one at a time; each promotion deletes the
+// matching line from `FIXTURE_METHOD_IDS`.
 //
 // `#frameworks/registry-boot.mts` calls `registerIterationStrategies(coreRegistry)`
-// at boot, before the mocks fill the rest of the catalogue.
+// at boot, before the fixtures fill the rest of the catalogue.
 
 import type { StrategyRegistry } from '#core/registry/strategy-registry.mjs';
 import type { BaseStrategy } from '#core/ast/base-strategy.mjs';

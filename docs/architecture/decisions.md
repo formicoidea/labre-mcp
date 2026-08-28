@@ -515,7 +515,7 @@ MCP has had `prompts/*` and `resources/*` since the beginning. The gap was not p
 
 1. **The kernel gains data catalogues.** `listPromptCatalog()` (`src/lib/prompts/catalog.mts`), `listShippedSchemas` / `readShippedSchema` / `listShippedRecipes` (`src/core/catalog/shipped-assets.mts`), `GRAMMAR` (`src/core/catalog/grammar.mts`) and `StrategyRegistry.catalogue()`. All four answer the question nothing could answer before — *what is there* — and all four are plain data: no handle, nothing to execute, no server anywhere in the graph. They are exported from lib mode, so an embedding consumer gets the same discovery surface a third-party harness gets over the wire.
 
-2. **Implementation provenance becomes part of the catalogue.** `StrategyRegistry.registerMock()` is a second registration verb with identical behaviour and one added fact. A harness must be able to tell a deterministic scaffold from a real computation **before** it spends a call trusting the answer, and `mock` was previously knowable only from a class-name prefix — a naming convention, not a contract. Provenance is now declared at the composition root that knows it (`src/frameworks/mocks-registry.mts`), so promoting a mock means deleting its line there, which is exactly what flips the catalogue.
+2. **Implementation provenance becomes part of the catalogue.** `StrategyRegistry.registerMock()` is a second registration verb with identical behaviour and one added fact. A harness must be able to tell a deterministic scaffold from a real computation **before** it spends a call trusting the answer, and `mock` was previously knowable only from a class-name prefix — a naming convention, not a contract. Provenance is now declared at the composition root that knows it (`src/frameworks/mocks-registry.mts`; since CH-26 / ARCH-29 that root is `src/frameworks/fixtures-registry.mts`), so promoting a mock means deleting its line there, which is exactly what flips the catalogue.
 
 3. **`PromptRegistry` and `ResourceRegistry` join `ToolRegistry` as kernel contracts.** Same shape, same reasoning (ARCH-27, cut 2): the kernel owns the type, `src/mcp/` composes an instance, the transport receives it filled and names nothing in it. A `ResourceDefinition.read()` takes **no argument, by contract** — that is the data-only limit of this ADR stated as a type rather than as a paragraph.
 
@@ -568,6 +568,13 @@ a kernel-owned registry composed by a delivery) and would amend **ARCH-08** and
 the bundle contract of [remote-admin-contracts.md](../technical/remote-admin-contracts.md)
 only if an executable option is retained. Full evidence, threat model and option
 analysis: [plugin-runtime-security.md](plugin-runtime-security.md).
+
+First tranche shipped under this decision: **CH-26 mocks → fixtures** — the 61
+mock strategies are now 61 lines of data plus one shared strategy
+(`src/frameworks/fixtures-registry.mts`); `mocks-registry.mts`, the 61
+`*.mock-strategy.mts` files and the `LABRE_DISABLE_MOCKS` flag are gone, and
+fixture `capturedAt` comes from the injected run clock, closing the I3 leak this
+ADR named.
 
 **Context:**
 
@@ -703,6 +710,9 @@ instead of replaying against different code; and a plugin receives the run clock
 **G2 — the model is written before the first executable byte.** No module
 reachable from a plugin path gains `import()` / `Function` / `vm` / `eval` / an
 isolate binding, enforced by a grep-level gate in the `check:boundaries` family.
+The fixture path added by CH-26 carries the gate as a source-level test
+(`src/frameworks/fixtures-registry.test.mts`); extend it, or the
+`check:boundaries` family, as further DATA-ONLY tranches land.
 `manifest.permissions` is either enforced or deleted.
 
 **⚠️ G2 was originally worded as "before this ADR's status moves off 🔴". That

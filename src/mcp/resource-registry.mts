@@ -72,8 +72,8 @@ export interface McpResourceRegistryOptions {
   /**
    * The strategy catalogue `labre://methods` describes. The composition roots
    * pass the registry they already built, so the resource reports the SAME
-   * catalogue the daemon will actually resolve against — including the effect
-   * of LABRE_DISABLE_MOCKS. Omitted → one is built lazily on first read.
+   * catalogue the daemon will actually resolve against, fixtures included and
+   * declared as such. Omitted → one is built lazily on first read.
    */
   strategies?: StrategyRegistry<BaseStrategy>;
   /** Where this package's `schema/` and `recipes/` live. Injectable for tests. */

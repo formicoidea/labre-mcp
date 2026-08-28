@@ -2,7 +2,7 @@
 
 > **Rôle de ce document.** Le reste de la documentation décrit le code **tel qu'il est aujourd'hui**. Cette page est le **backlog unique** des chantiers de migration non terminés : l'écart entre l'état courant et la cible architecturale (AGENT.md + [ast-schema.md](ast-schema.md)). Quand un doc dit « non encore câblé » ou « encore sous `_legacy/` », il renvoie ici.
 >
-> Source de vérité de l'état courant : le daemon imprime au boot la liste des outils et des stratégies enregistrés (stderr) ; `LABRE_DISABLE_MOCKS=1` isole les stratégies réelles.
+> Source de vérité de l'état courant : le daemon imprime au boot la liste des outils et des stratégies enregistrés (stderr) ; `registry.catalogue()` filtré sur `implementation === "real"` isole les stratégies réelles.
 
 ## État courant en une ligne
 
@@ -33,7 +33,7 @@ Daemon HTTP `src/mcp/labre-daemon.mts` (:6767) — **6 outils MCP câblés** (`e
 ### B4 — Promotion des mocks → stratégies réelles
 
 - **Cible** : catalogue [ast-schema.md](ast-schema.md) § 1.2 entièrement réel.
-- **Aujourd'hui** : 61 mocks (`src/frameworks/**/*.mock-strategy.mts`, enregistrés via `registerMocks`) vs 25 réelles. La liste des réelles fait foi dans [ast-schema.md → « État d'implémentation »](ast-schema.md). Dernières promotions : `wardley:map:basemap:generate:default`, `render:wardley-map:image:emit:svg`, `wardley:map:value-chain:organized-y-position:default`, et `wardley:map:value-chain:select-by-type:component` (moteur sélecteur : construit le tableau des nœuds `type:'component'` pour fan-out per-composant — le positionnement de masse est une recette, pas une stratégie monolithique).
+- **Aujourd'hui** : 61 fixtures (une ligne chacune dans `FIXTURE_METHOD_IDS`, `src/frameworks/fixtures-registry.mts`, enregistrées via `registerFixtures`) vs 25 réelles. La liste des réelles fait foi dans [ast-schema.md → « État d'implémentation »](ast-schema.md). Dernières promotions : `wardley:map:basemap:generate:default`, `render:wardley-map:image:emit:svg`, `wardley:map:value-chain:organized-y-position:default`, et `wardley:map:value-chain:select-by-type:component` (moteur sélecteur : construit le tableau des nœuds `type:'component'` pour fan-out per-composant — le positionnement de masse est une recette, pas une stratégie monolithique).
 - **Action** : implémenter les stratégies prioritaires, basculer leur `StrategyMetadata.status` de `mock` à `experimental`, mettre à jour la liste « État d'implémentation » de l'AST.
 
 ### B5 — Unification de version

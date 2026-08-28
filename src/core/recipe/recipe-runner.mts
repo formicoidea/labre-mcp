@@ -15,6 +15,7 @@ import type { BaseStrategy, StrategyResult } from "../ast/base-strategy.mjs";
 import type { RequestContext } from "../context/request-context.mjs";
 import { createEventBus, type EventBus } from "../bus/event-bus.mjs";
 import type { PipelineEvent } from "../bus/event.schema.mjs";
+import { runWithClock } from "../clock/run-clock-context.mjs";
 import {
   runWithPromptOverrides,
   type PromptOverrideStore,
@@ -30,9 +31,13 @@ import {
 // LLM outputs, two runs sharing a clock and an id factory produce a strictly
 // identical artefact. Production callers pass nothing and get the real ones.
 //
-// Deliberately narrow: this covers the runner's own stamps, NOT the timestamps
-// a strategy puts on its own signals (`capturedAt`) — those belong to the
-// strategy and are out of the runner's reach.
+// Since CH-26 it also reaches a STRATEGY's own timestamps. `runRecipe` installs
+// `now` as the run-scoped clock (core/clock/run-clock-context.mts) around the
+// whole run body, so a strategy stamps its signals' `capturedAt` from the
+// INJECTED clock without `evaluate()` gaining an argument — this is what closed
+// I3's known hole (recipes.md), where 61 mock strategies each read their own
+// `new Date()`. What stays out of reach is a strategy that ignores the seam and
+// reads the wall clock directly.
 export interface RunClock {
   /** Wall clock. Default: `() => new Date()`. */
   now?: () => Date;
@@ -262,13 +267,16 @@ export async function runRecipe(options: RunOptions): Promise<RunOutcome> {
   await options.hooks?.beforeRun?.();
 
   try {
-    await runWithUsageCollector(runWithOverrides, (aggregate) => {
+    // The run-scoped clock wraps everything below it (steps AND listeners), so
+    // a strategy's `capturedAt` comes from the same clock as the runner's own
+    // stamps — invariant I3, recipes.md.
+    await runWithClock(clock.now, () => runWithUsageCollector(runWithOverrides, (aggregate) => {
       usage = aggregate;
       // Metering seam, closing half: this run's LLM spend, handed to whoever
       // asked for it (the hosted daemon writes labre's cost ledger here). The
       // hook contract forbids throwing and blocking; the runner does not await.
       options.hooks?.onUsage?.(aggregate);
-    });
+    }));
     emitRunEnd();
   } catch (err) {
     emitRunEnd();

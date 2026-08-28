@@ -23,7 +23,7 @@ import { registerChainStrategies } from "#frameworks/wardley/chain/registry.mjs"
 import { registerIterationStrategies } from "#frameworks/wardley/iteration/registry.mjs";
 import { registerCommonStrategies } from "#frameworks/common/registry.mjs";
 import { registerRenderStrategies } from "#frameworks/render/registry.mjs";
-import { registerMocks } from "#frameworks/mocks-registry.mjs";
+import { registerFixtures } from "#frameworks/fixtures-registry.mjs";
 
 /**
  * Build the strategy registry by importing every framework's register
@@ -32,9 +32,16 @@ import { registerMocks } from "#frameworks/mocks-registry.mjs";
  * registry. Idempotent (throws on duplicate methodId — catches accidental
  * double-boot).
  *
- * Mocks (CP10) scaffold the rest of the v0.1.0 catalogue. Set
- * `LABRE_DISABLE_MOCKS=1` to skip — useful for prod runs where only real
- * strategies should be exposed.
+ * Fixtures (CH-26) scaffold the rest of the v0.1.0 catalogue as DATA — one
+ * methodId list plus one shared strategy (`#frameworks/fixtures-registry`).
+ *
+ * They are registered UNCONDITIONALLY. The `LABRE_DISABLE_MOCKS` env flag that
+ * used to skip them is gone: it was a second refusal channel beside the
+ * registry's `disabled` guard (ARCH-29 G2 — one channel, not two), and it
+ * answered a question the catalogue now answers better. A caller that must not
+ * trust a scaffold reads `implementation: "mock"` from `registry.catalogue()`
+ * / `labre://methods` (CH-24) and knows BEFORE spending a call, instead of
+ * depending on how the server it is talking to happened to be booted.
  */
 export function buildStrategyRegistry(): StrategyRegistry<BaseStrategy> {
   const registry = new StrategyRegistry<BaseStrategy>();
@@ -43,8 +50,6 @@ export function buildStrategyRegistry(): StrategyRegistry<BaseStrategy> {
   registerIterationStrategies(registry);
   registerCommonStrategies(registry);
   registerRenderStrategies(registry);
-  if (process.env.LABRE_DISABLE_MOCKS !== "1") {
-    registerMocks(registry);
-  }
+  registerFixtures(registry);
   return registry;
 }

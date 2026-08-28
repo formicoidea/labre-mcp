@@ -87,7 +87,7 @@ The canonical entrypoint is the HTTP daemon in [`src/mcp/labre-daemon.mts`](../.
 
 1. `src/mcp/labre-daemon.mts` builds the strategy registry via `buildStrategyRegistry()` (`src/frameworks/registry-boot.mts`), the MCP tool registry, and — since ARCH-28 — the prompt and resource registries, then hands them ALL to `startHttpDaemon` (`src/transport/http-daemon.mts`). Since ARCH-27 the transport composes nothing.
 2. Builds the MCP tool registry via `buildMcpToolRegistry()` — six tools: `__ping__` (smoke), `estimateEvolution` (recipe `estimate-component-evolution`), `generateValueChain` (recipe `generate`), `evaluateMap` (recipe `evaluate-map`), `runCommand` (generic direct invocation of any 5-segment methodId → `CommandResult`), and `runRecipe` (generic invocation of any multi-step recipe by `<domain>:<tool>:<name>` ref → JSON-labre envelope + final AST + artefact path).
-3. Builds the costume via `buildMcpPromptRegistry()` + `buildMcpResourceRegistry({ strategies })` — the SAME strategy registry instance, so `labre://methods` describes the catalogue this process will actually resolve against (including the effect of `LABRE_DISABLE_MOCKS`). A costume declaration that names a prompt the registry does not hold fails the boot.
+3. Builds the costume via `buildMcpPromptRegistry()` + `buildMcpResourceRegistry({ strategies })` — the SAME strategy registry instance, so `labre://methods` describes the catalogue this process will actually resolve against, fixtures included and declared `mock`. A costume declaration that names a prompt the registry does not hold fails the boot.
 4. Boots the HTTP server on `LABRE_HTTP_PORT` (default `6767`).
 5. Logs the registered tools, prompts, resources and strategy methodIds.
 
