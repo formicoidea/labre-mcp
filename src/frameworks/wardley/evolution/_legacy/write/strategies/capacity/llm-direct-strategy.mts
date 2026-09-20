@@ -40,9 +40,19 @@ export function parseLLMDirectResponse(text: string): { evolution: number; confi
 // any: llmCall closure shape is provider-dependent (see #lib/llm)
 type LlmCallFn = (user: string, ...args: unknown[]) => Promise<string>;
 
+// A bare integer up to 4 digits is a year (timeline-benchmark milestones,
+// numeric user input): `new Date(1995)` would read it as 1995 ms after the
+// epoch and yield 1970. Anything else (ISO string, Date, ms timestamp) goes
+// through `new Date(...)`.
+export function resolvePromptYear(date: ComponentInput['date']): string {
+  if (!date) return 'unknown';
+  if (typeof date === 'number' && Number.isInteger(date) && date > 0 && date <= 9999) return String(date);
+  return String(new Date(date).getFullYear());
+}
+
 function buildPrompt(component: ComponentInput): BuiltPrompt {
   const hasCapability = component.capability != null;
-  const dateStr = String(component.date ? new Date(component.date).getFullYear() : 'unknown');
+  const dateStr = resolvePromptYear(component.date);
   const p = hasCapability
     ? getPrompt('historical-evolution', 'with-capability')
     : getPrompt('historical-evolution', 'without-capability');
