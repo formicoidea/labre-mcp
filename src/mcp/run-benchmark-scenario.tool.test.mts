@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import '#lib/prompts/init.mjs';
 import { resetLLMConfigCache } from '#lib/llm/config.loader.mjs';
@@ -29,13 +29,14 @@ const CASE = {
 const GRID = [
   'Market', 'Knowledge management', 'Market perception', 'User perception', 'Industry perception', 'Value focus',
   'Understanding', 'Comparison', 'Failure/deficiency', 'Market action/engagement', 'Efficiency', 'Decision driver',
-].map((p) => `${p}=2|fictitious reason`).join('\n');
+].map((p, i) => `${p}=${i < 6 ? 2 : 4}|fictitious reason`).join('\n');
 
 // What the fake model answers next, and what it was asked.
 let reply = '';
 let seen: { model?: string; auth?: string } = {};
 let server: http.Server;
 const savedConfig = process.env.WARDLEY_LLM_CONFIG;
+let dir = '';
 
 before(async () => {
   server = http.createServer((req, res) => {
@@ -52,7 +53,7 @@ before(async () => {
   });
   await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
   const { port } = server.address() as AddressInfo;
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'labre-bench-'));
+  dir = mkdtempSync(path.join(os.tmpdir(), 'labre-bench-'));
   const config = path.join(dir, 'llm.config.json');
   writeFileSync(config, JSON.stringify({
     defaultProvider: 'fake',
@@ -68,8 +69,9 @@ beforeEach(() => {
   resetLLMRegistryCache();
 });
 
-after(() => {
-  server.close();
+after(async () => {
+  await new Promise((done) => server.close(done));
+  rmSync(dir, { recursive: true, force: true });
   if (savedConfig === undefined) delete process.env.WARDLEY_LLM_CONFIG;
   else process.env.WARDLEY_LLM_CONFIG = savedConfig;
   delete process.env.FAKE_BENCH_KEY;
@@ -88,6 +90,7 @@ describe('runBenchmarkScenario', () => {
     assert.equal(out.evolution, 0.62);
     assert.equal(out.confidence, 0.7);
     assert.equal(seen.model, 'fake-model-a');
+    assert.equal(seen.auth, 'Bearer not-a-real-key');
     assert.equal(out.usage.llmCalls, 1);
     assert.equal(out.usage.inputTokens, 120);
     assert.equal(out.usage.outputTokens, 30);
@@ -101,8 +104,11 @@ describe('runBenchmarkScenario', () => {
       context,
     );
     assert.equal(out.ok, true);
+    // Six rows at phase 2, six at phase 4: a back-filled grid (all phase 2)
+    // would answer 0.29, so this value proves every line was parsed.
     assert.equal(out.details?.properties?.length, 12);
-    assert.equal(out.evolution, 0.29);
+    assert.equal(out.evolution, 0.57);
+    assert.ok(out.details?.trace?.length);
     assert.equal(seen.model, 'fake-model-b');
   });
 

@@ -4,7 +4,7 @@ labre-mcp tourne comme un **daemon HTTP** (`src/core/transport/labre-daemon.mts`
 
 ## Surface MCP reellement exposee
 
-**6 outils** sont cables dans `buildBootRegistry()` :
+**7 outils** sont cables dans `buildBootRegistry()` :
 
 | Outil | Role | Schema Zod |
 |---|---|---|
@@ -394,7 +394,9 @@ Appele par `wardley-evolution-benchmark` (evaluateurs `labre-*`), un appel par c
 
 ### Sortie
 
-`{ ok, scenario, method?, evolution?, confidence?, details?: { reasoning, insights, properties? }, error?, usage: { llmCalls, inputTokens?, outputTokens?, records }, durationMs }`. Une erreur de la strategie donne `ok: false` **avec l'usage deja consomme** (le benchmark compte ce qu'un cas en echec a depense) ; une entree invalide ou un provider inconnu leve une erreur (degradee par le dispatch).
+`{ ok, scenario, method?, evolution?, confidence?, details?: { reasoning, insights, properties?, trace? }, error?, usage: { llmCalls, inputTokens?, outputTokens?, records }, durationMs }`. Une erreur de la strategie donne `ok: false` **avec l'usage deja consomme** (le benchmark compte ce qu'un cas en echec a depense) ; une entree invalide ou un provider inconnu leve une erreur (degradee par le dispatch).
+
+Comme le recipe runner, l'outil passe la jauge de budget du daemon heberge (`assertQuotaOk`) et reporte ses appels au ledger de couts (`reportUsageToLedger`) ; les deux sont sans effet sans JWT appelant (cle `lab_`, stdio). Pour `property-assessment`, une ligne comblee porte la raison « Not evaluated… » et `trace` donne le compte note/total.
 
 Pas de `s-curve` : la strategie labre prend certitude et ubiquite de l'appelant et ne les demande jamais a un modele.
 
