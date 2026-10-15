@@ -64,9 +64,18 @@ describe('reportUsageToLedger', () => {
     assert.equal(calls.length, 0);
   });
 
-  it('skips lab_ API-key callers (not a JWT — auth.uid() would be null)', async () => {
+  // Would have caught: a lab_ key's spend never reaching the ledger.
+  it('reports lab_ API-key callers through the key-based RPC, the key as proof', async () => {
     await runWithLedgerAuth('lab_deadbeef', () => reportUsageToLedger(RECORDS));
-    assert.equal(calls.length, 0);
+    assert.equal(calls.length, 1);
+    const { url, init } = calls[0];
+    assert.equal(url, 'http://supabase.test/rest/v1/rpc/report_ai_calls_for_api_key');
+    const headers = init.headers as Record<string, string>;
+    assert.equal(headers.authorization, 'Bearer anon');
+    assert.equal(headers['content-profile'], 'labre_mcp');
+    const body = JSON.parse(String(init.body)) as { api_key: string; calls: unknown[] };
+    assert.equal(body.api_key, 'lab_deadbeef');
+    assert.equal(body.calls.length, 2);
   });
 
   it('is a no-op when Supabase is not configured', async () => {

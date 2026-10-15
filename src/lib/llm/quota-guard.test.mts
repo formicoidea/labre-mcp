@@ -87,10 +87,19 @@ describe('assertQuotaOk', () => {
     assert.equal(calls, 0);
   });
 
-  it('skips lab_ API keys (not a JWT — the RPC sees no auth.uid())', async () => {
-    respond(usage(300000, 300000));
-    await runWithLedgerAuth('lab_deadbeef', () => assertQuotaOk());
-    assert.equal(calls, 0);
+  // Would have caught: a lab_ key escaping the budget on the hosted daemon.
+  it('reads a lab_ key owner\'s budget through the key-based RPC, and refuses when spent', async () => {
+    let sent: { url: string; init?: RequestInit } | undefined;
+    globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+      sent = { url: String(url), init };
+      return new Response(JSON.stringify(usage(300000, 300000)), { status: 200 });
+    }) as typeof fetch;
+    await assert.rejects(() => runWithLedgerAuth('lab_deadbeef', () => assertQuotaOk()), QuotaExceededError);
+    assert.equal(sent?.url, 'http://supabase.test/rest/v1/rpc/ai_usage_for_api_key');
+    const headers = sent?.init?.headers as Record<string, string>;
+    assert.equal(headers['content-profile'], 'labre_mcp');
+    assert.equal(headers.authorization, 'Bearer anon');
+    assert.deepEqual(JSON.parse(String(sent?.init?.body)), { api_key: 'lab_deadbeef' });
   });
 
   it('degrades OPEN when the budget read fails', async () => {

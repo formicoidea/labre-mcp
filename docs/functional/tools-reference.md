@@ -398,7 +398,7 @@ Appele par `wardley-evolution-benchmark` (evaluateurs `labre-*`), un appel par c
 
 **Acces** : l'outil depense la cle de labre sur un modele choisi par l'appelant ; sur un daemon authentifie, seuls les identifiants listes dans `LABRE_BENCHMARK_USERS` (lu au boot) l'appellent, tout autre compte est refuse. Stdio et dev local sans `LABRE_AUTH` passent.
 
-Comme le recipe runner, l'outil passe la jauge de budget du daemon heberge (`assertQuotaOk`) et reporte ses appels au ledger de couts (`reportUsageToLedger`) ; les deux sont sans effet sans JWT appelant (cle `lab_`, stdio). Pour `property-assessment`, une ligne comblee porte la raison « Not evaluated… » et `trace` donne le compte note/total ; au-dela de la moitie des proprietes non notees, la strategie refuse de repondre (`ok: false`).
+Comme le recipe runner, l'outil passe la jauge de budget du daemon heberge (`assertQuotaOk`) et reporte ses appels au ledger de couts (`reportUsageToLedger`) ; une cle `lab_` y passe aussi, par les RPC `labre_mcp.ai_usage_for_api_key` et `labre_mcp.report_ai_calls_for_api_key` qui resolvent son proprietaire ; sans appelant authentifie (stdio, dev local) les deux sont sans effet. Pour `property-assessment`, une ligne comblee porte la raison « Not evaluated… » et `trace` donne le compte note/total ; au-dela de la moitie des proprietes non notees, la strategie refuse de repondre (`ok: false`).
 
 `certitude-ubiquity-scurve` demande au modele la certitude et l'ubiquite du composant, puis les passe a la strategie `s-curve` inchangee ; une reponse sans l'une des deux valeurs dans [0, 1] est un echec, jamais une valeur par defaut.
 
