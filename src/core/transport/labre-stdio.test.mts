@@ -30,7 +30,7 @@ test("ping returns an empty result with the matching id", async () => {
   assert.deepEqual(res, { jsonrpc: "2.0", id: 1, result: {} });
 });
 
-test("tools/list advertises the six boot tools", async () => {
+test("tools/list advertises the seven boot tools", async () => {
   const tools = buildBootRegistry();
   const res = await handleLine(
     JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }),
@@ -45,6 +45,7 @@ test("tools/list advertises the six boot tools", async () => {
       "estimateEvolution",
       "evaluateMap",
       "generateValueChain",
+      "runBenchmarkScenario",
       "runCommand",
       "runRecipe",
     ].sort(),

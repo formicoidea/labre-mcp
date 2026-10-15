@@ -1,6 +1,6 @@
 // Shared MCP tool-registry boot logic, transport-agnostic.
 // Both the HTTP daemon (labre-daemon.mts) and the stdio entrypoint
-// (labre-stdio.mts) build the exact same six-tool registry from here, so the
+// (labre-stdio.mts) build the exact same tool registry from here, so the
 // surface stays identical regardless of how the client connects (ARCH-14).
 
 // Side-effect: register every custom prompt parser (getPrompt().parse()). This
@@ -16,6 +16,7 @@ import { EVALUATE_MAP_TOOL } from "#mcp/evaluate-map.tool.mjs";
 import { GENERATE_VALUE_CHAIN_TOOL } from "#mcp/generate-value-chain.tool.mjs";
 import { RUN_COMMAND_TOOL } from "#mcp/run-command.tool.mjs";
 import { RUN_RECIPE_TOOL } from "#mcp/run-recipe.tool.mjs";
+import { RUN_BENCHMARK_SCENARIO_TOOL } from "#mcp/run-benchmark-scenario.tool.mjs";
 
 export function buildBootRegistry(): ToolRegistry {
   const registry = new ToolRegistry();
@@ -37,5 +38,6 @@ export function buildBootRegistry(): ToolRegistry {
   registry.register(GENERATE_VALUE_CHAIN_TOOL);
   registry.register(RUN_COMMAND_TOOL);
   registry.register(RUN_RECIPE_TOOL);
+  registry.register(RUN_BENCHMARK_SCENARIO_TOOL);
   return registry;
 }

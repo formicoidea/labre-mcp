@@ -39,6 +39,7 @@ The `WARDLEY_LLM_CONFIG` env var is optional — if omitted, the server looks fo
 | `generateValueChain` | Generate a value chain from a natural-language prompt and emit it as OWM DSL (runs the `generate` recipe). |
 | `evaluateMap` | Position and identify every component of an existing OWM map (runs the `evaluate-map` recipe). |
 | `runCommand` | Invoke a single strategy directly by its 5-segment methodId → `CommandResult` + JSON-labre envelope. |
+| `runBenchmarkScenario` | Run one evolution strategy, unchanged, on one benchmark case with a caller-chosen model → position + details + metered usage. Stateless. |
 | `runRecipe` | Run a multi-step recipe by `<domain>:<tool>:<name>` reference → JSON-labre envelope + final AST + artifact path. |
 | `__ping__` | Smoke tool — echoes its input. Validates the transport. |
 
