@@ -4,7 +4,7 @@ labre-mcp tourne comme un **daemon HTTP** (`src/core/transport/labre-daemon.mts`
 
 ## Surface MCP reellement exposee
 
-**6 outils** sont cables dans `buildBootRegistry()` :
+**7 outils** sont cables dans `buildBootRegistry()` :
 
 | Outil | Role | Schema Zod |
 |---|---|---|
@@ -12,6 +12,7 @@ labre-mcp tourne comme un **daemon HTTP** (`src/core/transport/labre-daemon.mts`
 | `generateValueChain` | Genere une chaine de valeur depuis une commande en langage naturel et l'emet en DSL OWM (via la recipe `generate`) | `src/schemas/generate-value-chain.schema.mts` |
 | `evaluateMap` | Evalue tous les composants d'une carte OWM existante (via la recipe `evaluate-map`) | `src/schemas/evaluate-map.schema.mts` |
 | `runCommand` | Invoque **n'importe quel methodId** directement → `CommandResult` (output + enveloppe JSON-labre) | `src/schemas/command.schema.mts` |
+| `runBenchmarkScenario` | Execute **une strategie d'evolution telle quelle** sur un cas du benchmark, avec le modele choisi par l'appelant → position + details + usage mesure. N'ecrit rien | `src/mcp/run-benchmark-scenario.tool.mts` |
 | `runRecipe` | Lance une **recette multi-etapes** par ref `<domain>:<tool>:<name>` (shipped, override projet ou bundle) → AST final + enveloppe + artefact | `src/schemas/run-recipe.schema.mts` |
 | `__ping__` | Smoke tool — echo de l'input, valide le transport | (inline) |
 
@@ -375,6 +376,31 @@ Les commandes du domaine `render` convergent des entrées divergentes (DSL OWM, 
 | `render:wardley-map:text:lint:default` | `{ text, target? }` | **LLM** | Lint d'une chaîne de valeur quasi structurée vers `json` (défaut) ou `owm` ; refuse (`NOT_A_VALUE_CHAIN`) un texte hors sujet |
 
 Les JSON Schemas du contrat (map canonique, JSON-labre, CommandCall/CommandResult) sont servis par le daemon : `GET /schemas/wardley-map.schema.json`, `json-labre.schema.json`, `command-call.schema.json`, `command-result.schema.json`.
+
+---
+
+## runBenchmarkScenario
+
+Appele par `wardley-evolution-benchmark` (evaluateurs `labre-*`), un appel par cas. Le benchmark garde les cas, les valeurs de reference, la notation et le stockage ; l'outil ne recoit jamais la reference et **n'ecrit aucun artefact** (contrairement a `runCommand`).
+
+### Entree
+
+| Parametre | Type | Requis | Description |
+|---|---|---|---|
+| `scenario` | `"llm-direct"` \| `"certitude-ubiquity-scurve"` \| `"property-assessment"` | **oui** | Strategie executee telle quelle (`LLMDirectStrategy`, `CertitudeUbiquityStrategy`, `PropertiesStrategyCore` en mode `auto`) |
+| `provider` | string | **oui** | Id d'un provider declare dans `llm.config.json` du daemon (la cle reste cote daemon) |
+| `model` | string | **oui** | Modele appele sur ce provider |
+| `component` | `{ name, context?, description?, kind? }` | **oui** | Le cas sans sa reference : `context` = secteur, `description` = evidence, `kind` = `anchor` \| `solution` \| `capability` (llm-direct formule sa question pour ce type ; absent = formulation solution d'origine) |
+
+### Sortie
+
+`{ ok, scenario, method?, evolution?, confidence?, details?: { reasoning, insights, properties?, trace? }, error?, usage: { llmCalls, inputTokens?, outputTokens?, records }, durationMs }`. Une erreur de la strategie donne `ok: false` **avec l'usage deja consomme** (le benchmark compte ce qu'un cas en echec a depense) ; une entree invalide ou un provider inconnu leve une erreur (degradee par le dispatch).
+
+**Acces** : l'outil depense la cle de labre sur un modele choisi par l'appelant ; sur un daemon authentifie, seuls les identifiants listes dans `LABRE_BENCHMARK_USERS` (lu au boot) l'appellent, tout autre compte est refuse. Stdio et dev local sans `LABRE_AUTH` passent.
+
+Comme le recipe runner, l'outil passe la jauge de budget du daemon heberge (`assertQuotaOk`) et reporte ses appels au ledger de couts (`reportUsageToLedger`) ; une cle `lab_` y passe aussi, par les RPC `labre_mcp.ai_usage_for_api_key` et `labre_mcp.report_ai_calls_for_api_key` qui resolvent son proprietaire ; sans appelant authentifie (stdio, dev local) les deux sont sans effet. Pour `property-assessment`, une ligne comblee porte la raison « Not evaluated… » et `trace` donne le compte note/total ; au-dela de la moitie des proprietes non notees, la strategie refuse de repondre (`ok: false`).
+
+`certitude-ubiquity-scurve` demande au modele la certitude et l'ubiquite du composant, puis les passe a la strategie `s-curve` inchangee ; une reponse sans l'une des deux valeurs dans [0, 1] est un echec, jamais une valeur par defaut.
 
 ---
 

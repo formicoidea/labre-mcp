@@ -152,6 +152,17 @@ export function getStrategyVisionLLM(id: string): LLMCall {
   return callFor(id, 'vision', (strategy, provider) => provider.vision(strategy));
 }
 
+/** Text completion on a model the CALLER names, on a provider the config
+ *  declares. For the benchmark scenarios, which compare one strategy across
+ *  models: the provider (and so its key) stays under the daemon's config, only
+ *  the model varies. Not cached — one call object per request is cheap. */
+export function getModelLLM(providerId: string, model: string): LLMCall {
+  const cfg = loadLLMConfig();
+  const provider = instantiateProvider(providerId, cfg);
+  assertSupports(`model:${model}`, 'text', providerId, cfg, provider);
+  return provider.text({ provider: providerId, model });
+}
+
 // ─── Test helpers ───────────────────────────────────────────────────────────
 
 /** Test-only: inject a stub for a given (strategy, capability) pair. */

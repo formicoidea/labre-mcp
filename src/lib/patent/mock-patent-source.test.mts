@@ -436,6 +436,16 @@ describe('MockPatentSource — Strategy Swap Verification', () => {
 
       const component = { name: 'TestComponent', capability: 'test capability' };
 
+      // Zero patents is a refusal (a guess must never pass as an answer):
+      // both sources must then reject identically.
+      if (data.totalPatents === 0) {
+        const [a, b] = await Promise.allSettled([strategyA.evaluate(component), strategyB.evaluate(component)]);
+        assert.equal(a.status, 'rejected', `inline-${fixtureName} must reject`);
+        assert.equal(b.status, 'rejected', `mock-${fixtureName} must reject`);
+        assert.equal((b as PromiseRejectedResult).reason.message, (a as PromiseRejectedResult).reason.message);
+        return;
+      }
+
       const resultA = await strategyA.evaluate(component);
       const resultB = await strategyB.evaluate(component);
 
@@ -582,7 +592,9 @@ describe('MockPatentSource — Strategy Swap Verification', () => {
 
 describe('MockPatentSource — Error Path Swap', () => {
 
-  it('MockPatentSource error produces same no-abstention behavior as inline error mock', async () => {
+  // Guard: this used to assert both error paths answered the same neutral
+  // result. A source failure now rejects — identically for both sources.
+  it('MockPatentSource error produces the same refusal as inline error mock', async () => {
     // Inline mock that throws
     const inlineSource = { fetchByCpc: async () => { throw new Error('BQ timeout'); } };
     const strategyA = new CpcEvolutionStrategy({
@@ -598,20 +610,8 @@ describe('MockPatentSource — Error Path Swap', () => {
     });
 
     const component = { name: 'Test', capability: 'test' };
-    const resultA = await strategyA.evaluate(component);
-    const resultB = await strategyB.evaluate(component);
-
-    // Both must produce valid results (no abstention)
-    assertValidResult(resultA, 'inline-error');
-    assertValidResult(resultB, 'mock-error');
-
-    // Both degrade identically — same fallback path
-    assert.strictEqual(resultB.evolution, resultA.evolution,
-      'error path evolution must be identical');
-    assert.strictEqual(resultB.confidence, resultA.confidence,
-      'error path confidence must be identical');
-    assert.strictEqual(resultB.certitude, resultA.certitude);
-    assert.strictEqual(resultB.ubiquity, resultA.ubiquity);
+    await assert.rejects(strategyA.evaluate(component), /BQ timeout/);
+    await assert.rejects(strategyB.evaluate(component), /BQ timeout/);
   });
 
   it('MockPatentSource error still records instrumentation before throwing', async () => {
@@ -621,8 +621,7 @@ describe('MockPatentSource — Error Path Swap', () => {
       cpcMapper: mockCpcMapper,
     });
 
-    const result = await strategy.evaluate({ name: 'Test', capability: 'test' });
-    assertValidResult(result, 'error with instrumentation');
+    await assert.rejects(strategy.evaluate({ name: 'Test', capability: 'test' }), /Quota exceeded/);
 
     // Source was called (even though it threw)
     assert.equal(source.callCount, 1, 'should have been called once');
@@ -720,6 +719,12 @@ describe('MockPatentSource — Phase B Enrichment', () => {
         patentSource: source,
         cpcMapper: mockCpcMapper,
       });
+
+      // Zero patents gives Phase B a rejection, never a neutral entry.
+      if (FIXTURES[fixtureName]().totalPatents === 0) {
+        await assert.rejects(strategy.evaluate({ name: 'Test', capability: 'test' }), /no patent found/);
+        return;
+      }
 
       const result = await strategy.evaluate({ name: 'Test', capability: 'test' });
       assertValidResult(result, `phaseB-${fixtureName}`);

@@ -34,7 +34,7 @@ interface LogprobEntry {
 /**
  * Extract per-phase probabilities from a top-logprobs response.
  * Matches tokens that contain or are contained by a phase name (lowercased).
- * Falls back to uniform when no token matches any phase.
+ * Throws when no token matches a phase, or when none discriminates.
  */
 function extractPhaseProbabilities(logprobs: LogprobEntry[] | null | undefined): Record<PhaseName, number> {
   const phaseLogprobs: Record<PhaseName, number> = {
@@ -55,10 +55,17 @@ function extractPhaseProbabilities(logprobs: LogprobEntry[] | null | undefined):
     }
   }
 
-  const hasAnyMatch = Object.values(phaseLogprobs).some(lp => lp > -Infinity);
-  if (!hasAnyMatch) {
-    const uniform = 1 / PHASE_NAMES.length;
-    return { phase1: uniform, phase2: uniform, phase3: uniform, phase4: uniform };
+  // Both cases used to answer the uniform distribution (evolution ≈ 0.43 on
+  // every component): a guess under this strategy's name. They throw now, as in
+  // the wardley-evolution-benchmark port. A token matching every phase (a bare
+  // "Phase") pins the four pooled logprobs to one value: no discrimination.
+  const pooled = Object.values(phaseLogprobs);
+  const tokens = () => (logprobs ?? []).map((e) => JSON.stringify(e.token)).join(', ');
+  if (pooled.every(lp => lp === -Infinity)) {
+    throw new Error(`LogprobDistributionStrategy: no phase token among the alternatives: ${tokens()}`);
+  }
+  if (pooled.every(lp => lp === pooled[0])) {
+    throw new Error(`LogprobDistributionStrategy: no alternative discriminates between the phases: ${tokens()}`);
   }
 
   const maxLp = Math.max(
@@ -135,9 +142,13 @@ export class LogprobDistributionStrategy extends BaseStrategy {
 
     const { text, logprobs } = await this._llmLogprobCall(built.user, undefined, { systemPrompt: built.system });
 
-    const probs = (logprobs && logprobs.length > 0)
-      ? extractPhaseProbabilities(logprobs)
-      : (p.parse(text) as Record<PhaseName, number>);
+    // Without logprobs this method has no signal: the former text fallback
+    // (0.85 on the phase named in the reply) is a weaker method that answered
+    // under this one's name. It throws now, as in the benchmark port.
+    if (!logprobs || logprobs.length === 0) {
+      throw new Error(`LogprobDistributionStrategy: the provider returned no logprobs — this method has no signal without them (reply: ${(text ?? '').slice(0, 100)})`);
+    }
+    const probs = extractPhaseProbabilities(logprobs);
 
     const distribution = phase4Distribution(
       probs.phase1,

@@ -10,6 +10,7 @@ import type { BaseStrategy } from '#core/ast/base-strategy.mjs';
 
 import { SCurveStrategy } from './_legacy/write/strategies/capacity/s-curve-strategy.mjs';
 import { LLMDirectStrategy } from './_legacy/write/strategies/capacity/llm-direct-strategy.mjs';
+import { CertitudeUbiquityStrategy } from './_legacy/write/strategies/capacity/certitude-ubiquity-strategy.mjs';
 import { PublicationAnalysisStrategy } from './_legacy/write/strategies/capacity/publication-analysis-strategy.mjs';
 // Adapter: legacy class kept intact for 13 test/lib consumers.
 import { CpcEvolutionStrategyCore } from './_legacy/write/strategies/capacity/cpc-evolution-strategy.mjs';
@@ -32,6 +33,7 @@ export function registerEvolutionStrategies(
 ): void {
   registry.register(SCurveStrategy.method, SCurveStrategy);
   registry.register(LLMDirectStrategy.method, LLMDirectStrategy);
+  registry.register(CertitudeUbiquityStrategy.method, CertitudeUbiquityStrategy);
   registry.register(PublicationAnalysisStrategy.method, PublicationAnalysisStrategy);
   registry.register(CpcEvolutionStrategyCore.method, CpcEvolutionStrategyCore);
   registry.register(TimelineBenchmarkStrategyCore.method, TimelineBenchmarkStrategyCore);

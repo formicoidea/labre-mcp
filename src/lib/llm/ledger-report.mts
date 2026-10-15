@@ -19,15 +19,13 @@
 // never does. So a local/stdio run on the user's own keys writes nothing — it
 // costs labre nothing and needs no reporting — and the "who funded it" question
 // answers itself: the only writer is the labre-operated daemon on labre's key.
-// KNOWN GAP: lab_ API-key callers are not JWTs (auth.uid() would be null), so
-// their runs are skipped — the same limitation the bundle refresh has.
+// lab_ API-key callers are not JWTs (auth.uid() would be null): their rows go
+// through labre_mcp.report_ai_calls_for_api_key, which resolves the key's owner
+// like validate_api_key does — still no daemon credential, the key is the proof.
 
 import type { LlmUsageRecord } from './usage-context.mjs';
 import { currentLedgerJwt } from './ledger-auth-context.mjs';
 
-// A lab_ personal API key is not a JWT: PostgREST could not resolve auth.uid()
-// from it, so the insert would violate ai_calls.user_id NOT NULL. Skip it — the
-// same rule the bundle refresh applies (labre-daemon.mts).
 const API_KEY_PREFIX = 'lab_';
 
 /** Report one run's LLM calls to the ledger, one `ai_calls` row per call.
@@ -38,7 +36,7 @@ export async function reportUsageToLedger(records: LlmUsageRecord[]): Promise<vo
   if (records.length === 0) return;
 
   const jwt = currentLedgerJwt();
-  if (!jwt || jwt.startsWith(API_KEY_PREFIX)) return;
+  if (!jwt) return;
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const anonKey = process.env.SUPABASE_ANON_KEY;
@@ -59,6 +57,20 @@ export async function reportUsageToLedger(records: LlmUsageRecord[]): Promise<vo
   }));
 
   try {
+    if (jwt.startsWith(API_KEY_PREFIX)) {
+      // The RPC stamps source 'mcp' and the key's owner itself.
+      await fetch(`${supabaseUrl}/rest/v1/rpc/report_ai_calls_for_api_key`, {
+        method: 'POST',
+        headers: {
+          apikey: anonKey,
+          authorization: `Bearer ${anonKey}`,
+          'content-type': 'application/json',
+          'content-profile': 'labre_mcp',
+        },
+        body: JSON.stringify({ api_key: jwt, calls: rows }),
+      });
+      return;
+    }
     await fetch(`${supabaseUrl}/rest/v1/ai_calls`, {
       method: 'POST',
       headers: {

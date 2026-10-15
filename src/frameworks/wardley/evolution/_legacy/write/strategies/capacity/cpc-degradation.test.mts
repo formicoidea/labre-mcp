@@ -1,13 +1,17 @@
 // Targeted tests for the degradation behavior of CpcEvolutionStrategy.
 //
-// Verifies the post-migration contract:
+// Verifies the contract (refusal over default — a guess must never pass as
+// an answer):
 //   1. When the ambient collector is missing BigQuery env, a pre-flight
-//      event is recorded under source 'bigquery'.
-//   2. When fetchByCpc throws, the failure surfaces as a 'bigquery' event
-//      and the strategy still returns a valid neutral result.
-//   3. Outside an MCP invocation (no ambient collector), the strategy
-//      degrades silently — preserving the original behavior for unit
-//      tests and CLI scripts.
+//      event is recorded under source 'bigquery' (informational, kept).
+//   2. When fetchByCpc throws, the strategy rejects with that error instead
+//      of answering a neutral position from empty patent data.
+//   3. When the injected mapper throws, the strategy rejects instead of
+//      falling back to the default mapper / empty CPC codes.
+//   4. Zero patents or no CPC code rejects, with or without a collector.
+//
+// Guard: tests 2–4 used to assert a valid neutral result; they would catch a
+// tryDegradeAmbient stand-in coming back on a path that feeds the position.
 //
 // No LLM, no real BigQuery, no network.
 
@@ -34,6 +38,20 @@ function silenceStdout(): () => void {
 
 const COMPONENT = { name: 'TestCap', capability: 'test capability' };
 
+/** Patent data with enough content for the indicators to score it. */
+const SOME_PATENTS = {
+  totalPatents: 50,
+  patents: [],
+  cpcDistribution: [{ cpc: 'G06F', count: 50 }],
+  yearlyClassifications: [{ year: 2021, cpcCodes: ['G06F'] }],
+  citationData: { totalForwardCitations: 200, patentCount: 50 },
+  claimsTimeline: [{ year: 2021, avgIndependentClaims: 6 }],
+  assigneeData: { uniqueAssignees: 20, totalPatents: 50 },
+  geoData: { jurisdictionCount: 3 },
+  sectorData: { uniqueSections: 2, uniqueClasses: 4 },
+  expirationData: { expiredCount: 5, totalPatents: 50 },
+};
+
 describe('CpcEvolutionStrategy — degradation framework integration', () => {
   let restore: () => void;
 
@@ -54,16 +72,17 @@ describe('CpcEvolutionStrategy — degradation framework integration', () => {
       detail: { missing: ['BIGQUERY_PROJECT_ID'] },
     }));
 
-    // Inject a patentSource that returns empty data so the rest of the
-    // pipeline runs without touching real BigQuery.
+    // Inject a mapper and a patentSource with data so the rest of the
+    // pipeline runs without touching a real LLM or BigQuery.
     const strategy = new CpcEvolutionStrategy({
-      patentSource: { fetchByCpc: async () => ({ totalPatents: 0, patents: [] }) },
+      cpcMapper: { mapToCpc: async () => ({ codes: ['G06F'], titles: {} }) },
+      patentSource: { fetchByCpc: async () => SOME_PATENTS },
     });
 
     const collector = new DegradationCollector('test');
     const result = await withCollector(collector, () => strategy.evaluate(COMPONENT));
 
-    assert.ok(result, 'strategy must still return a valid result');
+    assert.ok(result, 'the pre-flight event is informational: data still answers');
     assert.equal(typeof result.evolution, 'number');
     assert.ok(collector.hasDegraded(), 'collector must report degraded');
 
@@ -72,7 +91,7 @@ describe('CpcEvolutionStrategy — degradation framework integration', () => {
     assert.match(bqEvents[0].reason, /BigQuery not configured/);
   });
 
-  it('records a bigquery event when fetchByCpc throws', async () => {
+  it('rejects with the source error when fetchByCpc throws (no empty-data stand-in)', async () => {
     registerHealthCheck('bigquery', async () => ({ ready: true }));
 
     const strategy = new CpcEvolutionStrategy({
@@ -84,37 +103,51 @@ describe('CpcEvolutionStrategy — degradation framework integration', () => {
     });
 
     const collector = new DegradationCollector('test');
-    const result = await withCollector(collector, () => strategy.evaluate(COMPONENT));
-
-    assert.ok(result);
-    assert.equal(typeof result.evolution, 'number');
-    assert.ok(collector.hasDegraded());
-
-    const bqEvents = collector.getEvents().filter((e) => e.source === 'bigquery');
-    assert.equal(bqEvents.length, 1);
-    assert.match(bqEvents[0].reason, /connection refused/);
+    await assert.rejects(
+      withCollector(collector, () => strategy.evaluate(COMPONENT)),
+      /connection refused/,
+    );
+    // The failure is the error itself, not a 'bigquery' degradation event
+    // sitting next to a neutral position.
+    assert.equal(collector.getEvents().filter((e) => e.source === 'bigquery').length, 0);
   });
 
-  it('records a cpc-mapper event when the injected mapper throws', async () => {
+  it('rejects with the mapper error when the injected mapper throws (no fallback mapper)', async () => {
     registerHealthCheck('bigquery', async () => ({ ready: true }));
 
+    let fetched = false;
     const strategy = new CpcEvolutionStrategy({
       cpcMapper: { mapToCpc: async () => { throw new Error('mapper boom'); } },
-      patentSource: { fetchByCpc: async () => ({ totalPatents: 0, patents: [] }) },
+      patentSource: { fetchByCpc: async () => { fetched = true; return SOME_PATENTS; } },
     });
 
     const collector = new DegradationCollector('test');
-    const result = await withCollector(collector, () => strategy.evaluate(COMPONENT));
-
-    assert.ok(result);
-    assert.ok(collector.hasDegraded());
-    const mapperEvents = collector.getEvents().filter((e) => e.source === 'cpc-mapper');
-    assert.ok(mapperEvents.length >= 1);
-    assert.match(mapperEvents[0].reason, /mapper boom/);
+    await assert.rejects(
+      withCollector(collector, () => strategy.evaluate(COMPONENT)),
+      /mapper boom/,
+    );
+    assert.equal(fetched, false, 'no patent query without CPC codes');
   });
 
-  it('outside any MCP invocation (no ambient collector), strategy still works silently', async () => {
+  it('rejects when the mapper resolves no CPC code', async () => {
+    const strategy = new CpcEvolutionStrategy({
+      cpcMapper: { mapToCpc: async () => ({ codes: [], titles: {} }) },
+      patentSource: { fetchByCpc: async () => SOME_PATENTS },
+    });
+    await assert.rejects(strategy.evaluate(COMPONENT), /no CPC code could be resolved for "test capability"/);
+  });
+
+  it('rejects when zero patents come back', async () => {
+    const strategy = new CpcEvolutionStrategy({
+      cpcMapper: { mapToCpc: async () => ({ codes: ['G06F'], titles: {} }) },
+      patentSource: { fetchByCpc: async () => ({ totalPatents: 0, patents: [] }) },
+    });
+    await assert.rejects(strategy.evaluate(COMPONENT), /no patent found for CPC G06F/);
+  });
+
+  it('outside any MCP invocation (no ambient collector), a source failure still rejects', async () => {
     // Note: no withCollector wrapping → ambient collector is undefined.
+    // tryDegradeAmbient used to swallow this silently and return empty data.
     const strategy = new CpcEvolutionStrategy({
       patentSource: {
         fetchByCpc: async () => { throw new Error('this would normally degrade'); },
@@ -122,10 +155,7 @@ describe('CpcEvolutionStrategy — degradation framework integration', () => {
       cpcMapper: { mapToCpc: async () => ({ codes: ['G06F'], titles: {} }) },
     });
 
-    const result = await strategy.evaluate(COMPONENT);
-    assert.ok(result, 'strategy must return a result even with no collector');
-    assert.equal(typeof result.evolution, 'number');
-    assert.equal(typeof result.confidence, 'number');
+    await assert.rejects(strategy.evaluate(COMPONENT), /this would normally degrade/);
   });
 
   it('records bigquery success without flipping degraded when env is ready', async () => {

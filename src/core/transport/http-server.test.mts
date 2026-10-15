@@ -100,6 +100,7 @@ describe("labre-mcp HTTP transport", () => {
       "estimateEvolution",
       "evaluateMap",
       "generateValueChain",
+      "runBenchmarkScenario",
       "runCommand",
       "runRecipe",
     ]);

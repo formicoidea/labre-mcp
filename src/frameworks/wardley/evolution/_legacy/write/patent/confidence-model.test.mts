@@ -410,19 +410,19 @@ async function main() {
     assert.ok(result.confidence <= 0.95, `confidence=${result.confidence} <= 0.95`);
   });
 
-  await runTest('empty data strategy → confidence bounded [0.1, 0.95]', async () => {
+  // Zero patents gets no confidence at all: a neutral position is a guess,
+  // so the strategy refuses rather than answering at a low confidence.
+  await runTest('empty data strategy → refuses instead of a low-confidence guess', async () => {
     const strategy = new CpcEvolutionStrategy({
       patentSource: createMockPatentSource(MOCK_EMPTY),
       cpcMapper: mockCpcMapper,
     });
-    const result = await strategy.evaluate({ name: 'Nothing' });
-
-    assert.ok(result.confidence >= 0.1, `confidence=${result.confidence} >= 0.1`);
-    assert.ok(result.confidence <= 0.95, `confidence=${result.confidence} <= 0.95`);
+    await assert.rejects(strategy.evaluate({ name: 'Nothing' }), /no patent found/);
   });
 
-  await runTest('confidence follows data quality ordering: rich > moderate > sparse > empty', async () => {
-    const datasets = [MOCK_RICH, MOCK_MODERATE, MOCK_SPARSE, MOCK_EMPTY];
+  // MOCK_EMPTY is refused, not scored (see the test above).
+  await runTest('confidence follows data quality ordering: rich > moderate > sparse', async () => {
+    const datasets = [MOCK_RICH, MOCK_MODERATE, MOCK_SPARSE];
     const results = [];
 
     for (const data of datasets) {
@@ -435,8 +435,6 @@ async function main() {
     }
 
     // Rich(300) >= Moderate(50) >= Sparse(5)
-    // Note: empty(0) may have slightly different modelConfidence due to neutral fallback
-    // so we only check the first three are weakly ordered
     assert.ok(results[0].confidence >= results[1].confidence,
       `rich(${results[0].confidence}) should be >= moderate(${results[1].confidence})`);
     assert.ok(results[1].confidence >= results[2].confidence,

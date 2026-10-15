@@ -65,25 +65,24 @@ export function isOverBudget(body: unknown): boolean {
  *  QuotaExceededError. */
 export async function assertQuotaOk(): Promise<void> {
   const jwt = currentLedgerJwt();
-  // A lab_ API key is not a JWT: get_my_ai_usage is SECURITY INVOKER and would
-  // see a null auth.uid(), so it can answer nothing meaningful. Same known gap
-  // as the ledger reporter — skipped, not guessed at.
-  if (!jwt || jwt.startsWith('lab_')) return;
+  if (!jwt) return;
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const anonKey = process.env.SUPABASE_ANON_KEY;
   if (!supabaseUrl || !anonKey) return;
 
+  // A lab_ API key is not a JWT: get_my_ai_usage would see a null auth.uid().
+  // Its owner's budget is read by labre_mcp.ai_usage_for_api_key, which
+  // resolves the key like validate_api_key does (the key is the proof).
+  const apiKey = jwt.startsWith('lab_');
   let body: unknown;
   try {
-    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/get_my_ai_usage`, {
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/${apiKey ? 'ai_usage_for_api_key' : 'get_my_ai_usage'}`, {
       method: 'POST',
-      headers: {
-        apikey: anonKey,
-        authorization: `Bearer ${jwt}`,
-        'content-type': 'application/json',
-      },
-      body: '{}',
+      headers: apiKey
+        ? { apikey: anonKey, authorization: `Bearer ${anonKey}`, 'content-type': 'application/json', 'content-profile': 'labre_mcp' }
+        : { apikey: anonKey, authorization: `Bearer ${jwt}`, 'content-type': 'application/json' },
+      body: apiKey ? JSON.stringify({ api_key: jwt }) : '{}',
     });
     if (!res.ok) return; // degrade open
     body = await res.json();

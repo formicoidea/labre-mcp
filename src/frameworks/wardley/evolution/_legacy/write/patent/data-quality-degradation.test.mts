@@ -309,22 +309,22 @@ async function main() {
     assert.ok(confStep.dataQuality <= 0.9, `dq=${confStep.dataQuality} <= 0.9`);
   });
 
-  await runTest('empty data (0 patents) → strategy still returns valid result', async () => {
+  // Guard: 0 patents used to answer a neutral (0.5, 0.5) position at low
+  // confidence. A guess must never pass as an answer, so it is a refusal.
+  await runTest('empty data (0 patents) → strategy refuses instead of answering', async () => {
     const strategy = new CpcEvolutionStrategy({
       patentSource: createMockPatentSource(0),
       cpcMapper: mockCpcMapper,
     });
-    const result = await strategy.evaluate({ name: 'Nothing', capability: 'nothing' });
-
-    assert.equal(typeof result.evolution, 'number');
-    assert.equal(typeof result.confidence, 'number');
-    assert.ok(result.confidence >= 0.1, 'confidence floor holds with 0 patents');
-    assert.ok(result.confidence <= 0.95, 'confidence ceiling holds with 0 patents');
-    assert.equal(result.method, 'write:capacity:cpc-evolution');
+    await assert.rejects(
+      strategy.evaluate({ name: 'Nothing', capability: 'nothing' }),
+      /no patent found/,
+    );
   });
 
-  await runTest('confidence ordering: 500 > 50 > 3 > 0 patents', async () => {
-    const counts = [500, 50, 3, 0];
+  // 0 patents is refused, not scored (see the test above).
+  await runTest('confidence ordering: 500 > 50 > 3 patents', async () => {
+    const counts = [500, 50, 3];
     const confidences = [];
 
     for (const count of counts) {

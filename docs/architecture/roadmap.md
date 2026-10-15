@@ -6,7 +6,7 @@
 
 ## État courant en une ligne
 
-Daemon HTTP `src/core/transport/labre-daemon.mts` (:6767) — **6 outils MCP câblés** (`estimateEvolution`, `generateValueChain`, `evaluateMap`, `runCommand`, `runRecipe`, `__ping__`) — **86 stratégies** enregistrées dont **25 réelles** et **61 mocks** — kernel sous `src/core/`, utilitaires encore sous `src/lib/`, stratégies réelles encore sous `_legacy/`.
+Daemon HTTP `src/core/transport/labre-daemon.mts` (:6767) — **7 outils MCP câblés** (`estimateEvolution`, `generateValueChain`, `evaluateMap`, `runCommand`, `runRecipe`, `runBenchmarkScenario`, `__ping__`) — **87 stratégies** enregistrées dont **26 réelles** et **61 mocks** — kernel sous `src/core/`, utilitaires encore sous `src/lib/`, stratégies réelles encore sous `_legacy/`.
 
 ## Chantiers (Famille B)
 

@@ -431,6 +431,19 @@ export class PropertiesStrategy extends SolutionBaseStrategy {
       );
     }
 
+    // Corrected from the wardley-evolution-benchmark port: a property the
+    // reply rates twice was counted twice in the coverage ratio while the
+    // aggregation kept one of them. Indexed by name, the last rating wins.
+    propertyEvaluations = [...new Map(propertyEvaluations.map((pe: any) => [pe.property, pe])).values()];
+
+    // Past half the grid unrated, the answer would be mostly the phase-2
+    // back-fill below: refuse rather than return a guess (decided 2026-10-15,
+    // same rule as the benchmark port).
+    const unrated = properties.length - propertyEvaluations.length;
+    if (unrated > properties.length / 2) {
+      throw new Error(`PropertiesStrategy: ${unrated} of ${properties.length} properties unrated — refusing to answer from the back-fill`);
+    }
+
     // Build PropertyEvaluation entries
     const propResults = propertyEvaluations.map((pe: any) =>
       SolutionBaseStrategy.buildPropertyEvaluation(pe.property, pe.phase, pe.reason)

@@ -13,6 +13,12 @@
 // Fallback: if BigQuery/cache is unavailable, the LLM returns a 4-char code
 // from its training knowledge (graceful degradation).
 //
+// No last resort: when both paths come back empty the mapper throws instead of
+// answering ['G06F'] (product-owner decision: a guess must never pass as an
+// answer). Scoring every unresolved component as "generic computing" would put
+// a default position in the results. Mirrors wardley-evolution-benchmark
+// (evaluators/_cpc-mapper.ts).
+//
 // Pipeline integration:
 //   cpc-evolution-strategy.mjs calls mapCapabilityToCPC(capability, options)
 //   which returns 1-5 CPC codes at the most specific level discovered.
@@ -235,21 +241,15 @@ async function progressiveDiscovery(capability: string, llmCall: LLMCall, taxono
 // ─── Main public API ────────────────────────────────────────────────────────
 
 /**
- * Default CPC code returned when all resolution paths fail.
- * @type {string[]}
- */
-const ULTIMATE_DEFAULT_CODES = ['G06F'];
-
-/**
  * Map a capability string to 1-5 CPC codes via progressive discovery.
  *
  * Resolution cascade:
  *   1. Progressive discovery (LLM + cache/BigQuery hierarchy with titles)
  *   2. LLM fallback (no cache — LLM guesses from training knowledge)
- *   3. Ultimate default: ['G06F']
  *
- * **Return contract:** Always returns { codes: string[] (1-5), titles: Record<string,string> }.
- * Never throws, codes never empty.
+ * **Return contract:** Returns { codes: string[] (1-5), titles: Record<string,string> },
+ * codes never empty. Throws when the capability is empty or both paths
+ * resolve nothing — there is no default code (see the file header).
  *
  * @param {string} capability - Technology capability or component description
  * @param {Object} [options]
@@ -259,7 +259,7 @@ const ULTIMATE_DEFAULT_CODES = ['G06F'];
  */
 export async function mapCapabilityToCPC(capability: string, options: { llmCall?: LLMCall; taxonomyCache?: any } = {}): Promise<CpcMappingResult> {
   const cap = (typeof capability === 'string' ? capability : '').trim();
-  if (!cap) return { codes: [...ULTIMATE_DEFAULT_CODES], titles: {} };
+  if (!cap) throw new Error('cpc-mapper: no CPC code could be resolved — the capability is empty');
 
   // Resolve LLM call function
   const llmCall = typeof options.llmCall === 'function'
@@ -268,8 +268,7 @@ export async function mapCapabilityToCPC(capability: string, options: { llmCall?
 
   // Path 1: Progressive discovery with taxonomy cache. Failures fall
   // through to the LLM fallback below — record on the ambient collector
-  // so the user can correlate the eventual ULTIMATE_DEFAULT_CODES path
-  // with its root cause.
+  // so the user can correlate an eventual refusal with its root cause.
   if (options.taxonomyCache) {
     const collector = getCurrentCollector();
     try {
@@ -283,20 +282,19 @@ export async function mapCapabilityToCPC(capability: string, options: { llmCall?
   }
 
   // Path 2: LLM fallback (no cache, returns 4-char codes, no titles)
-  {
-    const collector = getCurrentCollector();
-    try {
-      const codes = await llmFallbackMapping(cap, llmCall);
-      if (codes.length > 0) {
-        return { codes: codes.slice(0, 5), titles: {} };
-      }
-    } catch (err) {
-      if (collector) collector.recordError('cpc-mapper:llm', err, { recoverable: true });
+  let llmError: unknown = null;
+  try {
+    const codes = await llmFallbackMapping(cap, llmCall);
+    if (codes.length > 0) {
+      return { codes: codes.slice(0, 5), titles: {} };
     }
+  } catch (err) {
+    llmError = err;
   }
 
-  // Path 3: Ultimate default
-  return { codes: [...ULTIMATE_DEFAULT_CODES], titles: {} };
+  // No default code: an unresolved component must not be scored as G06F.
+  const cause = llmError instanceof Error ? `: ${llmError.message}` : '';
+  throw new Error(`cpc-mapper: no CPC code could be resolved for "${cap}"${cause}`, { cause: llmError ?? undefined });
 }
 
 /**
@@ -327,5 +325,4 @@ export {
   llmFallbackMapping,
   progressiveDiscovery,
   formatCount,
-  ULTIMATE_DEFAULT_CODES,
 };

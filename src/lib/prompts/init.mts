@@ -19,6 +19,7 @@ import { parsePubResponse } from '#work-on-evolution/write/strategies/capacity/p
 import { parseFallbackPhase } from '#work-on-evolution/write/strategies/capacity/logprob-distribution-strategy.mjs';
 import { parseHistoryIterationResponse } from '#work-on-evolution/write/strategies/capacity/timeline-benchmark-strategy.mjs';
 import { parseLLMDirectResponse } from '#work-on-evolution/write/strategies/capacity/llm-direct-strategy.mjs';
+import { parseCertitudeUbiquityResponse } from '#work-on-evolution/write/strategies/capacity/certitude-ubiquity-strategy.mjs';
 import {
   parseCpcPickClass,
   parseCpcPickFromList,
@@ -43,6 +44,7 @@ registerParser('publicationPhases',     parsePubResponse);
 registerParser('logprobFallback',       parseFallbackPhase);
 registerParser('timelineIteration',     parseHistoryIterationResponse);
 registerParser('llmDirect',             parseLLMDirectResponse);
+registerParser('certitudeUbiquity',     parseCertitudeUbiquityResponse);
 registerParser('cpcPickClass',          parseCpcPickClass);
 registerParser('cpcPickFromList',       parseCpcPickFromList);
 registerParser('cpcFallback',           parseCpcFallback);

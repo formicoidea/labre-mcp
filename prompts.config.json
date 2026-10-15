@@ -54,6 +54,17 @@
       "parser": { "kind": "custom", "id": "timelineIteration" }
     }
   },
+  "certitude-ubiquity": {
+    "default": {
+      "kind": "template",
+      "templateFile": {
+        "system": "prompts/certitude-ubiquity.system.md",
+        "user": "prompts/certitude-ubiquity.user.md"
+      },
+      "variables": ["component", "context"],
+      "parser": { "kind": "custom", "id": "certitudeUbiquity" }
+    }
+  },
   "historical-evolution": {
     "with-capability": {
       "kind": "template",
@@ -69,6 +80,42 @@
       "templateFile": {
         "system": "prompts/historical-evolution.without-capability.system.md",
         "user": "prompts/historical-evolution.without-capability.user.md"
+      },
+      "variables": ["component", "description", "context", "date"],
+      "parser": { "kind": "custom", "id": "llmDirect" }
+    },
+    "capability.with-capability": {
+      "kind": "template",
+      "templateFile": {
+        "system": "prompts/historical-evolution.capability.with-capability.system.md",
+        "user": "prompts/historical-evolution.capability.with-capability.user.md"
+      },
+      "variables": ["capability", "description", "context", "date"],
+      "parser": { "kind": "custom", "id": "llmDirect" }
+    },
+    "capability.without-capability": {
+      "kind": "template",
+      "templateFile": {
+        "system": "prompts/historical-evolution.capability.without-capability.system.md",
+        "user": "prompts/historical-evolution.capability.without-capability.user.md"
+      },
+      "variables": ["component", "description", "context", "date"],
+      "parser": { "kind": "custom", "id": "llmDirect" }
+    },
+    "anchor.with-capability": {
+      "kind": "template",
+      "templateFile": {
+        "system": "prompts/historical-evolution.anchor.with-capability.system.md",
+        "user": "prompts/historical-evolution.anchor.with-capability.user.md"
+      },
+      "variables": ["capability", "description", "context", "date"],
+      "parser": { "kind": "custom", "id": "llmDirect" }
+    },
+    "anchor.without-capability": {
+      "kind": "template",
+      "templateFile": {
+        "system": "prompts/historical-evolution.anchor.without-capability.system.md",
+        "user": "prompts/historical-evolution.anchor.without-capability.user.md"
       },
       "variables": ["component", "description", "context", "date"],
       "parser": { "kind": "custom", "id": "llmDirect" }

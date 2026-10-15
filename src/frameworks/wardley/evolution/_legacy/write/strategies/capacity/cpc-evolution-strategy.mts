@@ -20,12 +20,26 @@
 //
 // Auto-discovery: re-exported from src/strategies/cpc-evolution-strategy.mjs
 // so the registry picks it up alongside other *-strategy.mjs files.
+//
+// Refusal over default (product-owner decision: a guess must never pass as an
+// answer). Mirrors the port in wardley-evolution-benchmark (evaluators/cpc-evolution.ts):
+//   - no top-level safety net: a pipeline failure throws instead of returning
+//     a neutral (0.5, 0.5) position at confidence 0.1;
+//   - a failed CPC mapper, patent source or indicator computation propagates
+//     instead of being replaced by [] codes, empty patent data or neutral
+//     indicators — each of those stand-ins would feed the position;
+//   - no CPC code, or zero patents found, throws: the position would otherwise
+//     come from neutral indicators alone.
+// Kept: informational fallbacks that do not feed the position (taxonomy cache
+// absence → the mapper's LLM path, a null state-of-the-art example, the plain
+// .wm insight). Not mirrored: the benchmark's "more than half neutral
+// indicators throws" rule — patent-indicators.mts scores missing data itself
+// and does not report which indicators had none.
 
 import { BaseStrategy } from './base-strategy.mjs';
 import type { ComponentInput, EvolutionResult } from '#types/evolution.mjs';
 import { computeEvolution } from '../../s-curve/s-curve.mjs';
 import { getCpcTitle } from '../../patent/cpc-taxonomy-cache.mjs';
-import { toErrorMessage } from '#lib/errors.mjs';
 import type { IndicatorConfig, PatentData, IndicatorResults } from '#types/patent.mjs';
 import { getPrompt } from '#lib/prompts/registry.mjs';
 import {
@@ -33,7 +47,6 @@ import {
   runHealthCheck,
   tryDegradeAmbient,
 } from '#lib/degradation/index.mjs';
-import { emptyPatentData } from '#lib/patent/patent-data-source.mjs';
 
 // ─── Response parser (registered in src/lib/prompts/init.mts) ──────────────
 
@@ -261,46 +274,26 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    *   5. Delegate to computeEvolution(c, u)
    *   6. Build confidence from data quality + model fit
    *
-   * **GUARANTEE: Always returns a valid EvolutionResult — never throws, never
-   * returns null.** When data is missing, unavailable, or any internal error
-   * occurs, the strategy degrades gracefully to a low-confidence result with
-   * neutral (0.5, 0.5) defaults. Phase B enrichment in estimate-evolution.mjs
-   * uses the confidence score to weight this strategy's contribution alongside
-   * other strategies, so low confidence naturally reduces its influence on the
-   * final evolution estimate without requiring abstention.
+   * **Throws rather than guesses.** No CPC code resolved, zero patents found,
+   * or a failure of the mapper, the patent source or the indicators rejects
+   * the promise: a neutral (0.5, 0.5) stand-in would place the component
+   * mid-axis and pass that guess off as a patent-based answer. Callers (MCP
+   * dispatch, recipe fan-out) report the error instead of a fake position.
    *
-   * Degradation tiers:
-   *   - No CPC codes found → neutral indicators (0.5), confidence ≈ 0.25
-   *   - No patents found   → neutral indicators (0.5), confidence ≈ 0.25
+   * Confidence tiers (when an answer exists):
    *   - <10 patents        → real indicators, confidence 0.25–0.45
    *   - 10–100 patents     → real indicators, confidence 0.45–0.65
    *   - >100 patents       → real indicators, confidence 0.55–0.95
-   *   - Unexpected error    → fallback result, confidence = 0.1 (minimum)
    *
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {Promise<import('./base-strategy.mjs').EvolutionResult & { certitude: number, ubiquity: number }>}
    */
   async evaluate(component: ComponentInput): Promise<EvolutionResult> {
-    try {
-      return await this._evaluateInternal(component);
-    } catch (err) {
-      // ── SAFETY NET: guarantee no abstention ────────────────────────────
-      // If anything in the pipeline throws unexpectedly (BigQuery timeout,
-      // s-curve NaN, indicator bug, etc.), we still return a valid result
-      // with minimum confidence so Phase B weighting naturally deprioritizes it.
-      // Also surface the unexpected failure on the ambient collector so the
-      // MCP result reports degraded:true with the underlying reason.
-      const collector = getCurrentCollector();
-      if (collector) {
-        collector.recordError('cpc-evolution', err, { recoverable: true });
-      }
-      return this._buildFallbackResult(err);
-    }
+    return this._evaluateInternal(component);
   }
 
   /**
-   * Internal evaluation pipeline — separated from evaluate() so the top-level
-   * safety net can catch any unexpected error without duplicating fallback logic.
+   * Internal evaluation pipeline.
    *
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {Promise<import('./base-strategy.mjs').EvolutionResult & { certitude: number, ubiquity: number }>}
@@ -325,11 +318,19 @@ export class CpcEvolutionStrategy extends BaseStrategy {
       }
     }
 
-    // Step 1: Resolve CPC codes for the component
-    const cpcCodes = await this._resolveCpcCodes(component);
+    // Step 1: Resolve CPC codes for the component. No code means no patent
+    // query: whatever followed would be neutral indicators, i.e. a guess.
+    const cpcCodes: string[] = await this._resolveCpcCodes(component);
+    if (cpcCodes.length === 0) {
+      throw new Error(`cpc-evolution: no CPC code could be resolved for "${component.capability || component.name || ''}"`);
+    }
 
-    // Step 2: Fetch patent data
+    // Step 2: Fetch patent data. Zero patents would feed only neutral
+    // indicators into the S-curve, so it is a refusal, not a low-confidence answer.
     const patentData = await this._fetchPatentData(cpcCodes);
+    if (!patentData || !(patentData.totalPatents > 0)) {
+      throw new Error(`cpc-evolution: no patent found for CPC ${cpcCodes.join(', ')}`);
+    }
 
     // Step 3: Compute all 8 indicators via pure functions
     const indicatorValues = await this._computeIndicators(patentData, cpcCodes);
@@ -379,45 +380,6 @@ export class CpcEvolutionStrategy extends BaseStrategy {
     };
 
     return BaseStrategy.validateResult(result);
-  }
-
-  /**
-   * Build a minimal valid fallback result when the pipeline fails unexpectedly.
-   *
-   * Uses neutral (0.5, 0.5) inputs to computeEvolution so the evolution score
-   * is still derived from the calibrated S-curve model (no custom scoring bypass).
-   * Confidence is set to the minimum (0.1) so Phase B enrichment weighting
-   * naturally deprioritizes this result.
-   *
-   * @param {Error} err - The error that triggered the fallback
-   * @returns {import('./base-strategy.mjs').EvolutionResult & { certitude: number, ubiquity: number }}
-   * @private
-   */
-  _buildFallbackResult(err: unknown): any {
-    // Neutral midpoint — still delegate to S-curve for evolution score
-    const NEUTRAL = 0.5;
-    let evolution = NEUTRAL;
-
-    try {
-      const scurveResult = computeEvolution(NEUTRAL, NEUTRAL);
-      evolution = scurveResult.evolution;
-    } catch {
-      // Even S-curve failed — use raw neutral value (this should never happen
-      // with valid [0,1] inputs, but guarantees we still return a result)
-    }
-
-    return BaseStrategy.validateResult({
-      evolution,
-      confidence: 0.1,  // Minimum confidence — Phase B will deprioritize
-      method: CpcEvolutionStrategy.method,
-      certitude: NEUTRAL,
-      ubiquity: NEUTRAL,
-      trace: [
-        { step: 'fallback', reason: toErrorMessage(err) || 'unknown error' },
-        { step: 'aggregated', certitude: NEUTRAL, ubiquity: NEUTRAL },
-        { step: 'confidence', dataQuality: 0.2, modelConfidence: 0, combined: 0.1 },
-      ],
-    });
   }
 
   // ─── Runtime indicator management (AC 12) ───────────────────────────────
@@ -666,95 +628,63 @@ export class CpcEvolutionStrategy extends BaseStrategy {
   /**
    * Resolve CPC codes from component capability via CPC mapper.
    * Uses progressive discovery (LLM + taxonomy cache) when available.
-   * Falls back to empty array if no mapper available (confidence will be low).
+   * A mapper failure propagates: substituting [] codes would end in a
+   * neutral-indicator position, i.e. a guess passed off as an answer.
    *
    * @param {import('./base-strategy.mjs').ComponentInput} component
    * @returns {Promise<string[]>} Array of CPC codes (variable length)
    */
   async _resolveCpcCodes(component: any): Promise<any> {
     if (this._cpcMapper) {
-      // Injected mapper (typically tests/mocks). Fallback to default mapper
-      // when it throws — record the failure so the user sees why CPC is
-      // degraded.
-      const result = await tryDegradeAmbient(
-        'cpc-mapper',
-        async () => this._cpcMapper.mapToCpc(component),
-        null,
-      );
-      if (result !== null) {
-        return Array.isArray(result) ? result : result.codes || [];
+      // Injected mapper (typically tests/mocks). It is the mapper the caller
+      // chose: its failure is not silently replaced by the default one.
+      const result = await this._cpcMapper.mapToCpc(component);
+      return Array.isArray(result) ? result : result?.codes || [];
+    }
+
+    const { mapComponentToCpc } = await import('../../patent/cpc-mapper.mjs');
+    const { setCpcTitle } = await import('../../patent/cpc-taxonomy-cache.mjs');
+
+    // Try to create taxonomy cache for progressive discovery — its absence
+    // is informational only (the mapper falls back to its LLM path), it
+    // does not substitute a value for the position.
+    const taxonomyCache = await tryDegradeAmbient(
+      'cpc-taxonomy-cache',
+      async () => {
+        const { createTaxonomyCache } = await import('../../patent/cpc-taxonomy-cache.mjs');
+        return await createTaxonomyCache();
+      },
+      null,
+    );
+
+    const result = await mapComponentToCpc(component, this._llmCall, { taxonomyCache });
+
+    // Register titles from discovery into the global title store
+    if (result.titles) {
+      for (const [code, title] of Object.entries(result.titles)) {
+        setCpcTitle(code, title as string);
       }
     }
 
-    // Lazy-load CPC mapper + taxonomy cache. Wrapped in tryDegradeAmbient
-    // so a missing/failed module surfaces as a degradation event instead
-    // of an empty array silently degrading every downstream indicator.
-    return await tryDegradeAmbient(
-      'cpc-mapper',
-      async () => {
-        const { mapComponentToCpc } = await import('../../patent/cpc-mapper.mjs');
-        const { setCpcTitle } = await import('../../patent/cpc-taxonomy-cache.mjs');
-
-        // Try to create taxonomy cache for progressive discovery — its
-        // absence is informational only, the mapper falls back to LLM.
-        const taxonomyCache = await tryDegradeAmbient(
-          'cpc-taxonomy-cache',
-          async () => {
-            const { createTaxonomyCache } = await import('../../patent/cpc-taxonomy-cache.mjs');
-            return await createTaxonomyCache();
-          },
-          null,
-        );
-
-        const result = await mapComponentToCpc(component, this._llmCall, { taxonomyCache });
-
-        // Register titles from discovery into the global title store
-        if (result.titles) {
-          for (const [code, title] of Object.entries(result.titles)) {
-            setCpcTitle(code, title as string);
-          }
-        }
-
-        return result.codes || [];
-      },
-      [],
-    );
+    return result.codes || [];
   }
 
   /**
-   * Fetch patent data from the configured data source.
-   * Returns a minimal stub if no data source is available.
+   * Fetch patent data from the configured data source (injected, or
+   * BigQuery from env vars). A failure propagates: empty patent data in its
+   * place would feed neutral indicators into the position.
    *
    * @param {string[]} cpcCodes
    * @returns {Promise<Object>} Patent data object
    */
   async _fetchPatentData(cpcCodes: string[]): Promise<any> {
-    if (cpcCodes.length === 0) {
-      return emptyPatentData();
-    }
-
-    const empty = emptyPatentData();
-
     if (this._patentSource) {
-      return await tryDegradeAmbient(
-        'bigquery',
-        async () => this._patentSource.fetchByCpc(cpcCodes),
-        empty,
-      );
+      return await this._patentSource.fetchByCpc(cpcCodes);
     }
 
-    // Lazy-load BigQuery patent source. Failure here is the canonical
-    // "BigQuery not available" path — recorded under source 'bigquery'
-    // so the user can correlate with the boot-time pre-flight event.
-    return await tryDegradeAmbient(
-      'bigquery',
-      async () => {
-        const { createPatentSource } = await import('#lib/patent/bigquery-patent-source.mjs');
-        const source = createPatentSource();
-        return await source.fetchByCpc(cpcCodes);
-      },
-      empty,
-    );
+    const { createPatentSource } = await import('#lib/patent/bigquery-patent-source.mjs');
+    const source = createPatentSource();
+    return await source.fetchByCpc(cpcCodes);
   }
 
   /**
@@ -767,56 +697,39 @@ export class CpcEvolutionStrategy extends BaseStrategy {
    * @returns {Promise<{ certitude: Record<string, number>, ubiquity: Record<string, number> }>}
    */
   // any: return shape uses 'ubiquity' (legacy) instead of IndicatorResults.ubiquite
+  // A failure here propagates: eight neutral 0.5 indicators in its place
+  // would put the component mid-axis and call that a patent-based answer.
   async _computeIndicators(patentData: PatentData, cpcCodes: string[]): Promise<any> {
-    const neutral = {
+    const indicators = await import('#lib/patent/patent-indicators.mjs');
+
+    // Build certitude indicator config from strategy config (for toggling)
+    const certitudeConfig = Object.entries(this._certitudeIndicators)
+      .map(([key, cfg]: [string, any]) => ({ key, weight: cfg.weight, enabled: cfg.enabled }));
+    const ubiquiteConfig = Object.entries(this._ubiquityIndicators)
+      .map(([key, cfg]: [string, any]) => ({ key, weight: cfg.weight, enabled: cfg.enabled }));
+
+    // Delegate to computeAllIndicators which calls each pure function
+    const result = indicators.computeAllIndicators(patentData, {
+      certitudeConfig,
+      ubiquiteConfig,
+    });
+
+    // The per-indicator `?? 0.5` is upstream's: each pure function already
+    // scores its own missing data, so it only guards a key the result omits.
+    return {
       certitude: {
-        convergenceHHI: 0.5,
-        stabiliteTaxonomique: 0.5,
-        densiteCitation: 0.5,
-        retrecissementClaims: 0.5,
+        convergenceHHI:       result.scores.convergenceHHI ?? 0.5,
+        stabiliteTaxonomique: result.scores.stabiliteTaxonomique ?? 0.5,
+        densiteCitation:      result.scores.densiteCitation ?? 0.5,
+        retrecissementClaims: result.scores.retrecissementClaims ?? 0.5,
       },
       ubiquity: {
-        diversiteAssignees: 0.5,
-        couvertureGeo: 0.5,
-        diffusionSectorielle: 0.5,
-        ratioExpires: 0.5,
+        diversiteAssignees:   result.scores.diversiteAssignees ?? 0.5,
+        couvertureGeo:        result.scores.couvertureGeo ?? 0.5,
+        diffusionSectorielle: result.scores.diffusionSectorielle ?? 0.5,
+        ratioExpires:         result.scores.ratioExpires ?? 0.5,
       },
     };
-
-    return await tryDegradeAmbient(
-      'patent-indicators',
-      async () => {
-        const indicators = await import('#lib/patent/patent-indicators.mjs');
-
-        // Build certitude indicator config from strategy config (for toggling)
-        const certitudeConfig = Object.entries(this._certitudeIndicators)
-          .map(([key, cfg]: [string, any]) => ({ key, weight: cfg.weight, enabled: cfg.enabled }));
-        const ubiquiteConfig = Object.entries(this._ubiquityIndicators)
-          .map(([key, cfg]: [string, any]) => ({ key, weight: cfg.weight, enabled: cfg.enabled }));
-
-        // Delegate to computeAllIndicators which calls each pure function
-        const result = indicators.computeAllIndicators(patentData, {
-          certitudeConfig,
-          ubiquiteConfig,
-        });
-
-        return {
-          certitude: {
-            convergenceHHI:       result.scores.convergenceHHI ?? 0.5,
-            stabiliteTaxonomique: result.scores.stabiliteTaxonomique ?? 0.5,
-            densiteCitation:      result.scores.densiteCitation ?? 0.5,
-            retrecissementClaims: result.scores.retrecissementClaims ?? 0.5,
-          },
-          ubiquity: {
-            diversiteAssignees:   result.scores.diversiteAssignees ?? 0.5,
-            couvertureGeo:        result.scores.couvertureGeo ?? 0.5,
-            diffusionSectorielle: result.scores.diffusionSectorielle ?? 0.5,
-            ratioExpires:         result.scores.ratioExpires ?? 0.5,
-          },
-        };
-      },
-      neutral,
-    );
   }
 }
 

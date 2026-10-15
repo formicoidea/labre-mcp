@@ -3,7 +3,8 @@
 // Verifies the cascading resolution strategy:
 //   1. Progressive discovery (LLM + taxonomy cache)
 //   2. LLM fallback (no cache)
-//   3. Ultimate default: ['G06F']
+//   3. No default: throws when neither path resolves a code (it used to
+//      answer ['G06F'], scoring every unresolved component as generic computing)
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,8 +19,8 @@ import {
   llmFallbackMapping,
   progressiveDiscovery,
   formatCount,
-  ULTIMATE_DEFAULT_CODES,
 } from './cpc-mapper.mjs';
+import * as cpcMapperModule from './cpc-mapper.mjs';
 
 // ─── Mock helpers ───────────────────────────────────────────────────────────
 
@@ -251,31 +252,49 @@ describe('mapCapabilityToCPC', () => {
     assert.ok(result.codes.includes('G06F'));
   });
 
-  it('returns ultimate default for empty input', async () => {
-    const result = await mapCapabilityToCPC('', {
-      llmCall: mockLlm('G06F'),
-    });
-    assert.deepEqual(result.codes, ['G06F']);
+  // Guard: these three used to assert the ['G06F'] last resort. An
+  // unresolved component must not be scored as "generic computing".
+  it('throws on empty input instead of returning a default code', async () => {
+    let called = false;
+    await assert.rejects(
+      mapCapabilityToCPC('', { llmCall: async () => { called = true; return 'G06F'; } }),
+      /capability is empty/,
+    );
+    assert.equal(called, false, 'no LLM call for an empty capability');
   });
 
-  it('returns ultimate default when everything fails', async () => {
-    const result = await mapCapabilityToCPC('test', {
-      llmCall: async () => { throw new Error('LLM down'); },
-    });
-    assert.deepEqual(result.codes, ULTIMATE_DEFAULT_CODES);
+  it('throws when everything fails instead of returning G06F', async () => {
+    await assert.rejects(
+      mapCapabilityToCPC('test', {
+        llmCall: async () => { throw new Error('LLM down'); },
+      }),
+      /no CPC code could be resolved for "test": LLM down/,
+    );
   });
 
-  it('never throws', async () => {
-    const result = await mapCapabilityToCPC('test', {
-      llmCall: async () => { throw new Error('fail'); },
-      taxonomyCache: {
-        getSubclasses: async () => { throw new Error('cache fail'); },
-        getGroups: async () => { throw new Error('cache fail'); },
-        getSubgroups: async () => { throw new Error('cache fail'); },
-      },
-    });
-    assert.ok(Array.isArray(result.codes));
-    assert.ok(result.codes.length >= 1);
+  it('throws when the LLM answers no usable code', async () => {
+    await assert.rejects(
+      mapCapabilityToCPC('test', { llmCall: mockLlm('I do not know') }),
+      /no CPC code could be resolved for "test"/,
+    );
+  });
+
+  it('throws when both the cache and the LLM fail', async () => {
+    await assert.rejects(
+      mapCapabilityToCPC('test', {
+        llmCall: async () => { throw new Error('fail'); },
+        taxonomyCache: {
+          getSubclasses: async () => { throw new Error('cache fail'); },
+          getGroups: async () => { throw new Error('cache fail'); },
+          getSubgroups: async () => { throw new Error('cache fail'); },
+        },
+      }),
+      /no CPC code could be resolved/,
+    );
+  });
+
+  it('exports no default code any more', () => {
+    assert.equal('ULTIMATE_DEFAULT_CODES' in cpcMapperModule, false);
   });
 });
 
@@ -296,6 +315,10 @@ describe('mapComponentToCpc', () => {
       mockLlm('G06F'),
     );
     assert.ok(result.codes.length >= 1);
+  });
+
+  it('throws for a component with neither capability nor name', async () => {
+    await assert.rejects(mapComponentToCpc({}, mockLlm('G06F')), /capability is empty/);
   });
 
   it('passes taxonomyCache through options', async () => {

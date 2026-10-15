@@ -94,6 +94,11 @@ export const ComponentInputSchema = z.object({
   date: z.union([z.string(), z.date(), z.number()]).optional(),
   capability: z.string().optional(),
   nature: CapabilityNatureSchema.optional(),
+  /** What the label names, when the caller knows it: an anchor (a user need),
+   *  a solution (a product or named implementation) or a capability itself.
+   *  Strategies that word their question per subject read it (llm-direct);
+   *  absent = the original solution wording. */
+  subject: z.enum(['anchor', 'solution', 'capability']).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 export type ComponentInput = z.infer<typeof ComponentInputSchema>;

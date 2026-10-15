@@ -39,7 +39,8 @@ describe('evolution registry — SCurveStrategy', () => {
     assert.equal(registry.has('wardley:map:node:identify:default'), true);
     assert.equal(registry.has('wardley:map:climate:position-anchor-in-evolution:default'), true);
     assert.equal(registry.has('wardley:map:climate:position-anchor-in-evolution:culture-phase'), true);
-    assert.equal(registry.size(), 10);
+    assert.equal(registry.has('wardley:map:climate:position-functional-in-evolution:certitude-ubiquity'), true);
+    assert.equal(registry.size(), 11);
   });
 
   it('CpcEvolutionStrategyCore.method returns the 5-segment id', () => {
