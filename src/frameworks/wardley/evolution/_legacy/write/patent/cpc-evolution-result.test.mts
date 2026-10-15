@@ -335,46 +335,30 @@ async function main() {
 
   console.log('\nEvolutionResult Shape (empty data, 0 patents):');
 
-  await runTest('empty data still produces valid result (no abstention)', async () => {
+  // A guess must never pass as an answer: no patent → no EvolutionResult.
+  await runTest('empty data is refused, not turned into a neutral result', async () => {
     const strategy = new CpcEvolutionStrategy({
       patentSource: createMockPatentSource(MOCK_PATENT_DATA_EMPTY),
       cpcMapper: mockCpcMapper,
     });
-    const result = await strategy.evaluate(COMPONENT_MINIMAL);
-
-    // Must still produce all fields - strategy never abstains
-    assert.ok('evolution' in result);
-    assert.ok('confidence' in result);
-    assert.ok('method' in result);
-    assert.ok('certitude' in result);
-    assert.ok('ubiquity' in result);
-    assert.ok('trace' in result);
-
-    assert.equal(result.method, 'write:capacity:cpc-evolution');
-    assert.ok(result.confidence >= 0.1, 'confidence should be >= 0.1 even with no data');
-    assert.ok(result.confidence <= 0.95, 'confidence should be <= 0.95');
-    BaseStrategy.validateResult(result);
+    await assert.rejects(strategy.evaluate(COMPONENT_MINIMAL), /no patent found/);
   });
 
   // ── 5. No CPC codes (mapper returns empty) ────────────────────────────
 
   console.log('\nEvolutionResult with failed CPC mapping:');
 
-  await runTest('empty CPC codes produce valid result with neutral values', async () => {
+  // Without a CPC code the patent source is never asked: whatever followed
+  // would be neutral indicators, so the strategy refuses.
+  await runTest('empty CPC codes are refused before any patent query', async () => {
     const emptyCpcMapper = { mapToCpc: async () => [] };
+    let fetched = false;
     const strategy = new CpcEvolutionStrategy({
-      patentSource: createMockPatentSource(MOCK_PATENT_DATA_RICH),
+      patentSource: { fetchByCpc: async () => { fetched = true; return MOCK_PATENT_DATA_RICH; } },
       cpcMapper: emptyCpcMapper,
     });
-    const result = await strategy.evaluate(COMPONENT_MINIMAL);
-
-    assert.equal(result.method, 'write:capacity:cpc-evolution');
-    assert.equal(typeof result.evolution, 'number');
-    assert.equal(typeof result.confidence, 'number');
-    assert.equal(typeof result.certitude, 'number');
-    assert.equal(typeof result.ubiquity, 'number');
-    assert.ok(Array.isArray(result.trace));
-    BaseStrategy.validateResult(result);
+    await assert.rejects(strategy.evaluate(COMPONENT_MINIMAL), /no CPC code could be resolved/);
+    assert.equal(fetched, false, 'patent source must not be queried without a CPC code');
   });
 
   // ── 6. Trace structure detail ──────────────────────────────────────────

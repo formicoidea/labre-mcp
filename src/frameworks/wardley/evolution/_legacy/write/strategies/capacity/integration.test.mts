@@ -67,12 +67,14 @@ function mockTimelineLLMCallStalling(prompt) {
 /** Mock LLM logprob call returning phase classification with logprobs */
 function mockLLMLogprobCall(prompt) {
   return Promise.resolve({
-    text: 'Product',
+    // The prompt asks for phase1..phase4: phase names ("Product") never
+    // matched, and the strategy silently answered the uniform distribution.
+    text: 'phase3',
     logprobs: [
-      { token: 'Product', logprob: -0.2 },
-      { token: 'Commodity', logprob: -1.5 },
-      { token: 'Custom', logprob: -2.8 },
-      { token: 'Genesis', logprob: -4.0 },
+      { token: 'phase3', logprob: -0.2 },
+      { token: 'phase4', logprob: -1.5 },
+      { token: 'phase2', logprob: -2.8 },
+      { token: 'phase1', logprob: -4.0 },
     ],
   });
 }
@@ -108,6 +110,33 @@ const COMPONENT_MINIMAL = {
 
 // ── Constructor options for LLM-based strategies ────────────────────────────
 
+// CPC evolution refuses rather than guesses (no CPC code or zero patents
+// throws), so it gets a stub mapper and a stub patent source with data —
+// no LLM, no BigQuery.
+const CPC_OPTIONS = {
+  cpcMapper: { mapToCpc: async () => ['G06F'] },
+  patentSource: {
+    fetchByCpc: async () => ({
+      totalPatents: 120,
+      patents: [],
+      cpcDistribution: [{ cpc: 'G06F', count: 120 }],
+      yearlyClassifications: [
+        { year: 2020, cpcCodes: ['G06F'] },
+        { year: 2021, cpcCodes: ['G06F'] },
+      ],
+      citationData: { totalForwardCitations: 900, patentCount: 120 },
+      claimsTimeline: [
+        { year: 2019, avgIndependentClaims: 6 },
+        { year: 2021, avgIndependentClaims: 5 },
+      ],
+      assigneeData: { uniqueAssignees: 40, totalPatents: 120 },
+      geoData: { jurisdictionCount: 4 },
+      sectorData: { uniqueSections: 2, uniqueClasses: 5 },
+      expirationData: { expiredCount: 20, totalPatents: 120 },
+    }),
+  },
+};
+
 const STRATEGY_OPTIONS = {
   'llm-direct':            { llmCall: mockLLMCall },
   [LOGPROB_DISTRIBUTION]:  { llmLogprobCall: mockLLMLogprobCall },
@@ -115,8 +144,8 @@ const STRATEGY_OPTIONS = {
   // Analytical strategies need no special options
   's-curve':               {},
   [TIMELINE_BENCHMARK]:    { llmCall: mockTimelineLLMCall },
-  // CPC evolution: no external dependencies required (graceful degradation)
-  [CPC_EVOLUTION]:         {},
+  // CPC evolution: stubbed mapper + patent source (it refuses without data)
+  [CPC_EVOLUTION]:         CPC_OPTIONS,
 };
 
 // Components that work for each strategy
@@ -126,7 +155,7 @@ const STRATEGY_COMPONENTS = {
   'llm-direct':            COMPONENT_MINIMAL,     // uses LLM
   [LOGPROB_DISTRIBUTION]:  COMPONENT_MINIMAL,     // uses LLM logprobs
   'publication-analysis':  COMPONENT_FULL,        // has pub proportions
-  [CPC_EVOLUTION]:         COMPONENT_MINIMAL,     // graceful degradation without BigQuery
+  [CPC_EVOLUTION]:         COMPONENT_MINIMAL,     // stubbed CPC codes + patent data
 };
 
 // ── Expected strategies ─────────────────────────────────────────────────────
@@ -262,7 +291,7 @@ async function main() {
   await runTest('analytical strategies return valid results for same component', async () => {
     const strategies = await loadStrategies();
 
-    const cpc = new (strategies.get(CPC_EVOLUTION))();
+    const cpc = new (strategies.get(CPC_EVOLUTION))(CPC_OPTIONS);
     const cpcResult = await cpc.evaluate(COMPONENT_MINIMAL);
     assertEvolutionResult(cpcResult, CPC_EVOLUTION);
 

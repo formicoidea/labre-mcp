@@ -1,14 +1,16 @@
-// Test: AC 11 — Strategy always returns a result (no abstention)
+// Test: AC 11 (amended) — refusal over default
 //
-// The CPC Evolution Strategy must NEVER throw or return null. Under every
-// failure condition — missing CPC codes, BigQuery errors, zero patents,
-// indicator module failures, even s-curve crashes — it must return a valid
-// EvolutionResult with low confidence. Phase B enrichment in
-// estimate-evolution.mjs uses confidence for weighting, so low confidence
-// naturally deprioritizes unreliable results without requiring abstention.
+// The CPC Evolution Strategy used to NEVER throw: every failure (missing CPC
+// codes, BigQuery errors, zero patents, indicator failures) degraded to a
+// neutral (0.5, 0.5) result at low confidence. Product-owner decision: a guess
+// must never pass as an answer. Guard: each failure below now rejects; had the
+// old safety net come back, these tests would catch a neutral position being
+// returned in place of a refusal. When data exists, a valid result is still
+// returned (happy path, sparse data, malformed-but-present data).
 //
-// This test exhaustively verifies the no-abstention guarantee by injecting
-// failures at every stage of the pipeline.
+// Hermetic: no real LLM (a failing llmCall is injected where the default
+// mapper would run), no real BigQuery (BIGQUERY_PROJECT_ID is unset where
+// the default patent source would run).
 
 import assert from 'node:assert/strict';
 import { BaseStrategy } from '../strategies/capacity/base-strategy.mjs';
@@ -94,10 +96,30 @@ const MOCK_PATENT_DATA_RICH = {
 
 const COMPONENT = { name: 'Test Component', capability: 'testing' };
 
+/** An LLM that is down — keeps the default mapper away from any real model. */
+const FAILING_LLM = async () => { throw new Error('LLM down'); };
+
+/** Dependencies that produce an answer. */
+const RICH_DEPS = {
+  cpcMapper: { mapToCpc: async () => ['H04L'] },
+  patentSource: { fetchByCpc: async () => MOCK_PATENT_DATA_RICH },
+};
+
+/** Run fn with BIGQUERY_PROJECT_ID unset, so the default source cannot reach BigQuery. */
+async function withoutBigQueryEnv(fn) {
+  const saved = process.env.BIGQUERY_PROJECT_ID;
+  delete process.env.BIGQUERY_PROJECT_ID;
+  try {
+    return await fn();
+  } finally {
+    if (saved !== undefined) process.env.BIGQUERY_PROJECT_ID = saved;
+  }
+}
+
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('=== AC 11: No Abstention Guarantee Tests ===\n');
+  console.log('=== AC 11 (amended): Refusal Over Default Tests ===\n');
 
   // ── 1. Happy path: normal evaluation returns a result ─────────────────
 
@@ -114,149 +136,133 @@ async function main() {
 
   // ── 2. CPC mapper failure scenarios ───────────────────────────────────
 
-  console.log('\nCPC Mapper Failures (should NOT cause abstention):');
+  console.log('\nCPC Mapper Failures (refuse, never guess):');
 
-  await runTest('CPC mapper throws Error', async () => {
+  await runTest('CPC mapper throws Error → rejects with it', async () => {
     const strategy = new CpcEvolutionStrategy({
       cpcMapper: { mapToCpc: async () => { throw new Error('LLM timeout'); } },
       patentSource: { fetchByCpc: async () => MOCK_PATENT_DATA_RICH },
     });
-    const result = await strategy.evaluate(COMPONENT);
-    assertValidResult(result, 'mapper throws');
+    await assert.rejects(strategy.evaluate(COMPONENT), /LLM timeout/);
   });
 
-  await runTest('CPC mapper throws TypeError', async () => {
+  await runTest('CPC mapper throws TypeError → rejects with it', async () => {
     const strategy = new CpcEvolutionStrategy({
       cpcMapper: { mapToCpc: async () => { throw new TypeError('null ref'); } },
       patentSource: { fetchByCpc: async () => MOCK_PATENT_DATA_RICH },
     });
-    const result = await strategy.evaluate(COMPONENT);
-    assertValidResult(result, 'mapper TypeError');
+    await assert.rejects(strategy.evaluate(COMPONENT), TypeError);
   });
 
-  await runTest('CPC mapper returns empty array', async () => {
+  await runTest('CPC mapper returns empty array → rejects (no CPC code)', async () => {
     const strategy = new CpcEvolutionStrategy({
       cpcMapper: { mapToCpc: async () => [] },
       patentSource: { fetchByCpc: async () => MOCK_PATENT_DATA_RICH },
     });
-    const result = await strategy.evaluate(COMPONENT);
-    assertValidResult(result, 'mapper empty');
+    await assert.rejects(strategy.evaluate(COMPONENT), /no CPC code could be resolved/);
   });
 
-  await runTest('CPC mapper returns null (fallback handles it)', async () => {
+  await runTest('CPC mapper returns null → rejects (no CPC code)', async () => {
     const strategy = new CpcEvolutionStrategy({
       cpcMapper: { mapToCpc: async () => null },
       patentSource: { fetchByCpc: async () => MOCK_PATENT_DATA_RICH },
     });
-    // This may trigger the fallback path since null is not an array
-    const result = await strategy.evaluate(COMPONENT);
-    assertValidResult(result, 'mapper null');
+    await assert.rejects(strategy.evaluate(COMPONENT), /no CPC code could be resolved/);
   });
 
-  await runTest('no CPC mapper provided (lazy-load fails gracefully)', async () => {
+  await runTest('no CPC mapper provided, default mapper resolves nothing → rejects', async () => {
     const strategy = new CpcEvolutionStrategy({
-      // No cpcMapper — will try dynamic import which may fail
+      // No cpcMapper — the default mapper runs on a failing LLM, so it has
+      // no code to offer and must not answer the old G06F default.
+      llmCall: FAILING_LLM,
       patentSource: { fetchByCpc: async () => MOCK_PATENT_DATA_RICH },
     });
-    const result = await strategy.evaluate(COMPONENT);
-    assertValidResult(result, 'no mapper');
+    await assert.rejects(strategy.evaluate(COMPONENT), /no CPC code could be resolved.*LLM down/);
   });
 
   // ── 3. Patent data source failure scenarios ───────────────────────────
 
-  console.log('\nPatent DataSource Failures (should NOT cause abstention):');
+  console.log('\nPatent DataSource Failures (refuse, never guess):');
 
-  await runTest('patent source throws Error', async () => {
+  await runTest('patent source throws Error → rejects with it', async () => {
     const strategy = new CpcEvolutionStrategy({
       cpcMapper: { mapToCpc: async () => ['H04L'] },
       patentSource: { fetchByCpc: async () => { throw new Error('BigQuery 503'); } },
     });
-    const result = await strategy.evaluate(COMPONENT);
-    assertValidResult(result, 'source throws');
+    await assert.rejects(strategy.evaluate(COMPONENT), /BigQuery 503/);
   });
 
-  await runTest('patent source throws network error', async () => {
+  await runTest('patent source throws network error → rejects with it', async () => {
     const strategy = new CpcEvolutionStrategy({
       cpcMapper: { mapToCpc: async () => ['H04L'] },
       patentSource: { fetchByCpc: async () => { throw new Error('ECONNREFUSED'); } },
     });
-    const result = await strategy.evaluate(COMPONENT);
-    assertValidResult(result, 'source network error');
+    await assert.rejects(strategy.evaluate(COMPONENT), /ECONNREFUSED/);
   });
 
-  await runTest('patent source returns empty data', async () => {
+  await runTest('patent source returns empty data → rejects (zero patents)', async () => {
     const strategy = new CpcEvolutionStrategy({
       cpcMapper: { mapToCpc: async () => ['H04L'] },
       patentSource: { fetchByCpc: async () => ({ totalPatents: 0, patents: [] }) },
     });
-    const result = await strategy.evaluate(COMPONENT);
-    assertValidResult(result, 'source empty');
-    // With 0 patents, confidence should be low
-    assert.ok(result.confidence <= 0.55,
-      `confidence ${result.confidence} should be <= 0.55 with zero patents`);
+    await assert.rejects(strategy.evaluate(COMPONENT), /no patent found for CPC H04L/);
   });
 
-  await runTest('patent source returns null', async () => {
+  await runTest('patent source returns null → rejects (zero patents)', async () => {
     const strategy = new CpcEvolutionStrategy({
       cpcMapper: { mapToCpc: async () => ['H04L'] },
       patentSource: { fetchByCpc: async () => null },
     });
-    const result = await strategy.evaluate(COMPONENT);
-    assertValidResult(result, 'source null');
+    await assert.rejects(strategy.evaluate(COMPONENT), /no patent found/);
   });
 
-  await runTest('patent source returns undefined', async () => {
+  await runTest('patent source returns undefined → rejects (zero patents)', async () => {
     const strategy = new CpcEvolutionStrategy({
       cpcMapper: { mapToCpc: async () => ['H04L'] },
       patentSource: { fetchByCpc: async () => undefined },
     });
-    const result = await strategy.evaluate(COMPONENT);
-    assertValidResult(result, 'source undefined');
+    await assert.rejects(strategy.evaluate(COMPONENT), /no patent found/);
   });
 
-  await runTest('no patent source provided (lazy-load fails gracefully)', async () => {
+  await runTest('no patent source provided, BigQuery not configured → rejects', async () => {
     const strategy = new CpcEvolutionStrategy({
       cpcMapper: { mapToCpc: async () => ['H04L'] },
-      // No patentSource — will try dynamic import which may fail
+      // No patentSource — the default BigQuery source needs a project id.
     });
-    const result = await strategy.evaluate(COMPONENT);
-    assertValidResult(result, 'no source');
+    await withoutBigQueryEnv(() =>
+      assert.rejects(strategy.evaluate(COMPONENT), /BigQuery project ID is required/));
   });
 
   // ── 4. Both CPC mapper AND data source fail simultaneously ────────────
 
-  console.log('\nCombined Failures (should NOT cause abstention):');
+  console.log('\nCombined Failures (refuse, never guess):');
 
-  await runTest('both mapper and source throw', async () => {
+  await runTest('both mapper and source throw → rejects with the first failure', async () => {
     const strategy = new CpcEvolutionStrategy({
       cpcMapper: { mapToCpc: async () => { throw new Error('LLM dead'); } },
       patentSource: { fetchByCpc: async () => { throw new Error('BQ dead'); } },
     });
-    const result = await strategy.evaluate(COMPONENT);
-    assertValidResult(result, 'both throw');
+    await assert.rejects(strategy.evaluate(COMPONENT), /LLM dead/);
   });
 
-  await runTest('no dependencies at all (bare constructor)', async () => {
-    const strategy = new CpcEvolutionStrategy();
-    const result = await strategy.evaluate(COMPONENT);
-    assertValidResult(result, 'bare');
+  await runTest('no dependencies but an LLM that is down → rejects', async () => {
+    const strategy = new CpcEvolutionStrategy({ llmCall: FAILING_LLM });
+    await assert.rejects(strategy.evaluate(COMPONENT), /no CPC code could be resolved/);
   });
 
-  await runTest('no dependencies with minimal component', async () => {
-    const strategy = new CpcEvolutionStrategy();
-    const result = await strategy.evaluate({ name: 'X' });
-    assertValidResult(result, 'bare minimal');
+  await runTest('no dependencies with minimal component → rejects', async () => {
+    const strategy = new CpcEvolutionStrategy({ llmCall: FAILING_LLM });
+    await assert.rejects(strategy.evaluate({ name: 'X' }), /no CPC code could be resolved/);
   });
 
-  await runTest('no dependencies with empty component name', async () => {
+  await runTest('no dependencies with empty component name → rejects before any LLM call', async () => {
     const strategy = new CpcEvolutionStrategy();
-    const result = await strategy.evaluate({ name: '' });
-    assertValidResult(result, 'bare empty name');
+    await assert.rejects(strategy.evaluate({ name: '' }), /capability is empty/);
   });
 
   // ── 5. Degraded data quality scenarios ────────────────────────────────
 
-  console.log('\nDegraded Data Quality (should return low confidence, not abstain):');
+  console.log('\nDegraded Data Quality (data exists: low confidence, still an answer):');
 
   await runTest('1 patent returns valid result with very low confidence', async () => {
     const strategy = new CpcEvolutionStrategy({
@@ -308,7 +314,7 @@ async function main() {
 
   // ── 6. Indicator module failure ───────────────────────────────────────
 
-  console.log('\nIndicator Failures (fallback to neutral values):');
+  console.log('\nMalformed-but-present data (indicators score it themselves):');
 
   await runTest('malformed patent data still produces result', async () => {
     const strategy = new CpcEvolutionStrategy({
@@ -335,109 +341,73 @@ async function main() {
 
   // ── 7. Fallback result properties ─────────────────────────────────────
 
-  console.log('\nFallback Result Properties:');
+  console.log('\nNo Fallback Result:');
 
-  await runTest('fallback result has minimum confidence (0.1)', async () => {
-    // Force the internal pipeline to fail by making computeIndicators
-    // not available AND causing unexpected failure
+  await runTest('no fallback result: a pipeline failure rejects', async () => {
     const strategy = new CpcEvolutionStrategy({
       cpcMapper: { mapToCpc: async () => { throw new Error('forced fail'); } },
       patentSource: { fetchByCpc: async () => { throw new Error('forced fail'); } },
     });
-
-    // The strategy should still return via fallback
-    const result = await strategy.evaluate(COMPONENT);
-    assertValidResult(result, 'fallback');
+    await assert.rejects(strategy.evaluate(COMPONENT), /forced fail/);
   });
 
-  await runTest('degraded result has valid certitude/ubiquity (Phase B compatible)', async () => {
-    // Both dependencies fail — strategy degrades through individual error
-    // handlers (not top-level safety net). Indicator functions return 0 for
-    // undefined input data, yielding low certitude/ubiquity values.
+  await runTest('no neutral certitude/ubiquity when both dependencies fail', async () => {
     const strategy = new CpcEvolutionStrategy({
       cpcMapper: { mapToCpc: async () => { throw new Error('forced'); } },
       patentSource: { fetchByCpc: async () => { throw new Error('forced'); } },
     });
-    const result = await strategy.evaluate(COMPONENT);
-    assertValidResult(result, 'degraded neutral');
-    // certitude/ubiquity must be valid numbers in [0, 1] for Phase B averaging
-    assert.ok(result.certitude >= 0 && result.certitude <= 1,
-      `degraded certitude ${result.certitude} should be in [0, 1]`);
-    assert.ok(result.ubiquity >= 0 && result.ubiquity <= 1,
-      `degraded ubiquity ${result.ubiquity} should be in [0, 1]`);
+    const [outcome] = await Promise.allSettled([strategy.evaluate(COMPONENT)]);
+    assert.equal(outcome.status, 'rejected', 'a failed pipeline must not yield a (0.5, 0.5) result');
   });
 
-  await runTest('top-level safety net returns neutral 0.5 certitude/ubiquity', async () => {
-    // Test the _buildFallbackResult directly by triggering a failure
-    // that bypasses individual error handlers
-    const strategy = new CpcEvolutionStrategy();
-    // Access private method to test fallback directly
-    const fallback = strategy._buildFallbackResult(new Error('test'));
-    assertValidResult(fallback, 'safety net');
-    assert.equal(fallback.certitude, 0.5,
-      `safety net certitude should be 0.5, got ${fallback.certitude}`);
-    assert.equal(fallback.ubiquity, 0.5,
-      `safety net ubiquity should be 0.5, got ${fallback.ubiquity}`);
-    assert.equal(fallback.confidence, 0.1,
-      `safety net confidence should be 0.1, got ${fallback.confidence}`);
-    // Trace should mention fallback
-    const fallbackStep = fallback.trace.find(t => t.step === 'fallback');
-    assert.ok(fallbackStep, 'safety net trace must have fallback step');
-    assert.equal(fallbackStep.reason, 'test',
-      'fallback trace must include the error reason');
+  await runTest('no top-level safety net: an internal crash propagates', async () => {
+    const strategy = new CpcEvolutionStrategy(RICH_DEPS);
+    assert.equal(strategy._buildFallbackResult, undefined, '_buildFallbackResult must stay removed');
+    // Crash a step past the dependencies: the old safety net turned this
+    // into a neutral 0.5 / 0.5 result at confidence 0.1.
+    strategy._computeIndicators = async () => { throw new Error('Unexpected internal crash'); };
+    await assert.rejects(strategy.evaluate(COMPONENT), /Unexpected internal crash/);
   });
 
-  await runTest('fallback trace includes error reason', async () => {
+  await runTest('the rejection carries the error reason', async () => {
     const strategy = new CpcEvolutionStrategy({
       cpcMapper: { mapToCpc: async () => { throw new Error('test failure reason'); } },
     });
-    const result = await strategy.evaluate(COMPONENT);
-    assertValidResult(result, 'fallback trace');
-    // In normal degradation the trace won't show 'fallback' step unless
-    // the top-level safety net is triggered. Individual method catches
-    // handle gracefully with neutral defaults.
-    assert.ok(result.trace.length > 0, 'trace should not be empty');
+    await assert.rejects(strategy.evaluate(COMPONENT), { message: 'test failure reason' });
   });
 
   // ── 8. Phase B enrichment compatibility ───────────────────────────────
 
   console.log('\nPhase B Enrichment Compatibility:');
 
-  await runTest('result.certitude is always a number for Phase B averaging', async () => {
-    const scenarios = [
-      { cpcMapper: { mapToCpc: async () => ['H04L'] }, patentSource: { fetchByCpc: async () => MOCK_PATENT_DATA_RICH } },
+  await runTest('result.certitude is a number when answered, and there is no result otherwise', async () => {
+    const answered = await new CpcEvolutionStrategy(RICH_DEPS).evaluate(COMPONENT);
+    assert.equal(typeof answered.certitude, 'number', 'certitude must be number');
+    assert.equal(typeof answered.ubiquity, 'number', 'ubiquity must be number');
+    assert.ok(!Number.isNaN(answered.certitude), 'certitude must not be NaN');
+    assert.ok(!Number.isNaN(answered.ubiquity), 'ubiquity must not be NaN');
+
+    const refused = [
       { cpcMapper: { mapToCpc: async () => [] }, patentSource: { fetchByCpc: async () => ({ totalPatents: 0, patents: [] }) } },
       { cpcMapper: { mapToCpc: async () => { throw new Error('fail'); } } },
-      {},  // bare constructor
+      { llmCall: FAILING_LLM },  // default mapper, LLM down
     ];
-
-    for (const [i, opts] of scenarios.entries()) {
-      const strategy = new CpcEvolutionStrategy(opts);
-      const result = await strategy.evaluate(COMPONENT);
-      assert.equal(typeof result.certitude, 'number', `scenario ${i}: certitude must be number`);
-      assert.equal(typeof result.ubiquity, 'number', `scenario ${i}: ubiquity must be number`);
-      assert.ok(!Number.isNaN(result.certitude), `scenario ${i}: certitude must not be NaN`);
-      assert.ok(!Number.isNaN(result.ubiquity), `scenario ${i}: ubiquity must not be NaN`);
+    for (const [i, opts] of refused.entries()) {
+      await assert.rejects(new CpcEvolutionStrategy(opts).evaluate(COMPONENT), `scenario ${i} must reject`);
     }
   });
 
-  await runTest('low-confidence result is still consumed by Phase B averaging', async () => {
-    // Simulate what Phase B enrichment does: average certitude/ubiquity
-    // from all LLM strategies that provided them (non-error, non-null)
-    const strategy = new CpcEvolutionStrategy();
-    const result = await strategy.evaluate(COMPONENT);
-
-    // Phase B code from estimate-evolution.mjs:
-    // const llmResults = Object.values(evaluations).filter(
-    //   e => !e.error && e.certitude != null && e.ubiquity != null
-    // );
-    const isPhaseBAble = !result.error && result.certitude != null && result.ubiquity != null;
-    assert.ok(isPhaseBAble, 'result should be consumable by Phase B enrichment');
+  await runTest('a refused evaluation gives Phase B nothing to average', async () => {
+    // Phase B averages certitude/ubiquity of the strategies that answered;
+    // a refusal is a rejected promise, never a neutral (0.5, 0.5) entry.
+    const strategy = new CpcEvolutionStrategy({ cpcMapper: { mapToCpc: async () => [] } });
+    const [outcome] = await Promise.allSettled([strategy.evaluate(COMPONENT)]);
+    assert.equal(outcome.status, 'rejected');
   });
 
   // ── 9. Confidence ordering: more data = higher confidence ─────────────
 
-  console.log('\nConfidence Ordering (no data < sparse < rich):');
+  console.log('\nConfidence Ordering (no data refused, sparse < rich):');
 
   await runTest('confidence increases with data quality', async () => {
     const makeStrategy = (patentData) => new CpcEvolutionStrategy({
@@ -445,7 +415,7 @@ async function main() {
       patentSource: { fetchByCpc: async () => patentData },
     });
 
-    const noData = await makeStrategy({ totalPatents: 0, patents: [] }).evaluate(COMPONENT);
+    await assert.rejects(makeStrategy({ totalPatents: 0, patents: [] }).evaluate(COMPONENT), /no patent found/);
     const sparseData = await makeStrategy({
       totalPatents: 5, patents: [],
       cpcDistribution: [{ cpc: 'H04L', count: 5 }],
@@ -459,14 +429,10 @@ async function main() {
     }).evaluate(COMPONENT);
     const richData = await makeStrategy(MOCK_PATENT_DATA_RICH).evaluate(COMPONENT);
 
-    assertValidResult(noData, 'no data');
     assertValidResult(sparseData, 'sparse');
     assertValidResult(richData, 'rich');
 
-    // All return results (no abstention)
     // Confidence should increase with data quality
-    assert.ok(noData.confidence <= sparseData.confidence,
-      `no data confidence (${noData.confidence}) should be <= sparse (${sparseData.confidence})`);
     assert.ok(sparseData.confidence <= richData.confidence,
       `sparse confidence (${sparseData.confidence}) should be <= rich (${richData.confidence})`);
   });
@@ -475,23 +441,22 @@ async function main() {
 
   console.log('\nRegression Guards:');
 
-  await runTest('evaluate() returns a Promise', () => {
-    const strategy = new CpcEvolutionStrategy();
+  await runTest('evaluate() returns a Promise', async () => {
+    const strategy = new CpcEvolutionStrategy(RICH_DEPS);
     const returnValue = strategy.evaluate(COMPONENT);
     assert.ok(returnValue instanceof Promise, 'evaluate() must return a Promise');
+    await returnValue;
   });
 
-  await runTest('evaluate() resolves (never rejects)', async () => {
-    const strategy = new CpcEvolutionStrategy();
-    // This must not reject
-    const result = await strategy.evaluate(COMPONENT);
-    assert.ok(result != null, 'resolved value must not be null');
+  await runTest('evaluate() rejects rather than resolving to a guess', async () => {
+    const strategy = new CpcEvolutionStrategy({ llmCall: FAILING_LLM });
+    await assert.rejects(strategy.evaluate(COMPONENT));
   });
 
-  await runTest('evaluate() never returns undefined', async () => {
-    const strategy = new CpcEvolutionStrategy();
+  await runTest('evaluate() never resolves to null or undefined', async () => {
+    const strategy = new CpcEvolutionStrategy(RICH_DEPS);
     const result = await strategy.evaluate(COMPONENT);
-    assert.ok(result !== undefined, 'result must not be undefined');
+    assert.ok(result != null, 'result must not be null or undefined');
   });
 
   await runTest('multiple sequential calls all return results', async () => {
@@ -527,14 +492,14 @@ async function main() {
   console.log(`${'='.repeat(50)}`);
 
   if (failed > 0) {
-    console.error('\n\u2717 AC 11: No Abstention tests FAILED\n');
+    console.error('\n\u2717 AC 11: Refusal Over Default tests FAILED\n');
     process.exit(1);
   } else {
-    console.log('\n\u2713 AC 11: All No Abstention tests PASSED\n');
+    console.log('\n\u2713 AC 11: All Refusal Over Default tests PASSED\n');
   }
 }
 
 main().catch(err => {
-  console.error('\n\u2717 AC 11: No Abstention tests CRASHED:', err);
+  console.error('\n\u2717 AC 11: Refusal Over Default tests CRASHED:', err);
   process.exit(1);
 });

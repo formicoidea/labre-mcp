@@ -11,7 +11,6 @@
 import { evolutionToStage } from '#lib/response-formatter.mjs';
 import { parseKeyValueBlock } from '#lib/prompts/parsers.mjs';
 import { getPrompt } from '#lib/prompts/registry.mjs';
-import { tryDegradeAmbient, getCurrentCollector } from '#lib/degradation/index.mjs';
 
 // ─── Anchor Perception Model ───────────────────────────────────────────────
 
@@ -73,37 +72,16 @@ export async function estimateAnchorEvolution(args: any, llmCall: any): Promise<
   } else {
     const p = getPrompt('anchor-evolution');
     const built = p.build({ anchor: name, context });
-    // Wrap the LLM call: a failure flips the ambient MCP envelope's
-    // degraded flag and falls back to phase 2 (Custom-built) at low
-    // confidence rather than throwing.
-    const response = await tryDegradeAmbient(
-      'llm:anchor-evolution',
-      () => llmCall(built.user, undefined, { systemPrompt: built.system }),
-      '',
-    );
-    if (response) {
-      const parsed = p.parse(response);
-      phase = parsed.phase;
-      justification = parsed.justification;
-      source = 'llm';
-      confidence = parsed.confidence;
-    } else {
-      // tryDegradeAmbient returned the empty fallback — record the
-      // recovery decision and use a safe neutral default.
-      phase = 2;
-      justification = 'LLM call failed — defaulting to phase 2 (Custom-built)';
-      source = 'fallback';
-      confidence = 0.2;
-      const collector = getCurrentCollector();
-      if (collector) {
-        collector.record({
-          source: 'llm:anchor-evolution',
-          reason: 'LLM returned empty response — using phase 2 fallback',
-          severity: 'warning',
-          recoverable: true,
-        });
-      }
-    }
+    // A failed or empty call throws: the former fallback answered phase 2 at
+    // confidence 0.2, a guess passed off as an estimate (corrected as in the
+    // wardley-evolution-benchmark port; labre refuses to answer by default).
+    const response = await llmCall(built.user, undefined, { systemPrompt: built.system });
+    if (!response) throw new Error('estimateAnchorEvolution: empty LLM response');
+    const parsed = p.parse(response);
+    phase = parsed.phase;
+    justification = parsed.justification;
+    source = 'llm';
+    confidence = parsed.confidence;
   }
 
   const evolution = (PHASE_MIDPOINTS as Record<number, number>)[phase];

@@ -33,7 +33,7 @@ const GRID = [
 
 // What the fake model answers next, and what it was asked.
 let reply = '';
-let seen: { model?: string; auth?: string } = {};
+let seen: { model?: string; auth?: string; system?: string } = {};
 let server: http.Server;
 const savedConfig = process.env.WARDLEY_LLM_CONFIG;
 let dir = '';
@@ -43,7 +43,8 @@ before(async () => {
     let body = '';
     req.on('data', (c) => { body += c; });
     req.on('end', () => {
-      seen = { model: (JSON.parse(body) as { model: string }).model, auth: req.headers.authorization };
+      const sent = JSON.parse(body) as { model: string; messages: { role: string; content: string }[] };
+      seen = { model: sent.model, auth: req.headers.authorization, system: sent.messages.find((m) => m.role === 'system')?.content };
       res.setHeader('content-type', 'application/json');
       res.end(JSON.stringify({
         choices: [{ message: { content: reply } }],
@@ -97,6 +98,20 @@ describe('runBenchmarkScenario', () => {
     assert.match(JSON.stringify(out.details?.reasoning), /evolution=0.62/);
   });
 
+  it('words the llm-direct question for the kind of the case', async () => {
+    reply = 'evolution=0.8\nconfidence=0.6';
+    const run = (kind?: string) => runBenchmarkScenario(
+      { scenario: 'llm-direct', provider: 'fake', model: 'm', component: { ...CASE, ...(kind ? { kind } : {}) } },
+      context,
+    );
+    await run('anchor');
+    assert.match(seen.system ?? '', /identify the need that the label names/);
+    await run('capability');
+    assert.match(seen.system ?? '', /state the capability in its own terms/);
+    await run();
+    assert.match(seen.system ?? '', /identify the underlying capability/);
+  });
+
   it('runs property-assessment and returns the per-property phases', async () => {
     reply = GRID;
     const out = await runBenchmarkScenario(
@@ -110,6 +125,22 @@ describe('runBenchmarkScenario', () => {
     assert.equal(out.evolution, 0.57);
     assert.ok(out.details?.trace?.length);
     assert.equal(seen.model, 'fake-model-b');
+  });
+
+  it('runs certitude-ubiquity-scurve: the model gives the measures, the s-curve places them', async () => {
+    reply = 'certitude=0.90\nubiquity=0.95\nevolution=0.10\npub_wonder=0.1\npub_build=0.1\npub_operate=0.4\npub_usage=0.4';
+    const out = await runBenchmarkScenario(
+      { scenario: 'certitude-ubiquity-scurve', provider: 'fake', model: 'fake-model-c', component: CASE },
+      context,
+    );
+    assert.equal(out.ok, true);
+    // The model's own evolution (0.10) is another answer, never the position.
+    assert.ok((out.evolution ?? 0) > 0.7);
+    const signals = out.details?.signals as { name: string; value: unknown }[];
+    assert.equal(signals.find((s) => s.name === 'certitude')?.value, 0.9);
+    assert.equal(signals.find((s) => s.name === 'ubiquity')?.value, 0.95);
+    assert.equal(signals.find((s) => s.name === 'llm_evolution')?.value, 0.1);
+    assert.equal(seen.model, 'fake-model-c');
   });
 
   // The benchmark counts what a failing case spent: a strategy error must not

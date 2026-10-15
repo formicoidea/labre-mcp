@@ -67,12 +67,20 @@ export function yearOf(date: string | number | Date): number {
   return new Date(date).getFullYear();
 }
 
+// The anchor and capability wordings come from the wardley-evolution-benchmark
+// (llm-direct 2.0.0): only the subject and what to weigh move between the three,
+// never the output format, so one parser reads them all. Absent or `solution`
+// subject = the original prompts.
+function promptName(component: ComponentInput, hasCapability: boolean): string {
+  const variant = hasCapability ? 'with-capability' : 'without-capability';
+  const subject = component.subject;
+  return subject === 'anchor' || subject === 'capability' ? `${subject}.${variant}` : variant;
+}
+
 function buildPrompt(component: ComponentInput): BuiltPrompt {
   const hasCapability = component.capability != null;
   const dateStr = String(component.date ? yearOf(component.date) : 'unknown');
-  const p = hasCapability
-    ? getPrompt('historical-evolution', 'with-capability')
-    : getPrompt('historical-evolution', 'without-capability');
+  const p = getPrompt('historical-evolution', promptName(component, hasCapability));
   return hasCapability
     ? p.build({
         capability: component.capability ?? '',
@@ -88,10 +96,8 @@ function buildPrompt(component: ComponentInput): BuiltPrompt {
       });
 }
 
-function parseResponse(response: string, hasCapability: boolean): { evolution: number; confidence: number } {
-  const p = hasCapability
-    ? getPrompt('historical-evolution', 'with-capability')
-    : getPrompt('historical-evolution', 'without-capability');
+function parseResponse(response: string, component: ComponentInput): { evolution: number; confidence: number } {
+  const p = getPrompt('historical-evolution', promptName(component, component.capability != null));
   // any: registry parse signature is dynamic
   return p.parse(response) as { evolution: number; confidence: number };
 }
@@ -118,10 +124,9 @@ export class LLMDirectStrategy extends CoreBaseStrategy<ComponentInput, Evolutio
     // NEW_METHOD_ID is the canonical methodId for the core registry.
     const llmCall: LlmCallFn = this._llmCall ?? (await getStrategyLLM('llm-direct') as LlmCallFn);
 
-    const hasCapability = component.capability != null;
     const built = buildPrompt(component);
     const response = await llmCall(built.user, undefined, { systemPrompt: built.system });
-    const parsed = parseResponse(response, hasCapability);
+    const parsed = parseResponse(response, component);
 
     const evolution = Math.round(Math.max(0, Math.min(1, parsed.evolution)) * 1000) / 1000;
     const confidence = Math.round(Math.max(0.1, Math.min(1, parsed.confidence)) * 1000) / 1000;

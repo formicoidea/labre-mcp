@@ -10,7 +10,8 @@
 // This is the same contract as sector-agent-strategy.mjs:
 //   result = { evolution, confidence, method, certitude, ubiquity }
 //
-// Both the normal path and the fallback path must satisfy this contract.
+// The normal path satisfies this contract; a failed or empty pipeline
+// rejects instead of handing Phase B a neutral guess.
 
 import assert from 'node:assert/strict';
 import { BaseStrategy } from '../strategies/capacity/base-strategy.mjs';
@@ -228,12 +229,15 @@ async function main() {
       'result.ubiquity must match the value used in computeEvolution');
   });
 
-  // ── 4. Fallback path also exposes certitude/ubiquity ─────────────────
+  // ── 4. Failure path: a refusal, never a neutral entry ────────────────
+  //
+  // Guard: these used to assert that a crashed or empty pipeline still fed
+  // Phase B a neutral (0.5, 0.5) result at confidence 0.1. A guess must
+  // never pass as an answer, so Phase B now receives a rejection instead.
 
-  console.log('\nFallback Path (Phase B still sees certitude/ubiquity):');
+  console.log('\nFailure Path (Phase B gets a rejection, not a neutral guess):');
 
-  await test('degraded path (broken mapper+source) passes Phase B filter', async () => {
-    // Broken mapper/source are caught internally — strategy degrades gracefully
+  await test('broken mapper+source rejects instead of passing the Phase B filter', async () => {
     const brokenSource = {
       fetchByCpc: async () => { throw new Error('BigQuery timeout'); },
     };
@@ -244,79 +248,59 @@ async function main() {
       patentSource: brokenSource,
       cpcMapper: brokenMapper,
     });
-    const result = await strategy.evaluate(COMPONENT);
-
-    // Even degraded, Phase B must see certitude/ubiquity
-    const passesFilter = !result.error && result.certitude != null && result.ubiquity != null;
-    assert.ok(passesFilter, 'degraded result must pass Phase B filter');
-    assert.ok(Number.isFinite(result.certitude));
-    assert.ok(Number.isFinite(result.ubiquity));
+    await assert.rejects(strategy.evaluate(COMPONENT), /CPC mapping failed/);
   });
 
-  await test('true fallback (_buildFallbackResult) passes Phase B filter', async () => {
-    // Force the safety net by subclassing and making _evaluateInternal throw
-    class CrashingStrategy extends CpcEvolutionStrategy {
-      async _evaluateInternal() {
-        throw new Error('Unexpected internal crash');
-      }
-    }
-    // Copy static method since subclass inherits it
-    const strategy = new CrashingStrategy();
-    const result = await strategy.evaluate(COMPONENT);
-
-    const passesFilter = !result.error && result.certitude != null && result.ubiquity != null;
-    assert.ok(passesFilter, 'fallback result must pass Phase B filter');
-  });
-
-  await test('true fallback certitude/ubiquity are neutral (0.5)', async () => {
+  await test('an internal crash propagates (no _buildFallbackResult safety net)', async () => {
     class CrashingStrategy extends CpcEvolutionStrategy {
       async _evaluateInternal() {
         throw new Error('Unexpected internal crash');
       }
     }
     const strategy = new CrashingStrategy();
-    const result = await strategy.evaluate(COMPONENT);
-
-    assert.equal(result.certitude, 0.5, 'fallback certitude should be neutral 0.5');
-    assert.equal(result.ubiquity, 0.5, 'fallback ubiquity should be neutral 0.5');
+    await assert.rejects(strategy.evaluate(COMPONENT), /Unexpected internal crash/);
   });
 
-  await test('true fallback has minimum confidence (0.1) so Phase B deprioritizes it', async () => {
+  await test('an internal crash yields no neutral 0.5 certitude/ubiquity', async () => {
+    class CrashingStrategy extends CpcEvolutionStrategy {
+      async _evaluateInternal() {
+        throw new Error('Unexpected internal crash');
+      }
+    }
+    const [outcome] = await Promise.allSettled([new CrashingStrategy().evaluate(COMPONENT)]);
+    assert.equal(outcome.status, 'rejected', 'no (0.5, 0.5) result may reach Phase B');
+  });
+
+  await test('an internal crash yields no minimum-confidence (0.1) result either', async () => {
     class CrashingStrategy extends CpcEvolutionStrategy {
       async _evaluateInternal() {
         throw new Error('Unexpected internal crash');
       }
     }
     const strategy = new CrashingStrategy();
-    const result = await strategy.evaluate(COMPONENT);
-
-    assert.equal(result.confidence, 0.1, 'fallback confidence should be minimum 0.1');
+    assert.equal(strategy._buildFallbackResult, undefined, '_buildFallbackResult must stay removed');
+    await assert.rejects(strategy.evaluate(COMPONENT));
   });
 
-  // ── 5. Empty data path also exposes certitude/ubiquity ───────────────
+  // ── 5. Empty data path: refused ───────────────────────────────────────
 
-  console.log('\nEmpty Data Path (Phase B still sees certitude/ubiquity):');
+  console.log('\nEmpty Data Path (refused, Phase B sees nothing):');
 
-  await test('empty data result passes Phase B filter', async () => {
+  await test('empty data rejects instead of passing the Phase B filter', async () => {
     const strategy = new CpcEvolutionStrategy({
       patentSource: createMockSource(MOCK_EMPTY_DATA),
       cpcMapper: mockCpcMapper,
     });
-    const result = await strategy.evaluate(COMPONENT);
-
-    const passesFilter = !result.error && result.certitude != null && result.ubiquity != null;
-    assert.ok(passesFilter, 'empty data result must pass Phase B filter');
+    await assert.rejects(strategy.evaluate(COMPONENT), /no patent found/);
   });
 
-  await test('empty data certitude/ubiquity are finite numbers', async () => {
+  await test('empty data yields no certitude/ubiquity at all', async () => {
     const strategy = new CpcEvolutionStrategy({
       patentSource: createMockSource(MOCK_EMPTY_DATA),
       cpcMapper: mockCpcMapper,
     });
-    const result = await strategy.evaluate(COMPONENT);
-
-    assert.ok(Number.isFinite(result.certitude));
-    assert.ok(Number.isFinite(result.ubiquity));
+    const [outcome] = await Promise.allSettled([strategy.evaluate(COMPONENT)]);
+    assert.equal(outcome.status, 'rejected');
   });
 
   // ── 6. Simulated Phase B enrichment integration ──────────────────────

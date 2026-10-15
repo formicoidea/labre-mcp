@@ -98,7 +98,7 @@ const MOCK_PATENT_DATA_PRODUCT = {
   expirationData: { expiredCount: 30, totalPatents: 150 },
 };
 
-/** Empty data (0 patents) — neutral fallback */
+/** Empty data (0 patents) — the strategy refuses it */
 const MOCK_PATENT_DATA_EMPTY = {
   totalPatents: 0,
   patents: [],
@@ -180,16 +180,14 @@ async function main() {
       `evolution ${result.evolution} !== computeEvolution(${result.certitude}, ${result.ubiquity}).evolution ${expected.evolution}`);
   });
 
-  await runTest('empty data: evolution === computeEvolution(certitude, ubiquity)', async () => {
+  // Zero patents would only feed neutral indicators to computeEvolution — a
+  // guess, so the strategy refuses instead of delegating it.
+  await runTest('empty data: refuses instead of delegating a neutral guess to computeEvolution', async () => {
     const strategy = new CpcEvolutionStrategy({
       patentSource: createMockPatentSource(MOCK_PATENT_DATA_EMPTY),
       cpcMapper: mockCpcMapper,
     });
-    const result = await strategy.evaluate({ name: 'Unknown' });
-
-    const expected = computeEvolution(result.certitude, result.ubiquity);
-    assert.strictEqual(result.evolution, expected.evolution,
-      `evolution ${result.evolution} !== computeEvolution(${result.certitude}, ${result.ubiquity}).evolution ${expected.evolution}`);
+    await assert.rejects(strategy.evaluate({ name: 'Unknown' }), /no patent found/);
   });
 
   // ── 2. S-curve trace step matches independent computeEvolution call ──
@@ -241,7 +239,7 @@ async function main() {
       MOCK_PATENT_DATA_COMMODITY,
       MOCK_PATENT_DATA_GENESIS,
       MOCK_PATENT_DATA_PRODUCT,
-      MOCK_PATENT_DATA_EMPTY,
+      // MOCK_PATENT_DATA_EMPTY is refused, not scored (see 'empty data' above).
     ];
 
     for (const data of datasets) {
@@ -306,7 +304,7 @@ async function main() {
       MOCK_PATENT_DATA_COMMODITY,
       MOCK_PATENT_DATA_GENESIS,
       MOCK_PATENT_DATA_PRODUCT,
-      MOCK_PATENT_DATA_EMPTY,
+      // MOCK_PATENT_DATA_EMPTY is refused, not scored (see 'empty data' above).
     ];
 
     for (const data of datasets) {

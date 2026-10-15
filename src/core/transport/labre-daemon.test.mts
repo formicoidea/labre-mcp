@@ -46,18 +46,19 @@ describe("labre-daemon boot wiring", () => {
     const registry = buildStrategyRegistry();
     process.env.LABRE_DISABLE_MOCKS = prevDisable ?? "";
     const ids = registry.list();
-    // map climate position-* (9 = 6 functional + 1 solution + 2 anchor)
+    // map climate position-* (10 = 7 functional + 1 solution + 2 anchor)
     // + map node identify (1)
     // + map basemap generate (1)
     // + map value-chain (5 = 1 generate + 1 organized-y-position + 1 select-by-type + 1 prevent-collision + 1 audit)
     // + render wardley-map (6 = owm parse/emit + image emit/parse svg + image emit/parse png)
     // + iteration purpose (2 = generate + audit-purpose-quality)
-    // + render text lint (1) = 25 total real strategies
-    assert.equal(registry.size(), 25);
+    // + render text lint (1) = 26 total real strategies
+    assert.equal(registry.size(), 26);
 
     const expected = [
-      // map climate: position-functional-in-evolution (6)
+      // map climate: position-functional-in-evolution (7)
       "wardley:map:climate:position-functional-in-evolution:s-curve",
+      "wardley:map:climate:position-functional-in-evolution:certitude-ubiquity",
       "wardley:map:climate:position-functional-in-evolution:llm-direct",
       "wardley:map:climate:position-functional-in-evolution:publication-analysis",
       "wardley:map:climate:position-functional-in-evolution:cpc-evolution",
@@ -115,11 +116,11 @@ describe("labre-daemon boot wiring", () => {
 
   it("buildStrategyRegistry exposes the full v0.1.0 catalogue (real + mocks)", () => {
     const registry = buildStrategyRegistry();
-    // 25 real strategies (CP3-CP6 + basemap/Y-layout + render image emit/parse svg+png + text lint +
-    // value-chain select-by-type engine + iteration purpose generate + audit-purpose-quality)
-    // + 61 mock strategies (CP10, image emit/parse png promoted) = 86 total
+    // 26 real strategies (CP3-CP6 + basemap/Y-layout + render image emit/parse svg+png + text lint +
+    // value-chain select-by-type engine + iteration purpose generate + audit-purpose-quality + certitude-ubiquity)
+    // + 61 mock strategies (CP10, image emit/parse png promoted) = 87 total
     // (text:lint:default is NEW surface, not a promoted mock).
-    assert.equal(registry.size(), 86);
+    assert.equal(registry.size(), 87);
     // Every registered id is a valid 5-segment methodId.
     for (const id of registry.list()) {
       const segments = id.split(":");

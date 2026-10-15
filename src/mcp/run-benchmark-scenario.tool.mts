@@ -16,6 +16,7 @@ import { z } from "zod";
 import type { ToolDefinition } from "#core/transport/mcp-handler.mjs";
 import type { RequestContext } from "#core/context/request-context.mjs";
 import { LLMDirectStrategy } from "#frameworks/wardley/evolution/_legacy/write/strategies/capacity/llm-direct-strategy.mjs";
+import { CertitudeUbiquityStrategy } from "#frameworks/wardley/evolution/_legacy/write/strategies/capacity/certitude-ubiquity-strategy.mjs";
 import { PropertiesStrategyCore } from "#frameworks/wardley/evolution/_legacy/write/strategies/solution/properties-strategy.mjs";
 import { getModelLLM } from "#lib/llm/registry.mjs";
 import { assertQuotaOk } from "#lib/llm/quota-guard.mjs";
@@ -24,18 +25,19 @@ import { runWithUsageCollector, type LlmUsageAggregate } from "#lib/llm/usage-co
 import { validateOrThrow } from "#lib/zod/validate-or-throw.mjs";
 import type { LLMCall } from "#types/llm.mjs";
 
-// ponytail: two scenarios. labre's s-curve strategy takes certitude/ubiquity
-// from its caller and never asks a model for them, so the benchmark's
-// certitude-ubiquity-scurve (a promptfoo prompt) has no labre strategy to run.
-type Component = { name: string; context?: string; description?: string };
+type Component = { name: string; context?: string; description?: string; kind?: "anchor" | "solution" | "capability" };
 const SCENARIOS = {
   // any: LLMDirectStrategy types its call as `(user, ...unknown[])`, a wider
   // signature than LLMCall; the strategy only ever passes LLMCall's arguments.
   "llm-direct": (llmCall: LLMCall, c: Component, context: RequestContext) =>
     new LLMDirectStrategy({ llmCall: llmCall as (user: string, ...args: unknown[]) => Promise<string> })
-      .evaluate({ kind: "capability", ...c }, context),
+      .evaluate({ kind: "capability", name: c.name, context: c.context, description: c.description, subject: c.kind }, context),
+  "certitude-ubiquity-scurve": (llmCall: LLMCall, c: Component, context: RequestContext) =>
+    new CertitudeUbiquityStrategy({ llmCall })
+      .evaluate({ kind: "capability", name: c.name, context: c.context, description: c.description }, context),
   "property-assessment": (llmCall: LLMCall, c: Component, context: RequestContext) =>
-    new PropertiesStrategyCore({ llmCall, mode: "auto" }).evaluate({ kind: "solution", ...c }, context),
+    new PropertiesStrategyCore({ llmCall, mode: "auto" })
+      .evaluate({ kind: "solution", name: c.name, context: c.context, description: c.description }, context),
 } as const;
 
 export const RunBenchmarkScenarioInputSchema = z.object({
@@ -47,6 +49,8 @@ export const RunBenchmarkScenarioInputSchema = z.object({
     name: z.string().min(1).max(200),
     context: z.string().max(300).optional().describe("The sector the case is judged in."),
     description: z.string().max(20_000).optional().describe("The evidence of the case."),
+    kind: z.enum(["anchor", "solution", "capability"]).optional()
+      .describe("What the case names; llm-direct words its question for it. Absent = the original solution wording."),
   }).strict().describe("The case, without its reference value."),
 }).strict();
 export type RunBenchmarkScenarioInput = z.infer<typeof RunBenchmarkScenarioInputSchema>;
@@ -57,10 +61,12 @@ export interface RunBenchmarkScenarioResult {
   method?: string;
   evolution?: number;
   confidence?: number;
-  /** What makes a bad answer explainable: the raw reply (llm-direct), the
-   *  per-property phases and the evaluated/total count in `trace`
-   *  (property-assessment, whose back-filled rows read "Not evaluated…"). */
-  details?: { reasoning: unknown[]; insights: unknown[]; properties?: unknown[]; trace?: unknown[] };
+  /** What makes a bad answer explainable: the raw reply (in `reasoning`), the
+   *  measures the strategy read (`signals`: certitude and ubiquity for
+   *  certitude-ubiquity-scurve), the per-property phases and the
+   *  evaluated/total count in `trace` (property-assessment, whose back-filled
+   *  rows read "Not evaluated…"). */
+  details?: { reasoning: unknown[]; insights: unknown[]; signals: unknown[]; properties?: unknown[]; trace?: unknown[] };
   error?: string;
   usage: LlmUsageAggregate;
   durationMs: number;
@@ -96,7 +102,7 @@ export async function runBenchmarkScenario(
       method,
       evolution,
       confidence,
-      details: { reasoning: out.reasoning, insights: out.insights, ...(properties ? { properties } : {}), ...(trace ? { trace } : {}) },
+      details: { reasoning: out.reasoning, insights: out.insights, signals: out.signals, ...(properties ? { properties } : {}), ...(trace ? { trace } : {}) },
       usage,
       durationMs: Date.now() - started,
     };

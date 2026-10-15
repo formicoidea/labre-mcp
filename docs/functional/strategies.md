@@ -10,13 +10,13 @@ Le routage est transparent : l'utilisateur fournit un nom de composant et le sys
 > **Grammaire des methodId** : tous les identifiants ci-dessous suivent la forme 5 segments `domain:tool:sous-domaine:command:strategie@version`, definie dans [`../architecture/ast-schema.md`](../architecture/ast-schema.md). Le registre / contrat des strategies est documente dans [`../architecture/strategies.md`](../architecture/strategies.md).
 >
 > **Reel vs mock** : 86 strategies sont enregistrees, mais seulement **25 sont reellement implementees** — le reste est du scaffolding `status: mock`. La liste d'autorite est la table « Etat d'implementation » de [`../architecture/ast-schema.md`](../architecture/ast-schema.md). En resume :
-> `render:wardley-map:owm:{parse:dsl, emit:dsl}`, `render:wardley-map:image:{emit:svg, parse:svg, emit:png, parse:png}`, `render:wardley-map:text:lint:default`, `wardley:iteration:purpose:{generate:default, audit-purpose-quality:default}`, `wardley:map:node:identify:default`, `wardley:map:basemap:generate:default`, `wardley:map:value-chain:{generate:top-down, organized-y-position:default, prevent-collision:default, audit:overlap-check, select-by-type:component}`, `wardley:map:climate:position-functional-in-evolution:{s-curve, llm-direct, cpc-evolution, logprob-distribution, publication-analysis, timeline-benchmark}`, `wardley:map:climate:position-solution-in-evolution:property-assessment`, `wardley:map:climate:position-anchor-in-evolution:{culture-phase, default}`.
+> `render:wardley-map:owm:{parse:dsl, emit:dsl}`, `render:wardley-map:image:{emit:svg, parse:svg, emit:png, parse:png}`, `render:wardley-map:text:lint:default`, `wardley:iteration:purpose:{generate:default, audit-purpose-quality:default}`, `wardley:map:node:identify:default`, `wardley:map:basemap:generate:default`, `wardley:map:value-chain:{generate:top-down, organized-y-position:default, prevent-collision:default, audit:overlap-check, select-by-type:component}`, `wardley:map:climate:position-functional-in-evolution:{s-curve, certitude-ubiquity, llm-direct, cpc-evolution, logprob-distribution, publication-analysis, timeline-benchmark}`, `wardley:map:climate:position-solution-in-evolution:property-assessment`, `wardley:map:climate:position-anchor-in-evolution:{culture-phase, default}`.
 
 ---
 
 # Capability Strategies
 
-Les capability strategies (famille `wardley:map:climate:position-functional-in-evolution:*`) evaluent les capacites abstraites via 6 strategies pluggables reellement implementees : `s-curve`, `publication-analysis`, `timeline-benchmark`, `llm-direct`, `logprob-distribution`, `cpc-evolution`. Chaque strategie produit un resultat independant : `{ evolution, confidence, method }`.
+Les capability strategies (famille `wardley:map:climate:position-functional-in-evolution:*`) evaluent les capacites abstraites via 7 strategies pluggables reellement implementees : `s-curve`, `certitude-ubiquity`, `publication-analysis`, `timeline-benchmark`, `llm-direct`, `logprob-distribution`, `cpc-evolution`. Chaque strategie produit un resultat independant : `{ evolution, confidence, method }`.
 
 > `sector-agent` (decrit plus bas pour memoire) fait partie de la surface `mock` et n'est pas dans les 25 strategies reelles.
 
@@ -149,7 +149,23 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 **Cas d'usage** : Quand aucune donnee numerique n'est disponible.
 
+**Type du cas** : `subject` (`anchor` | `capability`) choisit la formulation de la question (prompts `historical-evolution.<subject>.*`) ; absent ou `solution` = formulation d'origine. Le format de reponse est identique.
+
+**Refus** : une reponse sans ligne `evolution=` lisible est une erreur, jamais une valeur par defaut.
+
 **Fichier** : `strategies/capacity/llm-direct-strategy.mts`
+
+---
+
+## 4 bis. Certitude-Ubiquity (`wardley:map:climate:position-functional-in-evolution:certitude-ubiquity`)
+
+**Principe** : Demande au LLM la certitude et l'ubiquite du composant (prompt `certitude-ubiquity`, sans mention de la temporalite), puis les passe a la strategie `s-curve` inchangee.
+
+**Entrees requises** : `name`, `description` ou `context`
+
+**Refus** : une reponse sans `certitude` ou `ubiquity` dans [0, 1] est une erreur.
+
+**Fichier** : `strategies/capacity/certitude-ubiquity-strategy.mts`
 
 ---
 
@@ -169,6 +185,8 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 **Confiance** : Basee sur l'entropie de la distribution — basse entropie = haute confiance.
 
+**Refus** : sans logprobs, sans token de phase, ou avec un token de phase qui ne discrimine pas, la strategie leve une erreur (plus de repli sur une lecture du texte).
+
 **Cas d'usage** : Quand on souhaite une mesure d'incertitude basee sur les probabilites du modele.
 
 **Fichier** : `strategies/capacity/logprob-distribution-strategy.mts`
@@ -177,7 +195,7 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 
 ## 6. Sector Agent (mock — non implemente)
 
-> Cette strategie ne fait pas partie des 25 strategies reelles. Elle est conservee ici pour memoire conceptuelle. Tant qu'elle n'est pas implementee, elle reste un scaffold `status: mock`.
+> Cette strategie ne fait pas partie des 26 strategies reelles. Elle est conservee ici pour memoire conceptuelle. Tant qu'elle n'est pas implementee, elle reste un scaffold `status: mock`.
 
 **Principe** : Agent specialise par secteur industriel qui analyse le composant dans son contexte sectoriel specifique.
 
@@ -203,6 +221,7 @@ La confiance depend de la distance a la frontiere : a l'interieur = 0.7-1.0, a l
 | publication-analysis | wonder/build/operate/usage | Optionnel | Oui | HHI | Basse |
 | timeline-benchmark | name + context | Oui | Non | Richesse timeline | Haute |
 | llm-direct | name + context | Oui | Non | Accord s-curve/LLM | Moyenne |
+| certitude-ubiquity | name + context | Oui | Non | Distance bande | Moyenne |
 | logprob-distribution | name + context | Oui (OpenCode) | Non | Entropie distribution | Moyenne |
 | cpc-evolution | name + context | Oui (BigQuery brevets) | Non | Couverture brevets | Haute |
 | sector-agent *(mock)* | name + context | Oui | Non | Cross-validation | Haute |
@@ -287,6 +306,8 @@ Seule solution strategy actuellement implementee. Supporte deux modes :
 |---|---|---|
 | **oneshot** | `_evaluateAuto()` | Un seul appel LLM evalue les 12 proprietes |
 | **conversational** | `_evaluateConversational()` | Une propriete par appel, pour le mode multi-tour |
+
+**Refus** : une propriete notee deux fois garde sa derniere note ; au-dela de la moitie des proprietes non notees, la strategie leve une erreur au lieu de combler en phase 2.
 
 > Note : ce `mode` est interne a la solution strategy. Il est independant du `mode` surface MCP (`oneshot` / `conversational` / `default`) du tool `estimateEvolution`.
 

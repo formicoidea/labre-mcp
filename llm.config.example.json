@@ -16,6 +16,7 @@
     "publication-analysis": { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
     "timeline-benchmark":   { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
     "llm-direct":           { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
+    "certitude-ubiquity":   { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
     "cpc-evolution":        { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "high" },
     "cpc-mapper":           { "provider": "claude", "model": "claude-sonnet-4-6", "effort": "low" },
     "logprob-distribution": { "provider": "opencode",   "model": "kimi-k2.5", "temperature": 0, "topLogprobs": 5 },

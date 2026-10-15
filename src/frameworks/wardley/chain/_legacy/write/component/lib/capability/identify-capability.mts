@@ -9,7 +9,6 @@
 import type { ParsedCapabilityResponse } from '#schemas/parsed-llm.schema.mjs';
 import { parseKeyValueBlock } from '#lib/prompts/parsers.mjs';
 import { getPrompt } from '#lib/prompts/registry.mjs';
-import { tryDegradeAmbient } from '#lib/degradation/index.mjs';
 
 const ELIGIBLE_TYPES = new Set(['component', 'pipeline']);
 
@@ -82,14 +81,10 @@ export async function identifyCapability(component: any, llmCall?: any): Promise
     description: component.description ?? '',
     context: component.context ?? '',
   });
-  // Wrap the LLM call so a failure (rate limit, auth, network) surfaces
-  // on the ambient degradation collector — the caller still receives a
-  // valid capability shape, but the MCP envelope flips degraded:true.
-  const response = await tryDegradeAmbient(
-    'llm:identify-capability',
-    () => llmCall(built.user, undefined, { systemPrompt: built.system }),
-    '',
-  );
+  // A failed call throws with its own cause. It used to be swapped for an
+  // empty reply, which the parser then refused as "could not parse" — the
+  // real error (rate limit, auth, network) was hidden behind it.
+  const response = await llmCall(built.user, undefined, { systemPrompt: built.system });
   const result = p.parse(response, component);
 
   // When type was not provided, check if LLM-estimated type is non-eligible

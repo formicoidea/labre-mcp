@@ -387,10 +387,10 @@ Appele par `wardley-evolution-benchmark` (evaluateurs `labre-*`), un appel par c
 
 | Parametre | Type | Requis | Description |
 |---|---|---|---|
-| `scenario` | `"llm-direct"` \| `"property-assessment"` | **oui** | Strategie executee telle quelle (`LLMDirectStrategy`, `PropertiesStrategyCore` en mode `auto`) |
+| `scenario` | `"llm-direct"` \| `"certitude-ubiquity-scurve"` \| `"property-assessment"` | **oui** | Strategie executee telle quelle (`LLMDirectStrategy`, `CertitudeUbiquityStrategy`, `PropertiesStrategyCore` en mode `auto`) |
 | `provider` | string | **oui** | Id d'un provider declare dans `llm.config.json` du daemon (la cle reste cote daemon) |
 | `model` | string | **oui** | Modele appele sur ce provider |
-| `component` | `{ name, context?, description? }` | **oui** | Le cas sans sa reference : `context` = secteur, `description` = evidence |
+| `component` | `{ name, context?, description?, kind? }` | **oui** | Le cas sans sa reference : `context` = secteur, `description` = evidence, `kind` = `anchor` \| `solution` \| `capability` (llm-direct formule sa question pour ce type ; absent = formulation solution d'origine) |
 
 ### Sortie
 
@@ -398,9 +398,9 @@ Appele par `wardley-evolution-benchmark` (evaluateurs `labre-*`), un appel par c
 
 **Acces** : l'outil depense la cle de labre sur un modele choisi par l'appelant ; sur un daemon authentifie, seuls les identifiants listes dans `LABRE_BENCHMARK_USERS` (lu au boot) l'appellent, tout autre compte est refuse. Stdio et dev local sans `LABRE_AUTH` passent.
 
-Comme le recipe runner, l'outil passe la jauge de budget du daemon heberge (`assertQuotaOk`) et reporte ses appels au ledger de couts (`reportUsageToLedger`) ; les deux sont sans effet sans JWT appelant (cle `lab_`, stdio). Pour `property-assessment`, une ligne comblee porte la raison « Not evaluated… » et `trace` donne le compte note/total.
+Comme le recipe runner, l'outil passe la jauge de budget du daemon heberge (`assertQuotaOk`) et reporte ses appels au ledger de couts (`reportUsageToLedger`) ; les deux sont sans effet sans JWT appelant (cle `lab_`, stdio). Pour `property-assessment`, une ligne comblee porte la raison « Not evaluated… » et `trace` donne le compte note/total ; au-dela de la moitie des proprietes non notees, la strategie refuse de repondre (`ok: false`).
 
-Pas de `s-curve` : la strategie labre prend certitude et ubiquite de l'appelant et ne les demande jamais a un modele.
+`certitude-ubiquity-scurve` demande au modele la certitude et l'ubiquite du composant, puis les passe a la strategie `s-curve` inchangee ; une reponse sans l'une des deux valeurs dans [0, 1] est un echec, jamais une valeur par defaut.
 
 ---
 
