@@ -11,7 +11,7 @@ import '#lib/prompts/init.mjs';
 import { resetLLMConfigCache } from '#lib/llm/config.loader.mjs';
 import { resetLLMRegistryCache } from '#lib/llm/registry.mjs';
 import type { RequestContext } from '#core/context/request-context.mjs';
-import { runBenchmarkScenario } from './run-benchmark-scenario.tool.mjs';
+import { createRunBenchmarkScenarioTool, parseBenchmarkUsers, runBenchmarkScenario } from './run-benchmark-scenario.tool.mjs';
 
 const context: RequestContext = {
   projectId: 'test',
@@ -132,5 +132,18 @@ describe('runBenchmarkScenario', () => {
     await assert.rejects(runBenchmarkScenario({ ...base, component: { ...CASE, expected: 0.5 } }, context));
     await assert.rejects(runBenchmarkScenario({ ...base, scenario: 's-curve' }, context));
     await assert.rejects(runBenchmarkScenario({ ...base, provider: 'nope' }, context), /Unknown provider/);
+  });
+
+  // The tool spends labre's key on a model the caller names: on an
+  // authenticated daemon only the listed accounts may call it.
+  it('is closed to an authenticated account not listed, open to a listed one and to local dev', async () => {
+    reply = 'evolution=0.5\nconfidence=0.5';
+    const tool = createRunBenchmarkScenarioTool(parseBenchmarkUsers(' u-allowed , '));
+    const args = { scenario: 'llm-direct', provider: 'fake', model: 'm', component: CASE };
+    const as = (userId: string): RequestContext => ({ ...context, auth: { userId, source: 'api-key' } });
+    await assert.rejects(tool.handler(args, as('u-other')), /not open to this account/);
+    assert.equal(((await tool.handler(args, as('u-allowed'))) as { ok: boolean }).ok, true);
+    assert.equal(((await tool.handler(args, context)) as { ok: boolean }).ok, true);
+    await assert.rejects(createRunBenchmarkScenarioTool(parseBenchmarkUsers(undefined)).handler(args, as('u-allowed')));
   });
 });

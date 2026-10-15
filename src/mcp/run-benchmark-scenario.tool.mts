@@ -111,12 +111,28 @@ export async function runBenchmarkScenario(
   }
 }
 
-export const RUN_BENCHMARK_SCENARIO_TOOL: ToolDefinition = {
-  name: "runBenchmarkScenario",
-  description:
-    "Run one labre evolution strategy, unchanged, on one benchmark case with the model the caller names. " +
-    "Returns the position, the strategy's details and the metered LLM usage (also on failure). Writes nothing.",
-  // any: zod-to-json conversion — the schema is well-typed at the Zod layer
-  inputSchema: z.toJSONSchema(RunBenchmarkScenarioInputSchema, { io: "input" }) as Record<string, unknown>,
-  handler: runBenchmarkScenario,
-};
+/** Who may call the tool. It spends labre's key on a model the CALLER names, so
+ *  on the hosted daemon it is closed to every authenticated caller but the
+ *  user ids listed at boot (LABRE_BENCHMARK_USERS). An unauthenticated context
+ *  (stdio, local dev without LABRE_AUTH) passes: it is the operator's own. */
+export function parseBenchmarkUsers(raw: string | undefined): Set<string> {
+  return new Set((raw ?? "").split(",").map((s) => s.trim()).filter(Boolean));
+}
+
+export function createRunBenchmarkScenarioTool(allowedUsers: Set<string>): ToolDefinition {
+  return {
+    name: "runBenchmarkScenario",
+    description:
+      "Run one labre evolution strategy, unchanged, on one benchmark case with the model the caller names. " +
+      "Returns the position, the strategy's details and the metered LLM usage (also on failure). Writes nothing. " +
+      "Restricted to the user ids of LABRE_BENCHMARK_USERS on an authenticated daemon.",
+    // any: zod-to-json conversion — the schema is well-typed at the Zod layer
+    inputSchema: z.toJSONSchema(RunBenchmarkScenarioInputSchema, { io: "input" }) as Record<string, unknown>,
+    async handler(args, context) {
+      if (context.auth && !allowedUsers.has(context.auth.userId)) {
+        throw new Error("runBenchmarkScenario is not open to this account");
+      }
+      return runBenchmarkScenario(args, context);
+    },
+  };
+}

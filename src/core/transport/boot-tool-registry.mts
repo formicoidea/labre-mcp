@@ -16,7 +16,7 @@ import { EVALUATE_MAP_TOOL } from "#mcp/evaluate-map.tool.mjs";
 import { GENERATE_VALUE_CHAIN_TOOL } from "#mcp/generate-value-chain.tool.mjs";
 import { RUN_COMMAND_TOOL } from "#mcp/run-command.tool.mjs";
 import { RUN_RECIPE_TOOL } from "#mcp/run-recipe.tool.mjs";
-import { RUN_BENCHMARK_SCENARIO_TOOL } from "#mcp/run-benchmark-scenario.tool.mjs";
+import { createRunBenchmarkScenarioTool, parseBenchmarkUsers } from "#mcp/run-benchmark-scenario.tool.mjs";
 
 export function buildBootRegistry(): ToolRegistry {
   const registry = new ToolRegistry();
@@ -38,6 +38,8 @@ export function buildBootRegistry(): ToolRegistry {
   registry.register(GENERATE_VALUE_CHAIN_TOOL);
   registry.register(RUN_COMMAND_TOOL);
   registry.register(RUN_RECIPE_TOOL);
-  registry.register(RUN_BENCHMARK_SCENARIO_TOOL);
+  // Boot-time env read (ARCH-15 allows it at boot): the tool spends labre's key
+  // on a caller-chosen model, so it is closed to every account not listed.
+  registry.register(createRunBenchmarkScenarioTool(parseBenchmarkUsers(process.env.LABRE_BENCHMARK_USERS)));
   return registry;
 }
