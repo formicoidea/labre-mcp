@@ -54,6 +54,10 @@ labre-mcp/
 ```
 
 
+# Delivery (usine)
+
+- Finish every task with the `land` skill of the `usine` plugin (loaded by `.claude/settings.json`): it runs `pnpm ci:local` and `.usine/obligations.json`, a fresh reviewer and `/security-review`, then opens or merges the PR. Pushing or merging without a green `ci:local` on the head commit is refused by the plugin; never bypass a hook.
+
 # Hard rules
 
 ## Language
