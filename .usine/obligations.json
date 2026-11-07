@@ -1,0 +1,10 @@
+{
+  "verifier": [
+    {
+      "nom": "schémas JSON exportés",
+      "commande": "pnpm run schemas && git diff --exit-code -- schema",
+      "corriger": "pnpm run schemas, puis committer schema/"
+    }
+  ],
+  "couplages": []
+}

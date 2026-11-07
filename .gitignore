@@ -39,7 +39,8 @@ Desktop.ini
 ehthumbs.db
 
 # ── Claude Code ───────────────────────────────
-.claude/
+.claude/*
+!.claude/settings.json
 .omc/
 
 # ── fallow analysis dumps ─────────────────────

@@ -1,0 +1,6 @@
+{
+  "extraKnownMarketplaces": {
+    "ia-skills": { "source": { "source": "github", "repo": "formicoidea/ia-skills" } }
+  },
+  "enabledPlugins": { "usine@ia-skills": true }
+}
