@@ -1,6 +1,19 @@
 {
   "extraKnownMarketplaces": {
-    "ia-skills": { "source": { "source": "github", "repo": "formicoidea/ia-skills" } }
+    "ia-skills": {
+      "source": {
+        "source": "github",
+        "repo": "formicoidea/ia-skills"
+      }
+    }
   },
-  "enabledPlugins": { "usine@ia-skills": true }
+  "enabledPlugins": {
+    "usine@ia-skills": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(gh api -X PUT repos/formicoidea/labre-mcp/pulls/*/merge *)",
+      "mcp__github__merge_pull_request"
+    ]
+  }
 }
