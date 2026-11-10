@@ -62,7 +62,8 @@ One surface per week, in turn, against the staging deployment only.
 
 ### S5. Resource abuse
 
-- One authenticated caller loops a recipe that fans out to many LLM calls: is there a ceiling per caller?
+- One authenticated caller loops a recipe that fans out to many LLM calls. The ceiling is the caller's hourly Labre AI budget (`src/lib/llm/quota-guard.mts`): check that the run is refused once it is spent.
+- The guard only bites where a caller JWT exists and fails open: check what bounds a `lab_` API-key caller, and that an unreachable budget answer cannot be provoked by the caller.
 - A very large tool argument, a deeply nested JSON-RPC body.
 
 ## 5. Rules of engagement
@@ -72,9 +73,13 @@ One surface per week, in turn, against the staging deployment only.
 - Minimal proof: stop at the first read or write that should not pass.
 - A proven flaw becomes a `securite` issue and an immediate message to the owner.
 
-## 6. Open questions (for the owner)
+## 6. Answered by the owner (2026-11-10)
 
-1. Which doors are open on the hosted deployment today, and is a no-auth daemon ever bound to a public interface?
-2. The staging host to allow from the cloud environment, and the names of the variables carrying two test credentials.
-3. Is there a per-caller quota on LLM spend, or is S5 a known gap?
-4. Are run artefacts kept on the hosted deployment, and for how long?
+- The hosted deployment is called by the Labre app (`app.labre.cc`), by its admin console (`admin.labre.cc`, the ops endpoint) and, soon, by the workspace connector (`workspace-mcp.labre.cc`). The same order of sensitivity as Labre applies: payment data, personal data, what users write or draw, configuration, admin data, secrets.
+- A per-caller quota on LLM spend exists (S5).
+
+## 7. Still open
+
+1. Which auth doors (`LABRE_AUTH`) are set on the hosted deployment, and is a daemon with no door ever bound to a public interface?
+2. Every tool run writes a JSON file of the run, the user's map included, on the server's disk (section 1, run artefacts), and no tool reads it back. On the hosted deployment: keep them, for how long, or stop writing them?
+3. The staging host to allow from the cloud environment, and two test credentials in `LABRE_MCP_STAGING_URL`, `LABRE_MCP_TEST_KEY_1` and `LABRE_MCP_TEST_KEY_2`.
