@@ -153,6 +153,7 @@ Voir [notifications.md](functional/notifications.md).
 | `mcp:prod` | `node dist/core/transport/labre-daemon.mjs` | Lance le bundle compilé |
 | `typecheck` | `tsc --noEmit` | Vérification TS stricte |
 | `test` | `tsx --test "src/**/*.test.mts"` | Tests (⚠️ certains appellent un vrai LLM — voir [AGENT.md](../AGENT.md) hard rule #9) |
+| `ci:local` | `typecheck` puis `test` (crée `llm.config.json` depuis l'exemple s'il manque) | Porte de l'usine : lancée par le plugin `usine` avant chaque push et chaque fusion |
 
 ## Structure du projet
 
