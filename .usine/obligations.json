@@ -6,5 +6,6 @@
       "corriger": "pnpm run schemas, puis committer schema/"
     }
   ],
-  "couplages": []
+  "couplages": [],
+  "sensibles": ["src/core/transport/*auth*", ".github/**"]
 }
