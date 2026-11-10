@@ -77,9 +77,9 @@ One surface per week, in turn, against the staging deployment only.
 
 - The hosted deployment is called by the Labre app (`app.labre.cc`), by its admin console (`admin.labre.cc`, the ops endpoint) and, soon, by the workspace connector (`workspace-mcp.labre.cc`). The same order of sensitivity as Labre applies: payment data, personal data, what users write or draw, configuration, admin data, secrets.
 - A per-caller quota on LLM spend exists (S5).
+- The hosted deployment sets the three auth doors: `LABRE_AUTH` is `supabase`, `oidc` and `api-key`. Each door is therefore a surface to try, and a call that presents no credential, or one of a family not listed, must be refused.
 
 ## 7. Still open
 
-1. Which auth doors (`LABRE_AUTH`) are set on the hosted deployment, and is a daemon with no door ever bound to a public interface?
-2. Every tool run writes a JSON file of the run, the user's map included, on the server's disk (section 1, run artefacts), and no tool reads it back. On the hosted deployment: keep them, for how long, or stop writing them?
-3. The staging host to allow from the cloud environment, and two test credentials in `LABRE_MCP_STAGING_URL`, `LABRE_MCP_TEST_KEY_1` and `LABRE_MCP_TEST_KEY_2`.
+1. Every tool run writes a JSON file of the run, the user's map included, on the server's disk (section 1, run artefacts), and no tool reads it back. On the hosted deployment: keep them, for how long, or stop writing them?
+2. The staging host to allow from the cloud environment, and two test credentials in `LABRE_MCP_STAGING_URL`, `LABRE_MCP_TEST_KEY_1` and `LABRE_MCP_TEST_KEY_2`.
