@@ -36,5 +36,10 @@ export function buildSupabaseAuthMiddleware(options: SupabaseAuthOptions): AuthM
     // Provenance (issue #33): tokens verified through this preset came from
     // the Supabase issuer — the only source whose bearer can pass RLS.
     source: "supabase",
+    // Tokens the Supabase Auth OAuth 2.1 server issues to third-party apps
+    // carry `client_id`; they belong to labre's workspace connector only.
+    // Both Supabase paths (single `supabase` door and the multi-issuer
+    // Supabase branch) build through this preset, so this covers both.
+    refuseClientIdClaim: true,
   });
 }

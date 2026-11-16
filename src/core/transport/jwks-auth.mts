@@ -34,6 +34,13 @@ export interface JwksAuthOptions {
    *  'oidc' — this file IS the generic OIDC core; the Supabase preset
    *  (supabase-auth.mts) overrides it to 'supabase'. */
   source?: Extract<AuthSource, "supabase" | "oidc">;
+  /** Refuse a verified token whose payload carries a `client_id` claim. Set
+   *  by the Supabase preset only: on that issuer the claim marks a token the
+   *  Supabase Auth OAuth 2.1 server minted for a third-party app, which must
+   *  stay confined to labre's workspace connector and never pass as a user
+   *  session. Generic OIDC IdPs (e.g. Cognito) stamp `client_id` on ordinary
+   *  access tokens, so the generic core leaves it off by default. */
+  refuseClientIdClaim?: boolean;
 }
 
 /**
@@ -103,6 +110,15 @@ export function buildJwksAuthMiddleware(options: JwksAuthOptions): AuthMiddlewar
 
       if (typeof payload.sub !== "string" || payload.sub.length === 0) {
         throw new AuthenticationError("token has no subject (sub) claim");
+      }
+
+      // Checked after jwtVerify so a forged token still gets the ordinary
+      // verification 401; either way the caller sees the same static 401
+      // (http-server.mts) and nothing downstream (tools, RLS, bundle refresh)
+      // ever runs. Any non-null value counts, empty string included — the
+      // same rule as labre's oauth-as bearerHasClientId.
+      if (options.refuseClientIdClaim && payload.client_id != null) {
+        throw new AuthenticationError("third-party OAuth client token refused on this door");
       }
 
       const role = typeof payload[roleClaim] === "string" ? (payload[roleClaim] as string) : undefined;
