@@ -7,5 +7,6 @@
     }
   ],
   "couplages": [],
-  "sensibles": ["src/core/transport/*auth*", ".github/**"]
+  "sensibles": ["src/core/transport/*auth*", ".github/**"],
+  "repriseLegere": true
 }
